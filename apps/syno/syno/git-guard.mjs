@@ -63,20 +63,23 @@ function diffHash(value) {
 }
 
 class GitGuard {
-  constructor({ repoRoot = PATHS.repoRoot, worktreeRoot = PATHS.worktreeRoot, lockFile = path.join(PATHS.stateRoot, "locks", "repository-git.lock") } = {}) {
+  constructor({ repoRoot = PATHS.repoRoot, worktreeRoot = PATHS.worktreeRoot, lockFile } = {}) {
     this.repoRoot = repoRoot;
     this.worktreeRoot = worktreeRoot;
-    this.writeLock = new ProcessFileLock({ file: lockFile, timeoutMs: 120_000 });
+    const resolvedLockFile = lockFile || (path.resolve(repoRoot) === path.resolve(PATHS.repoRoot)
+      ? path.join(PATHS.runtimeRoot, "locks", "repository-git.lock")
+      : path.join(repoRoot, ".runtime", "locks", "repository-git.lock"));
+    this.writeLock = new ProcessFileLock({ file: resolvedLockFile, timeoutMs: 120_000 });
   }
 
   async changedPaths(cwd = this.repoRoot) {
     const { stdout } = await git(["status", "--porcelain=v1", "-z", "--untracked-files=all"], { cwd });
-    return parsePorcelainZ(stdout).filter((item) => !this.#isManagedWorktreePath(item, cwd));
+    return parsePorcelainZ(stdout).filter((item) => !this.#isManagedPath(item, cwd));
   }
 
   async changes(cwd = this.repoRoot) {
     const { stdout } = await git(["status", "--porcelain=v1", "-z", "--untracked-files=all"], { cwd });
-    return parsePorcelainDetails(stdout).filter((item) => !this.#isManagedWorktreePath(item.path, cwd));
+    return parsePorcelainDetails(stdout).filter((item) => !this.#isManagedPath(item.path, cwd));
   }
 
   async diff(paths = [], cwd = this.repoRoot) {
@@ -214,11 +217,13 @@ class GitGuard {
     });
   }
 
-  #isManagedWorktreePath(relative, cwd) {
+  #isManagedPath(relative, cwd) {
     if (path.resolve(cwd) !== path.resolve(this.repoRoot)) return false;
+    const value = String(relative).replace(/\\/g, "/");
+    const runtime = path.relative(this.repoRoot, path.dirname(path.dirname(this.writeLock.file))).replace(/\\/g, "/");
+    if (runtime && !runtime.startsWith("../") && !path.isAbsolute(runtime) && (value === runtime || value.startsWith(`${runtime}/`))) return true;
     const managed = path.relative(this.repoRoot, this.worktreeRoot).replace(/\\/g, "/");
     if (!managed || managed.startsWith("../") || path.isAbsolute(managed)) return false;
-    const value = String(relative).replace(/\\/g, "/");
     return value === managed || value.startsWith(`${managed}/`);
   }
 }

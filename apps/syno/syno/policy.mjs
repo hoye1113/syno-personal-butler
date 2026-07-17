@@ -73,7 +73,7 @@ function evaluate(request = {}, context = {}) {
     // it may auto-merge or must pause for a second approval.
     needsWorktree: writes,
     autoCommit: false,
-    validators: ["changed-paths", "ops-contracts", ...(profile === "syno-curate" ? ["markdown", "vault-contract"] : [])],
+    validators: ["changed-paths", ...(writes ? ["ops-contracts"] : []), ...(profile === "syno-curate" ? ["markdown", "vault-contract"] : [])],
     allowed: !denied,
     reason: denied
       ? "开发模式默认关闭，拒绝由 Syno 修改自身代码"

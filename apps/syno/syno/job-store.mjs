@@ -38,9 +38,11 @@ function timestampParts(iso) {
 }
 
 class JobStore {
-  constructor({ opsRoot = PATHS.opsRoot, payloadRoot = path.join(PATHS.stateRoot, "job-payloads"), clock = () => new Date() } = {}) {
+  constructor({ opsRoot = PATHS.opsRoot, payloadRoot, clock = () => new Date() } = {}) {
     this.opsRoot = opsRoot;
-    this.payloadRoot = payloadRoot;
+    this.payloadRoot = payloadRoot || (path.resolve(opsRoot) === path.resolve(PATHS.opsRoot)
+      ? path.join(PATHS.stateRoot, "job-payloads")
+      : path.join(path.dirname(opsRoot), ".syno-state", "job-payloads"));
     this.clock = clock;
   }
 

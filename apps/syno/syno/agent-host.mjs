@@ -20,7 +20,7 @@ function diffRequiresApproval(decision, changes = []) {
 }
 
 class AgentHost {
-  constructor({ store, executor, gitGuard, policy = evaluate, validator = validateRepositoryChange, onCommitted = async () => {}, processLockRoot = path.join(PATHS.stateRoot, "locks", "jobs") } = {}) {
+  constructor({ store, executor, gitGuard, policy = evaluate, validator = validateRepositoryChange, onCommitted = async () => {}, processLockRoot } = {}) {
     if (!store || !executor || !gitGuard) throw new Error("AgentHost 缺少必要 Adapter");
     this.store = store;
     this.executor = executor;
@@ -31,7 +31,7 @@ class AgentHost {
     this.activeRuns = new Map();
     this.jobLocks = new Map();
     this.mergeTail = Promise.resolve();
-    this.processLockRoot = processLockRoot;
+    this.processLockRoot = processLockRoot || path.join(path.dirname(store?.payloadRoot || PATHS.stateRoot), "locks", "jobs");
   }
 
   async receive(request, context = {}) {
@@ -327,7 +327,7 @@ class AgentHost {
     await this.#commitSystemRecords(job, `syno: queue side effects ${job.id}`);
     try {
       const value = await this.onCommitted({ job, changedPaths: job.changedPaths, merge, execution });
-      return { ...pending, status: "completed", completedAt: new Date().toISOString(), value };
+      return { ...pending, status: "completed", completedAt: new Date().toISOString(), ...value };
     } catch (error) {
       return {
         ...pending,

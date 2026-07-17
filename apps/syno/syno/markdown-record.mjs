@@ -35,7 +35,7 @@ function parseRecord(markdown) {
 async function writeRecord(filePath, record, options) {
   if (options?.schema) await validateContractRecord(options.schema, record);
   const lockName = createHash("sha256").update(path.resolve(filePath)).digest("hex");
-  const lock = new ProcessFileLock({ file: path.join(PATHS.stateRoot, "locks", "records", `${lockName}.lock`) });
+  const lock = new ProcessFileLock({ file: path.join(PATHS.runtimeRoot, "locks", "records", `${lockName}.lock`) });
   return lock.run(() => writeRecordUnlocked(filePath, record, options));
 }
 

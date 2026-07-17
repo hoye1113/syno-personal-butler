@@ -34,6 +34,11 @@ test("GitGuard commits only declared paths", async (t) => {
   await fs.writeFile(path.join(root, "declared.md"), "declared\n");
   await fs.writeFile(path.join(root, "unrelated.md"), "unrelated\n");
   const guard = new GitGuard({ repoRoot: root, worktreeRoot: path.join(root, ".worktrees") });
+  assert.equal(guard.writeLock.file, path.join(root, ".runtime", "locks", "repository-git.lock"));
+  await fs.mkdir(path.dirname(guard.writeLock.file), { recursive: true });
+  await fs.writeFile(guard.writeLock.file, "owned by GitGuard");
+  assert.deepEqual((await guard.changedPaths()).sort(), ["declared.md", "unrelated.md"]);
+  await fs.rm(guard.writeLock.file, { force: true });
   const result = await guard.commitPaths(["declared.md"], "test: declared only");
   assert.equal(result.committed, true);
   assert.deepEqual(result.paths, ["declared.md"]);

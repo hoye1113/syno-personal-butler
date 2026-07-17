@@ -35,8 +35,10 @@ await checkDir('选题目录', paths.topicDir);
 await checkDir('收件箱目录', paths.inboxDir);
 await checkDir('归档目录', paths.archiveRoot);
 await checkDir('Wiki 目录', paths.wikiRoot);
-await checkFile('Wiki Index', paths.wikiIndexPath);
-await checkFile('Wiki Log', paths.wikiLogPath);
+if (settings.wikiMode === 'agent') {
+  await checkFile('Wiki Index', paths.wikiIndexPath);
+  await checkFile('Wiki Log', paths.wikiLogPath);
+}
 
 const invalidCalendar = !['none', 'lark'].includes(settings.calendarProvider);
 const invalidWikiMode = !['off', 'agent'].includes(settings.wikiMode);

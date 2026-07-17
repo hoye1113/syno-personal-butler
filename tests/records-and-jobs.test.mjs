@@ -18,6 +18,7 @@ test("AgentHost enforces no-approval, single-approval and isolated merge states"
   const opsRoot = path.join(PATHS.runtimeRoot, "tests", `jobs-${Date.now()}`);
   t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
   const store = new JobStore({ opsRoot });
+  assert.equal(store.payloadRoot.startsWith(path.dirname(opsRoot)), true);
   let currentChanges = [];
   const git = {
     commits: [], merges: [], removals: [],
@@ -35,6 +36,7 @@ test("AgentHost enforces no-approval, single-approval and isolated merge states"
     gitGuard: git,
     validator: async ({ changedPaths }) => ({ ok: true, changedPaths }),
   });
+  assert.equal(host.processLockRoot.startsWith(path.dirname(opsRoot)), true);
 
   const read = await host.receive({ intent: "search", text: "查找知识" });
   assert.equal(read.job.status, "completed");
