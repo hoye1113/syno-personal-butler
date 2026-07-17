@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { assertCognitiveCapabilities } from "./cognitive-runtime.mjs";
 
-const CONTROL_COMMAND = /^\s*\/(?:model|fallback|yolo|reload-mcp|update|memory|skills|background|rollback)\b/iu;
+const CONTROL_COMMAND = /^\s*\/[\p{L}\p{N}_-]+\b/iu;
 
 function deniedControlCommand() {
   const error = new Error("Syno 不向认知运行时暴露模型、权限、记忆、Skill 或更新控制命令");

@@ -11,7 +11,8 @@
     "state:archive": "node scripts/state-archive.mjs",
     "install:windows": "powershell -ExecutionPolicy Bypass -File scripts/install-windows-task.ps1",
     "probe:weixin": "node scripts/probe-weixin.mjs",
-    "probe:hermes": "node scripts/probe-hermes.mjs"
+    "probe:hermes": "node scripts/probe-hermes.mjs",
+    "probe:hermes-sidecar": "node scripts/probe-hermes-sidecar.mjs"
   },
   "engines": {
     "node": ">=22"

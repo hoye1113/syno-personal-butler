@@ -64,7 +64,9 @@ test("Hermes adapter exposes only Syno tools and rejects control commands or mod
   const runtime = new HermesCognitiveRuntime({ bridge, tools, fixedModelId: "fixed-model" });
   await runtime.initialize();
   assert.equal((await runtime.run({ text: "search" })).text, "done");
-  await assert.rejects(runtime.run({ text: "/model other" }), (error) => error.code === "RUNTIME_CONTROL_COMMAND_DENIED");
+  for (const command of ["/model other", "/terminal whoami", "/config set", "/mcp add", "/unknown-control"] ) {
+    await assert.rejects(runtime.run({ text: command }), (error) => error.code === "RUNTIME_CONTROL_COMMAND_DENIED");
+  }
   runtime.runs.set("running-one", { status: "running" });
   assert.equal(runtime.cancel("running-one"), true);
   assert.equal(canceled, "running-one");
