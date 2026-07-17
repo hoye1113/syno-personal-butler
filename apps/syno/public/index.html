@@ -15,44 +15,57 @@
   </head>
   <body>
     <div class="noise"></div>
+    <nav class="syno-primary-nav" aria-label="Syno 主导航">
+      <a class="syno-brand" href="#today" aria-label="Syno 首页"><span>𓂀</span><strong>SYNO</strong><small>知识守护者</small></a>
+      <div class="syno-primary-links">
+        <button class="is-active" type="button" data-scroll-target="today"><span>今</span>Today</button>
+        <button type="button" data-scroll-target="capture"><span>收</span>Capture</button>
+        <button type="button" data-syno-panel="knowledge"><span>知</span>Knowledge</button>
+        <button type="button" data-syno-panel="learn"><span>习</span>Learn</button>
+        <button type="button" data-syno-panel="create"><span>创</span>Create</button>
+      </div>
+      <div class="syno-primary-foot">
+        <button type="button" data-syno-panel="jobs">审批中心</button>
+        <button type="button" data-syno-panel="settings">设置</button>
+      </div>
+    </nav>
     <main class="app-shell">
-      <section class="hero">
+      <section id="today" class="hero">
         <div class="hero-main">
           <div class="hero-eyebrow-row">
-            <p class="eyebrow">SYNO · PERSONAL BUTLER · 赛诺</p>
+            <p class="eyebrow">TODAY · 主动知识闭环</p>
             <div class="hero-actions">
-              <button class="ghost-btn" type="button" data-syno-panel="knowledge">知识</button>
               <button class="ghost-btn" type="button" data-syno-panel="jobs">任务与审批</button>
               <button class="ghost-btn" type="button" data-syno-panel="notifications">通知</button>
-              <button class="accent-btn" type="button" data-syno-panel="chat">问赛诺</button>
+              <button class="accent-btn" type="button" data-syno-panel="chat">交给赛诺</button>
               <button id="themeToggleBtn" class="theme-toggle" type="button">◑ 深色</button>
             </div>
           </div>
-          <h1>把知识变成下一步。</h1>
+          <h1>今天，把什么真正变成你的？</h1>
           <div class="hero-copy-row">
-            <p class="hero-copy">收件箱素材一键转卡，重复内容自动合并，再排进周历。</p>
+            <p class="hero-copy">赛诺先守住承诺与到期复习，再帮你吸收新知识、形成能讲给小白听的观点。</p>
             <button id="heroConfigBtn" class="ghost-btn hero-config-btn" type="button">高级设置 →</button>
           </div>
-          <div class="hero-flow" aria-label="赛诺工作流">
+          <div id="synoTodayPriorities" class="hero-flow" aria-label="今日优先事项">
             <div class="flow-step">
-              <span>01</span>
-              <strong>接入工作区</strong>
-              <p>当前仓库已内置知识库、选题库、收件箱和归档，首次启动即可使用。</p>
+              <span>01 · 目标</span>
+              <strong>正在读取今日重点</strong>
+              <p>目标、承诺和到期复习会按固定规则排序。</p>
             </div>
             <div class="flow-step">
-              <span>02</span>
-              <strong>转卡去重</strong>
-              <p>收件箱里的网页、笔记、文章一键变选题卡，相同内容自动识别合并，不制造重复。</p>
+              <span>02 · 消化</span>
+              <strong>60% 已有知识</strong>
+              <p>优先复习、实践和输出，不让收藏代替掌握。</p>
             </div>
             <div class="flow-step">
-              <span>03</span>
-              <strong>挑题排期</strong>
-              <p>从题库挑一张想做的卡，拖进周历对应日期，设好时间段，排期就落定了。</p>
+              <span>03 · 输入</span>
+              <strong>25% 新内容</strong>
+              <p>新素材先形成收录方案，批准后才进入知识事实源。</p>
             </div>
             <div class="flow-step">
-              <span>04</span>
-              <strong>同步写回</strong>
-              <p>排期写回 Markdown 文件，可选同步到飞书日历，手机电脑都能看到。</p>
+              <span>04 · 维护</span>
+              <strong>15% 知识库维护</strong>
+              <p>处理冲突、过期证据和关联缺口，保留来源与判断过程。</p>
             </div>
           </div>
           <div class="hero-meta">
@@ -75,8 +88,14 @@
             </div>
           </div>
         </div>
-        <div class="hero-side">
-          <img src="./syno-mascot.png" alt="赛诺私人管家" class="hero-mascot" />
+        <div class="hero-side" aria-label="赛诺，纸片法老知识守护者">
+          <div class="syno-guardian-scene" aria-hidden="true">
+            <img class="guardian-layer is-background" src="./assets/syno/papyrus-background.png" alt="" />
+            <img class="guardian-layer is-rear" src="./assets/syno/rear.png" alt="" />
+            <img class="guardian-layer is-guardian" src="./assets/syno/guardian.png" alt="" />
+            <img class="guardian-layer is-foreground" src="./assets/syno/foreground.png" alt="" />
+          </div>
+          <p class="guardian-caption"><span>今日守护</span><strong>先完成一次真实输出</strong></p>
         </div>
       </section>
 
@@ -220,7 +239,7 @@
         </details>
       </section>
 
-      <section class="toolbar">
+      <section id="capture" class="toolbar">
         <div class="toolbar-left">
           <input id="searchInput" type="search" placeholder="搜选题 / 标签 / 目标形式" />
           <select id="stageFilter">
@@ -515,8 +534,11 @@
       </header>
       <nav class="syno-tabs" aria-label="赛诺功能">
         <button type="button" data-syno-tab="knowledge">知识</button>
+        <button type="button" data-syno-tab="learn">学习</button>
+        <button type="button" data-syno-tab="create">创作</button>
         <button type="button" data-syno-tab="jobs">任务</button>
         <button type="button" data-syno-tab="notifications">通知</button>
+        <button type="button" data-syno-tab="settings">设置</button>
         <button type="button" data-syno-tab="chat">对话</button>
       </nav>
       <section class="syno-pane" data-syno-pane="knowledge">
@@ -563,6 +585,43 @@
         </div>
         <div id="synoJobs" class="syno-list" aria-live="polite"></div>
       </section>
+      <section class="syno-pane" data-syno-pane="learn" hidden>
+        <div class="syno-pane-intro">
+          <p class="panel-tag">LEARN · 学习证据</p>
+          <h3>讲得清，才算开始掌握</h3>
+          <p>AI 草稿不会提高掌握度。请用自己的话口述、打字、答题或实践。</p>
+        </div>
+        <div id="synoDueReviews" class="syno-list" aria-live="polite"></div>
+        <form id="synoLearningForm" class="syno-stack-form">
+          <label>知识引用<input id="synoLearningRef" required placeholder="例如：vault/AI/Agent-Harness.md" /></label>
+          <label>输出方式<select id="synoLearningMode"><option value="teach-back">教给小白</option><option value="typed">打字解释</option><option value="voice">口述转录</option><option value="practice">实际应用</option><option value="quiz">答题</option></select></label>
+          <label>辅助程度<select id="synoLearningAssist"><option value="none">无辅助</option><option value="prompted">仅提示</option><option value="outlined">看过提纲</option><option value="heavily-assisted">大量辅助</option></select></label>
+          <label>自评（0–100）<input id="synoLearningScore" type="number" min="0" max="100" value="70" /></label>
+          <label>原始输出引用<input id="synoLearningArtifact" required placeholder="转录、文章或实践记录的 Artifact ID" /></label>
+          <label>发现的误区<textarea id="synoLearningMisconceptions" rows="3" placeholder="每行一个误区"></textarea></label>
+          <button class="accent-btn" type="submit">提交学习证据</button>
+          <p id="synoLearningHint" class="form-hint" aria-live="polite"></p>
+        </form>
+      </section>
+      <section class="syno-pane" data-syno-pane="create" hidden>
+        <div class="syno-pane-intro">
+          <p class="panel-tag">CREATE · 证据型输出</p>
+          <h3>从知识缺口长出观点</h3>
+          <p>优先 AI、Agent、AI Coding 与 Harness 深度文章；提纲和视频简报作为次级形式。</p>
+        </div>
+        <form id="synoTeachBackForm" class="syno-stack-form">
+          <label>想讲清的主题<input id="synoTeachBackTitle" required placeholder="例如：为什么 Agent Harness 比模型更决定上限" /></label>
+          <button class="ghost-btn" type="submit">生成 Teach-back 题目</button>
+        </form>
+        <div id="synoTeachBackPrompt" class="syno-list" aria-live="polite"></div>
+        <form id="synoOutputForm" class="syno-stack-form">
+          <label>输出标题<input id="synoOutputTitle" required /></label>
+          <label>为什么现在值得输出<textarea id="synoOutputReason" rows="3" required></textarea></label>
+          <label>形式<select id="synoOutputFormat"><option value="deep-article">证据型深度文章</option><option value="conversation-outline">对话提纲</option><option value="video-brief">视频简报</option></select></label>
+          <button class="accent-btn" type="submit">建立输出机会</button>
+          <p id="synoOutputHint" class="form-hint" aria-live="polite"></p>
+        </form>
+      </section>
       <section class="syno-pane" data-syno-pane="notifications" hidden>
         <section class="syno-channel-setup" aria-labelledby="synoWeixinTitle">
           <div>
@@ -599,6 +658,18 @@
             <button class="accent-btn" type="submit">发送</button>
           </div>
         </form>
+      </section>
+      <section class="syno-pane" data-syno-pane="settings" hidden>
+        <div class="syno-pane-intro"><p class="panel-tag">SETTINGS · 本机配置</p><h3>Agent 与外部连接</h3><p>Token 只经 Windows DPAPI 加密保存，不在页面回显。</p></div>
+        <form id="synoProviderForm" class="syno-stack-form">
+          <label>OpenAI 兼容 Base URL<input id="synoProviderBaseUrl" type="url" required /></label>
+          <label>Token<input id="synoProviderToken" type="password" autocomplete="new-password" required placeholder="保存后不会回显" /></label>
+          <label>固定 Model ID<input id="synoProviderModel" required /></label>
+          <label>上下文长度<input id="synoProviderContext" type="number" min="4096" value="128000" required /></label>
+          <button class="accent-btn" type="submit">安全保存 Provider</button>
+          <p id="synoProviderHint" class="form-hint" aria-live="polite"></p>
+        </form>
+        <section class="syno-channel-setup"><p class="panel-tag">飞书个人通道</p><h3>扫码注册并绑定 Owner</h3><p id="synoFeishuStatus">尚未注册。</p><div class="syno-job-actions"><button id="synoFeishuRegister" class="ghost-btn" type="button">开始注册</button><button id="synoFeishuConnect" class="accent-btn" type="button">连接</button><button id="synoFeishuDisconnect" class="ghost-btn" type="button">断开</button></div><div id="synoFeishuQr"></div></section>
       </section>
       <footer id="synoChannelStatus" class="syno-channel-status">正在读取本地状态…</footer>
     </aside>

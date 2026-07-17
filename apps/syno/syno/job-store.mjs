@@ -9,7 +9,8 @@ const TERMINAL = new Set(["completed", "failed", "rejected", "canceled"]);
 const TRANSITIONS = Object.freeze({
   pending: new Set(["awaiting_approval", "running", "canceled"]),
   awaiting_approval: new Set(["running", "rejected", "canceled", "completed"]),
-  running: new Set(["validating", "failed", "canceled"]),
+  running: new Set(["waiting_provider", "validating", "failed", "canceled"]),
+  waiting_provider: new Set(["running", "canceled"]),
   validating: new Set(["completed", "failed", "awaiting_approval", "canceled"]),
   completed: new Set(),
   failed: new Set(),

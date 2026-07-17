@@ -102,6 +102,12 @@ class AgentHost {
     return { job };
   }
 
+  async retry(jobId) {
+    const job = await this.#requiredJob(jobId);
+    if (job.status !== "waiting_provider") throw new Error("Job 当前不等待 Provider 重试");
+    return this.#execute(job);
+  }
+
   async #execute(job, { alreadyRunning = false } = {}) {
     let workspace = PATHS.repoRoot;
     try {
@@ -242,9 +248,11 @@ class AgentHost {
     } catch (error) {
       const current = await this.#withJobLock(job.id, async () => {
         const latest = await this.store.get(job.id).catch(() => null) || job;
-        if (!["failed", "canceled"].includes(latest.status) && ["running", "validating"].includes(latest.status)) {
-          await this.store.transition(latest, "failed", {
-            error: { code: error.code || error.failureCode || "EXECUTION_FAILED", message: error.message },
+        if (!["failed", "canceled", "waiting_provider"].includes(latest.status) && ["running", "validating"].includes(latest.status)) {
+          const providerRetry = latest.status === "running" && error.retryable === true;
+          await this.store.transition(latest, providerRetry ? "waiting_provider" : "failed", {
+            error: { code: error.code || error.failureCode || "EXECUTION_FAILED", message: error.message, retryable: providerRetry },
+            ...(providerRetry ? { nextRetryAt: new Date(Date.now() + 60_000).toISOString() } : {}),
           });
           latest.cleanup = await this.#cleanupWorktree(latest);
           await this.store.save(latest);
@@ -254,7 +262,7 @@ class AgentHost {
         }
         return latest;
       });
-      if (current.status === "failed") await this.#commitSystemRecords(current, `syno: fail ${job.id}`).catch(() => {});
+      if (["failed", "waiting_provider"].includes(current.status)) await this.#commitSystemRecords(current, `syno: ${current.status === "waiting_provider" ? "defer" : "fail"} ${job.id}`).catch(() => {});
       return { job: current, error: current.error || { code: "EXECUTION_FAILED", message: error.message } };
     } finally {
       this.activeRuns.delete(job.id);
@@ -340,6 +348,11 @@ class AgentHost {
   async recover() {
     const recovered = [];
     for (const job of await this.store.list({ limit: 2_000 })) {
+      if (job.status === "waiting_provider" && (!job.nextRetryAt || new Date(job.nextRetryAt) <= new Date())) {
+        await this.#execute(job);
+        recovered.push(job.id);
+        continue;
+      }
       if (["running", "validating"].includes(job.status)) {
         const merged = job.worktree?.commit && await this.gitGuard.isAncestor(job.worktree.commit).catch(() => false);
         if (merged) {

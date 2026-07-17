@@ -1,5 +1,11 @@
 const OPERATION_INTENTS = Object.freeze({
   "reports.create": "create_report",
+  "actions.create": "create_action",
+  "memory.proposals.create": "create_memory_proposal",
+  "ingest.apply": "curate_note",
+  "learning.evidence.record": "record_learning_evidence",
+  "outputs.opportunity.create": "create_output_opportunity",
+  "goals.create": "create_goal",
   "notes.edit": "overwrite_note",
   "content.brief.create": "create_content_brief",
   "memory.promote": "curate_note",

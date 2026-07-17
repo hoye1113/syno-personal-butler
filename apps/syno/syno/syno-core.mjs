@@ -1,21 +1,23 @@
 import { buildOperationRequest } from "./operation-registry.mjs";
 
 class SynoCore {
-  constructor({ host, knowledge, notifications, channels, reports } = {}) {
+  constructor({ host, knowledge, notifications, channels, reports, today } = {}) {
     this.host = host;
     this.knowledge = knowledge;
     this.notifications = notifications;
     this.channels = channels;
     this.reports = reports;
+    this.today = today;
   }
   async execute(command, context = {}) { return this.host.receive(command, context); }
   async snapshot(query = {}) {
-    const [jobs, notices, knowledge] = await Promise.all([
+    const [jobs, notices, knowledge, today] = await Promise.all([
       this.host.list({ limit: query.jobLimit || 50 }),
       this.notifications.list({ limit: query.notificationLimit || 30 }),
       this.knowledge.search(query.search || "", { limit: query.knowledgeLimit || 12 }),
+      this.today?.snapshot() || null,
     ]);
-    return { generatedAt: new Date().toISOString(), jobs, notifications: notices, knowledge, channels: this.channels.status() };
+    return { generatedAt: new Date().toISOString(), today, jobs, notifications: notices, knowledge, channels: this.channels.status() };
   }
   search(query, options) { return this.knowledge.search(query, options); }
   read(path) { return this.knowledge.read(path); }

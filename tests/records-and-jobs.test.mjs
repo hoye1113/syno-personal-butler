@@ -154,3 +154,26 @@ test("channel message request keys deduplicate retried jobs", async (t) => {
   assert.equal(second.deduplicated, true);
   assert.equal(second.job.id, first.job.id);
 });
+
+test("retryable Provider failures stay durable without switching executors", async (t) => {
+  const opsRoot = path.join(PATHS.runtimeRoot, "tests", `provider-wait-${Date.now()}`);
+  t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
+  const store = new JobStore({ opsRoot });
+  let attempts = 0;
+  const executor = {
+    async submit() {
+      attempts += 1;
+      if (attempts === 1) throw Object.assign(new Error("Provider 当前不可用"), { code: "PROVIDER_UNAVAILABLE", retryable: true });
+      return { runId: "provider-retry", executor: "tool-loop-agent", text: "恢复完成" };
+    },
+    inspect() { return null; }, cancel() { return false; },
+  };
+  const git = { async changedPaths() { return []; }, async commitPaths() { return { committed: false }; } };
+  const host = new AgentHost({ store, executor, gitGuard: git });
+  const deferred = await host.receive({ intent: "search", text: "需要模型" });
+  assert.equal(deferred.job.status, "waiting_provider");
+  assert.equal(deferred.job.error.retryable, true);
+  const retried = await host.retry(deferred.job.id);
+  assert.equal(retried.job.status, "completed");
+  assert.equal(attempts, 2);
+});

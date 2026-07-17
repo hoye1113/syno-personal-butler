@@ -4,7 +4,7 @@
   const title = document.querySelector("#synoDrawerTitle");
   const panes = [...document.querySelectorAll("[data-syno-pane]")];
   const tabs = [...document.querySelectorAll("[data-syno-tab]")];
-  const labels = { knowledge: "知识", jobs: "任务与审批", notifications: "通知", chat: "问赛诺" };
+  const labels = { knowledge: "知识", learn: "学习", create: "创作", jobs: "任务与审批", notifications: "通知", settings: "设置", chat: "问赛诺" };
   let active = "knowledge";
   let lastTrigger = null;
 
@@ -50,6 +50,8 @@
     }
     if (panel === "jobs") loadJobs();
     if (panel === "notifications") loadNotifications();
+    if (panel === "learn") loadDueReviews();
+    if (panel === "settings") loadProviderStatus();
     if (panel === "knowledge") {
       loadMemoryProposals();
       document.querySelector("#synoKnowledgeQuery")?.focus();
@@ -131,8 +133,7 @@
         payload = { kind, name: file.name, base64: btoa(binary) };
       }
       const result = await api("/api/syno/intake", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      document.querySelector("#synoIntakeHint").textContent = `任务 ${result.job.id} 已进入审批中心。`;
-      select("jobs");
+      document.querySelector("#synoIntakeHint").textContent = `已收到 ${result.artifact.id}。赛诺正在异步查重并形成收录方案。`;
     } catch (error) {
       document.querySelector("#synoIntakeHint").textContent = error.message;
     } finally {
@@ -192,7 +193,7 @@
   function statusLabel(job) {
     const values = {
       pending: "待执行", awaiting_approval: "等待审批", running: "执行中",
-      validating: "校验中", completed: "已完成", failed: "失败", rejected: "已拒绝", canceled: "已取消",
+      validating: "校验中", waiting_provider: "等待 Provider", completed: "已完成", failed: "失败", rejected: "已拒绝", canceled: "已取消",
     };
     return values[job.status] || job.status;
   }
@@ -346,6 +347,121 @@
     }
   }
 
+  function priorityKind(kind) {
+    return { goal: "目标", commitment: "承诺", review: "复习" }[kind] || "事项";
+  }
+
+  async function loadToday() {
+    const target = document.querySelector("#synoTodayPriorities");
+    if (!target) return;
+    try {
+      const snapshot = await api("/api/syno/today");
+      target.replaceChildren();
+      const priorities = snapshot.priorities.slice(0, 4);
+      if (!priorities.length) {
+        const empty = node("article", "flow-step");
+        empty.append(node("span", "", "今日清场"), node("strong", "", "还没有必须处理的事项"), node("p", "", "可以从一次复习、收录或输出开始。"));
+        target.append(empty);
+      }
+      priorities.forEach((item, index) => {
+        const card = node("article", "flow-step");
+        card.append(node("span", "", `${String(index + 1).padStart(2, "0")} · ${priorityKind(item.kind)}`), node("strong", "", item.title), node("p", "", item.dueAt ? `到期：${new Date(item.dueAt).toLocaleString("zh-CN")}` : "按当前目标与知识缺口排序"));
+        target.append(card);
+      });
+      document.querySelector("#weekScheduledCount").textContent = snapshot.counts.commitments;
+      document.querySelector("#inboxCandidateCount").textContent = snapshot.counts.reviews;
+    } catch (error) {
+      target.replaceChildren(node("p", "syno-error", `Today 暂不可用：${error.message}`));
+    }
+  }
+
+  async function loadDueReviews() {
+    const target = document.querySelector("#synoDueReviews");
+    if (!target) return;
+    target.replaceChildren(node("p", "syno-empty", "正在读取到期复习…"));
+    try {
+      const { reviews } = await api("/api/syno/learning/due");
+      target.replaceChildren();
+      if (!reviews.length) target.append(node("p", "syno-empty", "当前没有到期复习。可以主动选择一个主题做 Teach-back。"));
+      for (const review of reviews) {
+        const item = node("article", "syno-job");
+        item.append(node("strong", "", review.knowledgeRef), node("p", "", `掌握度 ${Math.round(review.mastery * 100)}% · 当前阶段 ${review.stage}`));
+        const start = node("button", "ghost-btn", "开始复习");
+        start.type = "button";
+        start.addEventListener("click", () => { document.querySelector("#synoLearningRef").value = review.knowledgeRef; document.querySelector("#synoLearningArtifact").focus(); });
+        item.append(start); target.append(item);
+      }
+    } catch (error) { target.replaceChildren(node("p", "syno-error", error.message)); }
+  }
+
+  async function submitLearning(event) {
+    event.preventDefault();
+    const hint = document.querySelector("#synoLearningHint");
+    hint.textContent = "正在记录…";
+    try {
+      const result = await api("/api/syno/learning/evidence", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+        knowledgeRef: document.querySelector("#synoLearningRef").value.trim(),
+        inputMode: document.querySelector("#synoLearningMode").value,
+        assistedLevel: document.querySelector("#synoLearningAssist").value,
+        rubricScore: Number(document.querySelector("#synoLearningScore").value) / 100,
+        rawArtifactRef: document.querySelector("#synoLearningArtifact").value.trim(),
+        misconceptions: document.querySelector("#synoLearningMisconceptions").value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean),
+      }) });
+      hint.textContent = result.requiresApproval ? `任务 ${result.job.id} 等待审批。` : "学习证据已记录，复习时间已更新。";
+      await loadDueReviews();
+    } catch (error) { hint.textContent = error.message; }
+  }
+
+  async function submitTeachBack(event) {
+    event.preventDefault();
+    const target = document.querySelector("#synoTeachBackPrompt");
+    target.replaceChildren(node("p", "syno-empty", "正在准备问题…"));
+    try {
+      const prompt = await api("/api/syno/learning/teach-back", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: document.querySelector("#synoTeachBackTitle").value.trim() }) });
+      const card = node("article", "syno-job"); card.append(node("strong", "", prompt.title));
+      const list = node("ol", ""); prompt.questions.forEach((question) => list.append(node("li", "", question)));
+      card.append(list, node("small", "", prompt.evidenceRule)); target.replaceChildren(card);
+      document.querySelector("#synoOutputTitle").value = document.querySelector("#synoTeachBackTitle").value.trim();
+    } catch (error) { target.replaceChildren(node("p", "syno-error", error.message)); }
+  }
+
+  async function submitOutput(event) {
+    event.preventDefault(); const hint = document.querySelector("#synoOutputHint"); hint.textContent = "正在建立机会…";
+    try {
+      const result = await api("/api/syno/outputs/opportunities", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: document.querySelector("#synoOutputTitle").value.trim(), reason: document.querySelector("#synoOutputReason").value.trim(), format: document.querySelector("#synoOutputFormat").value, priority: 70 }) });
+      hint.textContent = result.requiresApproval ? `任务 ${result.job.id} 等待审批。` : "输出机会已建立。";
+    } catch (error) { hint.textContent = error.message; }
+  }
+
+  async function loadProviderStatus() {
+    const hint = document.querySelector("#synoProviderHint");
+    try {
+      const status = await api("/api/syno/provider");
+      document.querySelector("#synoProviderBaseUrl").value = status.baseUrl;
+      document.querySelector("#synoProviderModel").value = status.modelId || "";
+      document.querySelector("#synoProviderContext").value = status.contextLength;
+      hint.textContent = status.configured ? `已配置 ${status.modelId}；Token 已加密保存。` : "尚未配置；本地搜索、任务与提醒仍可使用。";
+    } catch (error) { hint.textContent = error.message; }
+  }
+
+  async function saveProvider(event) {
+    event.preventDefault(); const hint = document.querySelector("#synoProviderHint"); hint.textContent = "正在使用 DPAPI 保存…";
+    try {
+      const status = await api("/api/syno/provider", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ baseUrl: document.querySelector("#synoProviderBaseUrl").value.trim(), token: document.querySelector("#synoProviderToken").value, modelId: document.querySelector("#synoProviderModel").value.trim(), contextLength: Number(document.querySelector("#synoProviderContext").value) }) });
+      document.querySelector("#synoProviderToken").value = ""; hint.textContent = `已安全保存 ${status.modelId}。`;
+    } catch (error) { hint.textContent = error.message; }
+  }
+
+  async function feishuAction(action) {
+    const status = document.querySelector("#synoFeishuStatus"); status.textContent = "正在处理…";
+    try {
+      const result = await api(`/api/syno/feishu/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      status.textContent = result.status === "waiting_scan" ? "请扫描二维码并在飞书中确认。" : `当前状态：${result.status || (result.running ? "已连接" : "未连接")}`;
+      const qr = document.querySelector("#synoFeishuQr");
+      if (result.url) { const link = node("a", "accent-btn", "打开飞书扫码注册"); link.href = result.url; link.target = "_blank"; link.rel = "noreferrer"; qr.replaceChildren(link); }
+    } catch (error) { status.textContent = error.message; }
+  }
+
   window.Syno = Object.freeze({ show, close, select });
 
   for (const trigger of document.querySelectorAll("[data-syno-panel]")) trigger.addEventListener("click", () => show(trigger.dataset.synoPanel, trigger));
@@ -366,5 +482,17 @@
   document.querySelector("#synoWeixinLogin")?.addEventListener("click", beginWeixinLogin);
   document.querySelector("#synoWeixinPoll")?.addEventListener("click", pollWeixinLogin);
   document.querySelector("#synoWeixinHome")?.addEventListener("click", setWeixinHome);
+  document.querySelector("#synoLearningForm")?.addEventListener("submit", submitLearning);
+  document.querySelector("#synoTeachBackForm")?.addEventListener("submit", submitTeachBack);
+  document.querySelector("#synoOutputForm")?.addEventListener("submit", submitOutput);
+  document.querySelector("#synoProviderForm")?.addEventListener("submit", saveProvider);
+  document.querySelector("#synoFeishuRegister")?.addEventListener("click", () => feishuAction("register/start"));
+  document.querySelector("#synoFeishuConnect")?.addEventListener("click", () => feishuAction("connect"));
+  document.querySelector("#synoFeishuDisconnect")?.addEventListener("click", () => feishuAction("disconnect"));
+  for (const trigger of document.querySelectorAll("[data-scroll-target]")) trigger.addEventListener("click", () => {
+    document.querySelector(`#${trigger.dataset.scrollTarget}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.querySelectorAll("[data-scroll-target]").forEach((item) => item.classList.toggle("is-active", item === trigger));
+  });
+  loadToday();
   loadChannelStatus();
 })();

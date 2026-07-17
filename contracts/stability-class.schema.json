@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/stability-class.schema.json",
+  "title": "StabilityClass",
+  "type": "object",
+  "required": ["value", "reviewPolicy"],
+  "properties": {
+    "value": { "enum": ["principle", "model", "practice", "fact", "volatile", "personal"] },
+    "reviewPolicy": { "enum": ["on-conflict", "yearly", "quarterly", "monthly", "weekly", "manual"] },
+    "reviewAfter": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

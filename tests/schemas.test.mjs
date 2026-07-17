@@ -31,3 +31,33 @@ test("Afu topic drafts satisfy the executable ContentIdea contract", async () =>
     status: field("status"), stage: field("stage"), source_inbox_path: candidate.sourcePath,
   });
 });
+
+test("knowledge-loop contracts reject AI-authored mastery and stale volatile claims", async () => {
+  const baseEvidence = {
+    id: "learning-1", knowledgeRef: "vault/note.md", producer: "user", inputMode: "teach-back",
+    rawArtifactRef: "ops/artifacts/answer.md", assistedLevel: "prompted", rubricScore: 0.8,
+    misconceptions: [], demonstratedAt: "2026-07-17T08:00:00.000Z", nextReviewAt: "2026-07-24T08:00:00.000Z",
+  };
+  await validateContractRecord("learning-evidence", baseEvidence);
+  await assert.rejects(validateContractRecord("learning-evidence", { ...baseEvidence, producer: "ai" }), /producer/);
+  const volatile = {
+    id: "claim-1", statement: "当前模型支持某项能力", stability: "volatile", status: "candidate",
+    evidenceRefs: [], updated: "2026-07-17T08:00:00.000Z",
+  };
+  await assert.rejects(validateContractRecord("claim", volatile), /复核时间/);
+  await validateContractRecord("claim", { ...volatile, reviewAfter: "2026-07-24T08:00:00.000Z" });
+});
+
+test("settings permissions are disjoint", async () => {
+  const registry = {
+    version: 1,
+    agentAdjustable: ["notifications.quietHours"],
+    confirmationRequired: ["provider.modelId"],
+    immutable: ["provider.token", "policy.rules", "toolRegistry"],
+  };
+  await validateContractRecord("settings-registry", registry);
+  await assert.rejects(validateContractRecord("settings-registry", {
+    ...registry,
+    confirmationRequired: ["notifications.quietHours"],
+  }), /不能重叠/);
+});

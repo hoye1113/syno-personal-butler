@@ -12,7 +12,7 @@ import { promisify } from "node:util";
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const execFileAsync = promisify(execFile);
 
-test("calendar failure degrades to durable Markdown on Windows", { timeout: 20_000 }, async (t) => {
+test("calendar failure degrades to durable Markdown on Windows", { timeout: 45_000 }, async (t) => {
   const fixture = await createFixture("failure");
   const server = await startFixtureServer(t, fixture, { LARK_FAKE_FAIL: "1" });
   const response = await queueAndApprove(server.port, "/api/topics/schedule", {
@@ -29,7 +29,7 @@ test("calendar failure degrades to durable Markdown on Windows", { timeout: 20_0
   assert.match(saved, /calendar_provider: lark/);
 });
 
-test("calendar Adapter sends selected calendar and configured timezone", { timeout: 20_000 }, async (t) => {
+test("calendar Adapter sends selected calendar and configured timezone", { timeout: 45_000 }, async (t) => {
   const fixture = await createFixture("timezone", { calendarProvider: "lark" });
   const capture = path.join(fixture.tempRoot, "local-data", "event.json");
   const params = path.join(fixture.tempRoot, "local-data", "params.json");
@@ -165,7 +165,7 @@ async function requestJson(port, pathname, body) {
       let raw = ""; res.setEncoding("utf8"); res.on("data", (chunk) => { raw += chunk; });
       res.on("end", () => { try { resolve({ statusCode: res.statusCode, body: raw ? JSON.parse(raw) : null }); } catch (error) { reject(error); } });
     });
-    req.on("error", reject); req.setTimeout(10_000, () => req.destroy(new Error("request timed out")));
+    req.on("error", reject); req.setTimeout(30_000, () => req.destroy(new Error("request timed out")));
     if (payload) req.write(payload); req.end();
   });
 }

@@ -1,0 +1,32 @@
+import assert from "node:assert/strict";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import test from "node:test";
+
+const root = path.resolve(import.meta.dirname, "..");
+
+test("Web shell exposes the five knowledge-loop areas and always-reachable approvals", async () => {
+  const html = await fs.readFile(path.join(root, "apps", "syno", "public", "index.html"), "utf8");
+  for (const area of ["Today", "Capture", "Knowledge", "Learn", "Create"]) assert.match(html, new RegExp(`>${area}<`));
+  assert.match(html, /data-syno-panel="jobs">审批中心/);
+  assert.match(html, /id="synoProviderForm"/);
+  assert.match(html, /id="synoLearningForm"/);
+  assert.match(html, /id="synoOutputForm"/);
+});
+
+test("paper-cut guardian is layered and reduced-motion safe", async () => {
+  const publicRoot = path.join(root, "apps", "syno", "public");
+  const [html, css] = await Promise.all([
+    fs.readFile(path.join(publicRoot, "index.html"), "utf8"),
+    fs.readFile(path.join(publicRoot, "styles.css"), "utf8"),
+  ]);
+  const assets = ["papyrus-background.png", "rear.png", "guardian.png", "foreground.png"];
+  for (const asset of assets) {
+    assert.match(html, new RegExp(`assets/syno/${asset.replace(".", "\\.")}`));
+    const stats = await fs.stat(path.join(publicRoot, "assets", "syno", asset));
+    assert.ok(stats.size > 10_000, `${asset} should be a real generated asset`);
+  }
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(css, /\.guardian-layer \{ transform: none !important; \}/);
+  assert.match(css, /:focus-visible/);
+});

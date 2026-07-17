@@ -1,15 +1,17 @@
 # Deterministic policy
 
-| Intent | Profile | Initial approval | Workspace | Executor |
-|---|---|---:|---|---|
-| read/search/chat | syno-read | none | repository | OpenCode |
-| create ops/content | syno-ops | single | worktree | OpenCode |
-| create canonical note | syno-curate | single | worktree | OpenCode |
-| overwrite/move/delete/new MOC/new tag | syno-curate | double | worktree | Claude Code |
-| code change | syno-code | double | worktree | Claude Code |
+Syno uses one `ToolLoopAgent` and one configured model ID. The model never chooses a provider, permission, risk level, approval count, wake-up time or retry escalation.
 
-OpenCode only falls back for `timeout`, `unavailable`, `invalid_json` or `schema_failure`. All other failures remain visible and do not silently change models.
+| Action | Initial approval | Workspace | Notes |
+|---|---:|---|---|
+| read/search/chat/review | none | repository | no fact-source writes |
+| whitelisted reminder or display preference | none | local settings | reversible low risk |
+| create ops record or new ordinary note | single | worktree | schema and exact-path validation |
+| overwrite/move/delete/new MOC/new tag | double | worktree | pinned diff and Web approval |
+| source-code change | denied | none | Syno may only create BugReport/ImprovementProposal |
 
-请求中的 `intent`、Profile、风险或审批字段都不是 Policy 输入。HTTP 入口只能选择公开的 `mode`，由 `OperationRegistry` 映射为固定操作。写入执行后再按真实 Git diff 升级审批：只要修改、删除、重命名或触及敏感路径，就必须停在合并阶段等待第二次 Web 批准。
+Public requests cannot supply intent, Profile, risk, approval, executor or ToolRegistry data. The operation registry maps public modes to canonical operations. After execution, the actual Git diff may only increase risk.
 
-微信只能批准 `single` 且风险为 `low` 的 Job。双审批、代码和 destructive Job 必须在 Web UI 完成。
+Agent-adjustable settings are limited to reminders, notification cadence, quiet hours, review counts, display ordering and interface preferences. Model ID, budget, channels, calendar, owner allowlist, retention and action allowlist require user confirmation. Provider endpoint/token, Policy, allowed roots, ToolRegistry, approval/security rules, source and schemas are never Agent-modifiable.
+
+Weixin may approve only a low-risk single-approval Job. Double approval and destructive operations require Web. Low-risk automation is bounded by a deterministic whitelist and a default budget of three proactive notifications per day.

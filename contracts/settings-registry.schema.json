@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/settings-registry.schema.json",
+  "title": "SettingsRegistry",
+  "type": "object",
+  "required": ["version", "agentAdjustable", "confirmationRequired", "immutable"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "agentAdjustable": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "confirmationRequired": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "immutable": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+  },
+  "additionalProperties": false
+}

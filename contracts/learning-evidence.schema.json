@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/learning-evidence.schema.json",
+  "title": "LearningEvidence",
+  "type": "object",
+  "required": ["id", "knowledgeRef", "producer", "inputMode", "rawArtifactRef", "assistedLevel", "rubricScore", "misconceptions", "demonstratedAt", "nextReviewAt"],
+  "properties": {
+    "id": { "type": "string" },
+    "knowledgeRef": { "type": "string" },
+    "producer": { "enum": ["user"] },
+    "inputMode": { "enum": ["voice", "typed", "quiz", "practice", "teach-back"] },
+    "rawArtifactRef": { "type": "string", "minLength": 1 },
+    "assistedLevel": { "enum": ["none", "prompted", "outlined", "heavily-assisted"] },
+    "rubricScore": { "type": "number", "minimum": 0, "maximum": 1 },
+    "misconceptions": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "demonstratedAt": { "type": "string", "format": "date-time" },
+    "nextReviewAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

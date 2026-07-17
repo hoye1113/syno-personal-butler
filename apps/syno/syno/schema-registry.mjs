@@ -58,6 +58,14 @@ async function validateContractRecord(name, value) {
   const schema = await loadContract(name);
   const errors = [];
   validateValue(value, schema, "$", errors);
+  if (name === "claim" && value?.stability === "volatile" && !value.reviewAfter) {
+    errors.push("$.reviewAfter 时效主张必须安排复核时间");
+  }
+  if (name === "settings-registry") {
+    const groups = [value?.agentAdjustable || [], value?.confirmationRequired || [], value?.immutable || []];
+    const flattened = groups.flat();
+    if (new Set(flattened).size !== flattened.length) errors.push("$ 设置权限分组不能重叠");
+  }
   if (errors.length) {
     const error = new Error(`${name} Contract 校验失败：${errors.join("；")}`);
     error.code = "CONTRACT_VALIDATION_FAILED";

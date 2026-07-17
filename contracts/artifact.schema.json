@@ -6,13 +6,16 @@
   "required": ["id", "kind", "path", "created", "isolated"],
   "properties": {
     "id": { "type": "string" },
-    "kind": { "enum": ["url", "text", "markdown", "pdf", "image", "file", "bilibili-opus"] },
+    "kind": { "enum": ["url", "wechat", "text", "markdown", "txt", "pdf", "image", "voice", "file", "bilibili-opus", "github-doc"] },
     "path": { "type": "string" },
     "created": { "type": "string", "format": "date-time" },
     "isolated": { "type": "boolean" },
     "sourceUrl": { "type": "string", "format": "uri" },
     "size": { "type": "integer", "minimum": 0, "maximum": 10485760 },
-    "mime": { "type": "string" }
+    "mime": { "type": "string" },
+    "status": { "enum": ["received", "quarantined", "extracted", "proposed", "accepted", "rejected", "failed"] },
+    "dedupeKey": { "type": "string" },
+    "ownerId": { "type": "string" }
   },
   "additionalProperties": true
 }

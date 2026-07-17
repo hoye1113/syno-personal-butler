@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/output-opportunity.schema.json",
+  "title": "OutputOpportunity",
+  "type": "object",
+  "required": ["id", "title", "format", "goalRefs", "knowledgeRefs", "reason", "priority", "status", "created"],
+  "properties": {
+    "id": { "type": "string" },
+    "title": { "type": "string", "minLength": 1 },
+    "format": { "enum": ["deep-article", "dialogue-outline", "video-brief", "teach-back", "practice"] },
+    "goalRefs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "knowledgeRefs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "reason": { "type": "string", "minLength": 1 },
+    "priority": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "status": { "enum": ["suggested", "accepted", "drafting", "practiced", "published", "dismissed"] },
+    "created": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

@@ -15,6 +15,7 @@
     "node": ">=22"
   },
   "dependencies": {
+    "@larksuiteoapi/node-sdk": "1.64.0",
     "pdf-parse": "2.4.5"
   }
 }

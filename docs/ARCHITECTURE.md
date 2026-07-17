@@ -3,19 +3,25 @@
 ## Data flow
 
 ```text
-Web / Weixin / Scheduler
+Web / Weixin / Feishu / Scheduler
         │
         ▼
    Channel Gateway ── allowlist / dedupe / normalization
         │
         ▼
-     AgentHost ── Session / Job lifecycle / approval
+ SignalEngine ── deterministic wake-up and notification budget
         │
         ▼
-      Policy ── pure deterministic decision
+ PriorityEngine ── goals → commitments → reviews → news → exploration
         │
         ▼
- Executor Router ── OpenCode → fallback → Claude Code
+ ToolLoopAgent ── one agent / bounded turns / native tool calls
+        │
+        ▼
+ ToolRegistry ── schema / risk / permission / retry / version
+        │
+        ▼
+ SynoCore / AgentHost ── Policy / Job lifecycle / approval
         │
         ▼
  Validator / GitGuard ── isolated diff / exact commit / pinned merge
@@ -26,11 +32,17 @@ Web / Weixin / Scheduler
 
 ## Deep modules
 
+- `SignalEngine.collect` deterministically decides when active work is due. The model cannot wake itself.
+- `PriorityEngine.rank` applies the fixed goal/commitment/review/news/exploration order and the 60/25/15 digest/ingest/maintenance budget.
+- `ToolLoopAgent.run` is the only model loop. It uses one fixed OpenAI-compatible model and cannot select providers, permissions or approval levels.
+- `ToolRegistry.resolve` exposes only schema-validated Syno capabilities; shell, arbitrary files, browser, Git and source editing are never tools.
+- `ProviderClient.complete` owns non-streaming `chat/completions`, authentication, timeout, cancellation and structured errors.
+- `ConversationStore` keeps recoverable local conversation and retry state with explicit retention.
 - `SynoCore.execute/snapshot` is the application interface. Callers do not learn storage, index or Git details.
 - `AgentHost.receive/inspect/cancel/approve` owns the Job lifecycle but delegates all model loops to an Executor Adapter.
 - `Policy.evaluate` is in-process and pure. Model output never changes Profile, approval count or escalation rules.
 - `OperationRegistry` binds every writable HTTP/API operation to a canonical intent. Public callers cannot supply Profile, risk, approval or executor decisions.
-- `Executor.submit/inspect/cancel` has OpenCode, Claude and Fake Adapters at a real seam.
+- Legacy OpenCode/Claude executors remain only while V1 operations are migrated. They are not the product Agent runtime and are removed from user-facing code operations.
 - `ChannelAdapter.start/stop/send/status` has Web, Windows, Weixin and Fake Adapters.
 - `CalendarAdapter` has Markdown, Lark and Fake Adapters. macOS is deliberately absent.
 
@@ -53,3 +65,5 @@ Job files and immutable events are the recovery log. Per-job locks serialize sta
 - Rebuildable cache: `.runtime/`.
 - Secrets and iLink session state: `%LOCALAPPDATA%\Syno\credentials` and `%LOCALAPPDATA%\Syno\state`.
 - All write worktrees: `.worktrees/syno-job-<id>`.
+
+Conversation defaults are 30 days for completed chat, 7 days for confirmed raw voice, 30 days for failed payloads, and until terminal state for unfinished work. Provider outage never changes provider or model: deterministic local features continue and LLM jobs remain durable for retry.

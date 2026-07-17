@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/ingest-proposal.schema.json",
+  "title": "IngestProposal",
+  "type": "object",
+  "required": ["id", "candidateId", "status", "suggestedPath", "suggestedTags", "suggestedLinks", "risk", "created"],
+  "properties": {
+    "id": { "type": "string" },
+    "candidateId": { "type": "string" },
+    "status": { "enum": ["proposed", "approved", "rejected", "applied", "failed"] },
+    "suggestedPath": { "type": "string", "pattern": "^vault/" },
+    "suggestedTags": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "suggestedLinks": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "splitTitles": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "existingNoteRef": { "type": "string" },
+    "risk": { "enum": ["additive", "overwrite", "merge", "new-tag", "new-moc"] },
+    "created": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

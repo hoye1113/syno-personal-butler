@@ -9,8 +9,7 @@ import { fileURLToPath } from "node:url";
 import { buildTopicDraftFromInbox, deriveInboxCandidate } from "./inbox-import.mjs";
 import { appendOperationLog } from "./operation-log.mjs";
 import { createSynoRuntime, routeSynoApi } from "./syno/runtime.mjs";
-import { ExecutorRouter } from "./syno/executors.mjs";
-import { OperationExecutor } from "./syno/operation-executor.mjs";
+import { WorkbenchOperations } from "./syno/workbench-operations.mjs";
 import { buildOperationRequest } from "./syno/operation-registry.mjs";
 import { GitGuard } from "./syno/git-guard.mjs";
 import { securityHeaders } from "./syno/http-security.mjs";
@@ -82,8 +81,28 @@ let plannerSettingsCache = null;
 const topicMutationLocks = new Map();
 const legacyWorkspace = new AsyncLocalStorage();
 const sideEffectGitGuard = new GitGuard();
+const workbenchOperations = new WorkbenchOperations({
+  workspaceContext: legacyWorkspace,
+  handlers: {
+    "inbox.import": (payload) => importInboxCandidate(payload),
+    "inbox.import-batch": (payload) => importInboxCandidateBatch(payload),
+    "settings.save": (payload) => savePlannerSettingsPayload(payload),
+    "wiki.compile": (payload) => compileWikiPacket(payload),
+    "wiki.todos.generate": (payload) => generateWikiTodos(payload),
+    "wiki.todos.accept": (payload) => acceptWikiTodo(payload),
+    "wiki.todos.reject": (payload) => rejectWikiTodo(payload),
+    "topics.schedule": (payload) => withTopicMutationLock(payload.path, () => scheduleTopic(payload)),
+    "topics.disposition": (payload) => withTopicMutationLock(payload.path, () => disposeTopic(payload)),
+    "topics.revert-import": (payload) => withTopicMutationLock(payload.path, () => revertImportedTopic(payload)),
+    "topics.unschedule": (payload) => withTopicMutationLock(payload.path, () => unscheduleTopic(payload)),
+    "content.brief.create": (payload) => createContentBrief(payload),
+    "memory.promote": (payload) => promoteMemoryProposal(payload),
+    "notes.edit": (payload) => editVaultNote(payload),
+  },
+});
+
 const synoRuntime = createSynoRuntime({
-  executor: new OperationExecutor({ execute: executeLegacyOperation, fallback: new ExecutorRouter() }),
+  operationHandler: (operation, payload, context) => workbenchOperations.execute(operation, payload, context),
   onCommitted: executeLegacySideEffects,
 });
 const synoReady = synoRuntime.initialize();
@@ -218,34 +237,6 @@ async function queueLegacyMutation(operation, payload) {
     buildOperationRequest(operation, payload, { text: `执行工作台操作：${operation}` }),
     { channel: "web", senderId: "local-user", developmentMode: synoRuntime.developmentMode },
   );
-}
-
-async function executeLegacyOperation(operation, payload, { workspace = PATHS.repoRoot } = {}) {
-  const handlers = {
-    "inbox.import": () => importInboxCandidate(payload),
-    "inbox.import-batch": () => importInboxCandidateBatch(payload),
-    "settings.save": () => savePlannerSettingsPayload(payload),
-    "wiki.compile": () => compileWikiPacket(payload),
-    "wiki.todos.generate": () => generateWikiTodos(payload),
-    "wiki.todos.accept": () => acceptWikiTodo(payload),
-    "wiki.todos.reject": () => rejectWikiTodo(payload),
-    "topics.schedule": () => withTopicMutationLock(payload.path, () => scheduleTopic(payload)),
-    "topics.disposition": () => withTopicMutationLock(payload.path, () => disposeTopic(payload)),
-    "topics.revert-import": () => withTopicMutationLock(payload.path, () => revertImportedTopic(payload)),
-    "topics.unschedule": () => withTopicMutationLock(payload.path, () => unscheduleTopic(payload)),
-    "content.brief.create": () => createContentBrief(payload),
-    "memory.promote": () => promoteMemoryProposal(payload),
-    "notes.edit": () => editVaultNote(payload),
-  };
-  const handler = handlers[operation];
-  if (!handler) {
-    const error = new Error(`未知工作台操作：${operation}`);
-    error.code = "UNKNOWN_OPERATION";
-    throw error;
-  }
-  const deferredActions = [];
-  const operationResult = await legacyWorkspace.run({ workspace, deferExternal: true, deferredActions }, handler);
-  return { ...operationResult, deferredActions };
 }
 
 async function editVaultNote(payload) {

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/learning-state.schema.json",
+  "title": "LearningState",
+  "type": "object",
+  "required": ["id", "knowledgeRef", "stage", "mastery", "evidenceRefs", "updated"],
+  "properties": {
+    "id": { "type": "string" },
+    "knowledgeRef": { "type": "string" },
+    "stage": { "enum": ["captured", "curated", "understood", "applied", "expressed", "retained", "integrated"] },
+    "mastery": { "type": "number", "minimum": 0, "maximum": 1 },
+    "evidenceRefs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "nextReviewAt": { "type": "string", "format": "date-time" },
+    "updated": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

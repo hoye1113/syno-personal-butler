@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/claim.schema.json",
+  "title": "Claim",
+  "type": "object",
+  "required": ["id", "statement", "stability", "status", "evidenceRefs", "updated"],
+  "properties": {
+    "id": { "type": "string" },
+    "statement": { "type": "string", "minLength": 1 },
+    "stability": { "enum": ["principle", "model", "practice", "fact", "volatile", "personal"] },
+    "status": { "enum": ["candidate", "supported", "contested", "superseded"] },
+    "evidenceRefs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "conflictsWith": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "reviewAfter": { "type": "string", "format": "date-time" },
+    "updated": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

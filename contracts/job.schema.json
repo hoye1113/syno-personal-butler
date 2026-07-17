@@ -7,7 +7,7 @@
   "properties": {
     "id": { "type": "string", "pattern": "^job-[a-z0-9-]+$" },
     "intent": { "type": "string" },
-    "status": { "enum": ["pending", "awaiting_approval", "running", "validating", "completed", "failed", "rejected", "canceled"] },
+    "status": { "enum": ["pending", "awaiting_approval", "running", "waiting_provider", "validating", "completed", "failed", "rejected", "canceled"] },
     "profile": { "enum": ["syno-read", "syno-ops", "syno-curate", "syno-code"] },
     "approval": { "enum": ["none", "single", "double"] },
     "approvalsReceived": { "type": "integer", "minimum": 0, "maximum": 2 },

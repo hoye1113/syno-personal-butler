@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/evidence-candidate.schema.json",
+  "title": "EvidenceCandidate",
+  "type": "object",
+  "required": ["id", "claimId", "evidence", "status", "created"],
+  "properties": {
+    "id": { "type": "string" },
+    "claimId": { "type": "string" },
+    "evidence": { "type": "object" },
+    "status": { "enum": ["pending", "approved", "rejected"] },
+    "created": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

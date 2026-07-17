@@ -10,6 +10,10 @@
 - Existing-file changes, deletion, rename and sensitive paths are promoted from the actual Git diff to a pinned second approval.
 - Git staging receives an explicit path list and rejects paths outside allowed roots.
 - Executor prompts are written to a local task file; user text is never interpolated into a shell command.
-- Claude runs without session persistence, Chrome, slash commands or inherited MCP servers, with a fixed allowed-tool list and no model argument.
+- The product model receives only ToolRegistry tools. It never receives shell, arbitrary filesystem, browser, direct Git, direct Markdown-write or source-edit capabilities.
+- Provider credentials use Windows DPAPI under `%LOCALAPPDATA%\Syno\credentials`; the API and logs expose only `configured` status and non-secret metadata.
+- Provider failure is fail-closed: no provider/model fallback, no silent privilege expansion, and durable retry for LLM jobs.
 - HTTP responses set a restrictive CSP, MIME sniffing protection, frame denial and referrer/permissions policies.
 - Weixin polling uses an inter-process lock, durable cursor ordering and post-delivery deduplication. Attachments accept only exact Tencent CDN hosts, are streamed with a 10 MB limit, signature/MIME checked and left unread in quarantine.
+- Feishu callbacks authenticate, deduplicate and enqueue quickly; knowledge facts remain in `vault/`, never in a channel-specific store.
+- Syno cannot modify its source. Codex is the external development authority; runtime may emit only BugReport and ImprovementProposal records.

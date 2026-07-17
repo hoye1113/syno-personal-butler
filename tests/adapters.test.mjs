@@ -6,6 +6,7 @@ import path from "node:path";
 
 import { FakeCalendarAdapter, MarkdownCalendarAdapter } from "../apps/syno/syno/calendar-adapters.mjs";
 import { ChannelHub, FakeChannelAdapter } from "../apps/syno/syno/channels.mjs";
+import { FeishuChannelAdapter, FeishuCredentialStore } from "../apps/syno/syno/feishu-channel.mjs";
 import { parseWeixinApproval } from "../apps/syno/syno/runtime.mjs";
 import { Scheduler, occurrenceFor } from "../apps/syno/syno/scheduler.mjs";
 import { LocalProcessLock, normalizeInbound, readLimitedBody, sniffMime, validateIlinkBaseUrl, WeixinIlinkAdapter } from "../apps/syno/syno/weixin-ilink.mjs";
@@ -65,6 +66,42 @@ test("Weixin approval commands are parsed deterministically", () => {
     code: "0F12AB",
   });
   assert.equal(parseWeixinApproval("批准全部任务"), null);
+});
+
+test("Feishu long connection accepts only owner DMs and deduplicates messages", async () => {
+  const handlers = new Map();
+  const sent = [];
+  const channel = {
+    on(name, handler) { handlers.set(name, handler); },
+    async connect() {}, async disconnect() {},
+    async send(chatId, body, options) { sent.push({ chatId, body, options }); },
+  };
+  const received = [];
+  const adapter = new FeishuChannelAdapter({
+    credentials: { async load() { return { appId: "cli_test", appSecret: "secret", ownerOpenId: "owner" }; } },
+    channelFactory: () => channel,
+    onMessage: async (message) => { received.push(message); return { text: "已记录" }; },
+  });
+  await adapter.start();
+  handlers.get("message")({ messageId: "m1", chatId: "c1", chatType: "group", senderId: "owner", content: "group" });
+  handlers.get("message")({ messageId: "m2", chatId: "c2", chatType: "p2p", senderId: "stranger", content: "stranger" });
+  handlers.get("message")({ messageId: "m3", chatId: "c3", chatType: "p2p", senderId: "owner", content: "hello" });
+  handlers.get("message")({ messageId: "m3", chatId: "c3", chatType: "p2p", senderId: "owner", content: "duplicate" });
+  for (let index = 0; index < 20 && !sent.length; index += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(received.length, 1);
+  assert.equal(received[0].text, "hello");
+  assert.equal(sent.length, 1);
+  await adapter.stop();
+});
+
+test("Feishu credentials keep App Secret outside metadata", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-feishu-credentials-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const store = new FeishuCredentialStore({ root, protect: async (value) => `protected:${value}`, unprotect: async (value) => value.replace("protected:", "") });
+  const status = await store.save({ appId: "cli_test", appSecret: "app-secret", ownerOpenId: "owner" });
+  assert.equal(status.ownerBound, true);
+  assert.doesNotMatch(await fs.readFile(store.metadataFile, "utf8"), /app-secret/);
+  assert.equal((await store.load()).appSecret, "app-secret");
 });
 
 test("Weixin restores cursor context and never promotes the first unknown sender", async () => {
