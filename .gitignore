@@ -25,3 +25,5 @@ Thumbs.db
 .obsidian/
 .pytest_cache/
 
+.pnpm-store/
+apps/syno/public/assets/syno/*-key.png

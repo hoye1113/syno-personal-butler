@@ -96,6 +96,10 @@ body { background-color: var(--papyrus); }
 .syno-pane-intro p:last-child { margin-bottom: 0; color: var(--muted); }
 .syno-stack-form { display: grid; gap: 14px; margin: 18px 0 28px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: color-mix(in oklch, var(--papyrus), white 35%); }
 .syno-stack-form label { display: grid; gap: 7px; color: var(--muted); font-size: .82rem; font-weight: 700; }
+.syno-rubric { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 12px; }
+.syno-rubric legend { padding: 0 6px; color: var(--indigo); font-size: .82rem; font-weight: 700; }
+.syno-rubric label { display: flex; grid-template-columns: none; align-items: center; gap: 8px; font-weight: 500; }
+.syno-rubric input { width: auto; }
 .syno-stack-form input,
 .syno-stack-form select,
 .syno-stack-form textarea { width: 100%; box-sizing: border-box; }

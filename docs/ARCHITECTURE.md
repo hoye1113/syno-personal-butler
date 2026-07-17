@@ -37,7 +37,8 @@ Web / Weixin / Feishu / Scheduler
 - `ToolLoopAgent.run` is the only model loop. It uses one fixed OpenAI-compatible model and cannot select providers, permissions or approval levels.
 - `ToolRegistry.resolve` exposes only schema-validated Syno capabilities; shell, arbitrary files, browser, Git and source editing are never tools.
 - `ProviderClient.complete` owns non-streaming `chat/completions`, authentication, timeout, cancellation and structured errors.
-- `ConversationStore` keeps recoverable local conversation and retry state with explicit retention.
+- `ConversationStore` keeps recoverable local conversation and retry state with explicit, separately enforced chat/raw-voice/failed-payload retention.
+- `StateArchive` exports only non-credential local state, records a versioned SHA-256 manifest and restores only into an empty target.
 - `SynoCore.execute/snapshot` is the application interface. Callers do not learn storage, index or Git details.
 - `AgentHost.receive/inspect/cancel/approve` owns the Job lifecycle but delegates all model loops to an Executor Adapter.
 - `Policy.evaluate` is in-process and pure. Model output never changes Profile, approval count or escalation rules.
@@ -67,3 +68,5 @@ Job files and immutable events are the recovery log. Per-job locks serialize sta
 - All write worktrees: `.worktrees/syno-job-<id>`.
 
 Conversation defaults are 30 days for completed chat, 7 days for confirmed raw voice, 30 days for failed payloads, and until terminal state for unfinished work. Provider outage never changes provider or model: deterministic local features continue and LLM jobs remain durable for retry.
+
+The Worker product path is `SignalEngine → PriorityEngine → ProactiveOrchestrator → ToolLoopAgent`. The historical `Scheduler` remains only for legacy regression coverage and is not used to wake the product Agent.

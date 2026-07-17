@@ -3,7 +3,7 @@
   "$id": "https://syno.local/contracts/learning-evidence.schema.json",
   "title": "LearningEvidence",
   "type": "object",
-  "required": ["id", "knowledgeRef", "producer", "inputMode", "rawArtifactRef", "assistedLevel", "rubricScore", "misconceptions", "demonstratedAt", "nextReviewAt"],
+  "required": ["id", "knowledgeRef", "producer", "inputMode", "rawArtifactRef", "assistedLevel", "rubric", "rubricScore", "selfAssessment", "calibration", "passed", "isReview", "misconceptions", "demonstratedAt", "nextReviewAt"],
   "properties": {
     "id": { "type": "string" },
     "knowledgeRef": { "type": "string" },
@@ -11,7 +11,22 @@
     "inputMode": { "enum": ["voice", "typed", "quiz", "practice", "teach-back"] },
     "rawArtifactRef": { "type": "string", "minLength": 1 },
     "assistedLevel": { "enum": ["none", "prompted", "outlined", "heavily-assisted"] },
+    "rubric": {
+      "type": "object",
+      "required": ["accurate", "explained", "applied", "discriminated"],
+      "properties": {
+        "accurate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "explained": { "type": "number", "minimum": 0, "maximum": 1 },
+        "applied": { "type": "number", "minimum": 0, "maximum": 1 },
+        "discriminated": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
     "rubricScore": { "type": "number", "minimum": 0, "maximum": 1 },
+    "selfAssessment": { "enum": ["solid", "mostly", "shaky", "lost"] },
+    "calibration": { "enum": ["aligned", "fluency-illusion", "under-confidence", "both-low"] },
+    "passed": { "type": "boolean" },
+    "isReview": { "type": "boolean" },
     "misconceptions": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
     "demonstratedAt": { "type": "string", "format": "date-time" },
     "nextReviewAt": { "type": "string", "format": "date-time" }

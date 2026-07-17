@@ -8,6 +8,7 @@
     "worker": "node apps/syno/worker.mjs",
     "test": "node --test apps/syno/tests/*.test.mjs tests/*.test.mjs",
     "verify": "node scripts/verify-repository.mjs",
+    "state:archive": "node scripts/state-archive.mjs",
     "install:windows": "powershell -ExecutionPolicy Bypass -File scripts/install-windows-task.ps1",
     "probe:weixin": "node scripts/probe-weixin.mjs"
   },

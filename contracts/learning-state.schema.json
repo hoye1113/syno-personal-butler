@@ -3,13 +3,17 @@
   "$id": "https://syno.local/contracts/learning-state.schema.json",
   "title": "LearningState",
   "type": "object",
-  "required": ["id", "knowledgeRef", "stage", "mastery", "evidenceRefs", "updated"],
+  "required": ["id", "knowledgeRef", "stage", "mastery", "evidenceRefs", "reviewCount", "reviewIntervalDays", "calibrationFlags", "lastTestedAt", "updated"],
   "properties": {
     "id": { "type": "string" },
     "knowledgeRef": { "type": "string" },
     "stage": { "enum": ["captured", "curated", "understood", "applied", "expressed", "retained", "integrated"] },
     "mastery": { "type": "number", "minimum": 0, "maximum": 1 },
     "evidenceRefs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "reviewCount": { "type": "integer", "minimum": 0 },
+    "reviewIntervalDays": { "type": "integer", "minimum": 1, "maximum": 60 },
+    "calibrationFlags": { "type": "array", "items": { "enum": ["fluency-illusion", "under-confidence", "both-low"] }, "uniqueItems": true },
+    "lastTestedAt": { "type": "string", "format": "date-time" },
     "nextReviewAt": { "type": "string", "format": "date-time" },
     "updated": { "type": "string", "format": "date-time" }
   },

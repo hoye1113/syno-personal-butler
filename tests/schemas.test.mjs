@@ -35,7 +35,9 @@ test("Afu topic drafts satisfy the executable ContentIdea contract", async () =>
 test("knowledge-loop contracts reject AI-authored mastery and stale volatile claims", async () => {
   const baseEvidence = {
     id: "learning-1", knowledgeRef: "vault/note.md", producer: "user", inputMode: "teach-back",
-    rawArtifactRef: "ops/artifacts/answer.md", assistedLevel: "prompted", rubricScore: 0.8,
+    rawArtifactRef: "ops/artifacts/answer.md", assistedLevel: "prompted",
+    rubric: { accurate: 1, explained: 1, applied: 1, discriminated: 1 }, rubricScore: 0.9,
+    selfAssessment: "mostly", calibration: "aligned", passed: true, isReview: false,
     misconceptions: [], demonstratedAt: "2026-07-17T08:00:00.000Z", nextReviewAt: "2026-07-24T08:00:00.000Z",
   };
   await validateContractRecord("learning-evidence", baseEvidence);

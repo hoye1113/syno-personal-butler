@@ -23,6 +23,9 @@ const WRITE_INTENTS = new Set([
   "record_learning_evidence",
   "create_output_opportunity",
   "create_goal",
+  "create_claim",
+  "create_evidence_candidate",
+  "approve_evidence_candidate",
   "create_report",
   "settings_change",
   "curate_note",
@@ -50,7 +53,6 @@ function inferIntent(request = {}) {
 function evaluate(request = {}, context = {}) {
   const intent = inferIntent(request);
   const developmentMode = context.developmentMode === true;
-  const explicitComplexity = COMPLEX_INTENTS.has(intent);
   const highRisk = HIGH_RISK_INTENTS.has(intent);
   const writes = WRITE_INTENTS.has(intent);
   const profile = intent === "code_change"
@@ -63,7 +65,7 @@ function evaluate(request = {}, context = {}) {
   const trustedAutomation = context.trustedAutomation === true && intent === "create_report";
   const approval = highRisk ? "double" : writes && !trustedAutomation ? "single" : "none";
   const risk = highRisk ? "high" : writes ? "low" : "read";
-  const executor = highRisk || explicitComplexity ? "claude" : "opencode";
+  const executor = "tool-loop-agent";
   const denied = intent === "code_change" && !developmentMode;
   return Object.freeze({
     intent,

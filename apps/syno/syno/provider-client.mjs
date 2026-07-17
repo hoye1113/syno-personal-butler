@@ -8,6 +8,11 @@ class ProviderError extends Error {
   }
 }
 
+function estimateTokens(messages, tools = []) {
+  const characters = JSON.stringify({ messages, tools }).length;
+  return Math.ceil(characters / 3.2) + 256;
+}
+
 class ProviderClient {
   constructor({ credentials, fetchImpl = globalThis.fetch, timeoutMs = 60_000 } = {}) {
     if (!credentials || !fetchImpl) throw new Error("ProviderClient 缺少凭据或 fetch Adapter");
@@ -18,6 +23,10 @@ class ProviderClient {
 
   async complete(messages, tools = [], { signal, temperature = 0.2 } = {}) {
     const config = await this.credentials.load();
+    const estimatedTokens = estimateTokens(messages, tools);
+    if (estimatedTokens > config.contextLength - 1_024) {
+      throw new ProviderError("PROVIDER_CONTEXT_LIMIT", `请求上下文约 ${estimatedTokens} tokens，超过配置长度 ${config.contextLength} 的安全预算`, { retryable: false });
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(new Error("timeout")), this.timeoutMs);
     const abort = () => controller.abort(signal?.reason || new Error("canceled"));
@@ -57,4 +66,4 @@ class ProviderClient {
   }
 }
 
-export { ProviderClient, ProviderError };
+export { ProviderClient, ProviderError, estimateTokens };

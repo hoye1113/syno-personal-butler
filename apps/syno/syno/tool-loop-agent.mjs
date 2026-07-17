@@ -46,7 +46,7 @@ class ToolLoopAgent {
         }
         for (const call of calls) {
           const name = call?.function?.name;
-          const result = await this.tools.execute(name, parseArguments(call), { channel, ownerId, allowWrites: false, allowJobSubmission: true, conversationId: conversation.id });
+          const result = await this.tools.execute(name, parseArguments(call), { channel, ownerId, allowWrites: false, allowJobSubmission: true, allowAgentSettings: true, conversationId: conversation.id });
           const toolMessage = { role: "tool", tool_call_id: call.id, content: JSON.stringify(result) };
           messages.push(toolMessage);
           conversation.messages.push(toolMessage);

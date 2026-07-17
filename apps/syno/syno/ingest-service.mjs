@@ -53,12 +53,13 @@ class IngestService {
   async propose(id) {
     const stateFile = path.join(this.stateRoot, `${id}.json`);
     const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
-    const prepared = await this.intake.prepare(state.payload);
+    try {
+      const prepared = await this.intake.prepare(state.payload);
     const title = titleFromPrepared(prepared, state.payload);
     const matches = await this.knowledge.search(title, { limit: 5 });
     const now = this.clock().toISOString();
     const candidate = {
-      id: `candidate-${randomUUID().slice(0, 8)}`, artifactId: id, title, summary: String(prepared.text || "").slice(0, 280),
+      id: `candidate-${randomUUID().slice(0, 8)}`, artifactId: id, title, summary: String(prepared.content || prepared.text || "").slice(0, 280),
       status: "proposed", confidence: matches.length ? 0.65 : 0.8, dedupeMatches: matches.map((item) => item.path), created: now,
     };
     const proposal = {
@@ -71,12 +72,16 @@ class IngestService {
     await writeRecord(path.join(this.opsRoot, "artifacts", "proposals", `${proposal.id}.md`), proposal, { schema: "ingest-proposal", title: `Ingest proposal: ${title}`, summaryKeys: ["id", "candidateId", "status", "suggestedPath", "risk", "created"] });
     await atomicJson(stateFile, { ...state, status: "proposed", prepared, candidate, proposal });
     return { candidate, proposal };
+    } catch (error) {
+      await atomicJson(stateFile, { ...state, status: "failed", error: { code: error.code || "INGEST_PROPOSAL_FAILED", message: error.message, retryable: error.retryable === true } });
+      throw error;
+    }
   }
 
   async status(id) {
     try {
       const state = JSON.parse(await fs.readFile(path.join(this.stateRoot, `${id}.json`), "utf8"));
-      return { id, status: state.status, candidate: state.candidate, proposal: state.proposal };
+      return { id, status: state.status, candidate: state.candidate, proposal: state.proposal, error: state.error };
     } catch (error) { if (error.code === "ENOENT") return null; throw error; }
   }
 
@@ -87,10 +92,17 @@ class IngestService {
     const target = path.join(workspace, relative);
     try { await fs.access(target); throw Object.assign(new Error("目标笔记已存在，需要重新查重"), { code: "INGEST_TARGET_EXISTS" }); } catch (error) { if (error.code !== "ENOENT") throw error; }
     const source = state.prepared.sourceUrl ? `source_url: ${JSON.stringify(state.prepared.sourceUrl)}\n` : "";
-    const content = `---\ntitle: ${JSON.stringify(state.candidate.title)}\nstatus: captured\nfactual_status: unverified\n${source}---\n\n# ${state.candidate.title}\n\n${state.prepared.text}\n\n## 关系状态\n\n${state.proposal.suggestedLinks.length ? state.proposal.suggestedLinks.map((item) => `- 候选关联：[[${item.replace(/^vault\//, "").replace(/\.md$/, "")}]]`).join("\n") : "当前标记为 orphan，等待后续渐进关联。"}\n`;
+    const content = `---\ntitle: ${JSON.stringify(state.candidate.title)}\nstatus: captured\nfactual_status: unverified\n${source}---\n\n# ${state.candidate.title}\n\n${state.prepared.content || state.prepared.text}\n\n## 关系状态\n\n${state.proposal.suggestedLinks.length ? state.proposal.suggestedLinks.map((item) => `- 候选关联：[[${item.replace(/^vault\//, "").replace(/\.md$/, "")}]]`).join("\n") : "当前标记为 orphan，等待后续渐进关联。"}\n`;
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, content, "utf8");
     return { applied: true, path: relative, changedPaths: [relative] };
+  }
+
+  async applyBatch(ids, options = {}) {
+    if (!Array.isArray(ids) || !ids.length || ids.length > 50) throw new Error("批量收录必须包含 1–50 个 Artifact ID");
+    const results = [];
+    for (const id of [...new Set(ids)]) results.push(await this.apply(id, options));
+    return { applied: results.length, results, changedPaths: [...new Set(results.flatMap((item) => item.changedPaths))] };
   }
 }
 

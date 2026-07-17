@@ -7,10 +7,11 @@ import path from "node:path";
 import { ConversationStore } from "../apps/syno/syno/conversation-store.mjs";
 import { executeDomainOperation } from "../apps/syno/syno/domain-operations.mjs";
 import { PriorityEngine } from "../apps/syno/syno/priority-engine.mjs";
-import { ProviderClient, ProviderError } from "../apps/syno/syno/provider-client.mjs";
+import { ProactiveOrchestrator, isQuietTime } from "../apps/syno/syno/proactive-orchestrator.mjs";
+import { ProviderClient, ProviderError, estimateTokens } from "../apps/syno/syno/provider-client.mjs";
 import { ProviderCredentialStore } from "../apps/syno/syno/provider-credential-store.mjs";
 import { SettingsRegistry } from "../apps/syno/syno/settings-registry.mjs";
-import { SignalEngine } from "../apps/syno/syno/signal-engine.mjs";
+import { SignalEngine, localDateKey } from "../apps/syno/syno/signal-engine.mjs";
 import { routeSynoApi } from "../apps/syno/syno/runtime.mjs";
 import { ToolLoopAgent } from "../apps/syno/syno/tool-loop-agent.mjs";
 import { ToolRegistry } from "../apps/syno/syno/tool-registry.mjs";
@@ -60,6 +61,17 @@ test("Provider errors never expose tokens and mark retryable outages", async () 
   });
 });
 
+test("Provider enforces the configured context budget before network access", async () => {
+  let called = false;
+  const client = new ProviderClient({
+    credentials: { async load() { return { baseUrl: "https://provider.example/v1", token: "secret", modelId: "fixed", contextLength: 4_096 }; } },
+    fetchImpl: async () => { called = true; return new Response("{}"); },
+  });
+  assert.ok(estimateTokens([{ role: "user", content: "x".repeat(20_000) }]) > 4_096);
+  await assert.rejects(client.complete([{ role: "user", content: "x".repeat(20_000) }]), (error) => error.code === "PROVIDER_CONTEXT_LIMIT" && error.retryable === false);
+  assert.equal(called, false);
+});
+
 test("ToolLoopAgent completes a bounded native tool-call loop", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-conversation-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
@@ -68,7 +80,7 @@ test("ToolLoopAgent completes a bounded native tool-call loop", async (t) => {
     { message: { role: "assistant", content: "找到一条知识。" }, model: "fixed", usage: { total_tokens: 20 } },
   ];
   const provider = { async complete() { return responses.shift(); } };
-  const tools = new ToolRegistry([{ name: "knowledge.search", description: "search", risk: "read", permission: "syno-read", retry: "safe", version: "1", inputSchema: { type: "object", required: ["query"], properties: { query: { type: "string", minLength: 1 } }, additionalProperties: false }, execute: async ({ query }) => [{ path: "vault/a.md", query }] }]);
+  const tools = new ToolRegistry([{ name: "knowledge.search", description: "search", risk: "read", permission: "syno-read", retry: "safe", version: "1", inputSchema: { type: "object", required: ["query"], properties: { query: { type: "string", minLength: 1 } }, additionalProperties: false }, outputSchema: { type: "array", items: { type: "object" } }, execute: async ({ query }) => [{ path: "vault/a.md", query }] }]);
   const conversations = new ConversationStore({ root });
   const agent = new ToolLoopAgent({ provider, tools, conversations, maxTurns: 4 });
   const result = await agent.run({ text: "查找 agent" });
@@ -78,9 +90,10 @@ test("ToolLoopAgent completes a bounded native tool-call loop", async (t) => {
 });
 
 test("ToolRegistry denies non-whitelisted and unapproved write tools", async () => {
-  const registry = new ToolRegistry([{ name: "jobs.create", description: "create", risk: "low", permission: "syno-ops", retry: "idempotent", version: "1", inputSchema: { type: "object", properties: {}, additionalProperties: false }, execute: async () => ({ ok: true }) }]);
+  const registry = new ToolRegistry([{ name: "jobs.create", description: "create", risk: "low", permission: "syno-ops", retry: "idempotent", version: "1", inputSchema: { type: "object", properties: {}, additionalProperties: false }, outputSchema: { type: "object", required: ["ok"], properties: { ok: { type: "boolean" } } }, execute: async () => ({ ok: true }) }]);
   await assert.rejects(registry.execute("source.edit", {}), /不在白名单/);
   await assert.rejects(registry.execute("jobs.create", {}), /审批入口/);
+  assert.throws(() => new ToolRegistry([{ name: "bad.tool", risk: "read", permission: "syno-read", retry: "safe", version: "1", execute: async () => ({}) }]), /输出 Schema/);
 });
 
 test("Signal and Priority engines are deterministic and notification-bounded", () => {
@@ -91,13 +104,45 @@ test("Signal and Priority engines are deterministic and notification-bounded", (
   const now = new Date("2026-07-19T21:00:00+08:00");
   assert.equal(signal.collect({ now, notificationsToday: 2, highValueEvents: [{ id: "e1" }] }).length, 1);
   assert.deepEqual(signal.collect({ now, notificationsToday: 3 }), []);
+  assert.match(localDateKey(now), /^2026-07-/);
 });
 
-test("SettingsRegistry prevents Agent authority escalation", () => {
-  const registry = new SettingsRegistry();
+test("ProactiveOrchestrator drives the single Agent but keeps local fallback and budget", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-proactive-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const messages = [];
+  const host = { async receive(request, context) {
+    assert.equal(request.intent, "chat");
+    assert.equal(context.senderId, "syno-worker");
+    return { job: { id: `job-${context.messageId.replaceAll(":", "-")}`, status: "waiting_provider" } };
+  } };
+  const today = { async snapshot() { return { priorities: [{ title: "复习 Tool Loop" }], allocation: { digest: 6, ingest: 3, maintenance: 1 } }; } };
+  const channels = { async send(message) { messages.push(message); return { web: { delivered: true } }; } };
+  const conversations = { async prune() { return []; } };
+  const proactive = new ProactiveOrchestrator({
+    host, today, channels, conversations,
+    signalEngine: new SignalEngine({ schedule: { morningHour: 8, eveningHour: 20, weeklyDay: 0, maxDailyNotifications: 1 } }),
+    stateFile: path.join(root, "state.json"), quietHours: { start: "23:00", end: "07:00" },
+  });
+  const first = await proactive.tick({ now: new Date("2026-07-20T08:30:00+08:00") });
+  assert.equal(first.length, 1);
+  assert.equal(first[0].localFallback, true);
+  assert.match(messages[0].body, /复习 Tool Loop/);
+  assert.deepEqual(await proactive.tick({ now: new Date("2026-07-20T20:30:00+08:00") }), []);
+  assert.equal(isQuietTime(new Date("2026-07-20T23:30:00+08:00"), { start: "23:00", end: "07:00" }), true);
+});
+
+test("SettingsRegistry persists only valid Agent-adjustable preferences", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-settings-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const registry = new SettingsRegistry({ stateFile: path.join(root, "settings.json"), clock: () => new Date("2026-07-17T08:00:00.000Z") });
   assert.equal(registry.assertChange("notifications.quietHours", { actor: "agent" }), "agentAdjustable");
   assert.throws(() => registry.assertChange("provider.modelId", { actor: "agent", confirmed: true }), /用户确认/);
   assert.throws(() => registry.assertChange("provider.token", { actor: "agent" }), /不得修改/);
+  await registry.set("learning.dailyReviewCount", 7, { actor: "agent" });
+  assert.equal(await registry.get("learning.dailyReviewCount"), 7);
+  await assert.rejects(registry.set("learning.dailyReviewCount", 100, { actor: "agent" }), /1–20/);
+  await assert.rejects(registry.set("channels", ["weixin"], { actor: "agent", confirmed: true }), /用户确认/);
 });
 
 test("Provider API never returns the submitted token", async () => {

@@ -27,7 +27,7 @@ Syno 是 Windows 本地、单用户、主动式且可审计的知识闭环私人
 - 仓库：`D:\workSpace\syno-personal-butler`
 - 分支：`codex/round3-remediation`
 - R3-0 已在本地提交 `c34ba05 fix: restore isolated R3 baseline`，当时 Node 66/66、vault Python 57/57 全绿。
-- 后续知识闭环、Provider、渠道和 Web 重构正在同一分支实现；以 `NEXT_SESSION.md` 的测试快照为准。
+- 主动知识闭环、单 Agent/Provider、渠道 Adapter、五区 Web 和纸片法老已完成首轮实现；本轮可靠性加固正在同一分支验收，以 `NEXT_SESSION.md` 的测试快照为准。
 - `.pnpm-store/` 是本机安装缓存，不暂存；删除仍须按仓库审批规则执行。
 
 ## 固定实施顺序
@@ -56,6 +56,7 @@ Syno 是 Windows 本地、单用户、主动式且可审计的知识闭环私人
 - Base URL、Token、Model ID、上下文长度由设置页录入；Token 由 Windows DPAPI 保存到 `%LOCALAPPDATA%\Syno\credentials`
 - Provider 不可用时，本地能力继续；LLM Job 进入 `waiting_provider`，人工/定时重试后恢复
 - 对话 30 天；确认转录后的原始语音 7 天；失败载荷 30 天；未完成任务保留到终态
+- `ConversationStore.prune` 分别执行语音与对话保留；状态归档默认只包含 `%LOCALAPPDATA%\Syno\state`，明确排除 credentials，并以 SHA-256 清单校验。
 
 ## 完成定义
 

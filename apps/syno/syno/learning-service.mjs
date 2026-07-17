@@ -8,25 +8,37 @@ import { validateContractRecord } from "./schema-registry.mjs";
 
 const STAGES = Object.freeze(["captured", "curated", "understood", "applied", "expressed", "retained", "integrated"]);
 const ASSISTANCE = Object.freeze({ none: 1, prompted: 0.9, outlined: 0.7, "heavily-assisted": 0.4 });
+const REVIEW_INTERVALS = Object.freeze([1, 3, 7, 14, 30, 60]);
+const RUBRIC_KEYS = Object.freeze(["accurate", "explained", "applied", "discriminated"]);
 
-function reviewIntervalDays(score) {
-  if (score < 0.4) return 1;
-  if (score < 0.6) return 3;
-  if (score < 0.75) return 7;
-  if (score < 0.9) return 14;
-  return 30;
+function rubricScore(rubric = {}) {
+  return RUBRIC_KEYS.reduce((sum, key) => sum + Math.max(0, Math.min(1, Number(rubric[key] || 0))), 0) / RUBRIC_KEYS.length;
 }
 
-function demonstratedStage(inputMode, score, evidenceCount = 1) {
-  if (score < 0.4) return "curated";
-  if (["voice", "typed"].includes(inputMode)) return "understood";
-  if (inputMode === "practice") return score >= 0.8 ? "applied" : "understood";
-  if (inputMode === "quiz") return score >= 0.85 && evidenceCount >= 2 ? "retained" : "understood";
+function calibrationFor(selfAssessment, score) {
+  const high = ["solid", "mostly"].includes(selfAssessment);
+  const low = ["shaky", "lost"].includes(selfAssessment);
+  if (high && score < 0.75) return "fluency-illusion";
+  if (low && score >= 0.75) return "under-confidence";
+  if (low && score < 0.75) return "both-low";
+  return "aligned";
+}
+
+function reviewIntervalDays({ passed, isReview = false, reviewCount = 0 } = {}) {
+  if (!passed) return 1;
+  if (!isReview) return 1;
+  return REVIEW_INTERVALS[Math.min(reviewCount, REVIEW_INTERVALS.length - 1)];
+}
+
+function demonstratedStage(inputMode, score, evidenceCount = 1, reviewCount = 0, passed = score >= 0.75) {
+  if (!passed || score < 0.4) return "curated";
+  if (reviewCount >= 3 && score >= 0.8) return "retained";
+  if (inputMode === "practice") return "applied";
   if (inputMode === "teach-back") {
-    if (score >= 0.92 && evidenceCount >= 3) return "integrated";
-    if (score >= 0.75) return "expressed";
-    return "understood";
+    if (score >= 0.9 && evidenceCount >= 3) return "integrated";
+    return "expressed";
   }
+  if (["voice", "typed", "quiz"].includes(inputMode)) return "understood";
   return "curated";
 }
 
@@ -38,30 +50,43 @@ class LearningService {
   async record(input, { opsRoot = this.opsRoot } = {}) {
     if (input.producer !== "user") throw Object.assign(new Error("只有主人亲自输出才能成为 LearningEvidence"), { code: "AI_EVIDENCE_FORBIDDEN" });
     const now = this.clock();
-    const effectiveScore = Math.max(0, Math.min(1, Number(input.rubricScore) * (ASSISTANCE[input.assistedLevel] ?? 0)));
+    const rawScore = Number(rubricScore(input.rubric).toFixed(3));
+    const effectiveScore = Number((rawScore * (ASSISTANCE[input.assistedLevel] ?? 0)).toFixed(3));
+    const passed = rawScore >= 0.75 && effectiveScore >= 0.6;
+    const calibration = calibrationFor(input.selfAssessment, rawScore);
     const id = `learning-evidence-${randomUUID().slice(0, 8)}`;
-    const next = new Date(now.getTime() + reviewIntervalDays(effectiveScore) * 86_400_000);
-    const evidence = {
-      id, knowledgeRef: input.knowledgeRef, producer: "user", inputMode: input.inputMode,
-      rawArtifactRef: input.rawArtifactRef, assistedLevel: input.assistedLevel,
-      rubricScore: effectiveScore, misconceptions: input.misconceptions || [],
-      demonstratedAt: now.toISOString(), nextReviewAt: next.toISOString(),
-    };
-    await validateContractRecord("learning-evidence", evidence);
     const stateFile = path.join(opsRoot, "reviews", "learning", "states", `${stateId(input.knowledgeRef)}.md`);
     let previous = null;
     try { previous = parseRecord(await fs.readFile(stateFile, "utf8")); } catch (error) { if (error.code !== "ENOENT") throw error; }
+    const isReview = input.isReview === true;
+    const reviewCount = isReview ? (passed ? Number(previous?.reviewCount || 0) + 1 : 0) : Number(previous?.reviewCount || 0);
+    const intervalDays = reviewIntervalDays({ passed, isReview, reviewCount });
+    const next = new Date(now.getTime() + intervalDays * 86_400_000);
+    const evidence = {
+      id, knowledgeRef: input.knowledgeRef, producer: "user", inputMode: input.inputMode,
+      rawArtifactRef: input.rawArtifactRef, assistedLevel: input.assistedLevel,
+      rubric: Object.fromEntries(RUBRIC_KEYS.map((key) => [key, Number(input.rubric?.[key] || 0)])),
+      rubricScore: effectiveScore, selfAssessment: input.selfAssessment, calibration,
+      passed, isReview, misconceptions: input.misconceptions || [],
+      demonstratedAt: now.toISOString(), nextReviewAt: next.toISOString(),
+    };
+    await validateContractRecord("learning-evidence", evidence);
     const refs = [...new Set([...(previous?.evidenceRefs || []), id])];
-    const observed = demonstratedStage(input.inputMode, effectiveScore, refs.length);
+    const observed = demonstratedStage(input.inputMode, effectiveScore, refs.length, reviewCount, passed);
     const previousIndex = Math.max(0, STAGES.indexOf(previous?.stage || "captured"));
     const observedIndex = STAGES.indexOf(observed);
     const stage = STAGES[Math.max(previousIndex, observedIndex)];
-    const mastery = Number(Math.max(Number(previous?.mastery || 0) * 0.7, effectiveScore).toFixed(3));
-    const state = { id: stateId(input.knowledgeRef), knowledgeRef: input.knowledgeRef, stage, mastery, evidenceRefs: refs, nextReviewAt: next.toISOString(), updated: now.toISOString() };
+    const mastery = Number((passed ? Math.max(Number(previous?.mastery || 0) * 0.75, effectiveScore) : Number(previous?.mastery || 0) * 0.65).toFixed(3));
+    const calibrationFlags = [...new Set([...(previous?.calibrationFlags || []), ...(calibration === "aligned" ? [] : [calibration])])];
+    const state = {
+      id: stateId(input.knowledgeRef), knowledgeRef: input.knowledgeRef, stage, mastery, evidenceRefs: refs,
+      reviewCount, reviewIntervalDays: intervalDays, calibrationFlags,
+      lastTestedAt: now.toISOString(), nextReviewAt: next.toISOString(), updated: now.toISOString(),
+    };
     await validateContractRecord("learning-state", state);
     const evidenceFile = path.join(opsRoot, "reviews", "learning", "evidence", `${id}.md`);
-    await writeRecord(evidenceFile, evidence, { schema: "learning-evidence", title: `Learning evidence ${id}`, summaryKeys: ["id", "knowledgeRef", "producer", "inputMode", "assistedLevel", "rubricScore", "demonstratedAt", "nextReviewAt"] });
-    await writeRecord(stateFile, state, { schema: "learning-state", title: `Learning state: ${input.knowledgeRef}`, summaryKeys: ["id", "knowledgeRef", "stage", "mastery", "nextReviewAt", "updated"] });
+    await writeRecord(evidenceFile, evidence, { schema: "learning-evidence", title: `Learning evidence ${id}`, summaryKeys: ["id", "knowledgeRef", "producer", "inputMode", "assistedLevel", "rubricScore", "selfAssessment", "calibration", "passed", "isReview", "demonstratedAt", "nextReviewAt"] });
+    await writeRecord(stateFile, state, { schema: "learning-state", title: `Learning state: ${input.knowledgeRef}`, summaryKeys: ["id", "knowledgeRef", "stage", "mastery", "reviewCount", "reviewIntervalDays", "lastTestedAt", "nextReviewAt", "updated"] });
     return { evidence, state, changedPaths: [evidenceFile, stateFile].map((file) => path.relative(path.dirname(opsRoot), file).replace(/\\/g, "/")) };
   }
 
@@ -79,4 +104,4 @@ class LearningService {
   }
 }
 
-export { ASSISTANCE, LearningService, STAGES, demonstratedStage, reviewIntervalDays, stateId };
+export { ASSISTANCE, LearningService, REVIEW_INTERVALS, RUBRIC_KEYS, STAGES, calibrationFor, demonstratedStage, reviewIntervalDays, rubricScore, stateId };

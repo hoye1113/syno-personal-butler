@@ -123,10 +123,11 @@
     button.textContent = "正在提交…";
     try {
       let payload = { kind, value };
-      if (kind === "pdf") {
+      if (["pdf", "txt"].includes(kind)) {
         const file = fileInput.files[0];
-        if (!file) throw new Error("请选择 PDF 文件");
-        if (file.size > 10 * 1024 * 1024) throw new Error("PDF 不能超过 10 MB");
+        if (!file) throw new Error("请选择文件");
+        const maximum = kind === "pdf" ? 10 * 1024 * 1024 : 1024 * 1024;
+        if (file.size > maximum) throw new Error(kind === "pdf" ? "PDF 不能超过 10 MB" : "文本文件不能超过 1 MB");
         const bytes = new Uint8Array(await file.arrayBuffer());
         let binary = "";
         for (let index = 0; index < bytes.length; index += 0x8000) binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
@@ -403,7 +404,14 @@
         knowledgeRef: document.querySelector("#synoLearningRef").value.trim(),
         inputMode: document.querySelector("#synoLearningMode").value,
         assistedLevel: document.querySelector("#synoLearningAssist").value,
-        rubricScore: Number(document.querySelector("#synoLearningScore").value) / 100,
+        rubric: {
+          accurate: document.querySelector("#synoRubricAccurate").checked ? 1 : 0,
+          explained: document.querySelector("#synoRubricExplained").checked ? 1 : 0,
+          applied: document.querySelector("#synoRubricApplied").checked ? 1 : 0,
+          discriminated: document.querySelector("#synoRubricDiscriminated").checked ? 1 : 0,
+        },
+        selfAssessment: document.querySelector("#synoLearningSelf").value,
+        isReview: document.querySelector("#synoLearningReview").checked,
         rawArtifactRef: document.querySelector("#synoLearningArtifact").value.trim(),
         misconceptions: document.querySelector("#synoLearningMisconceptions").value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean),
       }) });
@@ -473,9 +481,9 @@
   document.querySelector("#synoKnowledgeQuery")?.addEventListener("keydown", (event) => { if (event.key === "Enter") loadKnowledge(); });
   document.querySelector("#synoJobsRefresh")?.addEventListener("click", loadJobs);
   document.querySelector("#synoIntakeKind")?.addEventListener("change", (event) => {
-    const pdf = event.target.value === "pdf";
-    document.querySelector("#synoIntakeFile").hidden = !pdf;
-    document.querySelector("#synoIntakeValue").hidden = pdf;
+    const fileMode = ["pdf", "txt"].includes(event.target.value);
+    document.querySelector("#synoIntakeFile").hidden = !fileMode;
+    document.querySelector("#synoIntakeValue").hidden = fileMode;
   });
   document.querySelector("#synoIntakeSubmit")?.addEventListener("click", submitIntake);
   document.querySelector("#synoChatForm")?.addEventListener("submit", submitChat);

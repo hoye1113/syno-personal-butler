@@ -15,11 +15,21 @@
 4. 对本机状态做加密备份；DPAPI 凭据只能在同一 Windows 用户上下文恢复。Token 更推荐在新机器重新输入。
 5. `.runtime/` 可省略；恢复后重建索引。
 
+可执行的本地状态流程（归档目录必须是绝对路径）：
+
+```powershell
+pnpm state:archive -- backup D:\Backups\syno-state-20260717
+pnpm state:archive -- verify D:\Backups\syno-state-20260717
+```
+
+归档仅包含 `%LOCALAPPDATA%\Syno\state`，不会包含 DPAPI credentials；`manifest.json` 记录版本、文件大小与 SHA-256。请再使用系统加密备份保护归档目录。
+
 ## 恢复与回滚
 
 - 源码回滚只由 Codex 在独立开发流程执行；Syno 本身无源码修改能力。
 - 回滚前保存未提交差异，不使用 `git reset --hard` 丢弃用户修改。
 - 数据契约升级必须先备份，再运行迁移；迁移失败时保持旧数据不变并输出报告。
+- 恢复命令 `pnpm state:archive -- restore <绝对归档目录>` 只接受空的状态目标，拒绝覆盖现有状态；先验证清单再复制。
 - Provider 故障不回滚本地事实：Job 留在 `waiting_provider`，恢复连接后精确重试。
 - 渠道故障只降级渠道；Web、本地搜索、任务、提醒和审批继续运行。
 

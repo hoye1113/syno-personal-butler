@@ -5,8 +5,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { IngestService } from "../apps/syno/syno/ingest-service.mjs";
+import { ClaimEvidenceService } from "../apps/syno/syno/claim-evidence-service.mjs";
 import { GoalService } from "../apps/syno/syno/goal-service.mjs";
-import { LearningService, reviewIntervalDays } from "../apps/syno/syno/learning-service.mjs";
+import { LearningService, calibrationFor, reviewIntervalDays } from "../apps/syno/syno/learning-service.mjs";
 import { OutputService } from "../apps/syno/syno/output-service.mjs";
 import { TodayService } from "../apps/syno/syno/today-service.mjs";
 
@@ -45,6 +46,26 @@ test("dedupe matches force merge review instead of silent overwrite", async (t) 
   await assert.rejects(service.apply(receipt.artifact.id, { workspace: root }), /纯新增/);
 });
 
+test("ingest failures are durable and additive proposals support one approved batch", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-ingest-batch-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  let fail = true;
+  const service = new IngestService({
+    intake: { async prepare(payload) { if (fail) throw Object.assign(new Error("source unavailable"), { retryable: true }); return { sourceType: "text", content: payload.value, text: payload.value }; } },
+    knowledge: { async search() { return []; } }, opsRoot: path.join(root, "ops"), stateRoot: path.join(root, "state"),
+  });
+  const failed = await service.receive({ kind: "text", value: "first" });
+  await assert.rejects(service.propose(failed.artifact.id), /source unavailable/);
+  assert.deepEqual((await service.status(failed.artifact.id)).error, { code: "INGEST_PROPOSAL_FAILED", message: "source unavailable", retryable: true });
+  fail = false;
+  await service.propose(failed.artifact.id);
+  const second = await service.receive({ kind: "text", value: "second" });
+  await service.propose(second.artifact.id);
+  const batch = await service.applyBatch([failed.artifact.id, second.artifact.id], { workspace: root });
+  assert.equal(batch.applied, 2);
+  assert.equal(batch.changedPaths.length, 2);
+});
+
 test("only user-produced practice updates mastery and schedules repetition", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-learning-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
@@ -52,13 +73,25 @@ test("only user-produced practice updates mastery and schedules repetition", asy
   await assert.rejects(service.record({ producer: "ai" }), /主人亲自输出/);
   const result = await service.record({
     producer: "user", knowledgeRef: "vault/agent-loop.md", inputMode: "teach-back",
-    rawArtifactRef: "local-state://voice/answer-1", assistedLevel: "prompted", rubricScore: 0.9,
+    rawArtifactRef: "local-state://voice/answer-1", assistedLevel: "prompted",
+    rubric: { accurate: 1, explained: 1, applied: 1, discriminated: 1 }, selfAssessment: "mostly", isReview: false,
     misconceptions: ["忽略了失败恢复"],
   });
   assert.equal(result.state.stage, "expressed");
-  assert.equal(result.evidence.rubricScore, 0.81);
-  assert.equal(reviewIntervalDays(result.evidence.rubricScore), 14);
-  const due = await service.due({ now: new Date("2026-08-01T08:00:00.000Z") });
+  assert.equal(result.evidence.rubricScore, 0.9);
+  assert.equal(result.evidence.calibration, "aligned");
+  assert.equal(result.state.reviewIntervalDays, 1);
+  const reviewed = await service.record({
+    producer: "user", knowledgeRef: "vault/agent-loop.md", inputMode: "quiz",
+    rawArtifactRef: "local-state://typed/review-1", assistedLevel: "none",
+    rubric: { accurate: 1, explained: 1, applied: 1, discriminated: 0 }, selfAssessment: "solid", isReview: true,
+    misconceptions: [],
+  });
+  assert.equal(reviewed.state.reviewCount, 1);
+  assert.equal(reviewed.state.reviewIntervalDays, 3);
+  assert.equal(calibrationFor("solid", 0.5), "fluency-illusion");
+  assert.equal(reviewIntervalDays({ passed: false, isReview: true, reviewCount: 5 }), 1);
+  const due = await service.due({ now: new Date("2026-07-21T08:00:00.000Z") });
   assert.equal(due[0].knowledgeRef, "vault/agent-loop.md");
 });
 
@@ -75,6 +108,21 @@ test("output opportunities and teach-back prompts make output a mastery mechanis
   });
   assert.equal(opportunity.status, "suggested");
   assert.equal(opportunity.priority, 90);
+});
+
+test("time-sensitive claims keep supporting and conflicting evidence side by side", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-evidence-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const service = new ClaimEvidenceService({ opsRoot: path.join(root, "ops"), clock: () => new Date("2026-07-17T08:00:00.000Z") });
+  const { claim } = await service.createClaim({ statement: "某模型当前支持原生工具调用", stability: "volatile", reviewAfter: "2026-07-24T08:00:00.000Z" });
+  const support = await service.createEvidenceCandidate({ claimId: claim.id, sourceRef: "https://vendor.example/docs", sourceTier: "first-party", stance: "supports", excerpt: "官方文档列出 tools。" });
+  const conflict = await service.createEvidenceCandidate({ claimId: claim.id, sourceRef: "https://vendor.example/status", sourceTier: "first-party", stance: "contradicts", excerpt: "状态页说明该能力暂时关闭。" });
+  const first = await service.approveCandidate({ candidateId: support.candidate.id });
+  const second = await service.approveCandidate({ candidateId: conflict.candidate.id });
+  assert.notEqual(first.evidence.id, second.evidence.id);
+  assert.equal(first.evidence.stance, "supports");
+  assert.equal(second.evidence.stance, "contradicts");
+  assert.equal((await fs.readdir(path.join(root, "ops", "evidence", "records"))).length, 2);
 });
 
 test("Today ranks goals before commitments and reviews with the fixed work mix", async (t) => {

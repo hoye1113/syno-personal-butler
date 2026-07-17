@@ -5,6 +5,7 @@ import path from "node:path";
 import { PATHS } from "./paths.mjs";
 
 const RETENTION = Object.freeze({ completedChatDays: 30, confirmedVoiceDays: 7, failedPayloadDays: 30 });
+const DAY_MS = 86_400_000;
 
 async function atomicJson(file, value) {
   await fs.mkdir(path.dirname(file), { recursive: true });
@@ -57,13 +58,38 @@ class ConversationStore {
       if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
       const file = path.join(this.root, entry.name);
       const value = JSON.parse(await fs.readFile(file, "utf8"));
-      if (!["completed", "failed"].includes(value.status)) continue;
+      let changed = false;
+      for (const message of value.messages || []) {
+        const voice = message.rawVoice;
+        if (!voice || !voice.confirmedAt) continue;
+        if (this.clock().getTime() - new Date(voice.confirmedAt).getTime() <= this.retention.confirmedVoiceDays * DAY_MS) continue;
+        delete message.rawVoice;
+        changed = true;
+      }
+      if (!["completed", "failed"].includes(value.status)) {
+        if (changed) await atomicJson(file, value);
+        continue;
+      }
       const days = value.status === "failed" ? this.retention.failedPayloadDays : this.retention.completedChatDays;
-      if (this.clock().getTime() - new Date(value.updatedAt).getTime() <= days * 86_400_000) continue;
+      if (this.clock().getTime() - new Date(value.updatedAt).getTime() <= days * DAY_MS) {
+        if (changed) await atomicJson(file, value);
+        continue;
+      }
       await fs.rm(file, { force: true });
       removed.push(value.id);
+      changed = false;
+      continue;
     }
     return removed;
+  }
+
+  async markVoiceConfirmed(id, messageIndex, confirmedAt = this.clock().toISOString()) {
+    const conversation = await this.get(id);
+    if (!conversation) throw new Error(`Conversation 不存在：${id}`);
+    const message = conversation.messages?.[messageIndex];
+    if (!message?.rawVoice) throw new Error("指定消息没有原始语音");
+    message.rawVoice.confirmedAt = confirmedAt;
+    return this.save(conversation);
   }
 }
 

@@ -550,10 +550,11 @@
               <option value="url">URL / 单篇 B站 opus 或 cv</option>
               <option value="text">粘贴文本</option>
               <option value="markdown">Markdown</option>
+              <option value="txt">TXT / Markdown 文件（1 MB 内）</option>
               <option value="pdf">PDF（10 MB 内）</option>
             </select>
             <textarea id="synoIntakeValue" rows="4" placeholder="粘贴 URL、文本或 Markdown"></textarea>
-            <input id="synoIntakeFile" type="file" accept="application/pdf,.pdf" hidden />
+            <input id="synoIntakeFile" type="file" accept="application/pdf,.pdf,text/plain,.txt,.md,text/markdown" hidden />
             <div class="syno-intake-actions">
               <small id="synoIntakeHint">收录会先进入审批中心，不会直接改知识库。</small>
               <button id="synoIntakeSubmit" class="accent-btn" type="button">提交收录候选</button>
@@ -596,7 +597,9 @@
           <label>知识引用<input id="synoLearningRef" required placeholder="例如：vault/AI/Agent-Harness.md" /></label>
           <label>输出方式<select id="synoLearningMode"><option value="teach-back">教给小白</option><option value="typed">打字解释</option><option value="voice">口述转录</option><option value="practice">实际应用</option><option value="quiz">答题</option></select></label>
           <label>辅助程度<select id="synoLearningAssist"><option value="none">无辅助</option><option value="prompted">仅提示</option><option value="outlined">看过提纲</option><option value="heavily-assisted">大量辅助</option></select></label>
-          <label>自评（0–100）<input id="synoLearningScore" type="number" min="0" max="100" value="70" /></label>
+          <fieldset class="syno-rubric"><legend>四维掌握证据</legend><label><input id="synoRubricAccurate" type="checkbox" />事实与逻辑准确</label><label><input id="synoRubricExplained" type="checkbox" />能解释为什么</label><label><input id="synoRubricApplied" type="checkbox" />能用于新场景</label><label><input id="synoRubricDiscriminated" type="checkbox" />能区分相近概念</label></fieldset>
+          <label>提交前自评<select id="synoLearningSelf"><option value="solid">很扎实</option><option value="mostly">基本掌握</option><option value="shaky">不太稳</option><option value="lost">还没理解</option></select></label>
+          <label class="switch-line"><input id="synoLearningReview" type="checkbox" /><span>这是一次到期复习，而不是首次学习</span></label>
           <label>原始输出引用<input id="synoLearningArtifact" required placeholder="转录、文章或实践记录的 Artifact ID" /></label>
           <label>发现的误区<textarea id="synoLearningMisconceptions" rows="3" placeholder="每行一个误区"></textarea></label>
           <button class="accent-btn" type="submit">提交学习证据</button>

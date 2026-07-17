@@ -8,7 +8,9 @@ import { buildClaudeArgs, runProcess } from "../apps/syno/syno/executors.mjs";
 import { securityHeaders } from "../apps/syno/syno/http-security.mjs";
 import { assertRegisteredOperation, buildOperationRequest } from "../apps/syno/syno/operation-registry.mjs";
 import { routeSynoApi } from "../apps/syno/syno/runtime.mjs";
+import { ConversationStore } from "../apps/syno/syno/conversation-store.mjs";
 import { Scheduler } from "../apps/syno/syno/scheduler.mjs";
+import { backupState, restoreState, verifyArchive } from "../apps/syno/syno/state-archive.mjs";
 import { validateContractRecord } from "../apps/syno/syno/schema-registry.mjs";
 import { isPrivateAddress } from "../apps/syno/syno/source-fetcher.mjs";
 import { frontmatterData } from "../apps/syno/syno/validator.mjs";
@@ -101,4 +103,31 @@ test("Scheduler keeps the Worker event loop referenced", async (t) => {
   await scheduler.start();
   assert.equal(scheduler.timer.hasRef(), true);
   scheduler.stop();
+});
+
+test("conversation retention removes confirmed raw voice before the conversation", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-retention-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const now = new Date("2026-07-17T12:00:00.000Z");
+  const store = new ConversationStore({ root, clock: () => now });
+  const conversation = await store.create({ messages: [{ role: "user", content: "转录", rawVoice: { file: "voice.wav", confirmedAt: "2026-07-09T11:00:00.000Z" } }] });
+  await store.prune();
+  const retained = await store.get(conversation.id);
+  assert.equal(retained.status, "active");
+  assert.equal("rawVoice" in retained.messages[0], false);
+});
+
+test("state archive excludes credentials, verifies hashes and restores only to an empty target", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-archive-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const source = path.join(root, "source");
+  const archive = path.join(root, "archive");
+  const restored = path.join(root, "restored");
+  await fs.mkdir(path.join(source, "conversations"), { recursive: true });
+  await fs.writeFile(path.join(source, "conversations", "a.json"), "{\"safe\":true}", "utf8");
+  const manifest = await backupState({ sourceRoot: source, archiveRoot: archive, clock: () => new Date("2026-07-17T00:00:00.000Z") });
+  assert.equal(manifest.credentialsIncluded, false);
+  assert.equal((await verifyArchive(archive)).entries.length, 1);
+  assert.deepEqual(await restoreState({ archiveRoot: archive, targetRoot: restored }), { restored: 1, version: 1 });
+  await assert.rejects(restoreState({ archiveRoot: archive, targetRoot: restored }), /必须为空/);
 });
