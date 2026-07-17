@@ -1,0 +1,14 @@
+{
+  "requiredFrontmatter": ["title", "tags", "created", "source", "description"],
+  "approvedTags": [
+    "ai_agent", "ai_coding", "ai_evaluation", "ai_safety", "ai_career", "ai_philosophy",
+    "article", "video_transcript", "podcast", "course", "moc", "notes",
+    "zhihu", "wechat", "bilibili", "youtube", "podcast_rss",
+    "claude_code", "codex", "cursor", "devin", "chatgpt", "claude", "openai", "anthropic",
+    "harness_engineering", "loop_engineering", "memory", "multi_agent", "context_engineering",
+    "skills", "hooks", "mcp", "prompting", "fde", "web_clipping", "content_creation",
+    "text_refinement", "author"
+  ],
+  "maxFilenameLength": 50,
+  "requireSemanticLinkOrOrphan": true
+}

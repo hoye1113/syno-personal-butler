@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
-import { PATHS } from "./paths.mjs";
+import { PATHS, relativeToRepo } from "./paths.mjs";
 import { readRecord, writeRecord } from "./markdown-record.mjs";
 import { walkRecords } from "./records.mjs";
 
@@ -15,6 +15,12 @@ class NotificationStore {
     const record = { id: `notice-${randomUUID().slice(0, 10)}`, title, body, level, source, data, read: false, created: now };
     const file = path.join(this.opsRoot, "notifications", now.slice(0, 4), now.slice(5, 7), `${record.id}.md`);
     await writeRecord(file, record, { title, summaryKeys: ["id", "level", "source", "read", "created"] });
+    try {
+      record.recordPath = relativeToRepo(file);
+    } catch {
+      // Test/custom adapters may intentionally persist outside the repository.
+      record.recordPath = null;
+    }
     return record;
   }
   async list({ limit = 50 } = {}) {

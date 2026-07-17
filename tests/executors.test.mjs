@@ -1,7 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import path from "node:path";
 
-import { ExecutorRouter, FakeExecutor, extractOpenCodeText } from "../apps/syno/syno/executors.mjs";
+import {
+  ExecutorRouter,
+  FakeExecutor,
+  claudeProfileTools,
+  extractOpenCodeText,
+  openCodeProfileConfig,
+} from "../apps/syno/syno/executors.mjs";
+import { OperationExecutor } from "../apps/syno/syno/operation-executor.mjs";
+import { PATHS } from "../apps/syno/syno/paths.mjs";
 
 test("Fake Executor implements submit, inspect and cancel", async () => {
   const fake = new FakeExecutor({ responder: async () => ({ text: "ok", changedPaths: ["ops/a.md"] }) });
@@ -40,4 +49,50 @@ test("Executor Router does not hide ordinary process failures", async () => {
 test("OpenCode JSON event output extracts the final text", () => {
   const raw = [JSON.stringify({ part: { text: "first" } }), JSON.stringify({ text: "final" })].join("\n");
   assert.equal(extractOpenCodeText(raw), "final");
+});
+
+test("Executor profiles are enforced as deny-by-default capability maps", () => {
+  const opsJob = { profile: "syno-ops", decision: { allowedRoots: ["ops"] } };
+  const openCode = openCodeProfileConfig(opsJob);
+  assert.equal(openCode.permission["*"], "deny");
+  assert.equal(openCode.permission.read["vault/**"], "allow");
+  assert.equal(openCode.permission.edit["ops/**"], "allow");
+  assert.equal(openCode.permission.edit["vault/**"], undefined);
+  assert.equal(openCode.permission.bash, "deny");
+  assert.equal(openCode.permission.external_directory, "deny");
+
+  const claude = claudeProfileTools(opsJob);
+  assert.ok(claude.allowed.includes("Read(vault/**)"));
+  assert.ok(claude.allowed.includes("Edit(ops/**)"));
+  assert.ok(claude.allowed.includes("Write(ops/**)"));
+  assert.ok(claude.disallowed.includes("Bash"));
+  assert.ok(!claude.allowed.some((tool) => tool.includes("vault/**") && /Edit|Write/.test(tool)));
+});
+
+test("only quarantined intake attachments become extra read capabilities", () => {
+  const outside = { profile: "syno-curate", decision: { allowedRoots: ["vault", "ops"] }, request: { attachment: "C:\\Windows\\System32\\config\\SAM" } };
+  assert.equal(openCodeProfileConfig(outside).permission.read["C:\\Windows\\System32\\config\\SAM"], undefined);
+  const attachment = path.join(PATHS.runtimeRoot, "uploads", "paper.pdf");
+  const inside = { ...outside, request: { attachment } };
+  assert.equal(openCodeProfileConfig(inside).permission.read[attachment], "allow");
+});
+
+test("Operation Executor handles only declared deterministic operations", async () => {
+  const fallbackCalls = [];
+  const fallback = {
+    async submit(job) { fallbackCalls.push(job.id); return { runId: `fallback-${job.id}` }; },
+    inspect() { return null; },
+    cancel() { return false; },
+  };
+  const executor = new OperationExecutor({
+    operations: ["known"],
+    fallback,
+    execute: async (operation, payload) => ({ operation, payload }),
+  });
+  const handled = await executor.submit({ id: "one", request: { kind: "syno-operation", operation: "known", payload: { ok: true } } });
+  assert.equal(handled.executor, "syno-operation");
+  assert.deepEqual(handled.operationResult.payload, { ok: true });
+  assert.equal((await executor.submit({ id: "two", request: { kind: "syno-operation", operation: "other" } })).runId, "fallback-two");
+  assert.equal((await executor.submit({ id: "three", request: { text: "chat" } })).runId, "fallback-three");
+  assert.deepEqual(fallbackCalls, ["two", "three"]);
 });

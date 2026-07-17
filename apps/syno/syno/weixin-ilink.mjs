@@ -145,6 +145,8 @@ class WeixinIlinkAdapter {
         botId: result.ilink_bot_id || result.bot_id || "",
         ownerId: result.ilink_user_id || result.user_id || "",
         cursor: "",
+        contexts: {},
+        seenIds: [],
         savedAt: new Date().toISOString(),
       };
       await this.credentials.save(credential);
@@ -159,6 +161,8 @@ class WeixinIlinkAdapter {
     const credential = await this.credentials.load();
     if (!credential?.token) return this.status();
     this.credential = credential;
+    this.contexts = new Map(Object.entries(credential.contexts || {}));
+    this.seen = new Set((credential.seenIds || []).slice(-2_000));
     this.client = this.clientFactory(credential);
     this.running = true;
     this.abortController = new AbortController();
@@ -193,7 +197,7 @@ class WeixinIlinkAdapter {
         if (result.ret && result.ret !== 0) throw new Error(result.errmsg || `getUpdates ret=${result.ret}`);
         this.credential.cursor = result.get_updates_buf || this.credential.cursor || "";
         await this.credentials.save(this.credential);
-        for (const message of result.msgs || []) await this.#handleMessage(message);
+        for (const message of result.msgs || []) await this.handleInbound(message);
         backoff = 1_000;
       } catch (error) {
         if (signal.aborted || error.name === "AbortError") break;
@@ -205,7 +209,14 @@ class WeixinIlinkAdapter {
     }
   }
 
-  async #handleMessage(raw) {
+  async #persistRuntimeState() {
+    if (!this.credential) return;
+    this.credential.contexts = Object.fromEntries(this.contexts);
+    this.credential.seenIds = [...this.seen].slice(-2_000);
+    await this.credentials.save(this.credential);
+  }
+
+  async handleInbound(raw) {
     if (raw.message_type && raw.message_type !== 1) return;
     const message = normalizeInbound(raw);
     if (this.seen.has(message.id)) return;
@@ -213,14 +224,16 @@ class WeixinIlinkAdapter {
     if (this.seen.size > 2_000) this.seen.delete(this.seen.values().next().value);
 
     if (!this.credential.ownerId) {
-      this.credential.ownerId = message.senderId;
-      await this.credentials.save(this.credential);
+      await this.#persistRuntimeState();
+      await this.client.sendText({ toUserId: message.senderId, contextToken: message.contextToken, text: "扫码结果没有绑定所有者，请回到 Syno Web 重新扫码。" });
+      return;
     }
     if (message.senderId !== this.credential.ownerId) {
       await this.client.sendText({ toUserId: message.senderId, contextToken: message.contextToken, text: "赛诺当前仅允许扫码者本人使用。" });
       return;
     }
     this.contexts.set(message.senderId, message.contextToken);
+    await this.#persistRuntimeState();
     const video = message.items.some((item) => item.type === 5);
     if (video) return this.send({ toUserId: message.senderId, contextToken: message.contextToken, text: "当前版本暂不处理视频，请发送文字、语音、链接、图片或文件。" });
     const media = message.items.filter((item) => item.type === 2 || item.type === 4);

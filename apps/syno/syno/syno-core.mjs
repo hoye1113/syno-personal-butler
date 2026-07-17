@@ -21,7 +21,15 @@ class SynoCore {
   approve(id, approval) { return this.host.approve(id, approval); }
   reject(id, reason) { return this.host.reject(id, reason); }
   cancel(id) { return this.host.cancel(id); }
-  report(kind) { return this.reports.create(kind); }
+  report(kind, context = {}) {
+    return this.host.receive({
+      kind: "syno-operation",
+      operation: "reports.create",
+      intent: "create_report",
+      payload: { kind },
+      text: `生成 ${kind} 报告`,
+    }, context);
+  }
 }
 
 export { SynoCore };

@@ -34,7 +34,7 @@ class JobStore {
     const job = {
       id,
       intent: decision.intent,
-      status: decision.approval === "none" ? "pending" : "awaiting_approval",
+      status: decision.allowed === false ? "rejected" : decision.approval === "none" ? "pending" : "awaiting_approval",
       profile: decision.profile,
       approval: decision.approval,
       approvalsReceived: 0,
@@ -48,7 +48,7 @@ class JobStore {
       request,
       decision,
       result: null,
-      error: null,
+      error: decision.allowed === false ? { code: "POLICY_DENIED", message: decision.reason } : null,
       changedPaths: [],
     };
     await this.save(job);
@@ -120,7 +120,9 @@ class JobStore {
     }
     job.approvalsReceived += 1;
     job.approvalActors = [...(job.approvalActors || []), `${channel}:${senderId}`];
-    const required = job.phase === "merge" ? 1 : job.approval === "double" ? 2 : 1;
+    // A double-approval job uses one approval to execute in the isolated worktree,
+    // then resets this counter and requires the second approval for the merge diff.
+    const required = 1;
     await this.save(job);
     await this.event(job, "job.approved", { channel, senderId, count: job.approvalsReceived, required });
     return { job, ready: job.approvalsReceived >= required };
@@ -169,4 +171,3 @@ class JobStore {
 }
 
 export { JobStore, TERMINAL, TRANSITIONS };
-

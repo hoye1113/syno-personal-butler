@@ -253,6 +253,8 @@
     }
   }
 
+  window.Syno = Object.freeze({ show, close, select });
+
   for (const trigger of document.querySelectorAll("[data-syno-panel]")) trigger.addEventListener("click", () => show(trigger.dataset.synoPanel, trigger));
   for (const tab of tabs) tab.addEventListener("click", () => select(tab.dataset.synoTab));
   document.querySelector("#synoDrawerClose")?.addEventListener("click", close);

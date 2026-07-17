@@ -39,7 +39,6 @@ test("AgentHost enforces no-approval, single-approval and isolated merge states"
 
   const high = await host.receive({ intent: "delete", text: "删除一篇笔记" });
   assert.equal(high.job.approval, "double");
-  assert.equal((await host.approve(high.job.id)).requiresApproval, true);
   const mergeWait = await host.approve(high.job.id);
   assert.equal(mergeWait.job.phase, "merge");
   assert.equal(mergeWait.job.status, "awaiting_approval");
@@ -56,4 +55,43 @@ test("Weixin cannot approve high-risk or double-approval jobs", async (t) => {
   const decision = { intent: "delete", profile: "syno-curate", approval: "double", risk: "high", allowedRoots: ["vault"], needsWorktree: true };
   const job = await store.create({ request: { text: "delete" }, decision, channel: "weixin", senderId: "owner" });
   await assert.rejects(store.approve(job, { channel: "weixin", senderId: "owner", code: job.approvalCode }), /微信只能批准/);
+});
+
+test("high-risk failures remove their isolated worktree", async (t) => {
+  const opsRoot = path.join(PATHS.runtimeRoot, "tests", `cleanup-${Date.now()}`);
+  t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
+  const store = new JobStore({ opsRoot });
+  const removals = [];
+  const git = {
+    async changedPaths() { return []; },
+    async commitPaths() { return { committed: false }; },
+    async prepareWorktree(id) { return { branch: `syno/job/${id}`, directory: path.join(PATHS.runtimeRoot, "cleanup-worktree") }; },
+    async removeWorktree(value) { removals.push(value); },
+  };
+  const executor = { async submit() { throw new Error("forced failure"); }, inspect() { return null; }, cancel() { return false; } };
+  const host = new AgentHost({ store, executor, gitGuard: git });
+  const queued = await host.receive({ intent: "delete", text: "delete" });
+  const failed = await host.approve(queued.job.id);
+  assert.equal(failed.job.status, "failed");
+  assert.equal(failed.job.cleanup.removed, true);
+  assert.equal(removals.length, 1);
+});
+
+test("reject and cancel persist their terminal audit records", async (t) => {
+  const opsRoot = path.join(PATHS.runtimeRoot, "tests", `terminal-${Date.now()}`);
+  t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
+  const store = new JobStore({ opsRoot });
+  const commits = [];
+  const git = {
+    async changedPaths() { return ["ops/jobs/2026/07/job.md", "ops/events/2026/07/event.md"]; },
+    async commitPaths(paths, message) { commits.push({ paths, message }); return { committed: true }; },
+  };
+  const host = new AgentHost({ store, executor: new FakeExecutor(), gitGuard: git });
+  const rejected = await host.receive({ intent: "create_action", text: "one" });
+  await host.reject(rejected.job.id, "no");
+  const canceled = await host.receive({ intent: "create_action", text: "two" });
+  await host.cancel(canceled.job.id);
+  assert.equal(commits.length, 2);
+  assert.match(commits[0].message, /reject/);
+  assert.match(commits[1].message, /cancel/);
 });

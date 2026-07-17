@@ -9,6 +9,7 @@ import { JobStore } from "./job-store.mjs";
 import { IntakeService } from "./intake.mjs";
 import { KnowledgeStore } from "./knowledge-store.mjs";
 import { NotificationStore } from "./notification-store.mjs";
+import { OperationExecutor } from "./operation-executor.mjs";
 import { PATHS } from "./paths.mjs";
 import { ReportService } from "./reports.mjs";
 import { Scheduler } from "./scheduler.mjs";
@@ -25,7 +26,20 @@ function createSynoRuntime(options = {}) {
   const web = new WebChannelAdapter({ notifications });
   const windows = options.windowsChannel || new WindowsNotificationAdapter();
   const jobStore = options.jobStore || new JobStore();
-  const executor = options.executor || new ExecutorRouter();
+  const baseExecutor = options.executor || new ExecutorRouter();
+  let reports;
+  const executor = new OperationExecutor({
+    fallback: baseExecutor,
+    operations: ["reports.create"],
+    execute: async (operation, payload) => {
+      if (operation !== "reports.create") {
+        const error = new Error(`未知核心操作：${operation}`);
+        error.code = "UNKNOWN_CORE_OPERATION";
+        throw error;
+      }
+      return reports.create(payload.kind || "manual", { commit: false });
+    },
+  });
   const gitGuard = options.gitGuard || new GitGuard();
   const host = options.host || new AgentHost({ store: jobStore, executor, gitGuard });
   const knowledge = options.knowledge || new KnowledgeStore();
@@ -55,7 +69,7 @@ function createSynoRuntime(options = {}) {
     },
   });
   const channels = options.channels || new ChannelHub({ web, windows, weixin });
-  const reports = new ReportService({ host, knowledge, notifications, channels });
+  reports = new ReportService({ host, knowledge, notifications, channels, gitGuard });
   core = new SynoCore({ host, knowledge, notifications, channels, reports });
   const scheduler = new Scheduler({ onDue: (kind) => reports.create(kind) });
 
@@ -68,6 +82,7 @@ function createSynoRuntime(options = {}) {
     channels,
     scheduler,
     weixin,
+    developmentMode: options.developmentMode === true || process.env.SYNO_DEVELOPMENT_MODE === "true",
     async initialize({ worker = false } = {}) {
       await Promise.all([
         fs.mkdir(PATHS.opsRoot, { recursive: true }),
@@ -84,6 +99,7 @@ function createSynoRuntime(options = {}) {
 
 async function routeSynoApi(runtime, req, url, readBody) {
   const method = req.method || "GET";
+  const webContext = { channel: "web", senderId: "local-user", developmentMode: runtime.developmentMode };
   if (!url.pathname.startsWith("/api/syno/")) return null;
   if (method === "GET" && url.pathname === "/api/syno/snapshot") return runtime.core.snapshot({ search: url.searchParams.get("q") || "" });
   if (method === "GET" && url.pathname === "/api/syno/search") return { results: await runtime.core.search(url.searchParams.get("q") || "", { limit: url.searchParams.get("limit") }) };
@@ -91,13 +107,13 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "GET" && url.pathname === "/api/syno/jobs") return { jobs: await runtime.host.list({ limit: 100 }) };
   if (method === "GET" && url.pathname === "/api/syno/notifications") return { notifications: await runtime.notifications.list({ limit: 100 }) };
   if (method === "GET" && url.pathname === "/api/syno/channels") return { channels: runtime.channels.status() };
-  if (method === "POST" && url.pathname === "/api/syno/jobs") return runtime.core.execute(await readBody(req), { channel: "web", senderId: "local-user" });
+  if (method === "POST" && url.pathname === "/api/syno/jobs") return runtime.core.execute(await readBody(req), webContext);
   if (method === "POST" && url.pathname === "/api/syno/intake") {
     const request = await runtime.intake.prepare(await readBody(req));
-    return runtime.core.execute(request, { channel: "web", senderId: "local-user" });
+    return runtime.core.execute(request, webContext);
   }
   if (method === "POST" && url.pathname === "/api/syno/index/rebuild") return runtime.core.rebuildIndex();
-  if (method === "POST" && url.pathname === "/api/syno/reports/run") return runtime.core.report((await readBody(req)).kind || "manual");
+  if (method === "POST" && url.pathname === "/api/syno/reports/run") return runtime.core.report((await readBody(req)).kind || "manual", webContext);
   if (method === "POST" && url.pathname === "/api/syno/weixin/login/start") return runtime.weixin.beginLogin();
   if (method === "POST" && url.pathname === "/api/syno/weixin/login/poll") return runtime.weixin.pollLogin();
   if (method === "POST" && url.pathname === "/api/syno/weixin/connect") return runtime.weixin.start();

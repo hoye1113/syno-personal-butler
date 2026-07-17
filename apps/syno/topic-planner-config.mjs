@@ -223,7 +223,9 @@ async function loadPlannerSettings({ projectRoot = process.cwd() } = {}) {
 
 async function savePlannerSettings(settings, { projectRoot = process.cwd() } = {}) {
   const normalized = normalizePlannerSettings(settings, projectRoot);
-  await fs.writeFile(getPlannerConfigPath(projectRoot), `${JSON.stringify(normalized, null, 2)}\n`, 'utf8');
+  const configPath = getPlannerConfigPath(projectRoot);
+  await fs.mkdir(path.dirname(configPath), { recursive: true });
+  await fs.writeFile(configPath, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8');
   return normalized;
 }
 

@@ -27,6 +27,10 @@ class AgentHost {
       channel: context.channel || "web",
       senderId: context.senderId || "local-user",
     });
+    if (decision.allowed === false) {
+      await this.#commitSystemRecords(job, `syno: reject denied ${job.id}`).catch(() => {});
+      return { job, error: job.error };
+    }
     if (job.status === "pending") return this.#execute(job);
     return { job, requiresApproval: true };
   }
@@ -48,14 +52,19 @@ class AgentHost {
   }
 
   async reject(jobId, reason) {
-    return { job: await this.store.reject(await this.#requiredJob(jobId), reason) };
+    const job = await this.store.reject(await this.#requiredJob(jobId), reason);
+    await this.#commitSystemRecords(job, `syno: reject ${job.id}`);
+    return { job };
   }
 
   async cancel(jobId) {
     const job = await this.#requiredJob(jobId);
     if (["completed", "failed", "rejected", "canceled"].includes(job.status)) return { job };
     if (job.runId) this.executor.cancel(job.runId);
-    return { job: await this.store.transition(job, "canceled") };
+    const cleanup = await this.#cleanupWorktree(job);
+    await this.store.transition(job, "canceled", { cleanup });
+    await this.#commitSystemRecords(job, `syno: cancel ${job.id}`);
+    return { job };
   }
 
   async #execute(job) {
@@ -106,6 +115,8 @@ class AgentHost {
         await this.store.transition(job, "failed", {
           error: { code: error.code || error.failureCode || "EXECUTION_FAILED", message: error.message },
         });
+        job.cleanup = await this.#cleanupWorktree(job);
+        await this.store.save(job);
         await this.#commitSystemRecords(job, `syno: fail ${job.id}`).catch(() => {});
       }
       return { job, error: job.error || { code: "EXECUTION_FAILED", message: error.message } };
@@ -146,6 +157,16 @@ class AgentHost {
       throw error;
     }
     return job;
+  }
+
+  async #cleanupWorktree(job) {
+    if (!job.worktree) return { removed: false, reason: "no_worktree" };
+    try {
+      await this.gitGuard.removeWorktree(job.worktree);
+      return { removed: true };
+    } catch (error) {
+      return { removed: false, warning: error.message };
+    }
   }
 }
 

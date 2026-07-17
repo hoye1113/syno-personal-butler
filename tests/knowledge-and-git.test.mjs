@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { GitGuard } from "../apps/syno/syno/git-guard.mjs";
+import { GitGuard, parsePorcelainZ } from "../apps/syno/syno/git-guard.mjs";
 import { KnowledgeStore } from "../apps/syno/syno/knowledge-store.mjs";
 
 const exec = promisify(execFile);
@@ -40,4 +40,8 @@ test("GitGuard commits only declared paths", async (t) => {
   assert.deepEqual(await guard.changedPaths(), ["unrelated.md"]);
   const tracked = (await exec("git", ["show", "--name-only", "--format="], { cwd: root })).stdout.trim();
   assert.equal(tracked, "declared.md");
+});
+
+test("Git porcelain rename parsing keeps both destination and source", () => {
+  assert.deepEqual(parsePorcelainZ("R  new.md\0old.md\0"), ["new.md", "old.md"]);
 });

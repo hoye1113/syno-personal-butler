@@ -22,7 +22,7 @@ function formatDetailLines(details = {}) {
 
 async function appendOperationLog({ vaultRoot, action, title = '', details = {}, now = new Date() }) {
   const date = todayString(now);
-  const logDir = path.join(vaultRoot, '99_系统', 'topic-planner-log');
+  const logDir = path.join(vaultRoot, 'ops', 'events', 'planner');
   const logPath = path.join(logDir, `${date}.md`);
   await fs.mkdir(logDir, { recursive: true });
 

@@ -2,7 +2,7 @@ import { spawn, execFileSync } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { PATHS } from "./paths.mjs";
+import { PATHS, resolveInside } from "./paths.mjs";
 
 const DEFAULT_MODELS = Object.freeze([
   "opencode/mimo-v2.5-free",
@@ -10,6 +10,12 @@ const DEFAULT_MODELS = Object.freeze([
   "opencode/deepseek-v4-flash-free",
 ]);
 const FALLBACK_CODES = new Set(["timeout", "unavailable", "invalid_json", "schema_failure"]);
+const PROFILE_READ_ROOTS = Object.freeze({
+  "syno-read": ["vault", "ops", "contracts", "config", "docs", "AGENTS.md", "README.md"],
+  "syno-ops": ["vault", "ops", "contracts", "config", "docs", "AGENTS.md", "README.md"],
+  "syno-curate": ["vault", "ops", "contracts", "config", "docs", "AGENTS.md", "README.md"],
+  "syno-code": ["apps", "contracts", "config", "docs", "scripts", "tests", "AGENTS.md", "README.md", "package.json"],
+});
 
 function locateCommand(name, envName) {
   if (process.env[envName]) return process.env[envName];
@@ -37,9 +43,9 @@ function spawnPortable(command, args, options = {}) {
   return spawn(command, args, { ...options, windowsHide: true });
 }
 
-async function runProcess(command, args, { cwd, timeoutMs, signal } = {}) {
+async function runProcess(command, args, { cwd, timeoutMs, signal, env = process.env } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawnPortable(command, args, { cwd, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawnPortable(command, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"] });
     const stdout = [];
     const stderr = [];
     let settled = false;
@@ -95,11 +101,8 @@ function extractOpenCodeText(raw) {
   return values.at(-1) || String(raw).trim();
 }
 
-async function writeTaskFile(job, workspace) {
-  const root = path.join(PATHS.runtimeRoot, "executor-tasks");
-  await fs.mkdir(root, { recursive: true });
-  const file = path.join(root, `${job.id}.md`);
-  const instructions = [
+function buildTaskPrompt(job, workspace) {
+  return [
     `# Syno Job ${job.id}`,
     "",
     `Profile: ${job.profile}`,
@@ -114,8 +117,90 @@ async function writeTaskFile(job, workspace) {
     String(job.request.text || job.request.message || JSON.stringify(job.request)),
     "",
   ].join("\n");
+}
+
+async function writeTaskFile(job, workspace) {
+  const root = path.join(PATHS.runtimeRoot, "executor-tasks");
+  await fs.mkdir(root, { recursive: true });
+  const file = path.join(root, `${job.id}.md`);
+  const instructions = buildTaskPrompt(job, workspace);
   await fs.writeFile(file, instructions, "utf8");
-  return file;
+  return { file, instructions };
+}
+
+function permissionPaths(items, { defaultRule = "deny" } = {}) {
+  const rules = { "*": defaultRule };
+  for (const item of items || []) {
+    rules[item] = "allow";
+    if (!path.extname(item)) rules[`${item}/**`] = "allow";
+  }
+  return rules;
+}
+
+function profileReadItems(job) {
+  const items = [...(PROFILE_READ_ROOTS[job.profile] || [])];
+  if (job.request?.attachment) {
+    try {
+      items.push(resolveInside(path.join(PATHS.runtimeRoot, "uploads"), job.request.attachment));
+    } catch {
+      // Arbitrary request paths never become executor capabilities.
+    }
+  }
+  return items;
+}
+
+function openCodeProfileConfig(job) {
+  const readRoots = profileReadItems(job);
+  const writeRoots = job.decision.allowedRoots || [];
+  const bash = job.profile === "syno-code"
+    ? {
+        "*": "deny",
+        "git diff*": "allow",
+        "git status*": "allow",
+        "node --test*": "allow",
+        "node scripts/verify-repository.mjs": "allow",
+        "rg *": "allow",
+      }
+    : "deny";
+  return {
+    $schema: "https://opencode.ai/config.json",
+    permission: {
+      "*": "deny",
+      read: permissionPaths(readRoots),
+      glob: permissionPaths(readRoots),
+      grep: permissionPaths(readRoots),
+      list: permissionPaths(readRoots),
+      edit: permissionPaths(writeRoots),
+      bash,
+      external_directory: "deny",
+      task: "deny",
+      skill: "deny",
+      webfetch: "deny",
+      websearch: "deny",
+      question: "deny",
+    },
+  };
+}
+
+function claudeProfileTools(job) {
+  const readRoots = profileReadItems(job);
+  const writeRoots = job.decision.allowedRoots || [];
+  const allowed = [
+    ...readRoots.map((root) => `Read(${root}${path.extname(root) ? "" : "/**"})`),
+    ...writeRoots.map((root) => `Edit(${root}/**)`),
+    ...writeRoots.map((root) => `Write(${root}/**)`),
+  ];
+  if (job.profile === "syno-code") {
+    allowed.push("Bash(git diff:*)", "Bash(git status:*)", "Bash(node --test:*)", "Bash(node scripts/verify-repository.mjs)");
+  }
+  const disallowed = [
+    "Bash(git commit:*)", "Bash(git push:*)", "Bash(git reset:*)", "Bash(git clean:*)",
+    "Read(../**)", "Read(~/**)", "Read(//**)", "Edit(../**)", "Edit(~/**)", "Edit(//**)",
+    "WebFetch", "WebSearch", "Task",
+  ];
+  if (job.profile !== "syno-code") disallowed.unshift("Bash");
+  if (!writeRoots.length) disallowed.unshift("Edit", "Write");
+  return { allowed, disallowed };
 }
 
 class FakeExecutor {
@@ -142,7 +227,8 @@ class OpenCodeExecutor {
   }
 
   async submit(job, { workspace = PATHS.repoRoot } = {}) {
-    const taskFile = await writeTaskFile(job, workspace);
+    const task = await writeTaskFile(job, workspace);
+    const env = { ...process.env, OPENCODE_CONFIG_CONTENT: JSON.stringify(openCodeProfileConfig(job)) };
     const failures = [];
     for (const model of this.models) {
       const controller = new AbortController();
@@ -151,8 +237,8 @@ class OpenCodeExecutor {
       try {
         const result = await runProcess(this.command, [
           "run", "--format", "json", "--model", model, "--dir", workspace,
-          `读取并执行任务文件：${taskFile}`,
-        ], { cwd: workspace, timeoutMs: this.timeoutMs, signal: controller.signal });
+          task.instructions,
+        ], { cwd: workspace, timeoutMs: this.timeoutMs, signal: controller.signal, env });
         const text = extractOpenCodeText(result.stdout);
         if (job.request.expectsJson) {
           try { JSON.parse(text); } catch {
@@ -187,15 +273,17 @@ class ClaudeExecutor {
     this.controllers = new Map();
   }
   async submit(job, { workspace = PATHS.repoRoot } = {}) {
-    const taskFile = await writeTaskFile(job, workspace);
+    const task = await writeTaskFile(job, workspace);
+    const tools = claudeProfileTools(job);
     const runId = `claude-${job.id}`;
     const controller = new AbortController();
     this.controllers.set(runId, controller);
     try {
       const result = await runProcess(this.command, [
-        "-p", `读取并执行任务文件：${taskFile}`,
+        "-p", task.instructions,
         "--output-format", "json",
-        "--allowedTools", "Read,Glob,Grep,Edit,Write,Bash",
+        "--allowedTools", tools.allowed.join(","),
+        "--disallowedTools", tools.disallowed.join(","),
       ], { cwd: workspace, timeoutMs: this.timeoutMs, signal: controller.signal });
       let text = result.stdout.trim();
       try {
@@ -249,5 +337,8 @@ export {
   OpenCodeExecutor,
   extractOpenCodeText,
   locateCommand,
+  buildTaskPrompt,
+  claudeProfileTools,
+  openCodeProfileConfig,
   runProcess,
 };

@@ -25,9 +25,10 @@ function parsePorcelainZ(raw) {
     const status = entry.slice(0, 2);
     const file = entry.slice(3);
     if (status.includes("R") || status.includes("C")) {
-      const target = entries[index + 1];
-      if (target) {
-        paths.push(target.replace(/\\/g, "/"));
+      const source = entries[index + 1];
+      paths.push(file.replace(/\\/g, "/"));
+      if (source) {
+        paths.push(source.replace(/\\/g, "/"));
         index += 1;
       }
     } else {

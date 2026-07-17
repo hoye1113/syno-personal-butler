@@ -2,7 +2,7 @@ const PROFILE_ROOTS = Object.freeze({
   "syno-read": [],
   "syno-ops": ["ops"],
   "syno-curate": ["vault", "ops"],
-  "syno-code": ["apps", "contracts", "config", "docs", "scripts", "tests"],
+  "syno-code": ["apps", "contracts", "config", "docs", "scripts", "tests", "AGENTS.md", "README.md", "package.json"],
 });
 
 const HIGH_RISK_INTENTS = new Set([
@@ -20,6 +20,7 @@ const WRITE_INTENTS = new Set([
   "create_content_brief",
   "create_memory_proposal",
   "create_report",
+  "settings_change",
   "curate_note",
   ...HIGH_RISK_INTENTS,
 ]);
@@ -43,6 +44,7 @@ function inferIntent(request = {}) {
 
 function evaluate(request = {}, context = {}) {
   const intent = inferIntent(request);
+  const developmentMode = context.developmentMode === true;
   const explicitComplexity = request.complexity === "complex" || context.complexity === "complex";
   const highRisk = HIGH_RISK_INTENTS.has(intent);
   const writes = WRITE_INTENTS.has(intent);
@@ -57,6 +59,7 @@ function evaluate(request = {}, context = {}) {
   const approval = highRisk ? "double" : writes && !trustedAutomation ? "single" : "none";
   const risk = highRisk ? "high" : writes ? "low" : "read";
   const executor = highRisk || explicitComplexity ? "claude" : "opencode";
+  const denied = intent === "code_change" && !developmentMode;
   return Object.freeze({
     intent,
     profile,
@@ -67,8 +70,11 @@ function evaluate(request = {}, context = {}) {
     needsWorktree: highRisk,
     autoCommit: writes && !highRisk,
     validators: ["changed-paths", ...(profile === "syno-curate" ? ["markdown", "vault-contract"] : [])],
-    reason: highRisk
-      ? "命中确定性高风险意图，需要隔离工作区与双审批"
+    allowed: !denied,
+    reason: denied
+      ? "开发模式默认关闭，拒绝由 Syno 修改自身代码"
+      : highRisk
+        ? "命中确定性高风险意图，需要隔离工作区与双审批"
       : writes
         ? "请求会修改长期事实源，需要一次审批"
         : "只读请求可直接执行",

@@ -1462,6 +1462,7 @@ async function importInboxCandidate(candidate) {
     if (!response.ok) {
       throw new Error(data.error || '转卡失败');
     }
+    if (queueApprovalIfNeeded(data)) return;
     const importedTitle = stripTopicPrefix(data.topic?.title || candidate.title);
     const topicPath = data.topic?.path || data.mergedInto || data.created || "";
     state.lastCreatedTopic = { path: topicPath, title: importedTitle };
@@ -1499,6 +1500,7 @@ async function importSelectedInboxCandidates(sourcePaths = Array.from(state.sele
     if (!response.ok && !(data.created || []).length) {
       throw new Error(data.error || '批量转卡失败');
     }
+    if (queueApprovalIfNeeded(data)) return;
 
     for (const item of data.created || []) {
       state.selectedInboxPaths.delete(item.sourcePath);
@@ -1781,6 +1783,10 @@ async function submitPlannerSettings(event) {
     const data = await response.json();
     if (!response.ok) {
       throw new Error(data.error || '保存目录设置失败');
+    }
+    if (queueApprovalIfNeeded(data)) {
+      elements.plannerSettingsHint.textContent = `设置变更已进入审批中心：${data.job.id}`;
+      return;
     }
     state.settings = data.settings || payload;
     if (workspaceMode === "obsidian") {
@@ -2250,6 +2256,7 @@ async function postAndReload(url, payload) {
         : "操作失败";
       throw new Error(data.error || fallback);
     }
+    if (queueApprovalIfNeeded(data)) return null;
     await loadTopics();
     return data;
   } catch (error) {
@@ -2258,6 +2265,13 @@ async function postAndReload(url, payload) {
   } finally {
     setBusy(false);
   }
+}
+
+function queueApprovalIfNeeded(data) {
+  if (!data?.requiresApproval || !data.job?.id) return false;
+  showToast(`任务 ${data.job.id} 已进入审批中心，批准后才会写入。`);
+  window.Syno?.show?.("jobs");
+  return true;
 }
 
 function filteredBacklog() {

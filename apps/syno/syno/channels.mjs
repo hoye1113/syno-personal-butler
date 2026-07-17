@@ -23,7 +23,7 @@ class WebChannelAdapter {
       source: message.source || "web",
       data: message.data,
     });
-    return { delivered: true, id: record.id };
+    return { delivered: true, id: record.id, recordPath: record.recordPath };
   }
   status() { return { id: "web", running: this.running, available: true }; }
 }

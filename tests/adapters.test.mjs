@@ -66,3 +66,32 @@ test("Weixin approval commands are parsed deterministically", () => {
   });
   assert.equal(parseWeixinApproval("批准全部任务"), null);
 });
+
+test("Weixin restores cursor context and never promotes the first unknown sender", async () => {
+  const sent = [];
+  let saved = {
+    token: "token",
+    baseUrl: "https://ilinkai.weixin.qq.com/",
+    ownerId: "",
+    cursor: "cursor-one",
+    contexts: { owner: "ctx-old" },
+    seenIds: ["old-message"],
+  };
+  const credentials = {
+    async load() { return saved; },
+    async save(value) { saved = structuredClone(value); },
+    async clear() {},
+  };
+  const client = {
+    async getUpdates() { return new Promise(() => {}); },
+    async sendText(value) { sent.push(value); return { ret: 0 }; },
+  };
+  const adapter = new WeixinIlinkAdapter({ client, clientFactory: () => client, credentialStore: credentials });
+  await adapter.start();
+  assert.equal(adapter.contexts.get("owner"), "ctx-old");
+  assert.equal(adapter.seen.has("old-message"), true);
+  await adapter.handleInbound({ message_id: 10, from_user_id: "attacker", context_token: "ctx-new", item_list: [{ type: 1, text_item: { text: "hello" } }] });
+  assert.equal(saved.ownerId, "");
+  assert.match(sent[0].text, /重新扫码/);
+  await adapter.stop();
+});

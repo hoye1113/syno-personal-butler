@@ -2,12 +2,16 @@ import { createServer } from "node:http";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
+import { AsyncLocalStorage } from "node:async_hooks";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildTopicDraftFromInbox, deriveInboxCandidate } from "./inbox-import.mjs";
 import { appendOperationLog } from "./operation-log.mjs";
 import { createSynoRuntime, routeSynoApi } from "./syno/runtime.mjs";
+import { ExecutorRouter } from "./syno/executors.mjs";
+import { OperationExecutor } from "./syno/operation-executor.mjs";
+import { PATHS, resolveInside } from "./syno/paths.mjs";
 import {
   getPlannerConfigPath,
   getVaultProfile,
@@ -28,6 +32,7 @@ import { normalizeDisplayTitle } from "./topic-utils.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = __dirname;
 const PUBLIC_DIR = path.join(PROJECT_ROOT, "public");
+process.env.TOPIC_PLANNER_CONFIG ||= path.join(PATHS.stateRoot, "topic-planner.config.json");
 const PORT = Number(process.env.PORT || 4317);
 const TIMEZONE = normalizeTimeZone(
   process.env.TOPIC_PLANNER_TIME_ZONE || Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -71,15 +76,18 @@ let calendarCache = { expiresAt: 0, value: null };
 let authFlowCache = { expiresAt: 0, value: null };
 let plannerSettingsCache = null;
 const topicMutationLocks = new Map();
-const synoRuntime = createSynoRuntime();
+const legacyWorkspace = new AsyncLocalStorage();
+const synoRuntime = createSynoRuntime({
+  executor: new OperationExecutor({ execute: executeLegacyOperation, fallback: new ExecutorRouter() }),
+});
 const synoReady = synoRuntime.initialize();
 
 createServer(async (req, res) => {
   try {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+    if (url.pathname.startsWith("/api/")) assertLocalRequest(req);
 
     if (url.pathname.startsWith("/api/syno/")) {
-      assertLocalRequest(req);
       await synoReady;
       return respondJson(res, await routeSynoApi(synoRuntime, req, url, readJsonBody));
     }
@@ -94,12 +102,12 @@ createServer(async (req, res) => {
 
     if (url.pathname === "/api/inbox/import" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await importInboxCandidate(body));
+      return respondJson(res, await queueLegacyMutation("inbox.import", "create_content_idea", body));
     }
 
     if (url.pathname === "/api/inbox/import-batch" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await importInboxCandidateBatch(body));
+      return respondJson(res, await queueLegacyMutation("inbox.import-batch", "create_content_idea", body));
     }
 
     if (url.pathname === "/api/settings" && req.method === "GET") {
@@ -108,7 +116,7 @@ createServer(async (req, res) => {
 
     if (url.pathname === "/api/settings" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await savePlannerSettingsPayload(body));
+      return respondJson(res, await queueLegacyMutation("settings.save", "settings_change", body));
     }
 
     if (url.pathname === "/api/diagnostics" && req.method === "GET") {
@@ -117,42 +125,43 @@ createServer(async (req, res) => {
 
     if (url.pathname === "/api/wiki/compile" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await compileWikiPacket(body));
+      return respondJson(res, await queueLegacyMutation("wiki.compile", "curate_note", body));
     }
 
     if (url.pathname === "/api/wiki/todos/generate" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await generateWikiTodos(body));
+      return respondJson(res, await queueLegacyMutation("wiki.todos.generate", "curate_note", body));
     }
 
     if (url.pathname === "/api/wiki/todos/accept" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await acceptWikiTodo(body));
+      return respondJson(res, await queueLegacyMutation("wiki.todos.accept", "create_content_idea", body));
     }
 
     if (url.pathname === "/api/wiki/todos/reject" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await rejectWikiTodo(body));
+      return respondJson(res, await queueLegacyMutation("wiki.todos.reject", "create_action", body));
     }
 
     if (url.pathname === "/api/topics/schedule" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await withTopicMutationLock(body.path, () => scheduleTopic(body)));
+      return respondJson(res, await queueLegacyMutation("topics.schedule", "create_action", body));
     }
 
     if (url.pathname === "/api/topics/disposition" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await withTopicMutationLock(body.path, () => disposeTopic(body)));
+      const intent = body.action === "归档" ? "move" : "create_action";
+      return respondJson(res, await queueLegacyMutation("topics.disposition", intent, body));
     }
 
     if (url.pathname === "/api/topics/revert-import" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await withTopicMutationLock(body.path, () => revertImportedTopic(body)));
+      return respondJson(res, await queueLegacyMutation("topics.revert-import", "delete", body));
     }
 
     if (url.pathname === "/api/topics/unschedule" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await withTopicMutationLock(body.path, () => unscheduleTopic(body)));
+      return respondJson(res, await queueLegacyMutation("topics.unschedule", "create_action", body));
     }
 
     if (url.pathname === "/api/lark/repair/start" && req.method === "POST") {
@@ -178,6 +187,40 @@ createServer(async (req, res) => {
 }).listen(PORT, "127.0.0.1", () => {
   console.log(`Syno 赛诺运行于 http://127.0.0.1:${PORT}`);
 });
+
+async function queueLegacyMutation(operation, intent, payload) {
+  await synoReady;
+  return synoRuntime.core.execute({
+    kind: "syno-operation",
+    operation,
+    intent,
+    payload,
+    text: `执行工作台操作：${operation}`,
+  }, { channel: "web", senderId: "local-user", developmentMode: synoRuntime.developmentMode });
+}
+
+async function executeLegacyOperation(operation, payload, { workspace = PATHS.repoRoot } = {}) {
+  const handlers = {
+    "inbox.import": () => importInboxCandidate(payload),
+    "inbox.import-batch": () => importInboxCandidateBatch(payload),
+    "settings.save": () => savePlannerSettingsPayload(payload),
+    "wiki.compile": () => compileWikiPacket(payload),
+    "wiki.todos.generate": () => generateWikiTodos(payload),
+    "wiki.todos.accept": () => acceptWikiTodo(payload),
+    "wiki.todos.reject": () => rejectWikiTodo(payload),
+    "topics.schedule": () => withTopicMutationLock(payload.path, () => scheduleTopic(payload)),
+    "topics.disposition": () => withTopicMutationLock(payload.path, () => disposeTopic(payload)),
+    "topics.revert-import": () => withTopicMutationLock(payload.path, () => revertImportedTopic(payload)),
+    "topics.unschedule": () => withTopicMutationLock(payload.path, () => unscheduleTopic(payload)),
+  };
+  const handler = handlers[operation];
+  if (!handler) {
+    const error = new Error(`未知工作台操作：${operation}`);
+    error.code = "UNKNOWN_OPERATION";
+    throw error;
+  }
+  return legacyWorkspace.run({ workspace }, handler);
+}
 
 async function buildTopicsPayload() {
   const topics = await listTopics();
@@ -235,11 +278,17 @@ async function getPlannerSettingsPayload() {
 async function savePlannerSettingsPayload(payload) {
   const workspaceMode = payload.workspaceMode === 'standalone' ? 'standalone' : 'obsidian';
   const requestedVaultRoot = optionalString(payload.vaultRoot);
+  if (workspaceMode === "standalone") {
+    throw badRequest("Syno V1 仅允许当前 Git 仓库作为工作区");
+  }
   if (workspaceMode === 'obsidian' && !requestedVaultRoot) {
     throw badRequest("Syno 内置仓库模式必须填写仓库根目录");
   }
   if (workspaceMode === 'obsidian' && !path.isAbsolute(requestedVaultRoot)) {
     throw badRequest("Syno 内置仓库根目录必须是本机绝对路径");
+  }
+  if (path.resolve(requestedVaultRoot) !== path.resolve(PATHS.repoRoot)) {
+    throw badRequest("为保证审批、精确提交与回滚，工作区必须是当前 Syno 仓库");
   }
 
   const currentSettings = await getPlannerSettings();
@@ -415,9 +464,23 @@ async function getPlannerSettings(forceReload = false) {
 
 async function getPlannerPaths(forceReload = false) {
   const settings = await getPlannerSettings(forceReload);
-  return {
+  const resolved = {
     settings,
     ...resolvePlannerPaths(settings),
+  };
+  const operation = legacyWorkspace.getStore();
+  if (!operation) return resolved;
+  if (!isPathInside(PATHS.repoRoot, resolved.vaultRoot)) {
+    throw badRequest("为保证审批与 Git 回滚，Syno 工作区必须位于当前仓库内");
+  }
+  if (path.resolve(operation.workspace) === path.resolve(PATHS.repoRoot)) return resolved;
+  const remap = (value) => {
+    if (typeof value !== "string" || !path.isAbsolute(value) || !isPathInside(PATHS.repoRoot, value)) return value;
+    return path.join(operation.workspace, path.relative(PATHS.repoRoot, value));
+  };
+  return {
+    ...Object.fromEntries(Object.entries(resolved).map(([key, value]) => [key, remap(value)])),
+    settings: { ...settings, vaultRoot: remap(settings.vaultRoot) },
   };
 }
 
@@ -1966,6 +2029,26 @@ function assertLocalRequest(req) {
     error.statusCode = 403;
     throw error;
   }
+  const host = optionalString(req.headers?.host).toLowerCase();
+  if (!/^(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::\d+)?$/.test(host)) {
+    const error = new Error("拒绝非本机 Host 的 API 请求");
+    error.statusCode = 403;
+    throw error;
+  }
+  const origin = optionalString(req.headers?.origin);
+  if (origin) {
+    let originHost = "";
+    try { originHost = new URL(origin).host.toLowerCase(); } catch {
+      const error = new Error("请求 Origin 无效");
+      error.statusCode = 403;
+      throw error;
+    }
+    if (originHost !== host) {
+      const error = new Error("拒绝跨站 API 请求");
+      error.statusCode = 403;
+      throw error;
+    }
+  }
 }
 
 function todayString() {
@@ -2002,8 +2085,15 @@ async function readJsonBody(req) {
 }
 
 async function serveStatic(pathname, res) {
-  const targetPath = pathname === "/" ? "/index.html" : pathname;
-  const filePath = path.join(PUBLIC_DIR, path.normalize(targetPath).replace(/^(\.\.[/\\])+/, ""));
+  const targetPath = pathname === "/" ? "index.html" : pathname.replace(/^[/\\]+/, "");
+  let filePath;
+  try {
+    filePath = resolveInside(PUBLIC_DIR, targetPath);
+  } catch {
+    const error = new Error("静态资源路径超出公开目录");
+    error.statusCode = 404;
+    throw error;
+  }
 
   try {
     const content = await fs.readFile(filePath);
