@@ -34,4 +34,4 @@ Standards findings:
 - Startup recovery and durable external-side-effect retry semantics were incomplete.
 - `syno-code` could expose more host-code execution capability than required.
 
-Remediation is in progress. The last green release candidate remains `a75502c` (66/66 tests). The current working tree contains uncommitted round-three fixes and most recently passed 53/66 tests, so Round 3 is not closed. Continue from `docs/HANDOFF-EXECUTION-PLAN.md` and do not tag V1 until all P1 findings are closed and the full suite is green.
+Remediation is in progress. The last green release candidate remains `a75502c` (66/66 tests). Branch `codex/round3-remediation` contains checkpoint `5540bd8` and most recently passed 53/66 tests, so Round 3 is not closed. Continue from `docs/HANDOFF-EXECUTION-PLAN.md` and do not tag V1 until all P1 findings are closed and the full suite is green.

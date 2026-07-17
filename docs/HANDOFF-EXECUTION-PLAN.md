@@ -19,10 +19,11 @@ Syno 是 Windows 本地、单用户、私有 GitHub 同步的个人管家和第�
 
 ### 仓库
 
-- 当前开发仓库：`D:\workSpace\obsidian_repository\.syno-build`
-- 最终目标路径：`D:\workSpace\syno-personal-butler`
+- 当前权威开发仓库：`D:\workSpace\syno-personal-butler`
+- 旧暂存副本：`D:\workSpace\obsidian_repository\.syno-build`（受当前进程占用而暂未删除；新会话不要在此继续开发）
 - 远端：`https://github.com/hoye1113/syno-personal-butler.git`
-- 当前分支：`main`
+- 当前开发分支：`codex/round3-remediation`
+- `main` 保留在最后一个全绿基线 `a75502c`
 - 尚未 Push，尚未创建 V1 tag。
 
 ### 可回退基线
@@ -37,9 +38,9 @@ Syno 是 Windows 本地、单用户、私有 GitHub 同步的个人管家和第�
 
 ### 当前未完成工作
 
-`main` 上有第三轮审查整改的未提交改动。整改方向包括跨进程锁、敏感 payload 本地化、PDF 文本提取、ContentBrief 校验、外部副作用降级/重试、进程树终止、worktree 恢复、`syno-code` 收权、Windows 任务计划修复、复杂任务路由、微信任务路由和长期记忆批准入口。
+`codex/round3-remediation` 的 `5540bd8` 是第三轮审查整改交接检查点。整改方向包括跨进程锁、敏感 payload 本地化、PDF 文本提取、ContentBrief 校验、外部副作用降级/重试、进程树终止、worktree 恢复、`syno-code` 收权、Windows 任务计划修复、复杂任务路由、微信任务路由和长期记忆批准入口。
 
-这些改动当前不是可发布状态：最近一次完整测试为 **53/66 通过，13 项失败**。不得覆盖、重置或丢弃这些改动，也不得把 `docs/V1-VERIFICATION.md` 的旧绿灯结论当成当前工作树结论。
+该检查点当前不是可发布状态：最近一次完整测试为 **53/66 通过，13 项失败**。不得覆盖、重置或丢弃该分支，也不得把 `docs/V1-VERIFICATION.md` 的旧绿灯结论当成当前分支结论。
 
 已知第一批故障：
 
