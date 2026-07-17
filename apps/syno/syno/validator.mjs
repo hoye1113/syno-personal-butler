@@ -34,6 +34,7 @@ async function validateMarkdown(repoRoot, changedPaths) {
     if (!text.startsWith("---\n") && !text.startsWith("---\r\n")) errors.push(`${relative}: 缺少 frontmatter`);
     if (!/^title:\s*.+$/m.test(text)) errors.push(`${relative}: 缺少 title`);
     if (/^tags:\s*\[?[^\n]*#[^\n]*/m.test(text)) errors.push(`${relative}: tag 不应包含 #`);
+    try { frontmatterData(text); } catch (error) { errors.push(`${relative}: ${error.message}`); }
   }
   if (errors.length) throw new Error(errors.join("\n"));
 }
@@ -43,9 +44,17 @@ function frontmatterData(text) {
   if (!match) return { values: {}, tags: [], body: text };
   const block = match[1];
   const values = {};
+  const keys = new Set();
   for (const line of block.split(/\r?\n/)) {
     const field = /^([A-Za-z_][\w-]*):\s*(.*)$/.exec(line);
-    if (field) values[field[1]] = field[2].trim().replace(/^['"]|['"]$/g, "");
+    if (!field) {
+      if (/^\s*<<\s*:/.test(line)) throw new Error("frontmatter 禁止 YAML merge key");
+      continue;
+    }
+    if (keys.has(field[1])) throw new Error(`frontmatter 存在重复字段：${field[1]}`);
+    keys.add(field[1]);
+    if (/^[&*!]|^[>|]$/.test(field[2].trim())) throw new Error(`frontmatter 字段 ${field[1]} 使用了不受支持的 YAML 特性`);
+    values[field[1]] = field[2].trim().replace(/^['"]|['"]$/g, "");
   }
   const tagLine = /^tags:[ \t]*(.*)$/m.exec(block);
   let tags = [];

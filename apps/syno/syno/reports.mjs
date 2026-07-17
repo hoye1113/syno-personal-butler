@@ -15,7 +15,7 @@ class ReportService {
     this.clock = clock;
   }
 
-  async create(kind, { commit = true } = {}) {
+  async create(kind, { commit = true, deliver = true, opsRoot = this.opsRoot, pathResolver = this.pathResolver } = {}) {
     const now = this.clock();
     const jobs = await this.host.list({ limit: 200 });
     const open = jobs.filter((job) => !["completed", "failed", "rejected", "canceled"].includes(job.status));
@@ -32,13 +32,22 @@ class ReportService {
       openJobs: open.slice(0, 20).map((job) => ({ id: job.id, intent: job.intent, status: job.status })),
       failedJobs: failed.slice(0, 10).map((job) => ({ id: job.id, error: job.error })),
     };
-    const file = path.join(this.opsRoot, "reviews", String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, "0"), `${record.id}.md`);
+    const file = path.join(opsRoot, "reviews", String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, "0"), `${record.id}.md`);
     await writeRecord(file, record, { title, summaryKeys: ["id", "kind", "created", "summary"] });
-    const deliveries = await this.channels.send({ title, body: record.summary, source: "scheduler", data: { reportId: record.id } });
-    const commitPaths = [this.pathResolver(file), ...Object.values(deliveries).map((item) => item?.recordPath).filter(Boolean)];
+    const deliveries = deliver ? await this.deliver(record) : {};
+    const commitPaths = [pathResolver(file), ...Object.values(deliveries).map((item) => item?.recordPath).filter(Boolean)];
     if (commit && this.gitGuard) record.localCommit = await this.gitGuard.commitPaths(commitPaths, `syno: create ${kind} report`);
     record.changedPaths = commitPaths;
     return record;
+  }
+
+  async deliver(record) {
+    return this.channels.send({
+      title: record.title,
+      body: record.summary,
+      source: "scheduler",
+      data: { reportId: record.id },
+    });
   }
 }
 

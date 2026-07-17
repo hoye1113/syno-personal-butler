@@ -7,25 +7,27 @@ const MAX_SOURCE_BYTES = 2 * 1024 * 1024;
 const MAX_SOURCE_TEXT = 100_000;
 const MAX_REDIRECTS = 3;
 
+const PRIVATE_IPV4 = new net.BlockList();
+for (const [address, prefix] of [
+  ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8],
+  ["169.254.0.0", 16], ["172.16.0.0", 12], ["192.0.0.0", 24], ["192.0.2.0", 24],
+  ["192.88.99.0", 24], ["192.168.0.0", 16], ["198.18.0.0", 15], ["198.51.100.0", 24],
+  ["203.0.113.0", 24], ["224.0.0.0", 4], ["240.0.0.0", 4],
+]) PRIVATE_IPV4.addSubnet(address, prefix, "ipv4");
+const PRIVATE_IPV6 = new net.BlockList();
+for (const [address, prefix] of [
+  ["::", 96], ["::ffff:0:0", 96], ["64:ff9b::", 96], ["100::", 64],
+  ["2001::", 32], ["2001:2::", 48], ["2001:db8::", 32], ["2002::", 16],
+  ["fc00::", 7], ["fe80::", 10], ["fec0::", 10], ["ff00::", 8],
+]) PRIVATE_IPV6.addSubnet(address, prefix, "ipv6");
+
 function isPrivateAddress(address) {
   const value = String(address || "").toLowerCase().split("%")[0];
   const family = net.isIP(value);
-  if (family === 4) {
-    const [a, b] = value.split(".").map(Number);
-    return a === 0 || a === 10 || a === 127 || a >= 224
-      || (a === 100 && b >= 64 && b <= 127)
-      || (a === 169 && b === 254)
-      || (a === 172 && b >= 16 && b <= 31)
-      || (a === 192 && (b === 0 || b === 168))
-      || (a === 198 && (b === 18 || b === 19));
-  }
-  if (family === 6) {
-    if (value === "::" || value === "::1") return true;
-    if (value.startsWith("fc") || value.startsWith("fd") || /^fe[89ab]/.test(value)) return true;
-    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(value);
-    return mapped ? isPrivateAddress(mapped[1]) : false;
-  }
-  return false;
+  if (!family) return false;
+  return family === 4
+    ? PRIVATE_IPV4.check(value, "ipv4")
+    : PRIVATE_IPV6.check(value, "ipv6");
 }
 
 async function resolvePublicAddress(url, lookup = dnsLookup) {

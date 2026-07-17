@@ -45,3 +45,25 @@ test("GitGuard commits only declared paths", async (t) => {
 test("Git porcelain rename parsing keeps both destination and source", () => {
   assert.deepEqual(parsePorcelainZ("R  new.md\0old.md\0"), ["new.md", "old.md"]);
 });
+
+test("GitGuard rejects a branch changed after its diff approval", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-git-pin-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await exec("git", ["init", "-b", "main"], { cwd: root });
+  await exec("git", ["config", "user.name", "Syno Test"], { cwd: root });
+  await exec("git", ["config", "user.email", "syno-test@localhost"], { cwd: root });
+  await fs.writeFile(path.join(root, ".gitignore"), ".worktrees/\n");
+  await fs.writeFile(path.join(root, "base.md"), "base\n");
+  await exec("git", ["add", "--", ".gitignore", "base.md"], { cwd: root });
+  await exec("git", ["commit", "-m", "base"], { cwd: root });
+  const guard = new GitGuard({ repoRoot: root, worktreeRoot: path.join(root, ".worktrees") });
+  const worktree = await guard.prepareWorktree("pin-test");
+  await fs.writeFile(path.join(worktree.directory, "new.md"), "approved\n");
+  await guard.commitPaths(["new.md"], "approved", worktree.directory);
+  const approved = await guard.pinWorktree(worktree);
+  await fs.writeFile(path.join(worktree.directory, "later.md"), "not approved\n");
+  await exec("git", ["add", "--", "later.md"], { cwd: worktree.directory });
+  await exec("git", ["commit", "-m", "mutated after preview"], { cwd: worktree.directory });
+  await assert.rejects(guard.mergeWorktree({ ...worktree, commit: approved.commit, diffHash: approved.diffHash }), /审批后发生变化/);
+  await guard.removeWorktree(worktree);
+});

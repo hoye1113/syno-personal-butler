@@ -21,28 +21,61 @@ function parseWeixinApproval(text) {
   return match ? { jobId: match[1], code: match[2].toUpperCase() } : null;
 }
 
+const PUBLIC_COMMAND_INTENTS = Object.freeze({
+  search: "search",
+  create_content_idea: "create_content_idea",
+  create_content_brief: "create_content_brief",
+  create_action: "create_action",
+  create_memory_proposal: "create_memory_proposal",
+});
+
 function createSynoRuntime(options = {}) {
   const notifications = options.notifications || new NotificationStore();
   const web = new WebChannelAdapter({ notifications });
   const windows = options.windowsChannel || new WindowsNotificationAdapter();
   const jobStore = options.jobStore || new JobStore();
+  const knowledge = options.knowledge || new KnowledgeStore();
   const baseExecutor = options.executor || new ExecutorRouter();
   let reports;
   const executor = new OperationExecutor({
     fallback: baseExecutor,
     operations: ["reports.create"],
-    execute: async (operation, payload) => {
+    execute: async (operation, payload, { workspace } = {}) => {
       if (operation !== "reports.create") {
         const error = new Error(`未知核心操作：${operation}`);
         error.code = "UNKNOWN_CORE_OPERATION";
         throw error;
       }
-      return reports.create(payload.kind || "manual", { commit: false });
+      const root = workspace || PATHS.repoRoot;
+      return reports.create(payload.kind || "manual", {
+        commit: false,
+        deliver: false,
+        opsRoot: path.join(root, "ops"),
+        pathResolver: (file) => path.relative(root, file).replace(/\\/g, "/"),
+      });
     },
   });
   const gitGuard = options.gitGuard || new GitGuard();
-  const host = options.host || new AgentHost({ store: jobStore, executor, gitGuard });
-  const knowledge = options.knowledge || new KnowledgeStore();
+  const host = options.host || new AgentHost({
+    store: jobStore,
+    executor,
+    gitGuard,
+    onCommitted: async ({ job, changedPaths, execution }) => {
+      const effects = {};
+      if (changedPaths.some((item) => item.startsWith("vault/"))) knowledge.invalidate();
+      if (job.request?.operation === "reports.create") {
+        const report = execution?.operationResult;
+        if (report) {
+          const deliveries = await reports.deliver(report);
+          const records = Object.values(deliveries).map((item) => item?.recordPath).filter(Boolean);
+          if (records.length) await gitGuard.commitPaths(records, `syno: deliver ${report.id}`);
+          effects.reportDeliveries = deliveries;
+        }
+      }
+      if (options.onCommitted) effects.external = await options.onCommitted({ job, changedPaths, execution });
+      return effects;
+    },
+  });
   const intake = options.intake || new IntakeService();
   let core;
   const weixin = options.weixin || new WeixinIlinkAdapter({
@@ -61,7 +94,18 @@ function createSynoRuntime(options = {}) {
               : `任务 ${result.job.id} 已批准并进入 ${result.job.status}`,
           };
         }
-        const result = await core.execute({ text: message.text }, { channel: "weixin", senderId: message.senderId });
+        const trimmed = String(message.text || "").trim();
+        const request = /^https?:\/\/\S+$/i.test(trimmed)
+          ? await intake.prepare({ kind: "url", value: trimmed })
+          : {
+              text: trimmed || `收到 ${message.artifacts?.length || 0} 个隔离附件候选，请在 Web 中查看后决定是否收录。`,
+              artifacts: message.artifacts || [],
+            };
+        const result = await core.execute(request, {
+          channel: "weixin",
+          senderId: message.senderId,
+          messageId: message.id,
+        });
         return { text: result.error?.message || (result.requiresApproval ? `任务 ${result.job.id} 等待审批，审批码 ${result.job.approvalCode}` : result.job?.result?.text || `任务 ${result.job?.id || ""} 已处理`) };
       } catch (error) {
         return { text: `未能处理：${error.message}` };
@@ -71,7 +115,10 @@ function createSynoRuntime(options = {}) {
   const channels = options.channels || new ChannelHub({ web, windows, weixin });
   reports = new ReportService({ host, knowledge, notifications, channels, gitGuard });
   core = new SynoCore({ host, knowledge, notifications, channels, reports });
-  const scheduler = new Scheduler({ onDue: (kind) => reports.create(kind) });
+  const scheduler = new Scheduler({
+    onDue: (kind) => core.report(kind, { channel: "scheduler", senderId: "syno-worker", trustedAutomation: true }),
+  });
+  let channelRecoveryTimer = null;
 
   return {
     core,
@@ -90,10 +137,18 @@ function createSynoRuntime(options = {}) {
         fs.mkdir(PATHS.stateRoot, { recursive: true }),
       ]);
       await channels.start();
-      if (worker) await scheduler.start();
+      if (worker) {
+        await scheduler.start();
+        channelRecoveryTimer = setInterval(() => weixin.start().catch(() => {}), 60_000);
+      }
       return core.snapshot();
     },
-    async close() { scheduler.stop(); await channels.stop(); },
+    async close() {
+      scheduler.stop();
+      if (channelRecoveryTimer) clearInterval(channelRecoveryTimer);
+      channelRecoveryTimer = null;
+      await channels.stop();
+    },
   };
 }
 
@@ -107,7 +162,27 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "GET" && url.pathname === "/api/syno/jobs") return { jobs: await runtime.host.list({ limit: 100 }) };
   if (method === "GET" && url.pathname === "/api/syno/notifications") return { notifications: await runtime.notifications.list({ limit: 100 }) };
   if (method === "GET" && url.pathname === "/api/syno/channels") return { channels: runtime.channels.status() };
-  if (method === "POST" && url.pathname === "/api/syno/jobs") return runtime.core.execute(await readBody(req), webContext);
+  if (method === "POST" && url.pathname === "/api/syno/jobs") {
+    const request = await readBody(req);
+    const reserved = ["intent", "kind", "operation", "profile", "decision", "approval", "risk", "complexity"]
+      .filter((field) => Object.hasOwn(request, field));
+    if (reserved.length) {
+      const error = new Error(`公共 Job API 不接受 Policy 字段：${reserved.join(", ")}`);
+      error.statusCode = 400;
+      throw error;
+    }
+    const mappedIntent = request.mode ? PUBLIC_COMMAND_INTENTS[request.mode] : "";
+    if (request.mode && !mappedIntent) {
+      const error = new Error("未知的公共任务模式");
+      error.statusCode = 400;
+      throw error;
+    }
+    return runtime.core.execute({
+      text: String(request.text || request.message || ""),
+      attachments: request.attachments || [],
+      ...(mappedIntent ? { intent: mappedIntent } : {}),
+    }, webContext);
+  }
   if (method === "POST" && url.pathname === "/api/syno/intake") {
     const request = await runtime.intake.prepare(await readBody(req));
     return runtime.core.execute(request, webContext);
@@ -118,6 +193,10 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "POST" && url.pathname === "/api/syno/weixin/login/poll") return runtime.weixin.pollLogin();
   if (method === "POST" && url.pathname === "/api/syno/weixin/connect") return runtime.weixin.start();
   if (method === "POST" && url.pathname === "/api/syno/weixin/disconnect") return runtime.weixin.stop();
+  if (method === "POST" && url.pathname === "/api/syno/channels/home") {
+    const body = await readBody(req);
+    return { channels: await runtime.channels.setHome(String(body.channel || "")) };
+  }
   const match = /^\/api\/syno\/jobs\/([^/]+)\/(approve|reject|cancel)$/.exec(url.pathname);
   if (method === "POST" && match) {
     const body = await readBody(req);
@@ -130,4 +209,4 @@ async function routeSynoApi(runtime, req, url, readBody) {
   throw error;
 }
 
-export { createSynoRuntime, parseWeixinApproval, routeSynoApi };
+export { PUBLIC_COMMAND_INTENTS, createSynoRuntime, parseWeixinApproval, routeSynoApi };

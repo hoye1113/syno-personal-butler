@@ -110,10 +110,44 @@
       const heading = node("h3", "", note.title);
       const source = node("small", "syno-note-path", note.path);
       const body = node("pre", "syno-markdown", note.markdown);
-      reader.replaceChildren(heading, source, body);
+      const edit = node("button", "syno-source-edit", "编辑原文");
+      edit.type = "button";
+      edit.addEventListener("click", () => showNoteEditor(note));
+      reader.replaceChildren(heading, source, edit, body);
     } catch (error) {
       reader.replaceChildren(node("p", "syno-error", error.message));
     }
+  }
+
+  function showNoteEditor(note) {
+    const reader = document.querySelector("#synoReader");
+    const heading = node("h3", "", `编辑：${note.title}`);
+    const hint = node("p", "syno-edit-hint", "保存后会先生成 Markdown diff，并要求两次审批；这里不会直接覆盖原文。");
+    const textarea = node("textarea", "syno-source-editor");
+    textarea.value = note.markdown;
+    textarea.rows = 24;
+    const actions = node("div", "syno-job-actions");
+    const save = node("button", "accent-btn", "提交修改候选");
+    const cancel = node("button", "ghost-btn", "取消");
+    save.type = cancel.type = "button";
+    cancel.addEventListener("click", () => readNote(note.path));
+    save.addEventListener("click", async () => {
+      save.disabled = true;
+      try {
+        const result = await api("/api/notes/edit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: note.path, markdown: textarea.value }),
+        });
+        hint.textContent = `任务 ${result.job.id} 已进入审批中心。`;
+        select("jobs");
+      } catch (error) {
+        hint.textContent = error.message;
+      } finally { save.disabled = false; }
+    });
+    actions.append(save, cancel);
+    reader.replaceChildren(heading, hint, textarea, actions);
+    textarea.focus();
   }
 
   function statusLabel(job) {
@@ -138,6 +172,11 @@
         const request = node("p", "", job.request?.text || job.request?.message || "结构化任务");
         item.append(meta, request);
         if (job.error?.message) item.append(node("p", "syno-error", job.error.message));
+        if (job.result?.preview) {
+          const details = node("details", "syno-diff");
+          details.append(node("summary", "", "查看待合并 Markdown diff"), node("pre", "syno-markdown", job.result.preview));
+          item.append(details);
+        }
         if (job.status === "awaiting_approval") {
           const actions = node("div", "syno-job-actions");
           const approve = node("button", "accent-btn", job.phase === "merge" ? "批准合并" : "批准");
@@ -204,12 +243,27 @@
     try {
       const result = await api("/api/syno/weixin/login/poll", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       if (result.status === "confirmed") {
-        await api("/api/syno/weixin/connect", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-        status.textContent = "已连接。请在 ClawBot 私聊发送一条文字完成收发验证。";
+        const connection = await api("/api/syno/weixin/connect", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        status.textContent = connection.running
+          ? "已连接。请在 ClawBot 私聊发送一条文字完成收发验证。"
+          : (connection.lastError || "凭据已保存，后台 Worker 将接管连接。");
         document.querySelector("#synoWeixinQr").hidden = true;
         document.querySelector("#synoWeixinPoll").hidden = true;
         await loadChannelStatus();
       } else status.textContent = `当前状态：${result.status}。请在手机完成确认后重试。`;
+    } catch (error) { status.textContent = error.message; }
+  }
+
+  async function setWeixinHome() {
+    const status = document.querySelector("#synoWeixinStatus");
+    try {
+      await api("/api/syno/channels/home", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel: "weixin" }),
+      });
+      status.textContent = "微信已设为主要通知渠道；Web 通知中心与 Windows 通知仍会保留。";
+      await loadChannelStatus();
     } catch (error) { status.textContent = error.message; }
   }
 
@@ -231,7 +285,7 @@
       const result = await api("/api/syno/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, ...(intent ? { intent } : {}) }),
+        body: JSON.stringify({ text, ...(intent ? { mode: intent } : {}) }),
       });
       const message = result.error?.message
         || (result.requiresApproval
@@ -272,5 +326,6 @@
   document.querySelector("#synoChatForm")?.addEventListener("submit", submitChat);
   document.querySelector("#synoWeixinLogin")?.addEventListener("click", beginWeixinLogin);
   document.querySelector("#synoWeixinPoll")?.addEventListener("click", pollWeixinLogin);
+  document.querySelector("#synoWeixinHome")?.addEventListener("click", setWeixinHome);
   loadChannelStatus();
 })();

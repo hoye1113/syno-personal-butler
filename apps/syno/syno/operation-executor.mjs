@@ -1,3 +1,5 @@
+import { assertRegisteredOperation } from "./operation-registry.mjs";
+
 class OperationExecutor {
   constructor({ execute, fallback, operations = null } = {}) {
     if (typeof execute !== "function" || !fallback) throw new Error("OperationExecutor 缺少执行 seam");
@@ -11,8 +13,10 @@ class OperationExecutor {
     if (job.request?.kind !== "syno-operation" || (this.operations && !this.operations.has(job.request.operation))) {
       return this.fallback.submit(job, options);
     }
+    assertRegisteredOperation(job);
     const runId = `operation-${job.id}`;
     this.runs.set(runId, { status: "running", operation: job.request.operation });
+    await options.onStart?.(runId);
     try {
       const operationResult = await this.execute(job.request.operation, job.request.payload || {}, { job, ...options });
       const result = {

@@ -31,6 +31,9 @@ for (const file of files) {
   if (/C:\\Users\\[^\\\s]+\\\.(?:openclaw|ssh)|%LOCALAPPDATA%\\Syno\\credentials/i.test(text) && !relative.startsWith("docs/")) {
     errors.push(`${relative}: local credential path must only appear in documentation`);
   }
+  if (!relative.startsWith("docs/") && /(?:[A-Za-z]:[\\/](?:Users|workSpace)[\\/]|D:[\\/]workSpace[\\/])/i.test(text)) {
+    errors.push(`${relative}: hard-coded personal absolute path`);
+  }
   if ((relative.startsWith("apps/") || relative.startsWith("config/")) && /macOS|AppleScript|osascript|com\.apple\.iCal/i.test(text)) {
     errors.push(`${relative}: unsupported Apple implementation reference`);
   }

@@ -1,12 +1,9 @@
-import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { promisify } from "node:util";
 
 import { PATHS } from "./paths.mjs";
+import { locateCommand, runProcess } from "./executors.mjs";
 import { writeRecord } from "./markdown-record.mjs";
-
-const execFileAsync = promisify(execFile);
 
 class FakeCalendarAdapter {
   constructor() { this.events = []; }
@@ -28,10 +25,9 @@ class MarkdownCalendarAdapter {
 }
 
 class LarkCalendarAdapter {
-  constructor({ command = process.env.LARK_CLI_PATH || "lark-cli" } = {}) { this.command = command; }
+  constructor({ command } = {}) { this.command = command || locateCommand("lark-cli", "LARK_CLI_PATH"); }
   async #json(args) {
-    const executable = process.platform === "win32" && !path.extname(this.command) ? `${this.command}.cmd` : this.command;
-    const { stdout } = await execFileAsync(executable, args, { windowsHide: true, maxBuffer: 5 * 1024 * 1024 });
+    const { stdout } = await runProcess(this.command, args, { timeoutMs: 90_000 });
     return JSON.parse(stdout || "{}");
   }
   async create(event) {

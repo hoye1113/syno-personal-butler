@@ -20,6 +20,7 @@ test("Policy routes read, write and high-risk intents deterministically", () => 
   assert.equal(idea.profile, "syno-ops");
   assert.equal(idea.approval, "single");
   assert.equal(idea.executor, "opencode");
+  assert.equal(idea.needsWorktree, true);
   const deletion = evaluate({ intent: "delete" });
   assert.equal(deletion.approval, "double");
   assert.equal(deletion.executor, "claude");

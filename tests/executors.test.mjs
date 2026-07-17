@@ -85,11 +85,16 @@ test("Operation Executor handles only declared deterministic operations", async 
     cancel() { return false; },
   };
   const executor = new OperationExecutor({
-    operations: ["known"],
+    operations: ["reports.create"],
     fallback,
     execute: async (operation, payload) => ({ operation, payload }),
   });
-  const handled = await executor.submit({ id: "one", request: { kind: "syno-operation", operation: "known", payload: { ok: true } } });
+  const handled = await executor.submit({
+    id: "one",
+    intent: "create_report",
+    decision: { intent: "create_report" },
+    request: { kind: "syno-operation", operation: "reports.create", intent: "create_report", payload: { ok: true } },
+  });
   assert.equal(handled.executor, "syno-operation");
   assert.deepEqual(handled.operationResult.payload, { ok: true });
   assert.equal((await executor.submit({ id: "two", request: { kind: "syno-operation", operation: "other" } })).runId, "fallback-two");

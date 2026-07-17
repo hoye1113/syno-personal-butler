@@ -18,34 +18,43 @@ test("AgentHost enforces no-approval, single-approval and isolated merge states"
   const opsRoot = path.join(PATHS.runtimeRoot, "tests", `jobs-${Date.now()}`);
   t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
   const store = new JobStore({ opsRoot });
+  let currentChanges = [];
   const git = {
     commits: [], merges: [], removals: [],
     async changedPaths() { return []; },
-    async commitPaths(paths, message) { this.commits.push({ paths, message }); return { committed: Boolean(paths.length) }; },
-    async prepareWorktree(id) { return { branch: `syno/job/${id}`, directory: path.join(PATHS.runtimeRoot, "fake-worktree") }; },
-    async branchDiff() { return "diff preview"; },
+    async changes() { return currentChanges; },
+    async commitPaths(paths, message) { this.commits.push({ paths, message }); return { committed: Boolean(paths.length), commit: "work-1", paths }; },
+    async prepareWorktree(id) { return { branch: `syno/job/${id}`, directory: path.join(PATHS.runtimeRoot, "fake-worktree"), base: "base-1" }; },
+    async pinWorktree() { return { commit: "work-1", diffHash: "hash-1", preview: "diff preview", changes: currentChanges }; },
     async mergeWorktree(value) { this.merges.push(value); return { merged: true, commit: "merge-1" }; },
     async removeWorktree(value) { this.removals.push(value); },
   };
-  const host = new AgentHost({ store, executor: new FakeExecutor(), gitGuard: git });
+  const host = new AgentHost({
+    store,
+    executor: new FakeExecutor(),
+    gitGuard: git,
+    validator: async ({ changedPaths }) => ({ ok: true, changedPaths }),
+  });
 
   const read = await host.receive({ intent: "search", text: "查找知识" });
   assert.equal(read.job.status, "completed");
 
   const idea = await host.receive({ intent: "create_content_idea", text: "创建选题" });
   assert.equal(idea.job.status, "awaiting_approval");
+  currentChanges = [{ status: "??", path: "ops/content/new.md", kind: "added" }];
   const ideaDone = await host.approve(idea.job.id);
   assert.equal(ideaDone.job.status, "completed");
 
   const high = await host.receive({ intent: "delete", text: "删除一篇笔记" });
   assert.equal(high.job.approval, "double");
+  currentChanges = [{ status: "D", path: "vault/old.md", kind: "existing" }];
   const mergeWait = await host.approve(high.job.id);
-  assert.equal(mergeWait.job.phase, "merge");
+  assert.equal(mergeWait.job.phase, "merge", JSON.stringify(mergeWait));
   assert.equal(mergeWait.job.status, "awaiting_approval");
   const merged = await host.approve(high.job.id);
   assert.equal(merged.job.status, "completed");
-  assert.equal(git.merges.length, 1);
-  assert.equal(git.removals.length, 1);
+  assert.equal(git.merges.length, 2);
+  assert.equal(git.removals.length, 2);
 });
 
 test("Weixin cannot approve high-risk or double-approval jobs", async (t) => {
@@ -94,4 +103,52 @@ test("reject and cancel persist their terminal audit records", async (t) => {
   assert.equal(commits.length, 2);
   assert.match(commits[0].message, /reject/);
   assert.match(commits[1].message, /cancel/);
+});
+
+test("running jobs publish runId early enough to be canceled safely", async (t) => {
+  const opsRoot = path.join(PATHS.runtimeRoot, "tests", `cancel-running-${Date.now()}`);
+  t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
+  const store = new JobStore({ opsRoot });
+  let rejectRun;
+  const executor = {
+    async submit(_job, options) {
+      await options.onStart("run-cancel-me");
+      return new Promise((_resolve, reject) => { rejectRun = reject; });
+    },
+    cancel(id) {
+      if (id !== "run-cancel-me") return false;
+      rejectRun(Object.assign(new Error("canceled"), { failureCode: "canceled" }));
+      return true;
+    },
+    inspect() { return { status: "running" }; },
+  };
+  const git = {
+    async changedPaths() { return []; },
+    async commitPaths() { return { committed: false }; },
+    async prepareWorktree(id) { return { branch: `syno/job/${id}`, directory: path.join(PATHS.runtimeRoot, "cancel-worktree"), base: "base" }; },
+    async removeWorktree() {},
+  };
+  const host = new AgentHost({ store, executor, gitGuard: git });
+  const queued = await host.receive({ intent: "create_action", text: "cancel me" });
+  const running = host.approve(queued.job.id);
+  for (let index = 0; index < 50; index += 1) {
+    if ((await host.inspect(queued.job.id))?.runId) break;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  const canceled = await host.cancel(queued.job.id);
+  assert.equal(canceled.job.status, "canceled");
+  assert.equal((await running).job.status, "canceled");
+});
+
+test("channel message request keys deduplicate retried jobs", async (t) => {
+  const opsRoot = path.join(PATHS.runtimeRoot, "tests", `dedupe-${Date.now()}`);
+  t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
+  const store = new JobStore({ opsRoot });
+  const git = { async changedPaths() { return []; }, async changes() { return []; }, async commitPaths() { return { committed: false }; } };
+  const host = new AgentHost({ store, executor: new FakeExecutor(), gitGuard: git });
+  const context = { channel: "weixin", senderId: "owner", messageId: "message-one" };
+  const first = await host.receive({ intent: "search", text: "hello" }, context);
+  const second = await host.receive({ intent: "search", text: "hello" }, context);
+  assert.equal(second.deduplicated, true);
+  assert.equal(second.job.id, first.job.id);
 });

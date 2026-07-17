@@ -96,10 +96,6 @@
                   <input type="radio" name="workspaceMode" value="obsidian" id="modeSyno" />
                   <span>Syno 内置仓库</span>
                 </label>
-                <label class="mode-radio-label">
-                  <input type="radio" name="workspaceMode" value="standalone" id="modeStandalone" />
-                  <span>外部目录（高级）</span>
-                </label>
               </div>
               <div id="vaultRootLabel" class="directory-field">
                 <label for="plannerVaultRoot">Vault 根目录</label>
@@ -501,6 +497,7 @@
         <div class="topic-tags"></div>
         <div class="topic-actions">
           <button class="mini-btn" data-action="schedule" type="button">排期</button>
+          <button class="mini-btn" data-action="brief" type="button">生成 Brief</button>
           <button class="mini-btn" data-action="unschedule" type="button">取消排期</button>
           <button class="mini-btn" data-action="revert-import" type="button">撤回转卡</button>
           <button class="mini-btn" data-action="dispose" type="button">拒绝 / 删除</button>
@@ -571,6 +568,7 @@
           <div class="syno-channel-actions">
             <button id="synoWeixinLogin" class="ghost-btn" type="button">获取二维码</button>
             <button id="synoWeixinPoll" class="accent-btn" type="button" hidden>我已扫码确认</button>
+            <button id="synoWeixinHome" class="ghost-btn" type="button">设为主渠道</button>
           </div>
           <img id="synoWeixinQr" class="syno-weixin-qr" alt="微信 iLink 登录二维码" hidden />
         </section>

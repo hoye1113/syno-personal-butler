@@ -11,6 +11,9 @@ import { appendOperationLog } from "./operation-log.mjs";
 import { createSynoRuntime, routeSynoApi } from "./syno/runtime.mjs";
 import { ExecutorRouter } from "./syno/executors.mjs";
 import { OperationExecutor } from "./syno/operation-executor.mjs";
+import { buildOperationRequest } from "./syno/operation-registry.mjs";
+import { GitGuard } from "./syno/git-guard.mjs";
+import { securityHeaders } from "./syno/http-security.mjs";
 import { PATHS, resolveInside } from "./syno/paths.mjs";
 import {
   getPlannerConfigPath,
@@ -77,8 +80,10 @@ let authFlowCache = { expiresAt: 0, value: null };
 let plannerSettingsCache = null;
 const topicMutationLocks = new Map();
 const legacyWorkspace = new AsyncLocalStorage();
+const sideEffectGitGuard = new GitGuard();
 const synoRuntime = createSynoRuntime({
   executor: new OperationExecutor({ execute: executeLegacyOperation, fallback: new ExecutorRouter() }),
+  onCommitted: executeLegacySideEffects,
 });
 const synoReady = synoRuntime.initialize();
 
@@ -102,12 +107,12 @@ createServer(async (req, res) => {
 
     if (url.pathname === "/api/inbox/import" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await queueLegacyMutation("inbox.import", "create_content_idea", body));
+      return respondJson(res, await queueLegacyMutation("inbox.import", body));
     }
 
     if (url.pathname === "/api/inbox/import-batch" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await queueLegacyMutation("inbox.import-batch", "create_content_idea", body));
+      return respondJson(res, await queueLegacyMutation("inbox.import-batch", body));
     }
 
     if (url.pathname === "/api/settings" && req.method === "GET") {
@@ -116,7 +121,7 @@ createServer(async (req, res) => {
 
     if (url.pathname === "/api/settings" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await queueLegacyMutation("settings.save", "settings_change", body));
+      return respondJson(res, await queueLegacyMutation("settings.save", body));
     }
 
     if (url.pathname === "/api/diagnostics" && req.method === "GET") {
@@ -125,43 +130,52 @@ createServer(async (req, res) => {
 
     if (url.pathname === "/api/wiki/compile" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await queueLegacyMutation("wiki.compile", "curate_note", body));
+      return respondJson(res, await queueLegacyMutation("wiki.compile", body));
     }
 
     if (url.pathname === "/api/wiki/todos/generate" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await queueLegacyMutation("wiki.todos.generate", "curate_note", body));
+      return respondJson(res, await queueLegacyMutation("wiki.todos.generate", body));
     }
 
     if (url.pathname === "/api/wiki/todos/accept" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await queueLegacyMutation("wiki.todos.accept", "create_content_idea", body));
+      return respondJson(res, await queueLegacyMutation("wiki.todos.accept", body));
     }
 
     if (url.pathname === "/api/wiki/todos/reject" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await queueLegacyMutation("wiki.todos.reject", "create_action", body));
+      return respondJson(res, await queueLegacyMutation("wiki.todos.reject", body));
     }
 
     if (url.pathname === "/api/topics/schedule" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await queueLegacyMutation("topics.schedule", "create_action", body));
+      return respondJson(res, await queueLegacyMutation("topics.schedule", body));
     }
 
     if (url.pathname === "/api/topics/disposition" && req.method === "POST") {
       const body = await readJsonBody(req);
-      const intent = body.action === "归档" ? "move" : "create_action";
-      return respondJson(res, await queueLegacyMutation("topics.disposition", intent, body));
+      return respondJson(res, await queueLegacyMutation("topics.disposition", body));
     }
 
     if (url.pathname === "/api/topics/revert-import" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await queueLegacyMutation("topics.revert-import", "delete", body));
+      return respondJson(res, await queueLegacyMutation("topics.revert-import", body));
     }
 
     if (url.pathname === "/api/topics/unschedule" && req.method === "POST") {
       const body = await readJsonBody(req);
-      return respondJson(res, await queueLegacyMutation("topics.unschedule", "create_action", body));
+      return respondJson(res, await queueLegacyMutation("topics.unschedule", body));
+    }
+
+    if (url.pathname === "/api/topics/brief" && req.method === "POST") {
+      const body = await readJsonBody(req);
+      return respondJson(res, await queueLegacyMutation("content.brief.create", body));
+    }
+
+    if (url.pathname === "/api/notes/edit" && req.method === "POST") {
+      const body = await readJsonBody(req);
+      return respondJson(res, await queueLegacyMutation("notes.edit", body));
     }
 
     if (url.pathname === "/api/lark/repair/start" && req.method === "POST") {
@@ -188,15 +202,12 @@ createServer(async (req, res) => {
   console.log(`Syno 赛诺运行于 http://127.0.0.1:${PORT}`);
 });
 
-async function queueLegacyMutation(operation, intent, payload) {
+async function queueLegacyMutation(operation, payload) {
   await synoReady;
-  return synoRuntime.core.execute({
-    kind: "syno-operation",
-    operation,
-    intent,
-    payload,
-    text: `执行工作台操作：${operation}`,
-  }, { channel: "web", senderId: "local-user", developmentMode: synoRuntime.developmentMode });
+  return synoRuntime.core.execute(
+    buildOperationRequest(operation, payload, { text: `执行工作台操作：${operation}` }),
+    { channel: "web", senderId: "local-user", developmentMode: synoRuntime.developmentMode },
+  );
 }
 
 async function executeLegacyOperation(operation, payload, { workspace = PATHS.repoRoot } = {}) {
@@ -212,6 +223,8 @@ async function executeLegacyOperation(operation, payload, { workspace = PATHS.re
     "topics.disposition": () => withTopicMutationLock(payload.path, () => disposeTopic(payload)),
     "topics.revert-import": () => withTopicMutationLock(payload.path, () => revertImportedTopic(payload)),
     "topics.unschedule": () => withTopicMutationLock(payload.path, () => unscheduleTopic(payload)),
+    "content.brief.create": () => createContentBrief(payload),
+    "notes.edit": () => editVaultNote(payload),
   };
   const handler = handlers[operation];
   if (!handler) {
@@ -219,7 +232,109 @@ async function executeLegacyOperation(operation, payload, { workspace = PATHS.re
     error.code = "UNKNOWN_OPERATION";
     throw error;
   }
-  return legacyWorkspace.run({ workspace }, handler);
+  const deferredActions = [];
+  const operationResult = await legacyWorkspace.run({ workspace, deferExternal: true, deferredActions }, handler);
+  return { ...operationResult, deferredActions };
+}
+
+async function editVaultNote(payload) {
+  const workspace = legacyWorkspace.getStore()?.workspace || PATHS.repoRoot;
+  const relative = optionalString(payload.path).replace(/\\/g, "/");
+  if (!relative.startsWith("vault/") || !relative.endsWith(".md")) throw badRequest("只允许编辑 vault 内 Markdown");
+  const target = resolveInside(workspace, relative);
+  const markdown = String(payload.markdown || "");
+  if (!markdown || Buffer.byteLength(markdown, "utf8") > 2 * 1024 * 1024) throw badRequest("原文为空或超过 2 MB");
+  if (!markdown.startsWith("---\n") && !markdown.startsWith("---\r\n")) throw badRequest("原文必须保留 frontmatter");
+  await fs.writeFile(target, markdown, "utf8");
+  return { ok: true, path: relative };
+}
+
+async function createContentBrief(payload) {
+  const filePath = await resolveTopicPath(payload.path);
+  const source = await loadTopicSource(filePath);
+  const title = extractTitle(source.body, path.basename(filePath, ".md"));
+  const topic = normalizeTopic(source.frontmatter, title, source.relPath);
+  const workspace = legacyWorkspace.getStore()?.workspace || PATHS.repoRoot;
+  const now = new Date();
+  const id = `brief-${topic.topic_id || stableHash(source.relPath).slice(0, 12)}`;
+  const directory = path.join(workspace, "ops", "content", "briefs", String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, "0"));
+  const target = path.join(directory, `${id}.md`);
+  const markdown = [
+    "---",
+    "type: content_brief",
+    `id: ${JSON.stringify(id)}`,
+    "status: draft",
+    `created: ${now.toISOString()}`,
+    `source_topic: ${JSON.stringify(source.relPath)}`,
+    "---",
+    "",
+    `# ${normalizeDisplayTitle(title)}`,
+    "",
+    "## 可拍主张",
+    "",
+    `用一个清晰、可验证的内容单元回答：${normalizeDisplayTitle(title)}。`,
+    "",
+    "## 受众与价值",
+    "",
+    topic.excerpt || "从选题卡补充目标受众、核心证据与预期行动。",
+    "",
+    "## 内容结构",
+    "",
+    "1. 用现实问题建立冲突。",
+    "2. 给出核心判断与知识库证据。",
+    "3. 用反例或限制条件收紧结论。",
+    "4. 给出可以立刻执行的下一步。",
+    "",
+    "## 制作检查",
+    "",
+    "- [ ] 核心主张有来源支撑",
+    "- [ ] 明确适用边界",
+    "- [ ] 标题、封面与开场表达一致",
+    "",
+  ].join("\n");
+  await fs.mkdir(directory, { recursive: true });
+  await fs.writeFile(target, markdown, "utf8");
+  return { ok: true, id, path: path.relative(workspace, target).replace(/\\/g, "/") };
+}
+
+async function executeLegacySideEffects({ execution } = {}) {
+  const actions = execution?.operationResult?.deferredActions || [];
+  const changedPaths = [];
+  const results = [];
+  for (const action of actions) {
+    if (action.type === "lark.delete") {
+      await legacyWorkspace.run({ workspace: PATHS.repoRoot, deferExternal: false, deferredActions: [] }, () => deleteLarkEvent(action.topic));
+      results.push({ type: action.type, removed: true });
+      continue;
+    }
+    if (action.type !== "lark.sync") continue;
+    const filePath = await resolveTopicPath(action.topicPath);
+    const source = await loadTopicSource(filePath);
+    const title = extractTitle(source.body, path.basename(filePath, ".md"));
+    const topic = normalizeTopic(source.frontmatter, title, source.relPath);
+    try {
+      const result = await legacyWorkspace.run(
+        { workspace: PATHS.repoRoot, deferExternal: false, deferredActions: [] },
+        () => syncTopicToLark({ title, topic, path: source.relPath }),
+      );
+      topic.calendar_provider = result.provider;
+      topic.calendar_sync_status = result.syncStatus;
+      topic.lark_event_id = result.eventId || "";
+      topic.lark_calendar_id = result.calendarId || "";
+    } catch (error) {
+      topic.calendar_provider = "lark";
+      topic.calendar_sync_status = `同步失败：${formatCalendarSyncError(error)}`;
+      topic.lark_event_id = "";
+      topic.lark_calendar_id = "";
+    }
+    await writeTopicFile(filePath, topic, source.body);
+    changedPaths.push(source.relPath);
+    results.push({ type: action.type, path: source.relPath, syncStatus: topic.calendar_sync_status, eventId: topic.lark_event_id || "" });
+  }
+  if (changedPaths.length) {
+    await sideEffectGitGuard.commitPaths(changedPaths, "syno: reconcile approved calendar effects");
+  }
+  return { actions: actions.length, changedPaths, results };
 }
 
 async function buildTopicsPayload() {
@@ -1043,16 +1158,22 @@ async function disposeTopic(payload) {
 
   if (action === "拒绝") {
     topic.stage = "已拒绝";
-    await writeTopicFile(filePath, topic, source.body);
+    topic.status = "rejected";
+    const archivePath = await buildArchivePath(filePath);
+    await fs.mkdir(path.dirname(archivePath), { recursive: true });
+    await fs.writeFile(archivePath, composeMarkdown(topic, source.body), "utf8");
+    await fs.unlink(filePath);
     await appendPlannerLog("topic-disposition", title, {
       path: source.relPath,
       action,
       reason,
+      archivePath: path.relative((await getPlannerPaths()).vaultRoot, archivePath),
     });
-    return { ok: true, topic: await readTopic(filePath) };
+    return { ok: true, rejected: true, archivePath: path.relative((await getPlannerPaths()).vaultRoot, archivePath) };
   }
 
   topic.stage = "已归档";
+  topic.status = "archived";
   const updatedContent = composeMarkdown(topic, source.body);
   const archivePath = await buildArchivePath(filePath);
   await fs.mkdir(path.dirname(archivePath), { recursive: true });
@@ -1445,6 +1566,16 @@ async function syncTopicToCalendar({ title, topic, path: topicPath, provider }) 
 }
 
 async function syncTopicToLark({ title, topic, path: topicPath }) {
+  const context = legacyWorkspace.getStore();
+  if (context?.deferExternal) {
+    context.deferredActions.push({ type: "lark.sync", title, topicPath, topic: { ...topic } });
+    return {
+      provider: "lark",
+      syncStatus: "待审批后同步",
+      eventId: topic.lark_event_id || "",
+      calendarId: topic.lark_calendar_id || "",
+    };
+  }
   const auth = await getLarkStatus();
   if (!auth.available) {
     return {
@@ -1570,6 +1701,11 @@ function normalizeLarkCalendar(calendar = {}) {
 
 async function deleteLarkEvent(topic) {
   if (!topic.lark_event_id) return;
+  const context = legacyWorkspace.getStore();
+  if (context?.deferExternal) {
+    context.deferredActions.push({ type: "lark.delete", topic: { ...topic } });
+    return;
+  }
   const calendarId = topic.lark_calendar_id || (await getPrimaryCalendarId());
   await execJson("lark-cli", [
     "calendar",
@@ -1911,8 +2047,10 @@ function isPathInside(parentPath, childPath) {
 
 async function buildArchivePath(filePath) {
   const { archiveRoot } = await getPlannerPaths();
-  const year = new Date().getFullYear().toString();
-  const archiveDir = path.join(archiveRoot, year);
+  const now = new Date();
+  const year = now.getFullYear().toString();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const archiveDir = path.join(archiveRoot, year, month);
   const baseName = path.basename(filePath);
   const target = path.join(archiveDir, baseName);
 
@@ -2098,12 +2236,12 @@ async function serveStatic(pathname, res) {
   try {
     const content = await fs.readFile(filePath);
     res.writeHead(200, {
-      "Content-Type": contentType(filePath),
+      ...securityHeaders(contentType(filePath)),
       "Cache-Control": "no-store",
     });
     res.end(content);
   } catch {
-    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    res.writeHead(404, securityHeaders("text/plain; charset=utf-8"));
     res.end("Not found");
   }
 }
@@ -2113,11 +2251,13 @@ function contentType(filePath) {
   if (filePath.endsWith(".css")) return "text/css; charset=utf-8";
   if (filePath.endsWith(".js")) return "application/javascript; charset=utf-8";
   if (filePath.endsWith(".json")) return "application/json; charset=utf-8";
+  if (filePath.endsWith(".png")) return "image/png";
+  if (filePath.endsWith(".svg")) return "image/svg+xml";
   return "text/plain; charset=utf-8";
 }
 
 function respondJson(res, payload, status = 200) {
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  res.writeHead(status, securityHeaders("application/json; charset=utf-8"));
   res.end(JSON.stringify(payload));
 }
 

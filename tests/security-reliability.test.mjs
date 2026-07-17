@@ -1,0 +1,104 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { promises as fs } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+import { buildClaudeArgs, runProcess } from "../apps/syno/syno/executors.mjs";
+import { securityHeaders } from "../apps/syno/syno/http-security.mjs";
+import { assertRegisteredOperation, buildOperationRequest } from "../apps/syno/syno/operation-registry.mjs";
+import { routeSynoApi } from "../apps/syno/syno/runtime.mjs";
+import { Scheduler } from "../apps/syno/syno/scheduler.mjs";
+import { validateContractRecord } from "../apps/syno/syno/schema-registry.mjs";
+import { isPrivateAddress } from "../apps/syno/syno/source-fetcher.mjs";
+import { frontmatterData } from "../apps/syno/syno/validator.mjs";
+
+test("public Job API rejects Policy fields and maps only server-owned modes", async () => {
+  const calls = [];
+  const runtime = {
+    developmentMode: false,
+    core: { async execute(request) { calls.push(request); return { job: { id: "job-test" } }; } },
+  };
+  const req = { method: "POST" };
+  await assert.rejects(
+    routeSynoApi(runtime, req, new URL("http://localhost/api/syno/jobs"), async () => ({ text: "x", intent: "search" })),
+    /不接受 Policy 字段/,
+  );
+  await routeSynoApi(runtime, req, new URL("http://localhost/api/syno/jobs"), async () => ({ text: "策划", mode: "create_content_idea" }));
+  assert.equal(calls[0].intent, "create_content_idea");
+  await assert.rejects(
+    routeSynoApi(runtime, req, new URL("http://localhost/api/syno/jobs"), async () => ({ text: "x", mode: "delete" })),
+    /未知的公共任务模式/,
+  );
+});
+
+test("registered deterministic operations cannot lie about their Policy intent", () => {
+  const request = buildOperationRequest("topics.schedule", { path: "ops/content/a.md" });
+  assert.equal(request.intent, "create_action");
+  assert.throws(() => assertRegisteredOperation({
+    intent: "search",
+    decision: { intent: "search" },
+    request: { ...request, intent: "search" },
+  }), /意图不一致/);
+});
+
+test("HTTP policy blocks script injection surfaces and framing", () => {
+  const headers = securityHeaders("text/html; charset=utf-8");
+  assert.match(headers["Content-Security-Policy"], /script-src 'self'/);
+  assert.match(headers["Content-Security-Policy"], /object-src 'none'/);
+  assert.equal(headers["X-Content-Type-Options"], "nosniff");
+  assert.equal(headers["X-Frame-Options"], "DENY");
+});
+
+test("SSRF guard covers compact IPv4-mapped IPv6 and documentation ranges", () => {
+  for (const address of ["::ffff:7f00:1", "::ffff:192.168.1.1", "2001:db8::1", "198.51.100.10", "203.0.113.5"]) {
+    assert.equal(isPrivateAddress(address), true, address);
+  }
+  assert.equal(isPrivateAddress("8.8.8.8"), false);
+  assert.equal(isPrivateAddress("2001:4860:4860::8888"), false);
+});
+
+test("frontmatter rejects duplicate keys and YAML indirection", () => {
+  assert.throws(() => frontmatterData("---\ntitle: one\ntitle: two\ntags: [safe]\n---\nbody"), /重复字段/);
+  assert.throws(() => frontmatterData("---\ntitle: &shared one\ntags: [safe]\n---\nbody"), /不受支持/);
+  assert.throws(() => frontmatterData("---\n<<: *shared\ntitle: one\n---\nbody"), /merge key/);
+});
+
+test("runtime Contract validation rejects malformed records", async () => {
+  await validateContractRecord("job", {
+    id: "job-20260717-abcd1234", intent: "search", status: "completed", profile: "syno-read",
+    approval: "none", created: new Date().toISOString(), updated: new Date().toISOString(), request: {},
+  });
+  await assert.rejects(validateContractRecord("job", {
+    id: "not-a-job", intent: "search", status: "invented", profile: "root", approval: "none",
+    created: "yesterday", updated: "now", request: {},
+  }), /Contract 校验失败/);
+});
+
+test("Claude escalation is customization-free and MCP-empty", () => {
+  const args = buildClaudeArgs({ profile: "syno-read", decision: { allowedRoots: [] }, request: {} });
+  for (const flag of ["--safe-mode", "--no-chrome", "--disable-slash-commands", "--no-session-persistence", "--strict-mcp-config"]) {
+    assert.ok(args.includes(flag), flag);
+  }
+  assert.equal(args[args.indexOf("--permission-mode") + 1], "dontAsk");
+  assert.deepEqual(JSON.parse(args[args.indexOf("--mcp-config") + 1]), { mcpServers: {} });
+  assert.equal(args.includes("--model"), false);
+});
+
+test("Windows cmd launch preserves spaced arguments", { skip: process.platform !== "win32" }, async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-cmd-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const command = path.join(root, "echo-arg.cmd");
+  await fs.writeFile(command, "@echo off\r\necho %~1\r\n", "utf8");
+  const result = await runProcess(command, ["hello world"], { timeoutMs: 10_000 });
+  assert.equal(result.stdout.trim(), "hello world");
+});
+
+test("Scheduler keeps the Worker event loop referenced", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-worker-ref-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const scheduler = new Scheduler({ stateFile: path.join(root, "state.json"), onDue: async () => {} });
+  await scheduler.start();
+  assert.equal(scheduler.timer.hasRef(), true);
+  scheduler.stop();
+});

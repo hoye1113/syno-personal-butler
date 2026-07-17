@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import re
+import os
 from pathlib import Path
 
-VAULT = Path(r"D:/workSpace/obsidian_repository/02-Resources/AI and Agents/B站视频知识库")
-WS = Path(r"D:/workSpace/git_clone_test/hoye-git/Recastory/workspace/bilibili-retranscribe")
+VAULT = Path(__file__).resolve().parents[2] / "02-Resources/AI and Agents/B站视频知识库"
+RECASTORY_ENV = os.environ.get("RECASTORY_ROOT")
+if not RECASTORY_ENV:
+    raise SystemExit("Set RECASTORY_ROOT to the read-only legacy Recastory checkout")
+WS = Path(RECASTORY_ENV).resolve() / "workspace/bilibili-retranscribe"
 
 BATCH = [
     ("BV11H526yEiB", "行业观点与组织/OpenAI总裁-GPT5.5与下一阶段AI发展.md"),

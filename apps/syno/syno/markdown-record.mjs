@@ -1,5 +1,7 @@
 import { promises as fs } from "node:fs";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { validateContractRecord } from "./schema-registry.mjs";
 
 function yamlScalar(value) {
   if (value === null || value === undefined) return '""';
@@ -29,10 +31,28 @@ function parseRecord(markdown) {
 }
 
 async function writeRecord(filePath, record, options) {
+  if (options?.schema) await validateContractRecord(options.schema, record);
   await fs.mkdir(path.dirname(filePath), { recursive: true });
-  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  const tempPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
   await fs.writeFile(tempPath, serializeRecord(record, options), "utf8");
-  await fs.rename(tempPath, filePath);
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await fs.rename(tempPath, filePath);
+      break;
+    } catch (error) {
+      if (!['EPERM', 'EACCES', 'EEXIST'].includes(error.code) || attempt >= 4) {
+        if (attempt >= 4 && ['EPERM', 'EACCES', 'EEXIST'].includes(error.code)) {
+          // Windows can refuse atomic replacement while another reader closes
+          // its handle. The per-job lock prevents competing writers here.
+          await fs.rm(filePath, { force: true });
+          await fs.rename(tempPath, filePath);
+          break;
+        }
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10 * (attempt + 1)));
+    }
+  }
   return filePath;
 }
 
@@ -41,4 +61,3 @@ async function readRecord(filePath) {
 }
 
 export { parseRecord, readRecord, serializeRecord, writeRecord };
-

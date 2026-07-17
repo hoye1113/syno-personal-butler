@@ -23,7 +23,7 @@ test("calendar failure degrades to durable Markdown on Windows", { timeout: 20_0
     calendarProvider: "lark",
   });
   assert.equal(response.statusCode, 200, server.logs.text());
-  assert.equal(response.body.job.result.operationResult.topic.calendarSyncStatus, "同步失败：forced calendar create failure");
+  assert.equal(response.body.job.result.sideEffects.external.results[0].syncStatus, "同步失败：forced calendar create failure");
   const saved = await fs.readFile(fixture.topicPath, "utf8");
   assert.match(saved, /scheduled_date: 2026-07-10/);
   assert.match(saved, /calendar_provider: lark/);
@@ -46,7 +46,7 @@ test("calendar Adapter sends selected calendar and configured timezone", { timeo
     calendarProvider: "lark",
   });
   assert.equal(response.statusCode, 200, server.logs.text());
-  assert.equal(response.body.job.result.operationResult.topic.calendarSyncStatus, "已同步");
+  assert.equal(response.body.job.result.sideEffects.external.results[0].syncStatus, "已同步");
   assert.deepEqual(JSON.parse(await fs.readFile(params, "utf8")), { calendar_id: "cal_selected" });
   const data = JSON.parse(await fs.readFile(capture, "utf8"));
   assert.deepEqual(data.start_time, { timestamp: "1783702800", timezone: "America/Vancouver" });
@@ -123,8 +123,11 @@ async function queueAndApprove(port, pathname, body) {
   assert.equal(queued.statusCode, 200);
   assert.equal(queued.body.requiresApproval, true);
   const approved = await requestJson(port, `/api/syno/jobs/${encodeURIComponent(queued.body.job.id)}/approve`, {});
-  assert.equal(approved.body.job.status, "completed", JSON.stringify(approved.body));
-  return approved;
+  assert.equal(approved.body.job.status, "awaiting_approval", JSON.stringify(approved.body));
+  assert.equal(approved.body.job.phase, "merge");
+  const merged = await requestJson(port, `/api/syno/jobs/${encodeURIComponent(queued.body.job.id)}/approve`, {});
+  assert.equal(merged.body.job.status, "completed", JSON.stringify(merged.body));
+  return merged;
 }
 
 async function runGit(cwd, args) {

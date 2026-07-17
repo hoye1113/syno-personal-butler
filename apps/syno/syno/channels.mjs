@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { PATHS } from "./paths.mjs";
@@ -51,8 +52,16 @@ class WindowsNotificationAdapter {
 }
 
 class ChannelHub {
-  constructor(adapters = {}) { this.adapters = new Map(Object.entries(adapters)); }
+  constructor(adapters = {}, { stateFile = path.join(PATHS.stateRoot, "channels.json") } = {}) {
+    this.adapters = new Map(Object.entries(adapters));
+    this.stateFile = stateFile;
+    this.homeChannel = "web";
+  }
   async start() {
+    try {
+      const state = JSON.parse(await fs.readFile(this.stateFile, "utf8"));
+      if (this.adapters.has(state.homeChannel)) this.homeChannel = state.homeChannel;
+    } catch (error) { if (error.code !== "ENOENT") throw error; }
     const results = {};
     for (const [id, adapter] of this.adapters) results[id] = await adapter.start();
     return results;
@@ -62,16 +71,26 @@ class ChannelHub {
     for (const [id, adapter] of this.adapters) results[id] = await adapter.stop();
     return results;
   }
-  async send(message, targets = ["web", "windows"]) {
+  async send(message, targets) {
+    const selected = targets || [...new Set(["web", "windows", this.homeChannel])];
     const results = {};
-    for (const id of targets) {
+    for (const id of selected) {
       const adapter = this.adapters.get(id);
       if (adapter) results[id] = await adapter.send(message);
     }
     return results;
   }
   status() {
-    return Object.fromEntries([...this.adapters].map(([id, adapter]) => [id, adapter.status()]));
+    return Object.fromEntries([...this.adapters].map(([id, adapter]) => [id, { ...adapter.status(), home: id === this.homeChannel }]));
+  }
+  async setHome(id) {
+    if (!this.adapters.has(id)) throw new Error(`未知渠道：${id}`);
+    this.homeChannel = id;
+    await fs.mkdir(path.dirname(this.stateFile), { recursive: true });
+    const temporary = `${this.stateFile}.${process.pid}.tmp`;
+    await fs.writeFile(temporary, `${JSON.stringify({ homeChannel: id }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+    await fs.rename(temporary, this.stateFile);
+    return this.status();
   }
   get(id) { return this.adapters.get(id); }
 }

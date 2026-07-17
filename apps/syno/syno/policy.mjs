@@ -67,8 +67,10 @@ function evaluate(request = {}, context = {}) {
     risk,
     executor,
     allowedRoots: PROFILE_ROOTS[profile],
-    needsWorktree: highRisk,
-    autoCommit: writes && !highRisk,
+    // Every fact-source write is transactional. The actual diff decides whether
+    // it may auto-merge or must pause for a second approval.
+    needsWorktree: writes,
+    autoCommit: false,
     validators: ["changed-paths", ...(profile === "syno-curate" ? ["markdown", "vault-contract"] : [])],
     allowed: !denied,
     reason: denied

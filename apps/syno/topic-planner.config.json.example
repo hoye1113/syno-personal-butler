@@ -1,6 +1,6 @@
 {
   "workspaceMode": "obsidian",
-  "vaultRoot": "D:\\workSpace\\syno-personal-butler",
+  "vaultRoot": "${SYNO_REPO_ROOT}",
   "topicDir": "ops/content/ideas",
   "inboxDir": "vault/00-Inbox",
   "archiveDir": "ops/content/archive",

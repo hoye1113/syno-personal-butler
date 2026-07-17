@@ -1563,7 +1563,7 @@
       },
       "declared": {
         "transcript_source": null,
-        "ingest_dir": "D:/workSpace/git_clone_test/hoye-git/Recastory/workspace/bilibili-retranscribe/BV1YfE36TEyz/ingest",
+        "ingest_dir": "${LEGACY_RECASTORY_ROOT}/workspace/bilibili-retranscribe/BV1YfE36TEyz/ingest",
         "genre": "interview",
         "speaker_inference": "asr_heuristic + column_article_speaker_labels",
         "speaker_confidence": "high",
@@ -1603,7 +1603,7 @@
       },
       "declared": {
         "transcript_source": null,
-        "ingest_dir": "D:/workSpace/git_clone_test/hoye-git/Recastory/workspace/bilibili-retranscribe/BV1EJjN6XETy/ingest",
+        "ingest_dir": "${LEGACY_RECASTORY_ROOT}/workspace/bilibili-retranscribe/BV1EJjN6XETy/ingest",
         "genre": "interview",
         "speaker_inference": "column_article_speaker_labels",
         "speaker_confidence": "high",
@@ -1643,7 +1643,7 @@
       },
       "declared": {
         "transcript_source": null,
-        "ingest_dir": "D:/workSpace/git_clone_test/hoye-git/Recastory/workspace/bilibili-retranscribe/BV1rEEh6KEVF/ingest",
+        "ingest_dir": "${LEGACY_RECASTORY_ROOT}/workspace/bilibili-retranscribe/BV1rEEh6KEVF/ingest",
         "genre": "interview",
         "speaker_inference": "asr_heuristic + column_article_speaker_labels",
         "speaker_confidence": "high",
@@ -1683,7 +1683,7 @@
       },
       "declared": {
         "transcript_source": null,
-        "ingest_dir": "D:/workSpace/git_clone_test/hoye-git/Recastory/workspace/bilibili-retranscribe/BV1db7V6rEpr/ingest",
+        "ingest_dir": "${LEGACY_RECASTORY_ROOT}/workspace/bilibili-retranscribe/BV1db7V6rEpr/ingest",
         "genre": "interview",
         "speaker_inference": "asr_heuristic + column_article_speaker_labels",
         "speaker_confidence": "high",
@@ -1923,7 +1923,7 @@
       },
       "declared": {
         "transcript_source": null,
-        "ingest_dir": "D:/workSpace/git_clone_test/hoye-git/Recastory/workspace/bilibili-retranscribe/BV1dg5t6gEJ8/ingest",
+        "ingest_dir": "${LEGACY_RECASTORY_ROOT}/workspace/bilibili-retranscribe/BV1dg5t6gEJ8/ingest",
         "genre": "podcast",
         "speaker_inference": "column_article_qa_structure",
         "speaker_confidence": "high",
@@ -1963,7 +1963,7 @@
       },
       "declared": {
         "transcript_source": null,
-        "ingest_dir": "D:/workSpace/git_clone_test/hoye-git/Recastory/workspace/bilibili-retranscribe/BV1pYDiBPEQA/ingest",
+        "ingest_dir": "${LEGACY_RECASTORY_ROOT}/workspace/bilibili-retranscribe/BV1pYDiBPEQA/ingest",
         "genre": "podcast",
         "speaker_inference": "column_article_qa_structure",
         "speaker_confidence": "high",
@@ -2043,7 +2043,7 @@
       },
       "declared": {
         "transcript_source": null,
-        "ingest_dir": "D:/workSpace/git_clone_test/hoye-git/Recastory/workspace/bilibili-retranscribe/BV1wxDnB9Eo9/ingest",
+        "ingest_dir": "${LEGACY_RECASTORY_ROOT}/workspace/bilibili-retranscribe/BV1wxDnB9Eo9/ingest",
         "genre": "podcast",
         "speaker_inference": "column_article_qa_structure",
         "speaker_confidence": "high",
@@ -2083,7 +2083,7 @@
       },
       "declared": {
         "transcript_source": null,
-        "ingest_dir": "D:/workSpace/git_clone_test/hoye-git/Recastory/workspace/bilibili-retranscribe/BV1yAo4BsEed/ingest",
+        "ingest_dir": "${LEGACY_RECASTORY_ROOT}/workspace/bilibili-retranscribe/BV1yAo4BsEed/ingest",
         "genre": "podcast",
         "speaker_inference": "column_article_qa_structure",
         "speaker_confidence": "high",

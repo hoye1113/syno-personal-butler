@@ -7,6 +7,7 @@ import { PATHS, resolveInside } from "./paths.mjs";
 const DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com/";
 const CDN_ALLOWLIST = new Set(["novac2c.cdn.weixin.qq.com"]);
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const ATTACHMENT_TIMEOUT_MS = 20_000;
 
 function validateIlinkBaseUrl(value) {
   const url = new URL(value || DEFAULT_BASE_URL);
@@ -96,6 +97,75 @@ class LocalCredentialStore {
   async clear() { await fs.rm(this.file, { force: true }); }
 }
 
+class LocalProcessLock {
+  constructor({ file = path.join(PATHS.stateRoot, "weixin-poller.lock") } = {}) {
+    this.file = file;
+    this.handle = null;
+  }
+  async acquire() {
+    await fs.mkdir(path.dirname(this.file), { recursive: true });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        this.handle = await fs.open(this.file, "wx", 0o600);
+        await this.handle.writeFile(`${JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() })}\n`, "utf8");
+        return true;
+      } catch (error) {
+        if (error.code !== "EEXIST") throw error;
+        let owner = null;
+        try { owner = JSON.parse(await fs.readFile(this.file, "utf8")); } catch {}
+        let alive = false;
+        if (Number.isInteger(owner?.pid)) {
+          try { process.kill(owner.pid, 0); alive = true; } catch (probeError) { alive = probeError.code === "EPERM"; }
+        }
+        if (alive || attempt > 0) return false;
+        await fs.rm(this.file, { force: true });
+      }
+    }
+    return false;
+  }
+  async release() {
+    await this.handle?.close().catch(() => {});
+    this.handle = null;
+    let owner = null;
+    try { owner = JSON.parse(await fs.readFile(this.file, "utf8")); } catch {}
+    if (!owner || owner.pid === process.pid) await fs.rm(this.file, { force: true });
+  }
+}
+
+function sniffMime(bytes) {
+  if (bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes.length >= 6 && ["GIF87a", "GIF89a"].includes(bytes.subarray(0, 6).toString("ascii"))) return "image/gif";
+  if (bytes.length >= 12 && bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP") return "image/webp";
+  if (bytes.length >= 5 && bytes.subarray(0, 5).toString("ascii") === "%PDF-") return "application/pdf";
+  const sample = bytes.subarray(0, Math.min(bytes.length, 8_192));
+  if (sample.length && !sample.includes(0)) {
+    const decoded = sample.toString("utf8");
+    const replacements = (decoded.match(/\uFFFD/g) || []).length;
+    const controls = [...sample].filter((value) => value < 9 || (value > 13 && value < 32)).length;
+    if (replacements <= 2 && controls / sample.length < 0.01) return "text/plain";
+  }
+  return "";
+}
+
+async function readLimitedBody(response, maxBytes = MAX_ATTACHMENT_BYTES) {
+  const reader = response.body?.getReader?.();
+  if (!reader) throw new Error("附件响应不可流式验证");
+  const chunks = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel("attachment too large").catch(() => {});
+      throw new Error("附件超过 10 MB");
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks, size);
+}
+
 function messageKey(message) {
   return String(message.message_id || message.client_id || `${message.from_user_id}:${message.seq}:${message.create_time_ms}`);
 }
@@ -115,11 +185,13 @@ function normalizeInbound(message) {
 }
 
 class WeixinIlinkAdapter {
-  constructor({ client, clientFactory, credentialStore = new LocalCredentialStore(), onMessage = async () => ({ text: "已收到" }), quarantineRoot = path.join(PATHS.opsRoot, "artifacts", "quarantine") } = {}) {
+  constructor({ client, clientFactory, credentialStore = new LocalCredentialStore(), processLock = new LocalProcessLock(), fetchImpl = fetch, onMessage = async () => ({ text: "已收到" }), quarantineRoot = path.join(PATHS.runtimeRoot, "quarantine", "weixin") } = {}) {
     this.credentials = credentialStore;
     this.client = client || new WeixinIlinkClient();
     this.clientFactory = clientFactory || ((credential) => client || new WeixinIlinkClient({ baseUrl: credential.baseUrl, token: credential.token }));
     this.onMessage = onMessage;
+    this.processLock = processLock;
+    this.fetchImpl = fetchImpl;
     this.quarantineRoot = quarantineRoot;
     this.running = false;
     this.abortController = null;
@@ -161,17 +233,30 @@ class WeixinIlinkAdapter {
     const credential = await this.credentials.load();
     if (!credential?.token) return this.status();
     this.credential = credential;
-    this.contexts = new Map(Object.entries(credential.contexts || {}));
-    this.seen = new Set((credential.seenIds || []).slice(-2_000));
-    this.client = this.clientFactory(credential);
-    this.running = true;
-    this.abortController = new AbortController();
-    this.#pollLoop(this.abortController.signal).catch((error) => { this.lastError = error.message; this.running = false; });
-    return this.status();
+    if (!await this.processLock.acquire()) {
+      this.lastError = "微信轮询器已由另一个 Syno 进程持有";
+      return this.status();
+    }
+    try {
+      this.contexts = new Map(Object.entries(credential.contexts || {}));
+      this.seen = new Set((credential.seenIds || []).slice(-2_000));
+      this.client = this.clientFactory(credential);
+      this.lastError = null;
+      this.running = true;
+      this.abortController = new AbortController();
+      this.pollPromise = this.#pollLoop(this.abortController.signal)
+        .catch((error) => { this.lastError = error.message; })
+        .finally(async () => { this.running = false; await this.processLock.release(); });
+      return this.status();
+    } catch (error) {
+      await this.processLock.release();
+      throw error;
+    }
   }
 
   async stop() {
     this.abortController?.abort();
+    await this.pollPromise?.catch(() => {});
     this.running = false;
     return this.status();
   }
@@ -195,14 +280,14 @@ class WeixinIlinkAdapter {
         const result = await this.client.getUpdates(this.credential.cursor || "", signal);
         if (result.errcode === -14) throw Object.assign(new Error("微信 Token 已失效，请重新扫码"), { code: "TOKEN_EXPIRED" });
         if (result.ret && result.ret !== 0) throw new Error(result.errmsg || `getUpdates ret=${result.ret}`);
-        this.credential.cursor = result.get_updates_buf || this.credential.cursor || "";
-        await this.credentials.save(this.credential);
         for (const message of result.msgs || []) await this.handleInbound(message);
+        this.credential.cursor = result.get_updates_buf || this.credential.cursor || "";
+        await this.#persistRuntimeState();
         backoff = 1_000;
       } catch (error) {
         if (signal.aborted || error.name === "AbortError") break;
         this.lastError = error.message;
-        if (error.code === "TOKEN_EXPIRED") { await this.credentials.clear(); this.running = false; break; }
+        if (error.code === "TOKEN_EXPIRED") { await this.credentials.clear(); this.credential = null; this.running = false; break; }
         await new Promise((resolve) => setTimeout(resolve, backoff));
         backoff = Math.min(30_000, backoff * 2);
       }
@@ -220,30 +305,41 @@ class WeixinIlinkAdapter {
     if (raw.message_type && raw.message_type !== 1) return;
     const message = normalizeInbound(raw);
     if (this.seen.has(message.id)) return;
-    this.seen.add(message.id);
-    if (this.seen.size > 2_000) this.seen.delete(this.seen.values().next().value);
 
     if (!this.credential.ownerId) {
-      await this.#persistRuntimeState();
       await this.client.sendText({ toUserId: message.senderId, contextToken: message.contextToken, text: "扫码结果没有绑定所有者，请回到 Syno Web 重新扫码。" });
+      await this.#markProcessed(message.id);
       return;
     }
     if (message.senderId !== this.credential.ownerId) {
       await this.client.sendText({ toUserId: message.senderId, contextToken: message.contextToken, text: "赛诺当前仅允许扫码者本人使用。" });
+      await this.#markProcessed(message.id);
       return;
     }
     this.contexts.set(message.senderId, message.contextToken);
-    await this.#persistRuntimeState();
     const video = message.items.some((item) => item.type === 5);
-    if (video) return this.send({ toUserId: message.senderId, contextToken: message.contextToken, text: "当前版本暂不处理视频，请发送文字、语音、链接、图片或文件。" });
+    if (video) {
+      await this.send({ toUserId: message.senderId, contextToken: message.contextToken, text: "当前版本暂不处理视频，请发送文字、语音、链接、图片或文件。" });
+      await this.#markProcessed(message.id);
+      return;
+    }
     const media = message.items.filter((item) => item.type === 2 || item.type === 4);
     const artifacts = [];
     for (const item of media) {
       try { artifacts.push(await this.#quarantine(item)); } catch (error) { artifacts.push({ rejected: true, reason: error.message }); }
     }
-    if (!message.text && !artifacts.length) return;
+    if (!message.text && !artifacts.length) { await this.#markProcessed(message.id); return; }
     const response = await this.onMessage({ channel: "weixin", ...message, artifacts });
-    return this.send({ toUserId: message.senderId, contextToken: message.contextToken, text: response?.text || response?.job?.result?.text || "任务已记录，请在 Syno 查看状态。" });
+    const delivery = await this.send({ toUserId: message.senderId, contextToken: message.contextToken, text: response?.text || response?.job?.result?.text || "任务已记录，请在 Syno 查看状态。" });
+    if (!delivery.delivered) throw new Error(`微信回复未送达：${delivery.reason || "unknown"}`);
+    await this.#markProcessed(message.id);
+    return delivery;
+  }
+
+  async #markProcessed(id) {
+    this.seen.add(id);
+    if (this.seen.size > 2_000) this.seen.delete(this.seen.values().next().value);
+    await this.#persistRuntimeState();
   }
 
   async #quarantine(item) {
@@ -251,18 +347,36 @@ class WeixinIlinkAdapter {
     if (!media?.full_url) throw new Error("附件没有可安全验证的完整 CDN 地址，未下载");
     const url = new URL(media.full_url);
     if (url.protocol !== "https:" || !CDN_ALLOWLIST.has(url.hostname)) throw new Error("附件来源不在腾讯 CDN allowlist");
-    const response = await fetch(url, { redirect: "error" });
-    const length = Number(response.headers.get("content-length") || 0);
-    if (length > MAX_ATTACHMENT_BYTES) throw new Error("附件超过 10 MB");
-    const contentType = (response.headers.get("content-type") || "application/octet-stream").split(";")[0];
-    if (!/^(image\/(png|jpeg|gif|webp)|application\/pdf|text\/plain|text\/markdown|application\/octet-stream)$/.test(contentType)) throw new Error(`附件 MIME 不受支持：${contentType}`);
-    const bytes = Buffer.from(await response.arrayBuffer());
-    if (bytes.length > MAX_ATTACHMENT_BYTES) throw new Error("附件超过 10 MB");
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ATTACHMENT_TIMEOUT_MS);
+    let contentType;
+    let bytes;
+    try {
+      const response = await this.fetchImpl(url, { redirect: "error", signal: controller.signal });
+      if (!response.ok) throw new Error(`附件下载 HTTP ${response.status}`);
+      const length = Number(response.headers.get("content-length") || 0);
+      if (length > MAX_ATTACHMENT_BYTES) throw new Error("附件超过 10 MB");
+      contentType = (response.headers.get("content-type") || "application/octet-stream").split(";")[0].toLowerCase();
+      if (!/^(image\/(png|jpeg|gif|webp)|application\/pdf|text\/plain|text\/markdown|application\/octet-stream)$/.test(contentType)) throw new Error(`附件 MIME 不受支持：${contentType}`);
+      bytes = await readLimitedBody(response);
+    } finally {
+      clearTimeout(timer);
+    }
+    const sniffed = sniffMime(bytes);
+    if (!sniffed) throw new Error("附件内容无法识别为受支持格式");
+    if (contentType === "application/octet-stream") {
+      if (!sniffed) throw new Error("二进制附件缺少可验证格式");
+    } else if (contentType.startsWith("image/") || contentType === "application/pdf") {
+      if (contentType !== sniffed) throw new Error(`附件声明 MIME 与内容不符：${contentType} / ${sniffed}`);
+    } else if (contentType.startsWith("text/") && sniffed !== "text/plain") {
+      throw new Error("文本附件内容验证失败");
+    }
+    const verifiedMime = contentType === "application/octet-stream" || contentType.startsWith("text/") ? sniffed : contentType;
     await fs.mkdir(this.quarantineRoot, { recursive: true });
     const supplied = path.basename(item.file_item?.file_name || "attachment.bin").replace(/[^\p{L}\p{N}._-]/gu, "_");
     const file = resolveInside(this.quarantineRoot, `${randomUUID().slice(0, 10)}-${supplied}`);
     await fs.writeFile(file, bytes, { mode: 0o600 });
-    return { path: file, size: bytes.length, mime: contentType, isolated: true, autoRead: false };
+    return { path: file, size: bytes.length, mime: verifiedMime, isolated: true, autoRead: false };
   }
 }
 
@@ -270,10 +384,13 @@ export {
   CDN_ALLOWLIST,
   DEFAULT_BASE_URL,
   LocalCredentialStore,
+  LocalProcessLock,
   MAX_ATTACHMENT_BYTES,
   WeixinIlinkAdapter,
   WeixinIlinkClient,
   fetchJson,
   normalizeInbound,
+  readLimitedBody,
+  sniffMime,
   validateIlinkBaseUrl,
 };

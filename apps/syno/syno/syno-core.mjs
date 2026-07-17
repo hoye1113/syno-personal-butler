@@ -1,3 +1,5 @@
+import { buildOperationRequest } from "./operation-registry.mjs";
+
 class SynoCore {
   constructor({ host, knowledge, notifications, channels, reports } = {}) {
     this.host = host;
@@ -22,13 +24,7 @@ class SynoCore {
   reject(id, reason) { return this.host.reject(id, reason); }
   cancel(id) { return this.host.cancel(id); }
   report(kind, context = {}) {
-    return this.host.receive({
-      kind: "syno-operation",
-      operation: "reports.create",
-      intent: "create_report",
-      payload: { kind },
-      text: `生成 ${kind} 报告`,
-    }, context);
+    return this.host.receive(buildOperationRequest("reports.create", { kind }, { text: `生成 ${kind} 报告` }), context);
   }
 }
 

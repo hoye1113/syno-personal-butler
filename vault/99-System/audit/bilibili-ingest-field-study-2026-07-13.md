@@ -3,7 +3,7 @@ title: "B站收录工作流五篇实测"
 tags: [notes, bilibili, ai_agent]
 created: 2026-07-13
 source:
-  - "D:/workSpace/git_clone_test/hoye-git/Recastory/workspace"
+  - "${LEGACY_RECASTORY_ROOT}/workspace"
   - "vault existing canonical notes"
 description: "用五类真实 Recastory 素材复盘路由、来源职责、信息保留与现有成稿，验证双轴收录模型。"
 ---

@@ -28,7 +28,11 @@ class JobStore {
     this.clock = clock;
   }
 
-  async create({ request, decision, channel = "web", senderId = "local-user" }) {
+  async create({ request, decision, channel = "web", senderId = "local-user", requestKey = "" }) {
+    if (requestKey) {
+      const existing = (await this.list({ limit: 2_000 })).find((job) => job.requestKey === requestKey);
+      if (existing) return { ...existing, deduplicated: true };
+    }
     const now = this.clock().toISOString();
     const id = `job-${now.slice(0, 10).replaceAll("-", "")}-${randomUUID().slice(0, 8)}`;
     const job = {
@@ -43,6 +47,7 @@ class JobStore {
       risk: decision.risk,
       channel,
       senderId,
+      requestKey: requestKey || undefined,
       created: now,
       updated: now,
       request,
@@ -64,6 +69,7 @@ class JobStore {
   async save(job) {
     job.updated = this.clock().toISOString();
     await writeRecord(this.filePath(job), job, {
+      schema: "job",
       title: `Job ${job.id}`,
       summaryKeys: ["id", "intent", "status", "profile", "approval", "approvalsReceived", "phase", "risk", "channel", "created", "updated"],
     });
@@ -144,6 +150,7 @@ class JobStore {
     };
     const file = path.join(this.opsRoot, "events", year, month, `${event.id}.md`);
     await writeRecord(file, event, {
+      schema: "event",
       title: `${type} · ${job.id}`,
       summaryKeys: ["id", "type", "at", "subjectId"],
     });

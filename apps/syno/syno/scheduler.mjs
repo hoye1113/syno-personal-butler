@@ -61,7 +61,6 @@ class Scheduler {
     if (this.timer) return;
     await this.tick();
     this.timer = setInterval(() => this.tick().catch(() => {}), 60_000);
-    this.timer.unref?.();
   }
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }
 }

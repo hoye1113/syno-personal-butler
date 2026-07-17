@@ -3,12 +3,17 @@
   "$id": "https://syno.local/contracts/content-idea.schema.json",
   "title": "ContentIdea",
   "type": "object",
-  "required": ["id", "title", "claim", "status"],
+  "required": ["type", "topic_id", "title", "status", "stage"],
   "properties": {
-    "id": { "type": "string" },
+    "type": { "enum": ["选题策划"] },
+    "topic_id": { "type": "string", "minLength": 1 },
     "title": { "type": "string", "minLength": 1 },
-    "claim": { "type": "string", "minLength": 1 },
-    "status": { "enum": ["idea", "planned", "scheduled", "archived"] },
-    "sourceNotes": { "type": "array", "items": { "type": "string" } }
-  }
+    "claim": { "type": "string" },
+    "status": { "enum": ["active", "rejected", "archived"] },
+    "stage": { "type": "string", "minLength": 1 },
+    "source_wiki_pages": { "type": "array", "items": { "type": "string" } },
+    "source_inbox_path": { "type": "string" },
+    "source_url": { "type": "string" }
+  },
+  "additionalProperties": true
 }

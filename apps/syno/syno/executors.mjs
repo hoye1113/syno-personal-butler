@@ -1,5 +1,6 @@
 import { spawn, execFileSync } from "node:child_process";
 import { promises as fs } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 
 import { PATHS, resolveInside } from "./paths.mjs";
@@ -20,13 +21,23 @@ const PROFILE_READ_ROOTS = Object.freeze({
 function locateCommand(name, envName) {
   if (process.env[envName]) return process.env[envName];
   try {
-    return execFileSync("where.exe", [name], { encoding: "utf8", windowsHide: true })
+    const matches = execFileSync("where.exe", [name], { encoding: "utf8", windowsHide: true, stdio: ["ignore", "pipe", "ignore"] })
       .split(/\r?\n/)
       .map((item) => item.trim())
-      .find(Boolean) || name;
-  } catch {
-    return name;
+      .filter(Boolean);
+    const located = matches.find((item) => /\.(?:cmd|exe|bat|com)$/i.test(item)) || matches[0];
+    if (located) return located;
+  } catch {}
+  if (process.platform === "win32") {
+    const base = process.env.LOCALAPPDATA || (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, "AppData", "Local") : "");
+    const candidates = base ? [
+      path.join(base, "mise", "shims", `${name}.cmd`),
+      path.join(base, "mise", "shims", name),
+    ] : [];
+    const candidate = candidates.find((item) => existsSync(item));
+    if (candidate) return candidate;
   }
+  return name;
 }
 
 function quoteCmdArg(value) {
@@ -37,15 +48,21 @@ function quoteCmdArg(value) {
 
 function spawnPortable(command, args, options = {}) {
   if (process.platform === "win32" && /\.(cmd|bat)$/i.test(command)) {
-    const commandLine = [quoteCmdArg(command), ...args.map(quoteCmdArg)].join(" ");
-    return spawn(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", commandLine], { ...options, windowsHide: true });
+    const commandLine = `"${[quoteCmdArg(command), ...args.map(quoteCmdArg)].join(" ")}"`;
+    return spawn(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", commandLine], {
+      ...options,
+      windowsHide: true,
+      // cmd.exe must receive the conventional outer quote pair unchanged. Without
+      // this flag Node quotes the /c payload again and paths containing spaces fail.
+      windowsVerbatimArguments: true,
+    });
   }
   return spawn(command, args, { ...options, windowsHide: true });
 }
 
-async function runProcess(command, args, { cwd, timeoutMs, signal, env = process.env } = {}) {
+async function runProcess(command, args, { cwd, timeoutMs, signal, env = process.env, input } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawnPortable(command, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawnPortable(command, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
     const stdout = [];
     const stderr = [];
     let settled = false;
@@ -60,6 +77,8 @@ async function runProcess(command, args, { cwd, timeoutMs, signal, env = process
     signal?.addEventListener("abort", abort, { once: true });
     child.stdout.on("data", (chunk) => stdout.push(chunk));
     child.stderr.on("data", (chunk) => stderr.push(chunk));
+    child.stdin.on("error", () => {});
+    child.stdin.end(input);
     child.on("error", (error) => {
       clearTimeout(timer);
       if (settled) return;
@@ -149,8 +168,8 @@ function profileReadItems(job) {
   return items;
 }
 
-function openCodeProfileConfig(job) {
-  const readRoots = profileReadItems(job);
+function openCodeProfileConfig(job, { runtimeReadPaths = [] } = {}) {
+  const readRoots = [...profileReadItems(job), ...runtimeReadPaths];
   const writeRoots = job.decision.allowedRoots || [];
   const bash = job.profile === "syno-code"
     ? {
@@ -172,7 +191,7 @@ function openCodeProfileConfig(job) {
       list: permissionPaths(readRoots),
       edit: permissionPaths(writeRoots),
       bash,
-      external_directory: "deny",
+      external_directory: runtimeReadPaths.length ? permissionPaths(runtimeReadPaths) : "deny",
       task: "deny",
       skill: "deny",
       webfetch: "deny",
@@ -200,7 +219,28 @@ function claudeProfileTools(job) {
   ];
   if (job.profile !== "syno-code") disallowed.unshift("Bash");
   if (!writeRoots.length) disallowed.unshift("Edit", "Write");
-  return { allowed, disallowed };
+  const available = ["Read", "Glob", "Grep"];
+  if (writeRoots.length) available.push("Edit", "Write");
+  if (job.profile === "syno-code") available.push("Bash");
+  return { allowed, disallowed, available };
+}
+
+function buildClaudeArgs(job) {
+  const tools = claudeProfileTools(job);
+  return [
+    "-p",
+    "--safe-mode",
+    "--no-chrome",
+    "--disable-slash-commands",
+    "--no-session-persistence",
+    "--permission-mode", "dontAsk",
+    "--strict-mcp-config",
+    "--mcp-config", JSON.stringify({ mcpServers: {} }),
+    "--tools", tools.available.join(","),
+    "--output-format", "json",
+    "--allowedTools", tools.allowed.join(","),
+    "--disallowedTools", tools.disallowed.join(","),
+  ];
 }
 
 class FakeExecutor {
@@ -208,8 +248,10 @@ class FakeExecutor {
     this.responder = responder;
     this.runs = new Map();
   }
-  async submit(job) {
+  async submit(job, options = {}) {
     const runId = `fake-${job.id}`;
+    this.runs.set(runId, { status: "running" });
+    await options.onStart?.(runId);
     const result = await this.responder(job);
     this.runs.set(runId, { status: "completed", result });
     return { runId, executor: "fake", ...result };
@@ -226,18 +268,26 @@ class OpenCodeExecutor {
     this.controllers = new Map();
   }
 
-  async submit(job, { workspace = PATHS.repoRoot } = {}) {
+  async submit(job, { workspace = PATHS.repoRoot, onStart } = {}) {
     const task = await writeTaskFile(job, workspace);
-    const env = { ...process.env, OPENCODE_CONFIG_CONTENT: JSON.stringify(openCodeProfileConfig(job)) };
+    const env = {
+      ...process.env,
+      OPENCODE_CONFIG_CONTENT: JSON.stringify(openCodeProfileConfig(job, { runtimeReadPaths: [task.file] })),
+    };
     const failures = [];
     for (const model of this.models) {
       const controller = new AbortController();
       const runId = `opencode-${job.id}-${model.split("/").at(-1)}`;
       this.controllers.set(runId, controller);
       try {
+        await onStart?.(runId);
         const result = await runProcess(this.command, [
-          "run", "--format", "json", "--model", model, "--dir", workspace,
-          task.instructions,
+          // OpenCode declares --file as an array option, so the positional message
+          // must precede it or yargs consumes the message as another file path.
+          "run", "Follow the attached Syno job instructions. Return only the requested result.",
+          "--pure",
+          "--format", "json", "--model", model, "--dir", workspace,
+          "--file", task.file,
         ], { cwd: workspace, timeoutMs: this.timeoutMs, signal: controller.signal, env });
         const text = extractOpenCodeText(result.stdout);
         if (job.request.expectsJson) {
@@ -272,19 +322,16 @@ class ClaudeExecutor {
     this.command = command || locateCommand("claude", "CLAUDE_CMD");
     this.controllers = new Map();
   }
-  async submit(job, { workspace = PATHS.repoRoot } = {}) {
+  async submit(job, { workspace = PATHS.repoRoot, onStart } = {}) {
     const task = await writeTaskFile(job, workspace);
-    const tools = claudeProfileTools(job);
     const runId = `claude-${job.id}`;
     const controller = new AbortController();
     this.controllers.set(runId, controller);
     try {
-      const result = await runProcess(this.command, [
-        "-p", task.instructions,
-        "--output-format", "json",
-        "--allowedTools", tools.allowed.join(","),
-        "--disallowedTools", tools.disallowed.join(","),
-      ], { cwd: workspace, timeoutMs: this.timeoutMs, signal: controller.signal });
+      await onStart?.(runId);
+      const result = await runProcess(this.command, buildClaudeArgs(job), {
+        cwd: workspace, timeoutMs: this.timeoutMs, signal: controller.signal, input: task.instructions,
+      });
       let text = result.stdout.trim();
       try {
         const parsed = JSON.parse(text);
@@ -338,6 +385,7 @@ export {
   extractOpenCodeText,
   locateCommand,
   buildTaskPrompt,
+  buildClaudeArgs,
   claudeProfileTools,
   openCodeProfileConfig,
   runProcess,

@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -38,6 +39,28 @@ function parsePorcelainZ(raw) {
   return [...new Set(paths.filter(Boolean))];
 }
 
+function parsePorcelainDetails(raw) {
+  const entries = String(raw).split("\0").filter(Boolean);
+  const changes = [];
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index];
+    const status = entry.slice(0, 2);
+    const file = entry.slice(3).replace(/\\/g, "/");
+    const change = { status, path: file, kind: status === "??" || status.includes("A") ? "added" : "existing" };
+    if (status.includes("R") || status.includes("C")) {
+      change.sourcePath = String(entries[index + 1] || "").replace(/\\/g, "/");
+      change.kind = "existing";
+      index += 1;
+    }
+    changes.push(change);
+  }
+  return changes;
+}
+
+function diffHash(value) {
+  return createHash("sha256").update(String(value || "")).digest("hex");
+}
+
 class GitGuard {
   constructor({ repoRoot = PATHS.repoRoot, worktreeRoot = PATHS.worktreeRoot } = {}) {
     this.repoRoot = repoRoot;
@@ -46,7 +69,12 @@ class GitGuard {
 
   async changedPaths(cwd = this.repoRoot) {
     const { stdout } = await git(["status", "--porcelain=v1", "-z", "--untracked-files=all"], { cwd });
-    return parsePorcelainZ(stdout);
+    return parsePorcelainZ(stdout).filter((item) => !this.#isManagedWorktreePath(item, cwd));
+  }
+
+  async changes(cwd = this.repoRoot) {
+    const { stdout } = await git(["status", "--porcelain=v1", "-z", "--untracked-files=all"], { cwd });
+    return parsePorcelainDetails(stdout).filter((item) => !this.#isManagedWorktreePath(item.path, cwd));
   }
 
   async diff(paths = [], cwd = this.repoRoot) {
@@ -56,9 +84,32 @@ class GitGuard {
     return `${stdout}${untracked ? `\n未跟踪文件：\n${untracked}` : ""}`.trim();
   }
 
-  async branchDiff(branch) {
-    const { stdout } = await git(["diff", "HEAD..." + branch, "--"], { cwd: this.repoRoot });
+  async branchDiff(branch, base = "HEAD") {
+    const { stdout } = await git(["diff", `${base}...${branch}`, "--"], { cwd: this.repoRoot });
     return stdout;
+  }
+
+  async pinWorktree(worktree) {
+    const { stdout: head } = await git(["rev-parse", worktree.branch], { cwd: this.repoRoot });
+    const commit = head.trim();
+    const { stdout: preview } = await git(["diff", `${worktree.base}...${commit}`, "--"], { cwd: this.repoRoot });
+    const { stdout: names } = await git(["diff", "--name-status", "-z", worktree.base, commit, "--"], { cwd: this.repoRoot });
+    const parts = names.split("\0").filter(Boolean);
+    const changes = [];
+    for (let index = 0; index < parts.length; index += 1) {
+      const status = parts[index];
+      const file = String(parts[index + 1] || "").replace(/\\/g, "/");
+      if (!file) break;
+      const change = { status, path: file, kind: status === "A" ? "added" : "existing" };
+      index += 1;
+      if (/^[RC]/.test(status)) {
+        change.targetPath = String(parts[index + 1] || "").replace(/\\/g, "/");
+        change.kind = "existing";
+        index += 1;
+      }
+      changes.push(change);
+    }
+    return { commit, preview, diffHash: diffHash(`${names}\n${preview}`), changes };
   }
 
   async commitPaths(paths, message, cwd = this.repoRoot) {
@@ -84,14 +135,25 @@ class GitGuard {
     try { await fs.access(directory); throw new Error(`工作树目录已存在：${directory}`); } catch (error) {
       if (error.code !== "ENOENT") throw error;
     }
-    await git(["worktree", "add", "-b", branch, directory], { cwd: this.repoRoot });
-    return { branch, directory };
+    const { stdout } = await git(["rev-parse", "HEAD"], { cwd: this.repoRoot });
+    const base = stdout.trim();
+    await git(["worktree", "add", "-b", branch, directory, base], { cwd: this.repoRoot });
+    return { branch, directory, base };
   }
 
-  async mergeWorktree({ branch }) {
+  async mergeWorktree({ branch, commit, base, diffHash: expectedDiffHash }) {
     const dirty = await this.changedPaths(this.repoRoot);
-    if (dirty.length) throw new Error("主工作区存在未提交变更，拒绝自动合并");
-    await git(["merge", "--no-ff", branch, "-m", `merge: ${branch}`], { cwd: this.repoRoot });
+    if (dirty.length) throw new Error(`主工作区存在未提交变更，拒绝自动合并：${dirty.join(", ")}`);
+    const pinned = await this.pinWorktree({ branch, base });
+    if (!commit || pinned.commit !== commit || (expectedDiffHash && pinned.diffHash !== expectedDiffHash)) {
+      throw new Error("隔离分支在审批后发生变化，拒绝合并");
+    }
+    try {
+      await git(["merge", "--no-ff", commit, "-m", `merge: ${branch}`], { cwd: this.repoRoot });
+    } catch (error) {
+      await git(["merge", "--abort"], { cwd: this.repoRoot, allowExitCodes: [128] }).catch(() => {});
+      throw error;
+    }
     const { stdout } = await git(["rev-parse", "HEAD"], { cwd: this.repoRoot });
     return { merged: true, commit: stdout.trim() };
   }
@@ -101,6 +163,14 @@ class GitGuard {
     if (directory) await git(["worktree", "remove", "--force", directory], { cwd: this.repoRoot });
     if (branch) await git(["branch", "-D", branch], { cwd: this.repoRoot });
   }
+
+  #isManagedWorktreePath(relative, cwd) {
+    if (path.resolve(cwd) !== path.resolve(this.repoRoot)) return false;
+    const managed = path.relative(this.repoRoot, this.worktreeRoot).replace(/\\/g, "/");
+    if (!managed || managed.startsWith("../") || path.isAbsolute(managed)) return false;
+    const value = String(relative).replace(/\\/g, "/");
+    return value === managed || value.startsWith(`${managed}/`);
+  }
 }
 
-export { GitGuard, git, parsePorcelainZ };
+export { GitGuard, diffHash, git, parsePorcelainDetails, parsePorcelainZ };

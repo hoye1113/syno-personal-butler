@@ -61,6 +61,8 @@ class KnowledgeStore {
     return { notes: notes.length, rebuiltAt: new Date().toISOString() };
   }
 
+  invalidate() { this.cache = null; }
+
   async search(query, { limit = 30 } = {}) {
     if (!this.cache) await this.rebuild();
     const terms = String(query || "").toLocaleLowerCase("zh-CN").split(/\s+/).filter(Boolean);

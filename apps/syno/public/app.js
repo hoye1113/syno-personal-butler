@@ -921,6 +921,7 @@ function createTopicCard(topic, options = {}) {
   });
 
   const scheduleBtn = fragment.querySelector('[data-action="schedule"]');
+  const briefBtn = fragment.querySelector('[data-action="brief"]');
   const unscheduleBtn = fragment.querySelector('[data-action="unschedule"]');
   const revertImportBtn = fragment.querySelector('[data-action="revert-import"]');
   const disposeBtn = fragment.querySelector('[data-action="dispose"]');
@@ -930,6 +931,7 @@ function createTopicCard(topic, options = {}) {
   }
 
   scheduleBtn.addEventListener("click", () => openScheduleDialog(topic, topic.scheduledDate || getCurrentWeekDays()[0].iso));
+  briefBtn.addEventListener("click", () => handleCreateBrief(topic));
   if (topic.sourceInboxPath) {
     revertImportBtn.addEventListener("click", () => handleRevertImportedTopic(topic));
   } else {
@@ -982,12 +984,14 @@ function createInboxCandidateCard(candidate) {
 
   const meta = document.createElement('div');
   meta.className = 'inbox-meta';
-  meta.innerHTML = `
-    <span>${candidate.author || '未知作者'}</span>
-    <span>${candidate.source || '收件箱'}</span>
-    <span>${candidate.savedAt || '最近同步'}</span>
-    <span>置信度：${formatCandidateConfidence(candidate.confidence)}</span>
-  `;
+  for (const value of [
+    candidate.author || '未知作者',
+    candidate.source || '收件箱',
+    candidate.savedAt || '最近同步',
+    `置信度：${formatCandidateConfidence(candidate.confidence)}`,
+  ]) {
+    meta.append(Object.assign(document.createElement('span'), { textContent: String(value) }));
+  }
   card.append(meta);
 
   const excerpt = document.createElement('p');
@@ -1167,8 +1171,8 @@ function renderDisposeActionHint() {
   if (action === "拒绝") {
     elements.disposeActionHint.className = "dispose-action-hint";
     elements.disposeActionHint.innerHTML = `
-      <strong>会保留在 Vault 里</strong>
-      <span>行动卡片仍在「${escapeHtml(state.settings?.topicDir || "行动卡片目录")}」，只是标记为已拒绝，并从排期池/周历隐藏。原始收件箱素材不删除。</span>
+      <strong>会归档，不会删除</strong>
+      <span>行动卡片会按年月移入「${escapeHtml(state.settings?.archiveDir || "归档目录")}」并标记为已拒绝。原始收件箱素材仍保留。</span>
     `;
     return;
   }
@@ -1637,7 +1641,10 @@ function renderScheduleDaySidebar() {
       && newStart < t.scheduledEnd && newEnd > t.scheduledStart;
     const item = document.createElement("div");
     item.className = `schedule-day-item${hasConflict ? " conflict" : ""}`;
-    item.innerHTML = `<strong>${stripTopicPrefix(t.title)}</strong><span>${t.scheduledStart || ""}${t.scheduledEnd ? "–" + t.scheduledEnd : ""}</span>`;
+    item.append(
+      Object.assign(document.createElement("strong"), { textContent: stripTopicPrefix(t.title) }),
+      Object.assign(document.createElement("span"), { textContent: `${t.scheduledStart || ""}${t.scheduledEnd ? `–${t.scheduledEnd}` : ""}` }),
+    );
     return item;
   });
 
@@ -2265,6 +2272,11 @@ async function postAndReload(url, payload) {
   } finally {
     setBusy(false);
   }
+}
+
+async function handleCreateBrief(topic) {
+  const data = await postAndReload("/api/topics/brief", { path: topic.path });
+  if (data) showToast(`Content Brief 已创建：${data.path || data.id || topic.title}`);
 }
 
 function queueApprovalIfNeeded(data) {
