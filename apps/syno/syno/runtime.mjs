@@ -4,6 +4,7 @@ import path from "node:path";
 import { AgentHost } from "./agent-host.mjs";
 import { ChannelHub, WebChannelAdapter, WindowsNotificationAdapter } from "./channels.mjs";
 import { ClaimEvidenceService } from "./claim-evidence-service.mjs";
+import { NativeCognitiveRuntime } from "./cognitive-runtime.mjs";
 import { ConversationStore } from "./conversation-store.mjs";
 import { executeDomainOperation } from "./domain-operations.mjs";
 import { FeishuChannelAdapter } from "./feishu-channel.mjs";
@@ -156,7 +157,8 @@ function createSynoRuntime(options = {}) {
     },
   ]);
   const agent = options.agent || new ToolLoopAgent({ provider, tools, conversations });
-  const baseExecutor = options.executor || new ToolLoopExecutor({ agent });
+  const cognitiveRuntime = options.cognitiveRuntime || new NativeCognitiveRuntime({ agent, tools });
+  const baseExecutor = options.executor || new ToolLoopExecutor({ runtime: cognitiveRuntime });
   let reports;
   const executor = new OperationExecutor({
     fallback: baseExecutor,
@@ -285,6 +287,7 @@ function createSynoRuntime(options = {}) {
     conversations,
     tools,
     agent,
+    cognitiveRuntime,
     settingsRegistry,
     developmentMode: options.developmentMode === true || process.env.SYNO_DEVELOPMENT_MODE === "true",
     async initialize({ worker = false } = {}) {

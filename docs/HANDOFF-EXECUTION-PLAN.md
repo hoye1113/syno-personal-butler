@@ -16,7 +16,7 @@ Syno 是 Windows 本地、单用户、主动式且可审计的知识闭环私人
 
 - `vault/` 是唯一可写知识事实源，`ops/` 是行动和证据事实源；`.runtime/` 可删除重建。
 - 原始 `D:\workSpace\obsidian_repository` 永久只读，不做双向同步。
-- 产品运行时只有一个自建 `ToolLoopAgent`。OpenCode/OpenClaw 都不是产品运行时。
+- 产品运行时只有一个启用的 `CognitiveRuntime`。原生 `ToolLoopAgent` 是可信基线；Hermes 是固定 SHA、不可并行、不可自动回退的候选认知内核。OpenCode/OpenClaw 都不是产品运行时。
 - Provider 只使用一个固定 Model ID 和一个 OpenAI 兼容 Base URL，不自动换 Provider、模型或分层。
 - 模型不得唤醒自己、改变 Policy、扩大权限或绕过审批。
 - Syno 不修改自身源码，只能生成 `BugReport`、`ImprovementProposal`，以及修改 `SettingsRegistry` 白名单配置。
@@ -35,7 +35,15 @@ Syno 是 Windows 本地、单用户、主动式且可审计的知识闭环私人
 1. **R3-0 可信基线**：测试隔离、日历副作用契约、只读权限、完整回归。
 2. **产品和架构事实**：单 Agent、固定 Provider、Afu 改造边界、源码禁改、本地恢复策略。
 3. **知识闭环契约**：Goal、Artifact、Ingest、Claim/Evidence、Learning、Output、Memory、Settings。
-4. **运行时**：`SignalEngine → PriorityEngine → ToolLoopAgent → ToolRegistry`，Provider 离线持久等待。
+4. **运行时**：`SignalEngine → PriorityEngine → CognitiveRuntime → ToolRegistry`，Provider 离线持久等待。当前启用原生适配器；Hermes 只有通过全部硬门槛后才能显式切换。
+
+## Hermes 候选执行状态（2026-07-17）
+
+- 已建立窄接口：`run / cancel / health / capabilities`，并将原生循环迁入该接口。
+- 已锁定上游 `0f102fa4dc04b7dfdab048169aaaa640d09d7523`（Hermes `0.18.2`，MIT），本地源码只读。
+- 无凭据 Fake Provider Spike 已通过：空 toolset 不暴露工具、白名单只含 Syno 代理工具、固定模型、无 fallback/memory/context/Gateway/CLI，并完成两轮非流式原生工具调用。
+- Hermes 该版本必须设置固定 SHA 下的私有 `_disable_streaming` 标志才能满足 Syno 非流式契约；升级必须重新审计。
+- 当前决定：**候选可行但不采用/不启用**。真实 token-cloud、sidecar 进程取消/超时/重启、恶意工具名与提示注入尚未全部通过；原生 Runtime 继续是唯一活动实现。
 5. **知识技能**：低成本收录、渐进整理、Teach-back、间隔复习、证据型创作、时效查证。
 6. **外部渠道**：Web 完整控制；微信快速入口；飞书日程和结构化通知；同一 Agent/Policy/Store。
 7. **Web 与品牌**：Today、Capture、Knowledge、Learn、Create；纸片法老知识守护者；WCAG AA。

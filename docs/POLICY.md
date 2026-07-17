@@ -1,6 +1,6 @@
 # Deterministic policy
 
-Syno uses one `ToolLoopAgent` and one configured model ID. The model never chooses a provider, permission, risk level, approval count, wake-up time or retry escalation.
+Syno enables exactly one `CognitiveRuntime` and one configured model ID. The active baseline is `NativeCognitiveRuntime` around `ToolLoopAgent`; a Hermes adapter may be selected only after its pinned sidecar passes every adoption gate. Runtimes never run in parallel and never silently fall back to each other. The model never chooses a provider, permission, risk level, approval count, wake-up time or retry escalation.
 
 | Action | Initial approval | Workspace | Notes |
 |---|---:|---|---|

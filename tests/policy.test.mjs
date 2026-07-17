@@ -6,18 +6,18 @@ import { validateChangedPaths } from "../apps/syno/syno/validator.mjs";
 
 test("Policy routes read, write and high-risk intents deterministically", () => {
   assert.deepEqual(evaluate({ intent: "search" }), {
-    intent: "search", profile: "syno-read", approval: "none", risk: "read", executor: "tool-loop-agent",
+    intent: "search", profile: "syno-read", approval: "none", risk: "read", executor: "cognitive-runtime",
     allowedRoots: [], needsWorktree: false, autoCommit: false, validators: ["changed-paths"],
     allowed: true, reason: "只读请求可直接执行",
   });
   const idea = evaluate({ intent: "create_content_idea" });
   assert.equal(idea.profile, "syno-ops");
   assert.equal(idea.approval, "single");
-  assert.equal(idea.executor, "tool-loop-agent");
+  assert.equal(idea.executor, "cognitive-runtime");
   assert.equal(idea.needsWorktree, true);
   const deletion = evaluate({ intent: "delete" });
   assert.equal(deletion.approval, "double");
-  assert.equal(deletion.executor, "tool-loop-agent");
+  assert.equal(deletion.executor, "cognitive-runtime");
   assert.equal(deletion.needsWorktree, true);
   assert.equal(evaluate({ intent: "create_report" }, { trustedAutomation: true }).approval, "none");
   assert.equal(evaluate({ intent: "code_change" }).allowed, false);

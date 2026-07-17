@@ -15,7 +15,7 @@ Web / Weixin / Feishu / Scheduler
  PriorityEngine ── goals → commitments → reviews → news → exploration
         │
         ▼
- ToolLoopAgent ── one agent / bounded turns / native tool calls
+ CognitiveRuntime ── exactly one active adapter / bounded turns / native tool calls
         │
         ▼
  ToolRegistry ── schema / risk / permission / retry / version
@@ -34,7 +34,8 @@ Web / Weixin / Feishu / Scheduler
 
 - `SignalEngine.collect` deterministically decides when active work is due. The model cannot wake itself.
 - `PriorityEngine.rank` applies the fixed goal/commitment/review/news/exploration order and the 60/25/15 digest/ingest/maintenance budget.
-- `ToolLoopAgent.run` is the only model loop. It uses one fixed OpenAI-compatible model and cannot select providers, permissions or approval levels.
+- `CognitiveRuntime` is the only model-loop seam: `run(request)`, `cancel(runId)`, `health()` and `capabilities()`. The active native adapter wraps `ToolLoopAgent`; the inactive Hermes adapter can only proxy declared calls back to the same Node `ToolRegistry`.
+- A runtime uses one fixed OpenAI-compatible model and cannot select providers, permissions or approval levels. Runtime selection is explicit, mutually exclusive and has no automatic fallback.
 - `ToolRegistry.resolve` exposes only schema-validated Syno capabilities; shell, arbitrary files, browser, Git and source editing are never tools.
 - `ProviderClient.complete` owns non-streaming `chat/completions`, authentication, timeout, cancellation and structured errors.
 - `ConversationStore` keeps recoverable local conversation and retry state with explicit, separately enforced chat/raw-voice/failed-payload retention.
@@ -69,4 +70,4 @@ Job files and immutable events are the recovery log. Per-job locks serialize sta
 
 Conversation defaults are 30 days for completed chat, 7 days for confirmed raw voice, 30 days for failed payloads, and until terminal state for unfinished work. Provider outage never changes provider or model: deterministic local features continue and LLM jobs remain durable for retry.
 
-The Worker product path is `SignalEngine → PriorityEngine → ProactiveOrchestrator → ToolLoopAgent`. The historical `Scheduler` remains only for legacy regression coverage and is not used to wake the product Agent.
+The Worker product path is `SignalEngine → PriorityEngine → ProactiveOrchestrator → CognitiveRuntime`. The historical `Scheduler` remains only for legacy regression coverage and is not used to wake the product Agent.

@@ -65,7 +65,7 @@ function evaluate(request = {}, context = {}) {
   const trustedAutomation = context.trustedAutomation === true && intent === "create_report";
   const approval = highRisk ? "double" : writes && !trustedAutomation ? "single" : "none";
   const risk = highRisk ? "high" : writes ? "low" : "read";
-  const executor = "tool-loop-agent";
+  const executor = "cognitive-runtime";
   const denied = intent === "code_change" && !developmentMode;
   return Object.freeze({
     intent,

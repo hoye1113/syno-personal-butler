@@ -1,5 +1,9 @@
 # Security model
 
+## Cognitive runtime boundary
+
+Only one `CognitiveRuntime` may be active. Every adapter fails its capability handshake unless Terminal, direct file/source writes, memory writes, Skill mutation, model switch/fallback, YOLO, dynamic MCP, Cron, delegate, Browser and Gateway are explicitly `false`, and its tool list exactly matches the current Syno `ToolRegistry`. External runtimes never receive filesystem, Shell, Git, approval or configuration authority; tool requests return to Node for schema validation, Policy, Approval and GitGuard. Runtime failure is persisted and never triggers a silent adapter or model fallback.
+
 - Localhost only; non-loopback HTTP requests are rejected for mutation routes.
 - Secrets never live in the repository.
 - External messages are untrusted input. They cannot alter Policy or Profile.

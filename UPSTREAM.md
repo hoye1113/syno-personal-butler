@@ -22,3 +22,12 @@ Syno 使用全新 Git 历史，不合并任何上游提交历史，也不自动�
 - Claude channel study sample: <https://github.com/Johnixr/claude-code-wechat-channel> (MIT)
 - Syno implements an independent `WeixinIlinkAdapter`; neither package is a runtime dependency.
 
+## Hermes Agent candidate
+
+- Source: <https://github.com/nousresearch/hermes-agent>
+- Spike commit: `0f102fa4dc04b7dfdab048169aaaa640d09d7523`
+- Observed version: `0.18.2`
+- License: MIT
+- Integration form: read-only, pinned-source Python sidecar candidate behind Syno's `CognitiveRuntime`; no Hermes files are copied or modified.
+- Status: credential-free capability spike passed, but Hermes is not an active product runtime. Real Provider, process recovery, cancellation and injection gates remain.
+
