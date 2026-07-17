@@ -52,3 +52,10 @@ Run `pnpm probe:hermes-sidecar -- --source <pinned-hermes-root> --python <python
 All slash-prefixed runtime control commands are rejected before Hermes, and invented tool names are rejected at the process seam. Hermes-specific regression verifies that `jobs.submit` creates an `awaiting_approval` Job while a direct write remains `TOOL_APPROVAL_REQUIRED`; the shared full suite continues to cover knowledge-loop and GitGuard semantics. The real Provider gate is intentionally not bypassed with another endpoint or model.
 
 Until all of these pass, Hermes must not be selected in runtime configuration.
+
+## Current verification snapshot
+
+- main worktree: Node `108/108`, vault `57/57`, repository verification passed;
+- fresh clone at commit `2bb4195`: Node `108/108`, vault `57/57`, repository verification passed;
+- browser acceptance is unchanged from the prior desktop/mobile Playwright pass because this phase has no Web changes;
+- no Push was performed and the native runtime remains active.
