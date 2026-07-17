@@ -47,8 +47,8 @@ Run `pnpm probe:hermes-sidecar -- --source <pinned-hermes-root> --python <python
 ## Remaining adoption gates
 
 - real token-cloud fixed-model probe without credential persistence in Hermes;
-- full knowledge-loop, approval and GitGuard regressions at or above the native baseline.
+- real-Provider tool-call success-rate comparison against the native baseline.
 
-All slash-prefixed runtime control commands are rejected before Hermes, and invented tool names are rejected at the process seam. The real Provider gate is intentionally not bypassed with another endpoint or model.
+All slash-prefixed runtime control commands are rejected before Hermes, and invented tool names are rejected at the process seam. Hermes-specific regression verifies that `jobs.submit` creates an `awaiting_approval` Job while a direct write remains `TOOL_APPROVAL_REQUIRED`; the shared full suite continues to cover knowledge-loop and GitGuard semantics. The real Provider gate is intentionally not bypassed with another endpoint or model.
 
 Until all of these pass, Hermes must not be selected in runtime configuration.

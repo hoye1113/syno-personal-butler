@@ -1,8 +1,14 @@
 import assert from "node:assert/strict";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import test from "node:test";
 
+import { AgentHost } from "../apps/syno/syno/agent-host.mjs";
 import { NativeCognitiveRuntime, assertCognitiveCapabilities, baseCapabilities } from "../apps/syno/syno/cognitive-runtime.mjs";
+import { FakeExecutor } from "../apps/syno/syno/executors.mjs";
 import { HermesCognitiveRuntime } from "../apps/syno/syno/hermes-cognitive-runtime.mjs";
+import { JobStore } from "../apps/syno/syno/job-store.mjs";
+import { PATHS } from "../apps/syno/syno/paths.mjs";
 import { ToolRegistry } from "../apps/syno/syno/tool-registry.mjs";
 import { ToolLoopExecutor } from "../apps/syno/syno/tool-loop-executor.mjs";
 
@@ -80,4 +86,44 @@ test("Hermes adapter fails closed when the bridge advertises a forbidden capabil
   const tools = { list() { return []; } };
   const bridge = { async capabilities() { return { ...baseCapabilities({ adapter: "hermes-sidecar", tools: [] }), terminal: true }; } };
   await assert.rejects(new HermesCognitiveRuntime({ bridge, tools, fixedModelId: "fixed" }).initialize(), /terminal/);
+});
+
+test("Hermes can create only an approval Job and cannot turn a direct write into authority", async (t) => {
+  const opsRoot = path.join(PATHS.runtimeRoot, "tests", `hermes-approval-${Date.now()}`);
+  t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
+  const host = new AgentHost({
+    store: new JobStore({ opsRoot }),
+    executor: new FakeExecutor(),
+    gitGuard: { async changedPaths() { return []; }, async commitPaths() { return { committed: false }; } },
+  });
+  const tools = new ToolRegistry([
+    {
+      name: "jobs.submit", description: "submit", risk: "low", permission: "syno-ops", retry: "idempotent", version: "1", approvalBoundary: true,
+      inputSchema: { type: "object", required: ["text"], properties: { text: { type: "string" } }, additionalProperties: false },
+      outputSchema: { type: "object", required: ["id", "status", "requiresApproval"], properties: { id: { type: "string" }, status: { type: "string" }, requiresApproval: { type: "boolean" } } },
+      execute: async ({ text }) => {
+        const result = await host.receive({ intent: "create_content_idea", text });
+        return { id: result.job.id, status: result.job.status, requiresApproval: result.requiresApproval === true };
+      },
+    },
+    {
+      name: "knowledge.write", description: "never direct", risk: "low", permission: "syno-write", retry: "none", version: "1",
+      inputSchema: { type: "object", properties: {}, additionalProperties: false }, outputSchema: { type: "object" }, execute: async () => ({ written: true }),
+    },
+  ]);
+  const bridge = {
+    async capabilities() { return baseCapabilities({ adapter: "hermes-sidecar", tools: tools.list().map((tool) => tool.name) }); },
+    async health() { return { ready: true }; }, cancel() { return false; },
+    async run(_payload, callbacks) {
+      const proposal = await callbacks.onToolCall({ name: "jobs.submit", arguments: { text: "Create evidence-backed article" } });
+      let directWriteCode;
+      try { await callbacks.onToolCall({ name: "knowledge.write", arguments: {} }); } catch (error) { directWriteCode = error.code; }
+      return { text: "queued", model: "fixed-model", proposal, directWriteCode };
+    },
+  };
+  const result = await new HermesCognitiveRuntime({ bridge, tools, fixedModelId: "fixed-model" }).run({ text: "create" });
+  assert.equal(result.proposal.status, "awaiting_approval");
+  assert.equal(result.proposal.requiresApproval, true);
+  assert.equal(result.directWriteCode, "TOOL_APPROVAL_REQUIRED");
+  assert.equal((await host.list()).length, 1);
 });
