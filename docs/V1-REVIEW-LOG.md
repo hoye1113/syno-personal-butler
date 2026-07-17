@@ -14,4 +14,24 @@ The remediation introduced the canonical operation registry, all-write worktrees
 
 ## Round 3
 
-Pending final post-remediation review.
+The third review found no P0 issue, but found release-blocking P1 issues in transaction consistency, crash/concurrency behavior, process cancellation, persisted request privacy, OpenCode Schema fallback and ContentBrief contracts.
+
+Spec findings:
+
+- An external side-effect failure could leave Markdown merged while the Job was reported failed.
+- OpenCode fallback did not cover the intended Schema-validation path.
+- ContentBrief output did not fully satisfy or validate its contract.
+- PDF intake retained a binary artifact without useful extracted content and could expose an absolute local path.
+- Windows Task Scheduler could terminate the worker after seven days.
+- Deterministic complex-to-Claude routing, Weixin task routing, ACP and MemoryProposal promotion were incomplete.
+
+Standards findings:
+
+- The server and worker lacked a shared cross-process Git/Job lock.
+- Cancellation, rejection or a crash could leave worktrees behind.
+- Windows cancellation did not reliably terminate the whole process tree.
+- Raw request payloads could be committed and expose tokens or local paths.
+- Startup recovery and durable external-side-effect retry semantics were incomplete.
+- `syno-code` could expose more host-code execution capability than required.
+
+Remediation is in progress. The last green release candidate remains `a75502c` (66/66 tests). The current working tree contains uncommitted round-three fixes and most recently passed 53/66 tests, so Round 3 is not closed. Continue from `docs/HANDOFF-EXECUTION-PLAN.md` and do not tag V1 until all P1 findings are closed and the full suite is green.

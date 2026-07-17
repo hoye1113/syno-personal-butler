@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -10,12 +10,27 @@ const TRANSITIONS = Object.freeze({
   pending: new Set(["awaiting_approval", "running", "canceled"]),
   awaiting_approval: new Set(["running", "rejected", "canceled", "completed"]),
   running: new Set(["validating", "failed", "canceled"]),
-  validating: new Set(["completed", "failed", "awaiting_approval"]),
+  validating: new Set(["completed", "failed", "awaiting_approval", "canceled"]),
   completed: new Set(),
   failed: new Set(),
   rejected: new Set(),
   canceled: new Set(),
 });
+
+const SAFE_REQUEST_FIELDS = new Set(["kind", "operation", "sourceType", "expectsJson"]);
+
+function sanitizeRequest(request = {}) {
+  const serialized = JSON.stringify(request);
+  const safe = {
+    summary: request.operation ? `Syno operation: ${request.operation}` : `本地请求载荷（${Buffer.byteLength(serialized, "utf8")} bytes）`,
+    payloadDigest: createHash("sha256").update(serialized).digest("hex"),
+    fields: Object.keys(request).sort(),
+  };
+  for (const [key, value] of Object.entries(request)) {
+    if (SAFE_REQUEST_FIELDS.has(key) && ["string", "boolean", "number"].includes(typeof value)) safe[key] = value;
+  }
+  return safe;
+}
 
 function timestampParts(iso) {
   const date = new Date(iso);
@@ -23,8 +38,9 @@ function timestampParts(iso) {
 }
 
 class JobStore {
-  constructor({ opsRoot = PATHS.opsRoot, clock = () => new Date() } = {}) {
+  constructor({ opsRoot = PATHS.opsRoot, payloadRoot = path.join(PATHS.stateRoot, "job-payloads"), clock = () => new Date() } = {}) {
     this.opsRoot = opsRoot;
+    this.payloadRoot = payloadRoot;
     this.clock = clock;
   }
 
@@ -35,6 +51,7 @@ class JobStore {
     }
     const now = this.clock().toISOString();
     const id = `job-${now.slice(0, 10).replaceAll("-", "")}-${randomUUID().slice(0, 8)}`;
+    await this.#savePayload(id, request);
     const job = {
       id,
       intent: decision.intent,
@@ -50,7 +67,8 @@ class JobStore {
       requestKey: requestKey || undefined,
       created: now,
       updated: now,
-      request,
+      request: sanitizeRequest(request),
+      payloadRef: id,
       decision,
       result: null,
       error: decision.allowed === false ? { code: "POLICY_DENIED", message: decision.reason } : null,
@@ -99,6 +117,18 @@ class JobStore {
       }
     }
     return jobs.sort((a, b) => b.created.localeCompare(a.created)).slice(0, limit);
+  }
+
+  async loadRequest(job) {
+    if (!job?.payloadRef) return job?.request || {};
+    try {
+      return JSON.parse(await fs.readFile(path.join(this.payloadRoot, `${job.payloadRef}.json`), "utf8"));
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      const missing = new Error(`Job 本地载荷不存在：${job.id}`);
+      missing.code = "JOB_PAYLOAD_MISSING";
+      throw missing;
+    }
   }
 
   async transition(job, next, patch = {}) {
@@ -175,6 +205,14 @@ class JobStore {
     await walk(root);
     return output.sort();
   }
+
+  async #savePayload(id, request) {
+    await fs.mkdir(this.payloadRoot, { recursive: true });
+    const file = path.join(this.payloadRoot, `${id}.json`);
+    const temporary = `${file}.${process.pid}.${randomUUID()}.tmp`;
+    await fs.writeFile(temporary, `${JSON.stringify(request)}\n`, { encoding: "utf8", mode: 0o600 });
+    await fs.rename(temporary, file);
+  }
 }
 
-export { JobStore, TERMINAL, TRANSITIONS };
+export { JobStore, TERMINAL, TRANSITIONS, sanitizeRequest };

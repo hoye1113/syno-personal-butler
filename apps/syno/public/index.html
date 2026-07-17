@@ -538,6 +538,11 @@
             </div>
           </div>
         </details>
+        <details class="syno-intake syno-memory-box">
+          <summary>长期记忆候选</summary>
+          <p>候选不会自动进入知识库；“提交晋升”仍会先进入审批，并展示最终 Markdown 差异。</p>
+          <div id="synoMemoryProposals" class="syno-list" aria-live="polite"></div>
+        </details>
         <label class="syno-search-label" for="synoKnowledgeQuery">搜索知识库</label>
         <div class="syno-search-row">
           <input id="synoKnowledgeQuery" type="search" placeholder="输入主题、概念或笔记标题" />
@@ -589,6 +594,7 @@
               <option value="create_content_brief">创建 Content Brief</option>
               <option value="create_action">创建行动</option>
               <option value="create_memory_proposal">长期记忆候选</option>
+              <option value="complex_analysis">复杂分析（固定升级 Claude）</option>
             </select>
             <button class="accent-btn" type="submit">发送</button>
           </div>

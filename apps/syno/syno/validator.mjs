@@ -4,6 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { PATHS } from "./paths.mjs";
+import { validateContractRecord } from "./schema-registry.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -149,11 +150,47 @@ async function validateVaultContract(repoRoot, changedPaths, decision) {
   if (errors.length) throw new Error(errors.join("\n"));
 }
 
+function parseContractValue(value) {
+  const text = String(value ?? "").trim();
+  if (/^[\[{]/.test(text)) {
+    try { return JSON.parse(text); } catch {}
+  }
+  if (text === "true") return true;
+  if (text === "false") return false;
+  if (/^-?\d+(?:\.\d+)?$/.test(text)) return Number(text);
+  return text;
+}
+
+function contractForPath(relative) {
+  if (/^ops\/content\/briefs\/.*\.md$/.test(relative)) return "content-brief";
+  if (/^ops\/content\/ideas\/.*\.md$/.test(relative)) return "content-idea";
+  if (/^ops\/actions\/.*\.md$/.test(relative)) return "action";
+  if (/^ops\/memory\/proposals\/.*\.md$/.test(relative)) return "memory-proposal";
+  return null;
+}
+
+async function validateOpsContracts(repoRoot, changedPaths) {
+  for (const relative of changedPaths) {
+    const contract = contractForPath(relative);
+    if (!contract) continue;
+    let text;
+    try { text = await fs.readFile(path.join(repoRoot, relative), "utf8"); } catch (error) {
+      if (error.code === "ENOENT") continue;
+      throw error;
+    }
+    const parsed = frontmatterData(text);
+    const record = Object.fromEntries(Object.entries(parsed.values).map(([key, value]) => [key, parseContractValue(value)]));
+    if (!record.title) record.title = /^#\s+(.+)$/m.exec(parsed.body)?.[1]?.trim();
+    await validateContractRecord(contract, record);
+  }
+}
+
 async function validateRepositoryChange({ repoRoot = PATHS.repoRoot, changedPaths, decision }) {
   const normalized = validateChangedPaths(changedPaths, decision);
   if (decision.validators?.includes("markdown")) await validateMarkdown(repoRoot, normalized);
   if (decision.validators?.includes("vault-contract")) await validateVaultContract(repoRoot, normalized, decision);
+  if (decision.validators?.includes("ops-contracts")) await validateOpsContracts(repoRoot, normalized);
   return { ok: true, changedPaths: normalized };
 }
 
-export { frontmatterData, validateChangedPaths, validateMarkdown, validateRepositoryChange, validateVaultContract };
+export { contractForPath, frontmatterData, validateChangedPaths, validateMarkdown, validateOpsContracts, validateRepositoryChange, validateVaultContract };

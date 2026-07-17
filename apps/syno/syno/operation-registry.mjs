@@ -2,6 +2,7 @@ const OPERATION_INTENTS = Object.freeze({
   "reports.create": "create_report",
   "notes.edit": "overwrite_note",
   "content.brief.create": "create_content_brief",
+  "memory.promote": "curate_note",
   "inbox.import": "create_content_idea",
   "inbox.import-batch": "create_content_idea",
   "settings.save": "settings_change",

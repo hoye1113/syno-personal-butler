@@ -1,4 +1,4 @@
-import { spawn, execFileSync } from "node:child_process";
+import { spawn, execFile, execFileSync } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -66,14 +66,24 @@ async function runProcess(command, args, { cwd, timeoutMs, signal, env = process
     const stdout = [];
     const stderr = [];
     let settled = false;
+    let terminationError = null;
+    let terminating = false;
+    const terminate = (error) => {
+      if (settled || terminating) return;
+      terminating = true;
+      terminationError = error;
+      terminateProcessTree(child).catch(() => child.kill());
+    };
     const timer = setTimeout(() => {
-      if (settled) return;
-      child.kill();
       const error = new Error(`执行超时（${timeoutMs}ms）`);
       error.failureCode = "timeout";
-      reject(error);
+      terminate(error);
     }, timeoutMs);
-    const abort = () => child.kill();
+    const abort = () => {
+      const error = new Error("执行已取消");
+      error.failureCode = "canceled";
+      terminate(error);
+    };
     signal?.addEventListener("abort", abort, { once: true });
     child.stdout.on("data", (chunk) => stdout.push(chunk));
     child.stderr.on("data", (chunk) => stderr.push(chunk));
@@ -83,6 +93,10 @@ async function runProcess(command, args, { cwd, timeoutMs, signal, env = process
       clearTimeout(timer);
       if (settled) return;
       settled = true;
+      if (terminationError) {
+        reject(terminationError);
+        return;
+      }
       error.failureCode = error.code === "ENOENT" ? "unavailable" : "process_error";
       reject(error);
     });
@@ -91,6 +105,10 @@ async function runProcess(command, args, { cwd, timeoutMs, signal, env = process
       signal?.removeEventListener("abort", abort);
       if (settled) return;
       settled = true;
+      if (terminationError) {
+        reject(terminationError);
+        return;
+      }
       const output = Buffer.concat(stdout).toString("utf8");
       const errorText = Buffer.concat(stderr).toString("utf8");
       if (code !== 0) {
@@ -103,6 +121,28 @@ async function runProcess(command, args, { cwd, timeoutMs, signal, env = process
       resolve({ stdout: output, stderr: errorText, exitCode: code });
     });
   });
+}
+
+async function terminateProcessTree(child) {
+  if (!child?.pid) return;
+  if (process.platform !== "win32") {
+    child.kill("SIGTERM");
+    return;
+  }
+  await new Promise((resolve) => {
+    execFile("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true }, () => resolve());
+  });
+}
+
+function executorEnvironment(extra = {}) {
+  const allowed = [
+    "PATH", "Path", "PATHEXT", "SystemRoot", "WINDIR", "ComSpec", "TEMP", "TMP",
+    "USERPROFILE", "LOCALAPPDATA", "APPDATA", "HOMEDRIVE", "HOMEPATH", "HOME",
+    "LANG", "LC_ALL", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "SSL_CERT_FILE",
+  ];
+  const env = {};
+  for (const key of allowed) if (process.env[key] !== undefined) env[key] = process.env[key];
+  return { ...env, ...extra };
 }
 
 function extractOpenCodeText(raw) {
@@ -171,16 +211,7 @@ function profileReadItems(job) {
 function openCodeProfileConfig(job, { runtimeReadPaths = [] } = {}) {
   const readRoots = [...profileReadItems(job), ...runtimeReadPaths];
   const writeRoots = job.decision.allowedRoots || [];
-  const bash = job.profile === "syno-code"
-    ? {
-        "*": "deny",
-        "git diff*": "allow",
-        "git status*": "allow",
-        "node --test*": "allow",
-        "node scripts/verify-repository.mjs": "allow",
-        "rg *": "allow",
-      }
-    : "deny";
+  const externalReadPaths = readRoots.filter((item) => path.isAbsolute(item));
   return {
     $schema: "https://opencode.ai/config.json",
     permission: {
@@ -190,8 +221,8 @@ function openCodeProfileConfig(job, { runtimeReadPaths = [] } = {}) {
       grep: permissionPaths(readRoots),
       list: permissionPaths(readRoots),
       edit: permissionPaths(writeRoots),
-      bash,
-      external_directory: runtimeReadPaths.length ? permissionPaths(runtimeReadPaths) : "deny",
+      bash: "deny",
+      external_directory: externalReadPaths.length ? permissionPaths(externalReadPaths) : "deny",
       task: "deny",
       skill: "deny",
       webfetch: "deny",
@@ -209,20 +240,17 @@ function claudeProfileTools(job) {
     ...writeRoots.map((root) => `Edit(${root}/**)`),
     ...writeRoots.map((root) => `Write(${root}/**)`),
   ];
-  if (job.profile === "syno-code") {
-    allowed.push("Bash(git diff:*)", "Bash(git status:*)", "Bash(node --test:*)", "Bash(node scripts/verify-repository.mjs)");
-  }
   const disallowed = [
     "Bash(git commit:*)", "Bash(git push:*)", "Bash(git reset:*)", "Bash(git clean:*)",
     "Read(../**)", "Read(~/**)", "Read(//**)", "Edit(../**)", "Edit(~/**)", "Edit(//**)",
     "WebFetch", "WebSearch", "Task",
   ];
-  if (job.profile !== "syno-code") disallowed.unshift("Bash");
+  disallowed.unshift("Bash");
   if (!writeRoots.length) disallowed.unshift("Edit", "Write");
   const available = ["Read", "Glob", "Grep"];
   if (writeRoots.length) available.push("Edit", "Write");
-  if (job.profile === "syno-code") available.push("Bash");
-  return { allowed, disallowed, available };
+  const externalDirs = [...new Set(readRoots.filter((item) => path.isAbsolute(item)).map((item) => path.extname(item) ? path.dirname(item) : item))];
+  return { allowed, disallowed, available, externalDirs };
 }
 
 function buildClaudeArgs(job) {
@@ -240,6 +268,7 @@ function buildClaudeArgs(job) {
     "--output-format", "json",
     "--allowedTools", tools.allowed.join(","),
     "--disallowedTools", tools.disallowed.join(","),
+    ...tools.externalDirs.flatMap((directory) => ["--add-dir", directory]),
   ];
 }
 
@@ -253,8 +282,10 @@ class FakeExecutor {
     this.runs.set(runId, { status: "running" });
     await options.onStart?.(runId);
     const result = await this.responder(job);
-    this.runs.set(runId, { status: "completed", result });
-    return { runId, executor: "fake", ...result };
+    const response = { runId, executor: "fake", ...result };
+    if (options.validate) response.validation = await options.validate(response);
+    this.runs.set(runId, { status: "completed", result: response });
+    return response;
   }
   inspect(runId) { return this.runs.get(runId) || null; }
   cancel(runId) { return this.runs.delete(runId); }
@@ -268,12 +299,11 @@ class OpenCodeExecutor {
     this.controllers = new Map();
   }
 
-  async submit(job, { workspace = PATHS.repoRoot, onStart } = {}) {
+  async submit(job, { workspace = PATHS.repoRoot, onStart, validate, onRetry } = {}) {
     const task = await writeTaskFile(job, workspace);
-    const env = {
-      ...process.env,
+    const env = executorEnvironment({
       OPENCODE_CONFIG_CONTENT: JSON.stringify(openCodeProfileConfig(job, { runtimeReadPaths: [task.file] })),
-    };
+    });
     const failures = [];
     for (const model of this.models) {
       const controller = new AbortController();
@@ -297,11 +327,15 @@ class OpenCodeExecutor {
             throw error;
           }
         }
-        return { runId, executor: "opencode", model, text, stderr: result.stderr, failures };
+        const response = { runId, executor: "opencode", model, text, stderr: result.stderr, failures };
+        if (validate) response.validation = await validate(response);
+        return response;
       } catch (error) {
-        const code = error.failureCode || "process_error";
+        const code = error.failureCode || (error.code === "CONTRACT_VALIDATION_FAILED" ? "schema_failure" : "process_error");
+        error.failureCode = code;
         failures.push({ model, code, message: error.message });
         if (!FALLBACK_CODES.has(code)) throw Object.assign(error, { failures });
+        await onRetry?.({ model, code, error });
       } finally {
         this.controllers.delete(runId);
       }
@@ -322,7 +356,7 @@ class ClaudeExecutor {
     this.command = command || locateCommand("claude", "CLAUDE_CMD");
     this.controllers = new Map();
   }
-  async submit(job, { workspace = PATHS.repoRoot, onStart } = {}) {
+  async submit(job, { workspace = PATHS.repoRoot, onStart, validate } = {}) {
     const task = await writeTaskFile(job, workspace);
     const runId = `claude-${job.id}`;
     const controller = new AbortController();
@@ -330,7 +364,7 @@ class ClaudeExecutor {
     try {
       await onStart?.(runId);
       const result = await runProcess(this.command, buildClaudeArgs(job), {
-        cwd: workspace, timeoutMs: this.timeoutMs, signal: controller.signal, input: task.instructions,
+        cwd: workspace, timeoutMs: this.timeoutMs, signal: controller.signal, input: task.instructions, env: executorEnvironment(),
       });
       let text = result.stdout.trim();
       try {
@@ -339,7 +373,9 @@ class ClaudeExecutor {
       } catch {
         // Claude output formats may evolve; raw successful output remains useful.
       }
-      return { runId, executor: "claude", text, stderr: result.stderr };
+      const response = { runId, executor: "claude", text, stderr: result.stderr };
+      if (validate) response.validation = await validate(response);
+      return response;
     } finally {
       this.controllers.delete(runId);
     }
@@ -383,10 +419,12 @@ export {
   FakeExecutor,
   OpenCodeExecutor,
   extractOpenCodeText,
+  executorEnvironment,
   locateCommand,
   buildTaskPrompt,
   buildClaudeArgs,
   claudeProfileTools,
   openCodeProfileConfig,
   runProcess,
+  terminateProcessTree,
 };

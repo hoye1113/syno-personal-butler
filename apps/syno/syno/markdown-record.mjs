@@ -1,7 +1,9 @@
 import { promises as fs } from "node:fs";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import { validateContractRecord } from "./schema-registry.mjs";
+import { PATHS } from "./paths.mjs";
+import { ProcessFileLock } from "./process-lock.mjs";
 
 function yamlScalar(value) {
   if (value === null || value === undefined) return '""';
@@ -32,6 +34,12 @@ function parseRecord(markdown) {
 
 async function writeRecord(filePath, record, options) {
   if (options?.schema) await validateContractRecord(options.schema, record);
+  const lockName = createHash("sha256").update(path.resolve(filePath)).digest("hex");
+  const lock = new ProcessFileLock({ file: path.join(PATHS.stateRoot, "locks", "records", `${lockName}.lock`) });
+  return lock.run(() => writeRecordUnlocked(filePath, record, options));
+}
+
+async function writeRecordUnlocked(filePath, record, options) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   const tempPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
   await fs.writeFile(tempPath, serializeRecord(record, options), "utf8");

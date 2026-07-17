@@ -5,6 +5,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { PATHS } from "./paths.mjs";
+import { ProcessFileLock } from "./process-lock.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -62,9 +63,10 @@ function diffHash(value) {
 }
 
 class GitGuard {
-  constructor({ repoRoot = PATHS.repoRoot, worktreeRoot = PATHS.worktreeRoot } = {}) {
+  constructor({ repoRoot = PATHS.repoRoot, worktreeRoot = PATHS.worktreeRoot, lockFile = path.join(PATHS.stateRoot, "locks", "repository-git.lock") } = {}) {
     this.repoRoot = repoRoot;
     this.worktreeRoot = worktreeRoot;
+    this.writeLock = new ProcessFileLock({ file: lockFile, timeoutMs: 120_000 });
   }
 
   async changedPaths(cwd = this.repoRoot) {
@@ -113,6 +115,10 @@ class GitGuard {
   }
 
   async commitPaths(paths, message, cwd = this.repoRoot) {
+    return this.writeLock.run(() => this.#commitPaths(paths, message, cwd));
+  }
+
+  async #commitPaths(paths, message, cwd) {
     const normalized = [...new Set(paths.map((item) => item.replace(/\\/g, "/")))];
     if (!normalized.length) return { committed: false, reason: "no_changes" };
     await git(["add", "--", ...normalized], { cwd });
@@ -128,6 +134,10 @@ class GitGuard {
   }
 
   async prepareWorktree(jobId) {
+    return this.writeLock.run(() => this.#prepareWorktree(jobId));
+  }
+
+  async #prepareWorktree(jobId) {
     const safeId = String(jobId).replace(/[^a-zA-Z0-9-]/g, "-");
     const branch = `syno/job/${safeId}`;
     const directory = path.join(this.worktreeRoot, `syno-job-${safeId}`);
@@ -142,6 +152,10 @@ class GitGuard {
   }
 
   async mergeWorktree({ branch, commit, base, diffHash: expectedDiffHash }) {
+    return this.writeLock.run(() => this.#mergeWorktree({ branch, commit, base, diffHash: expectedDiffHash }));
+  }
+
+  async #mergeWorktree({ branch, commit, base, diffHash: expectedDiffHash }) {
     const dirty = await this.changedPaths(this.repoRoot);
     if (dirty.length) throw new Error(`主工作区存在未提交变更，拒绝自动合并：${dirty.join(", ")}`);
     const pinned = await this.pinWorktree({ branch, base });
@@ -160,8 +174,44 @@ class GitGuard {
 
 
   async removeWorktree({ directory, branch } = {}) {
+    return this.writeLock.run(() => this.#removeWorktree({ directory, branch }));
+  }
+
+  async #removeWorktree({ directory, branch } = {}) {
     if (directory) await git(["worktree", "remove", "--force", directory], { cwd: this.repoRoot });
     if (branch) await git(["branch", "-D", branch], { cwd: this.repoRoot });
+  }
+
+  async isAncestor(commit, ref = "HEAD") {
+    if (!commit) return false;
+    const result = await git(["merge-base", "--is-ancestor", commit, ref], { cwd: this.repoRoot, allowExitCodes: [1] });
+    return result.code === 0;
+  }
+
+  async restoreWorktree({ directory } = {}) {
+    const resolved = path.resolve(directory || "");
+    const relative = path.relative(path.resolve(this.worktreeRoot), resolved);
+    if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("只允许重置 Syno 管理的隔离工作区");
+    return this.writeLock.run(async () => {
+      const changes = await this.changes(resolved);
+      const tracked = [];
+      const untracked = [];
+      for (const change of changes) {
+        for (const item of [change.path, change.sourcePath].filter(Boolean)) {
+          const exists = await git(["cat-file", "-e", `HEAD:${item}`], { cwd: resolved, allowExitCodes: [128] });
+          (exists.code === 0 ? tracked : untracked).push(item);
+        }
+      }
+      if (tracked.length) await git(["restore", "--source=HEAD", "--staged", "--worktree", "--", ...new Set(tracked)], { cwd: resolved });
+      for (const item of new Set(untracked)) {
+        const target = path.resolve(resolved, item);
+        const inside = path.relative(resolved, target);
+        if (!inside.startsWith("..") && !path.isAbsolute(inside)) await fs.rm(target, { force: true });
+      }
+      const remaining = await this.changedPaths(resolved);
+      if (remaining.length) throw new Error(`隔离工作区未能恢复干净：${remaining.join(", ")}`);
+      return { restored: true };
+    });
   }
 
   #isManagedWorktreePath(relative, cwd) {

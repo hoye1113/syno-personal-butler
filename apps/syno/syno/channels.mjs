@@ -76,7 +76,10 @@ class ChannelHub {
     const results = {};
     for (const id of selected) {
       const adapter = this.adapters.get(id);
-      if (adapter) results[id] = await adapter.send(message);
+      if (adapter) {
+        try { results[id] = await adapter.send(message); }
+        catch (error) { results[id] = { delivered: false, error: error.message }; }
+      }
     }
     return results;
   }

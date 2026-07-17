@@ -30,10 +30,13 @@ test("URL intake embeds only controlled readable source text", async () => {
 test("PDF intake validates magic bytes and size before quarantine", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-intake-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const service = new IntakeService({ runtimeRoot: root });
+  const service = new IntakeService({ runtimeRoot: root, pdfExtractor: async () => ({ text: "-- 1 of 1 --\nHello PDF", pages: 1 }) });
   await assert.rejects(service.prepare({ kind: "pdf", base64: Buffer.from("not pdf").toString("base64") }), /有效 PDF/);
   const request = await service.prepare({ kind: "pdf", name: "paper.pdf", base64: Buffer.from("%PDF-1.7\nmock").toString("base64") });
   assert.equal(request.intent, "curate_note");
   assert.match(request.attachment, /paper\.pdf$/);
-  assert.equal((await fs.stat(request.attachment)).size, 13);
+  assert.equal(path.isAbsolute(request.attachment), false);
+  assert.match(request.text, /Hello PDF/);
+  assert.equal(request.artifact.pages, 1);
+  assert.equal((await fs.stat(path.join(root, "uploads", request.attachment))).size, 13);
 });

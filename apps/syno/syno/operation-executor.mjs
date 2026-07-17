@@ -25,6 +25,7 @@ class OperationExecutor {
         text: `确定性操作 ${job.request.operation} 已执行`,
         operationResult,
       };
+      if (options.validate) result.validation = await options.validate(result);
       this.runs.set(runId, { status: "completed", result });
       return result;
     } catch (error) {

@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { PATHS, relativeToRepo } from "./paths.mjs";
@@ -12,7 +13,17 @@ class NotificationStore {
   }
   async add({ title, body, level = "info", source = "syno", data = {} }) {
     const now = this.clock().toISOString();
-    const record = { id: `notice-${randomUUID().slice(0, 10)}`, title, body, level, source, data, read: false, created: now };
+    const key = data.idempotencyKey || (data.reportId ? `report:${data.reportId}:${source}` : "");
+    const id = key ? `notice-${createHash("sha256").update(key).digest("hex").slice(0, 12)}` : `notice-${randomUUID().slice(0, 10)}`;
+    if (key) {
+      for (const existingFile of await walkRecords(path.join(this.opsRoot, "notifications"))) {
+        if (path.basename(existingFile) !== `${id}.md`) continue;
+        const existing = await readRecord(existingFile);
+        try { existing.recordPath = relativeToRepo(existingFile); } catch { existing.recordPath = null; }
+        return existing;
+      }
+    }
+    const record = { id, title, body, level, source, data, read: false, created: now };
     const file = path.join(this.opsRoot, "notifications", now.slice(0, 4), now.slice(5, 7), `${record.id}.md`);
     await writeRecord(file, record, { title, summaryKeys: ["id", "level", "source", "read", "created"] });
     try {

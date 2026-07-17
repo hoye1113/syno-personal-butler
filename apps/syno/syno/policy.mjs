@@ -13,6 +13,7 @@ const HIGH_RISK_INTENTS = new Set([
   "new_tag",
   "code_change",
 ]);
+const COMPLEX_INTENTS = new Set(["complex_analysis"]);
 
 const WRITE_INTENTS = new Set([
   "create_action",
@@ -33,6 +34,7 @@ function inferIntent(request = {}) {
   if (/移动|move|重命名|rename/.test(text)) return "move";
   if (/新建\s*moc|new\s+moc/.test(text)) return "new_moc";
   if (/新标签|新 tag|new tag/.test(text)) return "new_tag";
+  if (/^(?:\/任务\s+|任务[：:]|待办[：:]|提醒我|新增行动)/u.test(text.trim())) return "create_action";
   if (/代码|code|实现|修复/.test(text)) return "code_change";
   if (/选题|content idea/.test(text)) return "create_content_idea";
   if (/brief|内容策划|制作说明/.test(text)) return "create_content_brief";
@@ -45,7 +47,7 @@ function inferIntent(request = {}) {
 function evaluate(request = {}, context = {}) {
   const intent = inferIntent(request);
   const developmentMode = context.developmentMode === true;
-  const explicitComplexity = request.complexity === "complex" || context.complexity === "complex";
+  const explicitComplexity = COMPLEX_INTENTS.has(intent);
   const highRisk = HIGH_RISK_INTENTS.has(intent);
   const writes = WRITE_INTENTS.has(intent);
   const profile = intent === "code_change"
@@ -71,7 +73,7 @@ function evaluate(request = {}, context = {}) {
     // it may auto-merge or must pause for a second approval.
     needsWorktree: writes,
     autoCommit: false,
-    validators: ["changed-paths", ...(profile === "syno-curate" ? ["markdown", "vault-contract"] : [])],
+    validators: ["changed-paths", "ops-contracts", ...(profile === "syno-curate" ? ["markdown", "vault-contract"] : [])],
     allowed: !denied,
     reason: denied
       ? "开发模式默认关闭，拒绝由 Syno 修改自身代码"
@@ -83,4 +85,4 @@ function evaluate(request = {}, context = {}) {
   });
 }
 
-export { HIGH_RISK_INTENTS, PROFILE_ROOTS, evaluate, inferIntent };
+export { COMPLEX_INTENTS, HIGH_RISK_INTENTS, PROFILE_ROOTS, evaluate, inferIntent };

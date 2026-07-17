@@ -27,6 +27,7 @@ const PUBLIC_COMMAND_INTENTS = Object.freeze({
   create_content_brief: "create_content_brief",
   create_action: "create_action",
   create_memory_proposal: "create_memory_proposal",
+  complex_analysis: "complex_analysis",
 });
 
 function createSynoRuntime(options = {}) {
@@ -136,6 +137,7 @@ function createSynoRuntime(options = {}) {
         fs.mkdir(PATHS.runtimeRoot, { recursive: true }),
         fs.mkdir(PATHS.stateRoot, { recursive: true }),
       ]);
+      await host.recover();
       await channels.start();
       if (worker) {
         await scheduler.start();

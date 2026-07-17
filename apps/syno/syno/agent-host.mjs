@@ -1,5 +1,8 @@
+import path from "node:path";
+
 import { evaluate } from "./policy.mjs";
 import { PATHS } from "./paths.mjs";
+import { ProcessFileLock } from "./process-lock.mjs";
 import { validateRepositoryChange } from "./validator.mjs";
 
 function isSystemPath(value) {
@@ -17,7 +20,7 @@ function diffRequiresApproval(decision, changes = []) {
 }
 
 class AgentHost {
-  constructor({ store, executor, gitGuard, policy = evaluate, validator = validateRepositoryChange, onCommitted = async () => {} } = {}) {
+  constructor({ store, executor, gitGuard, policy = evaluate, validator = validateRepositoryChange, onCommitted = async () => {}, processLockRoot = path.join(PATHS.stateRoot, "locks", "jobs") } = {}) {
     if (!store || !executor || !gitGuard) throw new Error("AgentHost 缺少必要 Adapter");
     this.store = store;
     this.executor = executor;
@@ -28,6 +31,7 @@ class AgentHost {
     this.activeRuns = new Map();
     this.jobLocks = new Map();
     this.mergeTail = Promise.resolve();
+    this.processLockRoot = processLockRoot;
   }
 
   async receive(request, context = {}) {
@@ -74,6 +78,10 @@ class AgentHost {
 
   async reject(jobId, reason) {
     const job = await this.#withJobLock(jobId, async () => this.store.reject(await this.#requiredJob(jobId), reason));
+    if (job.worktree) {
+      job.cleanup = await this.#cleanupWorktree(job);
+      await this.store.save(job);
+    }
     await this.#commitSystemRecords(job, `syno: reject ${job.id}`);
     return { job };
   }
@@ -107,11 +115,43 @@ class AgentHost {
       if (job.decision.needsWorktree) {
         job.worktree = await this.gitGuard.prepareWorktree(job.id);
         workspace = job.worktree.directory;
-        await this.store.save(job);
+        const gated = await this.#withJobLock(job.id, async () => {
+          const latest = await this.#requiredJob(job.id);
+          if (["canceled", "failed", "rejected"].includes(latest.status)) {
+            latest.worktree ||= job.worktree;
+            await this.store.save(latest);
+            return latest;
+          }
+          latest.worktree = job.worktree;
+          Object.assign(job, latest);
+          await this.store.save(latest);
+          return latest;
+        });
+        Object.assign(job, gated);
+        if (["canceled", "failed", "rejected"].includes(job.status)) {
+          job.cleanup = await this.#cleanupWorktree(job);
+          await this.store.save(job);
+          await this.#commitSystemRecords(job, `syno: stop before run ${job.id}`);
+          return { job };
+        }
         await this.#commitSystemRecords(job, `syno: isolate ${job.id}`);
       }
-      const execution = await this.executor.submit(job, {
+      const executionJob = { ...job, request: await this.store.loadRequest(job) };
+      const execution = await this.executor.submit(executionJob, {
         workspace,
+        validate: job.decision.needsWorktree ? async () => {
+          const attemptChanges = typeof this.gitGuard.changes === "function"
+            ? await this.gitGuard.changes(workspace)
+            : (await this.gitGuard.changedPaths(workspace)).map((item) => ({ path: item }));
+          const attemptPaths = [...new Set(attemptChanges.flatMap((item) => [item.path, item.sourcePath].filter(Boolean)).filter((item) => !isSystemPath(item)))];
+          try {
+            return await this.validator({ repoRoot: workspace, changedPaths: attemptPaths, decision: job.decision });
+          } catch (error) {
+            error.failureCode = error.code === "CONTRACT_VALIDATION_FAILED" ? "schema_failure" : error.failureCode;
+            throw error;
+          }
+        } : undefined,
+        onRetry: job.decision.needsWorktree ? () => this.gitGuard.restoreWorktree(job.worktree) : undefined,
         onStart: async (runId) => {
           this.activeRuns.set(job.id, runId);
           await this.#withJobLock(job.id, async () => {
@@ -134,7 +174,19 @@ class AgentHost {
         return { job: current };
       }
       Object.assign(job, current, { runId: execution.runId });
-      await this.store.transition(job, "validating", { execution });
+      const validating = await this.#withJobLock(job.id, async () => {
+        const latest = await this.#requiredJob(job.id);
+        if (latest.status === "canceled") return false;
+        Object.assign(job, latest);
+        await this.store.transition(job, "validating", { execution });
+        return true;
+      });
+      if (!validating) {
+        job.cleanup = await this.#cleanupWorktree(job);
+        await this.store.save(job);
+        await this.#commitSystemRecords(job, `syno: canceled ${job.id}`);
+        return { job };
+      }
 
       const changes = typeof this.gitGuard.changes === "function"
         ? await this.gitGuard.changes(workspace)
@@ -171,8 +223,9 @@ class AgentHost {
         await this.#commitSystemRecords(job, `syno: approve additive merge ${job.id}`);
         const merge = await this.#serializeMerge(() => this.gitGuard.mergeWorktree(job.worktree));
         const cleanup = await this.#cleanupWorktree(job);
-        const sideEffects = await this.onCommitted({ job, changedPaths: job.changedPaths, merge, execution });
-        await this.store.transition(job, "completed", { result: { ...execution, validation, commit, merge, cleanup, preview: pinned.preview, sideEffects } });
+        const result = { ...execution, validation, commit, merge, cleanup, preview: pinned.preview };
+        const sideEffects = await this.#runCommittedSideEffects(job, { result, merge, execution });
+        await this.store.transition(job, "completed", { result: { ...result, sideEffects } });
         await this.#commitSystemRecords(job, `syno: complete ${job.id}`);
         return { job };
       }
@@ -193,6 +246,9 @@ class AgentHost {
           await this.store.transition(latest, "failed", {
             error: { code: error.code || error.failureCode || "EXECUTION_FAILED", message: error.message },
           });
+          latest.cleanup = await this.#cleanupWorktree(latest);
+          await this.store.save(latest);
+        } else if (latest.status === "canceled" && latest.worktree && latest.cleanup?.removed !== true) {
           latest.cleanup = await this.#cleanupWorktree(latest);
           await this.store.save(latest);
         }
@@ -216,14 +272,17 @@ class AgentHost {
       } catch (error) {
         cleanup = { removed: false, warning: error.message };
       }
-      const sideEffects = await this.onCommitted({ job, changedPaths: job.changedPaths, merge, execution: job.result });
-      await this.store.transition(job, "completed", { result: { ...job.result, merge, cleanup, sideEffects } });
+      const result = { ...job.result, merge, cleanup };
+      const sideEffects = await this.#runCommittedSideEffects(job, { result, merge, execution: job.result });
+      await this.store.transition(job, "completed", { result: { ...result, sideEffects } });
       await this.#commitSystemRecords(job, `syno: merged ${job.id}`);
       return { job };
     } catch (error) {
       const current = await this.#requiredJob(job.id);
       if (current.status === "running" || current.status === "validating") {
         await this.store.transition(current, "failed", { error: { code: "MERGE_FAILED", message: error.message } });
+        current.cleanup = await this.#cleanupWorktree(current);
+        await this.store.save(current);
         await this.#commitSystemRecords(current, `syno: fail merge ${job.id}`).catch(() => {});
       }
       return { job: current, error: { code: "MERGE_FAILED", message: error.message } };
@@ -256,9 +315,70 @@ class AgentHost {
     }
   }
 
+  async #runCommittedSideEffects(job, { result, merge, execution }) {
+    const previous = job.result?.sideEffects;
+    const pending = {
+      status: "pending",
+      attempts: Number(previous?.attempts || 0) + 1,
+      attemptedAt: new Date().toISOString(),
+    };
+    job.result = { ...result, sideEffects: pending };
+    await this.store.save(job);
+    await this.#commitSystemRecords(job, `syno: queue side effects ${job.id}`);
+    try {
+      const value = await this.onCommitted({ job, changedPaths: job.changedPaths, merge, execution });
+      return { ...pending, status: "completed", completedAt: new Date().toISOString(), value };
+    } catch (error) {
+      return {
+        ...pending,
+        error: { code: error.code || "SIDE_EFFECT_FAILED", message: error.message },
+        retryOnStartup: true,
+      };
+    }
+  }
+
+  async recover() {
+    const recovered = [];
+    for (const job of await this.store.list({ limit: 2_000 })) {
+      if (["running", "validating"].includes(job.status)) {
+        const merged = job.worktree?.commit && await this.gitGuard.isAncestor(job.worktree.commit).catch(() => false);
+        if (merged) {
+          if (job.status === "running") await this.store.transition(job, "validating", { phase: "recovery" });
+          const cleanup = await this.#cleanupWorktree(job);
+          const result = { ...(job.result || {}), cleanup, recoveredAfterRestart: true };
+          const sideEffects = await this.#runCommittedSideEffects(job, { result, merge: result.merge, execution: job.result });
+          await this.store.transition(job, "completed", { result: { ...result, sideEffects } });
+        } else {
+          await this.store.transition(job, "failed", {
+            error: { code: "INTERRUPTED", message: "Syno 在任务执行期间重启；隔离工作区已清理，可重新提交" },
+          });
+          job.cleanup = await this.#cleanupWorktree(job);
+          await this.store.save(job);
+        }
+        await this.#commitSystemRecords(job, `syno: recover ${job.id}`).catch(() => {});
+        recovered.push(job.id);
+        continue;
+      }
+      if (job.status === "completed" && job.result?.sideEffects?.status === "pending" && job.result.sideEffects.retryOnStartup) {
+        const sideEffects = await this.#runCommittedSideEffects(job, {
+          result: job.result,
+          merge: job.result.merge,
+          execution: job.result,
+        });
+        job.result = { ...job.result, sideEffects };
+        await this.store.save(job);
+        await this.#commitSystemRecords(job, `syno: retry side effects ${job.id}`).catch(() => {});
+        recovered.push(job.id);
+      }
+    }
+    return recovered;
+  }
+
   async #withJobLock(jobId, operation) {
     const previous = this.jobLocks.get(jobId) || Promise.resolve();
-    const current = previous.catch(() => {}).then(operation);
+    const safeId = String(jobId).replace(/[^a-zA-Z0-9-]/g, "-");
+    const processLock = new ProcessFileLock({ file: path.join(this.processLockRoot, `${safeId}.lock`), timeoutMs: 120_000 });
+    const current = previous.catch(() => {}).then(() => processLock.run(operation));
     this.jobLocks.set(jobId, current);
     try { return await current; }
     finally { if (this.jobLocks.get(jobId) === current) this.jobLocks.delete(jobId); }

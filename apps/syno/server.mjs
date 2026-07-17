@@ -15,6 +15,7 @@ import { buildOperationRequest } from "./syno/operation-registry.mjs";
 import { GitGuard } from "./syno/git-guard.mjs";
 import { securityHeaders } from "./syno/http-security.mjs";
 import { PATHS, resolveInside } from "./syno/paths.mjs";
+import { validateContractRecord } from "./syno/schema-registry.mjs";
 import {
   getPlannerConfigPath,
   getVaultProfile,
@@ -178,6 +179,15 @@ createServer(async (req, res) => {
       return respondJson(res, await queueLegacyMutation("notes.edit", body));
     }
 
+    if (url.pathname === "/api/memory/proposals" && req.method === "GET") {
+      return respondJson(res, { proposals: await listMemoryProposals() });
+    }
+
+    if (url.pathname === "/api/memory/promote" && req.method === "POST") {
+      const body = await readJsonBody(req);
+      return respondJson(res, await queueLegacyMutation("memory.promote", body));
+    }
+
     if (url.pathname === "/api/lark/repair/start" && req.method === "POST") {
       return respondJson(res, await startLarkAuthRepair());
     }
@@ -224,6 +234,7 @@ async function executeLegacyOperation(operation, payload, { workspace = PATHS.re
     "topics.revert-import": () => withTopicMutationLock(payload.path, () => revertImportedTopic(payload)),
     "topics.unschedule": () => withTopicMutationLock(payload.path, () => unscheduleTopic(payload)),
     "content.brief.create": () => createContentBrief(payload),
+    "memory.promote": () => promoteMemoryProposal(payload),
     "notes.edit": () => editVaultNote(payload),
   };
   const handler = handlers[operation];
@@ -257,12 +268,29 @@ async function createContentBrief(payload) {
   const workspace = legacyWorkspace.getStore()?.workspace || PATHS.repoRoot;
   const now = new Date();
   const id = `brief-${topic.topic_id || stableHash(source.relPath).slice(0, 12)}`;
+  const outline = [
+    "用现实问题建立冲突。",
+    "给出核心判断与知识库证据。",
+    "用反例或限制条件收紧结论。",
+    "给出可以立刻执行的下一步。",
+  ];
+  const brief = {
+    id,
+    ideaId: topic.topic_id || source.relPath,
+    audience: topic.excerpt || "希望把知识转化为可执行判断的个人创作者",
+    outline,
+    status: "draft",
+  };
+  await validateContractRecord("content-brief", brief);
   const directory = path.join(workspace, "ops", "content", "briefs", String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, "0"));
   const target = path.join(directory, `${id}.md`);
   const markdown = [
     "---",
     "type: content_brief",
     `id: ${JSON.stringify(id)}`,
+    `ideaId: ${JSON.stringify(brief.ideaId)}`,
+    `audience: ${JSON.stringify(brief.audience)}`,
+    `outline: ${JSON.stringify(outline)}`,
     "status: draft",
     `created: ${now.toISOString()}`,
     `source_topic: ${JSON.stringify(source.relPath)}`,
@@ -276,14 +304,11 @@ async function createContentBrief(payload) {
     "",
     "## 受众与价值",
     "",
-    topic.excerpt || "从选题卡补充目标受众、核心证据与预期行动。",
+    brief.audience,
     "",
     "## 内容结构",
     "",
-    "1. 用现实问题建立冲突。",
-    "2. 给出核心判断与知识库证据。",
-    "3. 用反例或限制条件收紧结论。",
-    "4. 给出可以立刻执行的下一步。",
+    ...outline.map((item, index) => `${index + 1}. ${item}`),
     "",
     "## 制作检查",
     "",
@@ -297,14 +322,93 @@ async function createContentBrief(payload) {
   return { ok: true, id, path: path.relative(workspace, target).replace(/\\/g, "/") };
 }
 
+async function listMemoryProposals() {
+  const root = path.join(PATHS.opsRoot, "memory", "proposals");
+  const proposals = [];
+  for (const file of await listMarkdownFiles(root)) {
+    if (path.basename(file).toLowerCase() === "readme.md") continue;
+    const raw = await fs.readFile(file, "utf8");
+    const { frontmatter } = parseFrontmatter(raw);
+    try {
+      await validateContractRecord("memory-proposal", frontmatter);
+      proposals.push({
+        path: path.relative(PATHS.repoRoot, file).replace(/\\/g, "/"),
+        id: frontmatter.id,
+        statement: frontmatter.statement,
+        reason: frontmatter.reason,
+        status: frontmatter.status,
+      });
+    } catch {
+      // Invalid candidates remain visible to repository validation, not promotable in the UI.
+    }
+  }
+  return proposals.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+}
+
+async function promoteMemoryProposal(payload) {
+  const workspace = legacyWorkspace.getStore()?.workspace || PATHS.repoRoot;
+  const relative = optionalString(payload.path).replace(/\\/g, "/");
+  if (!/^ops\/memory\/proposals\/.*\.md$/i.test(relative)) throw badRequest("只允许晋升 ops/memory/proposals 内候选");
+  const sourceFile = resolveInside(workspace, relative);
+  const raw = await fs.readFile(sourceFile, "utf8");
+  const parsed = parseFrontmatter(raw);
+  await validateContractRecord("memory-proposal", parsed.frontmatter);
+  if (parsed.frontmatter.status !== "proposed") throw badRequest("只有 proposed 候选可以晋升");
+
+  const statement = optionalString(parsed.frontmatter.statement);
+  const title = optionalString(payload.title) || statement.slice(0, 42) || `赛诺记忆 ${parsed.frontmatter.id}`;
+  const filename = title.replace(/[<>:"/\\|?*：]/gu, "-").replace(/[. ]+$/g, "").slice(0, 48) || `memory-${stableHash(statement).slice(0, 10)}`;
+  const destination = path.join(workspace, "vault", "01-Areas", "赛诺记忆", `${filename}.md`);
+  try { await fs.access(destination); throw badRequest("目标记忆笔记已存在，请先合并或改名"); } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  const now = new Date().toISOString();
+  const note = [
+    "---",
+    `title: ${JSON.stringify(title)}`,
+    "tags: [memory]",
+    `created: ${now}`,
+    `source: ${JSON.stringify(`syno://memory-proposal/${parsed.frontmatter.id}`)}`,
+    `description: ${JSON.stringify(optionalString(parsed.frontmatter.reason) || "经用户批准的长期记忆")}`,
+    "status: orphan",
+    "---",
+    "",
+    `# ${title}`,
+    "",
+    statement,
+    "",
+    "## 为什么保留",
+    "",
+    optionalString(parsed.frontmatter.reason),
+    "",
+    "## 关系状态",
+    "",
+    "当前作为个人上下文独立保存，尚未找到可信的语义反向链，因此标记为 orphan，后续渐进关联。",
+    "",
+  ].join("\n");
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+  await fs.writeFile(destination, note, "utf8");
+
+  parsed.frontmatter.status = "approved";
+  parsed.frontmatter.approvedAt = now;
+  parsed.frontmatter.destination = path.relative(workspace, destination).replace(/\\/g, "/");
+  await validateContractRecord("memory-proposal", parsed.frontmatter);
+  await fs.writeFile(sourceFile, `---\n${serializeFrontmatter(parsed.frontmatter).join("\n")}\n---\n\n${parsed.body.replace(/^\s+/, "")}`, "utf8");
+  return { ok: true, source: relative, path: parsed.frontmatter.destination };
+}
+
 async function executeLegacySideEffects({ execution } = {}) {
   const actions = execution?.operationResult?.deferredActions || [];
   const changedPaths = [];
   const results = [];
   for (const action of actions) {
     if (action.type === "lark.delete") {
-      await legacyWorkspace.run({ workspace: PATHS.repoRoot, deferExternal: false, deferredActions: [] }, () => deleteLarkEvent(action.topic));
-      results.push({ type: action.type, removed: true });
+      try {
+        await legacyWorkspace.run({ workspace: PATHS.repoRoot, deferExternal: false, deferredActions: [] }, () => deleteLarkEvent(action.topic));
+        results.push({ type: action.type, removed: true });
+      } catch (error) {
+        results.push({ type: action.type, removed: false, error: formatCalendarSyncError(error) });
+      }
       continue;
     }
     if (action.type !== "lark.sync") continue;

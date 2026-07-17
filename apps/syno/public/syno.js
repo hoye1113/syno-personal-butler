@@ -50,7 +50,46 @@
     }
     if (panel === "jobs") loadJobs();
     if (panel === "notifications") loadNotifications();
-    if (panel === "knowledge") document.querySelector("#synoKnowledgeQuery")?.focus();
+    if (panel === "knowledge") {
+      loadMemoryProposals();
+      document.querySelector("#synoKnowledgeQuery")?.focus();
+    }
+  }
+
+  async function loadMemoryProposals() {
+    const target = document.querySelector("#synoMemoryProposals");
+    if (!target) return;
+    target.replaceChildren(node("p", "syno-empty", "正在读取候选…"));
+    try {
+      const { proposals } = await api("/api/memory/proposals");
+      target.replaceChildren();
+      const pending = proposals.filter((item) => item.status === "proposed");
+      if (!pending.length) target.append(node("p", "syno-empty", "暂时没有待晋升候选。"));
+      for (const proposal of pending) {
+        const item = node("article", "syno-job");
+        item.append(node("strong", "", proposal.statement), node("p", "", proposal.reason));
+        const promote = node("button", "ghost-btn", "提交晋升");
+        promote.type = "button";
+        promote.addEventListener("click", async () => {
+          promote.disabled = true;
+          try {
+            await api("/api/memory/promote", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ path: proposal.path }),
+            });
+            select("jobs");
+          } catch (error) {
+            promote.disabled = false;
+            item.append(node("p", "syno-error", error.message));
+          }
+        });
+        item.append(promote);
+        target.append(item);
+      }
+    } catch (error) {
+      target.replaceChildren(node("p", "syno-error", error.message));
+    }
   }
 
   async function loadKnowledge() {
@@ -169,7 +208,7 @@
         const item = node("article", `syno-job is-${job.status}`);
         const meta = node("div", "syno-job-meta");
         meta.append(node("strong", "", job.intent), node("span", "syno-status", statusLabel(job)));
-        const request = node("p", "", job.request?.text || job.request?.message || "结构化任务");
+        const request = node("p", "", job.request?.summary || "结构化任务");
         item.append(meta, request);
         if (job.error?.message) item.append(node("p", "syno-error", job.error.message));
         if (job.result?.preview) {
