@@ -20,7 +20,7 @@ Syno 是 Windows 本地、单用户、私有 GitHub 同步的个人管家和第�
 ### 仓库
 
 - 当前权威开发仓库：`D:\workSpace\syno-personal-butler`
-- 旧暂存副本：`D:\workSpace\obsidian_repository\.syno-build`（受当前进程占用而暂未删除；新会话不要在此继续开发）
+- 旧临时目录：`D:\workSpace\obsidian_repository\.syno-build` 的内容已清空；当前旧会话仍占用空目录句柄，关闭旧会话后可删除。它已不再是 Git 仓库，新会话不要在此开发。
 - 远端：`https://github.com/hoye1113/syno-personal-butler.git`
 - 当前开发分支：`codex/round3-remediation`
 - `main` 保留在最后一个全绿基线 `a75502c`
