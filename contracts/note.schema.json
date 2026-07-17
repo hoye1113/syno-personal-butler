@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/note.schema.json",
+  "title": "Note",
+  "type": "object",
+  "required": ["path", "title"],
+  "properties": {
+    "path": { "type": "string", "pattern": "\\.md$" },
+    "title": { "type": "string", "minLength": 1 },
+    "tags": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "source_url": { "type": "string", "format": "uri" },
+    "factual_status": { "enum": ["verified", "partial", "unverified"] }
+  },
+  "additionalProperties": true
+}

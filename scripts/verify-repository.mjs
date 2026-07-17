@@ -1,0 +1,52 @@
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const ignored = new Set([".git", ".runtime", ".worktrees", "node_modules"]);
+const textExtensions = new Set([".md", ".mjs", ".js", ".json", ".ps1", ".py", ".toml", ".yml", ".yaml", ".html", ".css"]);
+const errors = [];
+
+async function walk(directory) {
+  const files = [];
+  for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+    if (ignored.has(entry.name)) continue;
+    const candidate = path.join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...await walk(candidate));
+    else files.push(candidate);
+  }
+  return files;
+}
+
+const files = await walk(ROOT);
+for (const file of files) {
+  const relative = path.relative(ROOT, file).replace(/\\/g, "/");
+  if (path.extname(file) === ".json") {
+    try { JSON.parse(await fs.readFile(file, "utf8")); } catch (error) { errors.push(`${relative}: invalid JSON (${error.message})`); }
+  }
+  if (!textExtensions.has(path.extname(file).toLowerCase())) continue;
+  const text = await fs.readFile(file, "utf8");
+  if (/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(text)) errors.push(`${relative}: private key material`);
+  if (/\b(?:sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/.test(text)) errors.push(`${relative}: probable credential`);
+  if (/C:\\Users\\[^\\\s]+\\\.(?:openclaw|ssh)|%LOCALAPPDATA%\\Syno\\credentials/i.test(text) && !relative.startsWith("docs/")) {
+    errors.push(`${relative}: local credential path must only appear in documentation`);
+  }
+  if ((relative.startsWith("apps/") || relative.startsWith("config/")) && /macOS|AppleScript|osascript|com\.apple\.iCal/i.test(text)) {
+    errors.push(`${relative}: unsupported Apple implementation reference`);
+  }
+}
+
+const required = [
+  "apps/syno/server.mjs", "apps/syno/worker.mjs", "apps/syno/syno/syno-core.mjs",
+  "vault/AGENTS.md", "ops/README.md", "contracts/job.schema.json", "docs/ARCHITECTURE.md",
+];
+for (const relative of required) {
+  try { await fs.access(path.join(ROOT, relative)); } catch { errors.push(`${relative}: required file missing`); }
+}
+
+if (errors.length) {
+  console.error(errors.join("\n"));
+  process.exitCode = 1;
+} else {
+  console.log(`Repository verification passed (${files.length} files).`);
+}

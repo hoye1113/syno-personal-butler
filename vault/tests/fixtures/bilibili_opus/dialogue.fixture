@@ -1,0 +1,56 @@
+---
+title: "DeepMind团队：当数百万Agent相遇"
+tags: [ai_agent, video_transcript, bilibili, multi_agent]
+created: 2026-07-13
+source: "https://www.bilibili.com/opus/1219939938135441409"
+description: "真实主持人与嘉宾问答的 source dialogue 样板。"
+ingest_workflow: bilibili_opus_ingest_v2
+source_type: bilibili_opus
+source_url: "https://www.bilibili.com/opus/1219939938135441409"
+opus_id: "1219939938135441409"
+column_id: "cv51005468"
+video_url: "https://www.bilibili.com/video/BV1ixKX6oEzK/"
+bv: "BV1ixKX6oEzK"
+uploader: "Easonlee的AI笔记"
+source_tier: C1
+primary_source: column
+material_tier: S
+source_form: dialogue
+content_form: dialogue
+dialogue_fidelity: source
+question_source: column
+voice_basis: direct_speech
+factual_status: partial
+factual_reviewed: 2026-07-13
+verification_scope: column_only
+verification_basis: [column]
+unresolved_facts:
+  - "专栏是第三方中文整理，未核对官方逐字原话。"
+---
+# DeepMind团队：当数百万Agent相遇
+
+> Hannah Fry 通过追问，让 Nenad Tomašev 展开委派、信任和多 Agent 安全边界。
+
+## 开场
+
+**Hannah Fry：** 当 Agent 数量扩大时，最先变化的是什么？
+
+**Nenad Tomašev：** 委派关系会从单条链路变成网络，信任和责任也随之变复杂。
+
+## 01 为什么规模会改变安全问题？
+
+**Hannah Fry：** 单个 Agent 的护栏为什么不能直接复制到数百万 Agent？
+
+**Nenad Tomašev：** 多方互动会产生单体测试没有覆盖的协同行为。
+
+## 限制与边界
+
+专栏讨论的是研究方向，不等于已经给出大规模部署的完整安全方案。
+
+## 知识连接
+
+- **限制** [[MOC - Agent Theory and Design]]：规模化多 Agent 让单体 Agent 的安全假设不再充分。
+
+## 来源说明
+
+问答关系来自专栏文字；图片和转写未读取，人物发言不等同于官方逐字稿。

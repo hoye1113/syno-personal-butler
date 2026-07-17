@@ -1,0 +1,3981 @@
+{
+  "ok": true,
+  "data": {
+    "url": "https://mp.weixin.qq.com/s/wJrUsBSs0owDascwDZBd-w",
+    "title": "Codex 负责人：「所有人都是 builder」是个很糟糕的主意",
+    "tree": [
+      [
+        {
+          "role": "heading",
+          "name": "Codex 负责人：「所有人都是 builder」是个很糟糕的主意",
+          "children": [
+            {
+              "role": "StaticText",
+              "name": "Codex 负责人：「所有人都是 builder」是个很糟糕的主意",
+              "children": [
+                {
+                  "role": "InlineTextBox",
+                  "name": "Codex 负责人：「所有人都是 builder」是个很糟糕的主意"
+                }
+              ]
+            }
+          ]
+        },
+        [
+          {
+            "role": "StaticText",
+            "name": "原创",
+            "children": [
+              {
+                "role": "InlineTextBox",
+                "name": "原创"
+              }
+            ]
+          },
+          {
+            "role": "StaticText",
+            "name": "Founder Park",
+            "children": [
+              {
+                "role": "InlineTextBox",
+                "name": "Founder Park"
+              }
+            ]
+          },
+          {
+            "role": "link",
+            "name": "Founder Park",
+            "ref": "@e1",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "Founder Park",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Founder Park"
+                  }
+                ]
+              }
+            ]
+          },
+          [
+            {
+              "role": "emphasis",
+              "children": [
+                {
+                  "role": "StaticText",
+                  "name": "2026年7月2日 19:06",
+                  "children": [
+                    {
+                      "role": "InlineTextBox",
+                      "name": "2026年7月2日 19:06"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "role": "emphasis",
+              "name": "中国香港"
+            }
+          ]
+        ],
+        [
+          {
+            "role": "image",
+            "name": "图片"
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "做 AI 产品还需要 PM 吗？如果需要的话，AI 时代的 PM 需要做什么？",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "做 AI 产品还需要 PM 吗？如果需要的话，AI 时代的 PM 需要做什么？"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "Andrew Ambrosino 是 OpenAI Codex 团队负责人。设计师出身，做过工程师，也做过产品，还创过业，现在负责的 Codex 周活跃用户已经超过 500 万。他大概是当下最适合回答「AI 时代产品该怎么做」的人之一。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Andrew Ambrosino 是 OpenAI Codex 团队负责人。设计师出身，做过工程师，也做过产"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "品，还创过业，现在负责的 Codex 周活跃用户已经超过 500 万。他大概是当下最适合回答"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "「AI 时代产品该怎么做」的人之一。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "在他看来，当公司里几乎每个人都能快速搭出一个功能原型，真正的难题就不再是「能不能做出来」，而是「该不该做这个」。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "在他看来，当公司里几乎每个人都能快速搭出一个功能原型，真正的难题就不再是「能不能做"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "出来」，而是「该不该做这个」。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "在与 Lenny 的对谈中，Andrew Ambrosino 详细介绍了 OpenAI 内部的开发流程：当实现成本被 AI 大幅压缩后，产品开发的每一个环节，从立项、文档、原型、设计到角色分工、团队协作、产品规划，都在发生变化。哪些旧规则在失效？哪些新标准正在成形？当实现不再稀缺，什么才是真正稀缺的资源？",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "在与 Lenny 的对谈中，Andrew Ambrosino 详细介绍了 OpenAI 内部的开发流程：当实现成"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "本被 AI 大幅压缩后，产品开发的每一个环节，从立项、文档、原型、设计到角色分工、团队"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "协作、产品规划，都在发生变化。哪些旧规则在失效？哪些新标准正在成形？当实现不再稀"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "缺，什么才是真正稀缺的资源？"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "一些核心观点：",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "一些核心观点："
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "list",
+            "children": [
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "ListMarker",
+                    "name": "• "
+                  },
+                  {
+                    "role": "paragraph",
+                    "children": [
+                      {
+                        "role": "StaticText",
+                        "name": "当 90 个人都能做出 90 个看起来能上线的产品原型时，最宝贵的是 taste。",
+                        "children": [
+                          {
+                            "role": "InlineTextBox",
+                            "name": "当 90 个人都能做出 90 个看起来能上线的产品原型时，最宝贵的是 taste。"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "ListMarker",
+                    "name": "• "
+                  },
+                  {
+                    "role": "paragraph",
+                    "children": [
+                      {
+                        "role": "StaticText",
+                        "name": "Codex 团队招人的硬标准之一是品味，能从海量内容中分辨信号与噪音。在一个「拥有无限 tokens」的世界里，他们不想生产垃圾内容。",
+                        "children": [
+                          {
+                            "role": "InlineTextBox",
+                            "name": "Codex 团队招人的硬标准之一是品味，能从海量内容中分辨信号与噪音。在一个「拥有无"
+                          },
+                          {
+                            "role": "InlineTextBox",
+                            "name": "限 tokens」的世界里，他们不想生产垃圾内容。"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "ListMarker",
+                    "name": "• "
+                  },
+                  {
+                    "role": "paragraph",
+                    "children": [
+                      {
+                        "role": "StaticText",
+                        "name": "Codex 如果早三个月发布会彻底失败，唯一的变量是模型进步了。不要轻易判定一个功能不好，它可能只是还没到时候。",
+                        "children": [
+                          {
+                            "role": "InlineTextBox",
+                            "name": "Codex 如果早三个月发布会彻底失败，唯一的变量是模型进步了。不要轻易判定一个功能"
+                          },
+                          {
+                            "role": "InlineTextBox",
+                            "name": "不好，它可能只是还没到时候。"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "ListMarker",
+                    "name": "• "
+                  },
+                  {
+                    "role": "paragraph",
+                    "children": [
+                      {
+                        "role": "StaticText",
+                        "name": "一个功能最终是否足够好，前提往往不是功能本身的形态，而是模型到底够不够聪明。",
+                        "children": [
+                          {
+                            "role": "InlineTextBox",
+                            "name": "一个功能最终是否足够好，前提往往不是功能本身的形态，而是模型到底够不够聪明。"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "ListMarker",
+                    "name": "• "
+                  },
+                  {
+                    "role": "paragraph",
+                    "children": [
+                      {
+                        "role": "StaticText",
+                        "name": "就像 Codex 曾颠覆 ChatGPT 一样，Codex 也可能被新的尝试颠覆。要保留自下而上的探索文化，不能指望同一个团队既打磨细节又颠覆自己。",
+                        "children": [
+                          {
+                            "role": "InlineTextBox",
+                            "name": "就像 Codex 曾颠覆 ChatGPT 一样，Codex 也可能被新的尝试颠覆。要保留自下而上的探"
+                          },
+                          {
+                            "role": "InlineTextBox",
+                            "name": "索文化，不能指望同一个团队既打磨细节又颠覆自己。"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "以下是对谈的精华内容。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "以下是对谈的精华内容。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "link",
+            "name": "Founder Park ， 来自极客公园，专注与科技创业者聊「真问题」。 580篇原创内容 公众号",
+            "ref": "@e2",
+            "children": [
+              {
+                "role": "option",
+                "name": "Founder Park 来自极客公园，专注与科技创业者聊「真问题」。 580篇原创内容",
+                "ref": "@e3"
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "⬆️",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "⬆️"
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": "关注 Founder Park，最及时最干货的创业分享",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "关注 Founder Park，最及时最干货的创业分享"
+                  }
+                ]
+              },
+              {
+                "role": "LineBreak",
+                "name": "\n",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "\n"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "separator"
+          },
+          [
+            {
+              "role": "StaticText",
+              "name": "Founder Park 正在",
+              "children": [
+                {
+                  "role": "InlineTextBox",
+                  "name": "Founder Park 正在"
+                }
+              ]
+            },
+            {
+              "role": "StaticText",
+              "name": "持续寻找值得被看见的 AI 团队与项目。",
+              "children": [
+                {
+                  "role": "InlineTextBox",
+                  "name": "持续寻找值得被看见的 AI 团队与项目。"
+                }
+              ]
+            }
+          ],
+          [
+            [
+              {
+                "role": "paragraph",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "我们将通过「AI 产品市集」、内容报道、社群分发等方式，帮你触达早期用户、获得真实反馈，以及建立关键连接。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "我们将通过「AI 产品市集」、内容报道、社群分发等方式，帮你触达早期用户、获得真实反"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "馈，以及建立关键连接。"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": "如果你正在做 AI 相关的事，欢迎和我们聊聊。 ",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "如果你正在做 AI 相关的事，欢迎和我们聊聊。 "
+                  }
+                ]
+              },
+              {
+                "role": "image",
+                "name": "图片"
+              }
+            ],
+            {
+              "role": "separator"
+            }
+          ],
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "LineBreak",
+                "name": "\n",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "\n"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "01 ",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "01",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "01"
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "LineBreak",
+                    "name": "\n",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "\n"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "实现的成本降低了， ",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "实现",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "实现"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "的成本降低了",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "的成本降低了"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "，",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "，"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "LineBreak",
+                    "name": "\n",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "\n"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "taste 就变得更重要了",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "taste 就变得更重要了",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "taste 就变得更重要了"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：你说过 AI 正在改变产品工作的形态。你现在在可能是全球最前沿的 AI 产品团队工作。具体来说，产品团队的工作方式和两年前比有什么变化？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：你说过 AI 正在改变产品工作的形态。你现在在可能是全球最前沿的 AI 产品团队工"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "作。具体来说，产品团队的工作方式和两年前比有什么变化？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 现在作为一个团队负责人，最难的事情就是流程倒过来了。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 现在作为一个团队负责人，最难的事情就是流程倒过来了。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "过去怎么做产品，大家都很熟悉：先调研、出想法、做原型。即使我们早就过了瀑布式开发时代，底层逻辑还是一样的，实现是昂贵的。所以你要在实现之前，通过文档、调研、原型把所有风险提前排除。因为原型和设计比开发便宜，这是过去的基本假设。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "过去怎么做产品，大家都很熟悉：先调研、出想法、做原型。即使我们早就过了瀑布式开发时"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "代，底层逻辑还是一样的，实现是昂贵的。所以你要在实现之前，通过文档、调研、原型把所"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "有风险提前排除。因为原型和设计比开发便宜，这是过去的基本假设。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "现在这个假设完全变了，任何人都可以做出任何东西。我真的相信，你从零开始跟这些模型对话，不管是我们的模型还是其他公司的，你都能搭出你想要的任何功能。这不一定是软件开发中最难的部分，但确实很酷。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "现在这个假设完全变了，任何人都可以做出任何东西。我真的相信，你从零开始跟这些模型对"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "话，不管是我们的模型还是其他公司的，你都能搭出你想要的任何功能。这不一定是软件开发"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "中最难的部分，但确实很酷。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "你给人们无限的 tokens，OpenAI 的每个人都很有主动性、都有好想法。所以每个人都在做各种各样的东西。现在公司里有个我们急需做的功能，我确信同时有 90 个不同的、没有协调过的小团队在各自实现和尝试。在那 90 个尝试里，哪些是好的？应该把哪些部分折叠到其他方面？应该怎么定义它？它应该是另一个功能的一部分吗？开关里应该有几个选项？是这些事情。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "你给人们无限的 tokens，OpenAI 的每个人都很有主动性、都有好想法。所以每个人都在做"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "各种各样的东西。现在公司里有个我们急需做的功能，我确信同时有 90 个不同的、没有协调"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "过的小团队在各自实现和尝试。在那 90 个尝试里，哪些是好的？应该把哪些部分折叠到其他"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "方面？应该怎么定义它？它应该是另一个功能的一部分吗？开关里应该有几个选项？是这些事"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "情。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "所以简短的答案就是：倒过来了。不是人们在做根本不同的角色，也不是技能消失了、角色不存在了。实现不再是最贵的部分了，我斗胆说一句，",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "所以简短的答案就是：倒过来了。不是人们在做根本不同的角色，也不是技能消失了、角色不"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "存在了。实现不再是最贵的部分了，我斗胆说一句，"
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "最贵的是品味（taste）。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "最贵的是品味（taste）。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：所以以前大家会写 PRD、策略文档，现在大家直接做原型。公司里很多人有类似的想法，就出现了 90 个不同的东西，然后从中选方向？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：所以以前大家会写 PRD、策略文档，现在大家直接做原型。公司里很多人有类似的"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "想法，就出现了 90 个不同的东西，然后从中选方向？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 是的，这种事情大量发生。不只是在 OpenAI，你已经看到很多产品负责人说",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 是的，这种事情大量发生。不只是在 OpenAI，你已经看到很多产品"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "负责人说"
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "「PRD 已死，原型当道」，但我实际上完全不同意这个观点。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "「PRD 已死，原型当道」，但我实际上完全不同意这个观点。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "因为实现在每个媒介上都变得便宜了，跳过思考直接做原型就变得非常诱人。尤其是如果你不是工程师，如果你从来没写过代码、没有兴趣或者没有时间，你就会忍不住说：「PRD 已死，让我直接给你看我想要什么。」",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "因为实现在每个媒介上都变得便宜了，跳过思考直接做原型就变得非常诱人。尤其是如果你不"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "是工程师，如果你从来没写过代码、没有兴趣或者没有时间，你就会忍不住说：「PRD 已死，"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "让我直接给你看我想要什么。」"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "但我也注意到一个反过来的现象。对工程师来说，写大量文档反而变得很诱人，大量不值得读的文档。这不是在说写文档的人不好，而是说当实现变得充裕时，选对你要表达观点的格式，变得真正重要了。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "但我也注意到一个反过来的现象。对工程师来说，写大量文档反而变得很诱人，大量不值得读"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "的文档。这不是在说写文档的人不好，而是说当实现变得充裕时，选对你要表达观点的格式，"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "变得真正重要了。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "如果你要表达的是一个模糊领域的产品清晰度，那可能确实应该写文档。如果你想让人们上手试用、压力测试一个交互模式，那就做原型。关键是选对媒介。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "如果你要表达的是一个模糊领域的产品清晰度，那可能确实应该写文档。如果你想让人们上手"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "试用、压力测试一个交互模式，那就做原型。关键是选对媒介。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：有个概念叫 primal mark（原始标记），画家在画布上落的第一笔，后面所有东西都从那一笔延伸出来。你的意思是，有时候原型是错误的第一笔？因为大家会锚定在上面，而不是去想更大的方案？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：有个概念叫 primal mark（原始标记），画家在画布上落的第一笔，后面所有东西"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "都从那一笔延伸出来。你的意思是，有时候原型是错误的第一笔？因为大家会锚定在上面，而"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "不是去想更大的方案？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 对。过去有一种隐含的信号，一个东西看起来像什么样子，就意味着它处于流程的什么阶段。如果你看到一个东西看起来像正式上线的产品，那意味着它已经是后期了，风险已经被排除了、设计看过了、商业目标是合理的。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 对。过去有一种隐含的信号，一个东西看起来像什么样子，就意味着"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "它处于流程的什么阶段。如果你看到一个东西看起来像正式上线的产品，那意味着它已经是后"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "期了，风险已经被排除了、设计看过了、商业目标是合理的。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "现在这些东西脱钩了。原因是过去要获得资源来构建，你得先充分降低风险，现在这个门槛没了。所以一个本来只是探索阶段的东西，看起来已经可以上线了，视觉上它已经准备好了。但它可能根本不是正确的方向，不符合调研结论，不是用户真正需要的，也不是对业务最优的选择。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "现在这些东西脱钩了。原因是过去要获得资源来构建，你得先充分降低风险，现在这个门槛没"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "了。所以一个本来只是探索阶段的东西，看起来已经可以上线了，视觉上它已经准备好了。但"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "它可能根本不是正确的方向，不符合调研结论，不是用户真正需要的，也不是对业务最优的选"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "择。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "不是要过度强调品味这件事。但再说一次，知道该做什么、怎么呈现、怎么达成目标、用什么媒介，这正在成为每个领域里最重要的能力。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "不是要过度强调品味这件事。但再说一次，知道该做什么、怎么呈现、怎么达成目标、用什么"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "媒介，这正在成为每个领域里最重要的能力。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：品味这个词现在是个流行词。具体来说，你说的「好的品味」到底是什么？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：品味这个词现在是个流行词。具体来说，你说的「好的品味」到底是什么？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 品味得拆开来看。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 品味得拆开来看。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "确实有审美的部分，但也有系统思维的部分，这个东西在整个系统里怎么放；有方向性的部分，我们要去哪、这件事是哪个主题的一部分；有表达的部分，怎么呈现这个信息；还有一部分品味是交互层面的，这个动画不符合它要传达的语义，它太急促了，跟它要表达的含义不匹配。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "确实有审美的部分，但也有系统思维的部分，这个东西在整个系统里怎么放；有方向性的部"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "分，我们要去哪、这件事是哪个主题的一部分；有表达的部分，怎么呈现这个信息；还有一部"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "分品味是交互层面的，这个动画不符合它要传达的语义，它太急促了，跟它要表达的含义不匹"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "配。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "这些确实非常重要，但真正的品味问题是，",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这些确实非常重要，但真正的品味问题是，"
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "如果我们什么都能做，目标是什么？怎么到达那里？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "如果我们什么都能做，目标是什么？怎么到达那"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "里？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：当 AI 越来越强、做越来越多的事，人类大脑在哪些地方会继续有价值？品味感觉是其中之一。但 AI 的设计产出还是不太行，为什么顶尖模型做不好设计？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：当 AI 越来越强、做越来越多的事，人类大脑在哪些地方会继续有价值？品味感觉是"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "其中之一。但 AI 的设计产出还是不太行，为什么顶尖模型做不好设计？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 有一些实际原因，也有一些更难解决的问题。设计比软件更难评分，创建一个反馈循环来训练模型什么是好设计，比训练代码能不能编译要繁琐得多，因为人的品味是反馈机制的一部分。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 有一些实际原因，也有一些更难解决的问题。设计比软件更难评分，"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "创建一个反馈循环来训练模型什么是好设计，比训练代码能不能编译要繁琐得多，因为人的品"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "味是反馈机制的一部分。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "另外，实验室历史上优先让模型擅长能加速 AI 研究的东西。模型能写正确代码显然能加速研究，设计就没法做同样的论证。不是说设计不重要，而是它不在那个飞轮里。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "另外，实验室历史上优先让模型擅长能加速 AI 研究的东西。模型能写正确代码显然能加速研"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "究，设计就没法做同样的论证。不是说设计不重要，而是它不在那个飞轮里。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "这些是实际原因，它们会消失。模型会在设计上变得相当好，但有一些更难搞的东西。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这些是实际原因，它们会消失。模型会在设计上变得相当好，但有一些更难搞的东西。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "第一，设计有文化属性。你还记得去年每个新网站都在抄 Linear 的设计。如果模型每次都输出 Linear 的网站，那不是挑战所在。设计中新颖性的重要程度，远高于软件工程。软件工程你恨不得模型完全按已知模式来，但设计需要一定的随机性和新颖性。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "第一，设计有文化属性。你还记得去年每个新网站都在抄 Linear 的设计。如果模型每次都输"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "出 Linear 的网站，那不是挑战所在。设计中新颖性的重要程度，远高于软件工程。软件工程"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "你恨不得模型完全按已知模式来，但设计需要一定的随机性和新颖性。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "第二，是视觉设计和代码之间的相互作用。如果明天公司换品牌，浅层的做法是逐个更新 263 个组件。深层的做法是理解这两个看起来不一样的东西，其实都属于一个列表样式，传达的是同一种交互模式。这个抽象层，目前的技术还够不到。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "第二，是视觉设计和代码之间的相互作用。如果明天公司换品牌，浅层的做法是逐个更新 263 "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "个组件。深层的做法是理解这两个看起来不一样的东西，其实都属于一个列表样式，传达的是"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "同一种交互模式。这个抽象层，目前的技术还够不到。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：Jenny Wen（Anthropic Claude Code 设计负责人）说设计流程已经死了，直接构建就好，你怎么看？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：Jenny Wen（Anthropic Claude Code 设计负责人）说设计流程已经死了，直接"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "构建就好，你怎么看？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 我跟 Jenny 在很多事上可能是一致的。正规的设计流程，我同意她说的，它死了。而且我在 AI 之前就不是那个流程的粉丝。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 我跟 Jenny 在很多事上可能是一致的。正规的设计流程，我同意她"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "说的，它死了。而且我在 AI 之前就不是那个流程的粉丝。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "多年前我做创业公司的时候，有篇文章叫「案例研究工厂」，说的就是设计师被训练去遵循一套固定流程，并且逐渐把这套流程本身看得比结果更重要。如果一个东西经过了这个流程，就会默认得到两个结论：第一，它会是好的，流程保证了质量；第二，即使没人用，它也是好的，因为它走了流程。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "多年前我做创业公司的时候，有篇文章叫「案例研究工厂」，说的就是设计师被训练去遵循一"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "套固定流程，并且逐渐把这套流程本身看得比结果更重要。如果一个东西经过了这个流程，就"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "会默认得到两个结论：第一，它会是好的，流程保证了质量；第二，即使没人用，它也是好"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "的，因为它走了流程。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "用户调研、发散、收敛，框架是对的，但一直有点学术化。那个流程的前提是实现很贵，你只造得起一次，所以必须在做之前穷尽所有问题空间和方案空间。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "用户调研、发散、收敛，框架是对的，但一直有点学术化。那个流程的前提是实现很贵，你只"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "造得起一次，所以必须在做之前穷尽所有问题空间和方案空间。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "后来 Figma 和 Origami 出现了，我们把交互原型拉进了流程。现在的问题是，你可以把全部实现拉到流程的最前面。一个完全精致的原型，看起来可以直接上线。公司里足够多的人看到之后就问：「我们现在能发吗？」但实际上，你们还处于早期设计探索阶段，只是没人明说。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "后来 Figma 和 Origami 出现了，我们把交互原型拉进了流程。现在的问题是，你可以把全部"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "实现拉到流程的最前面。一个完全精致的原型，看起来可以直接上线。公司里足够多的人看到"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "之后就问：「我们现在能发吗？」但实际上，你们还处于早期设计探索阶段，只是没人明说。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "所以说设计流程死了，既对又不对。如果你绑定在特定工具和特定日常操作上，那它确实死了。但「我们现在处于流程的哪个阶段」这个认知，比以往任何时候都更重要。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "所以说设计流程死了，既对又不对。如果你绑定在特定工具和特定日常操作上，那它确实死"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "了。但「我们现在处于流程的哪个阶段」这个认知，比以往任何时候都更重要。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "把设计流程绑定在特定媒介上，那才是危险的地方。设计师现在有更多工具了，你可以把东西直接放进现有产品里，可以做 A/B 测试。很多公司都有产品的 baby 版本，baby Cursor、baby Codex，一个大幅简化的代码库，能模拟正式产品的所有交互。你可以拿它来 vibe code（氛围编程），说「如果侧边栏变成这样呢？如果弹出一个面板呢？」",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "把设计流程绑定在特定媒介上，那才是危险的地方。设计师现在有更多工具了，你可以把东西"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "直接放进现有产品里，可以做 A/B 测试。很多公司都有产品的 baby 版本，baby Cursor、"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "baby Codex，一个大幅简化的代码库，能模拟正式产品的所有交互。你可以拿它来 vibe "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "code（氛围编程），说「如果侧边栏变成这样呢？如果弹出一个面板呢？」"
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "这是设计师的新工具，但它需要配合旧的认知：你现在在流程的哪个位置。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "这是设计师的新工"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "具，但它需要配合旧的认知：你现在在流程的哪个位置。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "LineBreak",
+                    "name": "\n",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "\n"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "02",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "02",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "02"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "岗位和角色在融合，",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "岗位和",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "岗位和"
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "角色在融合，",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "角色在融合，"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "但 PM 不会消失",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "但 PM 不会消失",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "但 PM 不会消失"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：很多公司在说「角色消亡」。你觉得 PM、工程师、设计师的分工会彻底消失吗？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：很多公司在说「角色消亡」。你觉得 PM、工程师、设计师的分工会彻底消失吗？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": "一些公司很喜欢赶潮流，走极端。消灭角色概念的危险在于，它可能同时消灭掉「这些领域是有可以学习的最佳实践的专业」这一认知。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "一些公司很喜欢赶潮流，走极端。消灭角色概念的危险在于，它可能"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "同时消灭掉「这些领域是有可以学习的最佳实践的专业」这一认知。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "我听到很多公司说「我们要取消产品角色」，我觉得这是个很糟糕的主意，然后说「每个人都是 builder」。结果是产品管理这个已经积累了真正最佳实践、真正踩过坑的学科，被直接抛弃了。因为有人写了几行代码，就觉得万事大吉了，那可不是个好状态。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "我听到很多公司说「我们要取消产品角色」，我觉得这是个很糟糕的主意，然后说「每个人都"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "是 builder」。结果是产品管理这个已经积累了真正最佳实践、真正踩过坑的学科，被直接抛"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "弃了。因为有人写了几行代码，就觉得万事大吉了，那可不是个好状态。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "我欢迎「这不是你的领域、你不能碰」这种边界消失，但需要平衡。不是每个人都能做所有事，不论是从广度还是深度来说，这也是为什么管理者不会消失。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "我欢迎「这不是你的领域、你不能碰」这种边界消失，但需要平衡。不是每个人都能做所有"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "事，不论是从广度还是深度来说，这也是为什么管理者不会消失。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "而且每个学科都有技能成分。很多工程师不承认这一点，觉得工程是有技能的，其他岗位角色都是「氛围」。不是这样的，你会用 Excel 不代表你能去财务团队工作。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "而且每个学科都有技能成分。很多工程师不承认这一点，觉得工程是有技能的，其他岗位角色"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "都是「氛围」。不是这样的，你会用 Excel 不代表你能去财务团队工作。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "我觉得现在发生的更多是，人们跨角色协作变得更容易了，学习其他领域最佳实践也变得更容易了，不用把你在某个角色上的效率跟使用特定工具的能力绑在一起了。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "我觉得现在发生的更多是，人们跨角色协作变得更容易了，学习其他领域最佳实践也变得更容"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "易了，不用把你在某个角色上的效率跟使用特定工具的能力绑在一起了。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "我花了很长时间觉得自己不应该做软件工程师，因为我不关心汇编语言，也不想记住 TypeScript 的类型系统。这些角色一直存在一些门槛，仿佛「做好这个角色等于熟练掌握这个工具」。我觉得这正开始消解，但人们把它夸大了。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "我花了很长时间觉得自己不应该做软件工程师，因为我不关心汇编语言，也不想记住 "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "TypeScript 的类型系统。这些角色一直存在一些门槛，仿佛「做好这个角色等于熟练掌握这"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "个工具」。我觉得这正开始消解，但人们把它夸大了。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：你们 Codex 团队里确实有更多角色融合，具体是什么样的？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：你们 Codex 团队里确实有更多角色融合，具体是什么样的？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 我们在 Codex 团队里，确实看到了比公司其他团队和其他行业更多的角色融合。部分原因在于，这是一个面向工程师的技术产品。所以我们的设计师说工程师的语言，我们的产品经理说技术语言、会写代码。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 我们在 Codex 团队里，确实看到了比公司其他团队和其他行业更多"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "的角色融合。部分原因在于，这是一个面向工程师的技术产品。所以我们的设计师说工程师的"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "语言，我们的产品经理说技术语言、会写代码。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "我们内部有一种描述协作方式的说法：如今角色之间的重叠比过去大得多。定义一个人，不再是看「设计到哪里结束、工程从哪里开始」这样的职责边界，而是看他所有工作内容的平均分布。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "我们内部有一种描述协作方式的说法：如今角色之间的重叠比过去大得多。定义一个人，不再"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "是看「设计到哪里结束、工程从哪里开始」这样的职责边界，而是看他所有工作内容的平均分"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "布。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "如果把设计团队里某个人做的所有事情摊开来看，其中可能包含大量写代码的工作，也包含大量产品相关的工作。但把这些工作取一个「平均值」，他最终仍然会落在某个更偏设计的区域。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "如果把设计团队里某个人做的所有事情摊开来看，其中可能包含大量写代码的工作，也包含大"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "量产品相关的工作。但把这些工作取一个「平均值」，他最终仍然会落在某个更偏设计的区"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "域。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：你提到产品经理的工作更像 zone defense（区域防守），具体是什么意思？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：你提到产品经理的工作更像 zone defense（区域防守），具体是什么意思？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 如果两个产品经理合作得过于紧密，通常不是一个好信号。你更应该像力导向布局那样把团队展开来看，哪里存在空缺，哪里还没人覆盖？",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 如果两个产品经理合作得过于紧密，通常不是一个好信号。你更应该"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "像力导向布局那样把团队展开来看，哪里存在空缺，哪里还没人覆盖？"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "在今天这个世界里，策展、引导和对齐变成了最重要的工作。每个人都在不断抛出想法，整个环境充满噪声，过去那种自上而下、按年度制定计划的方式已经行不通了。我们需要有人作为品味的把关者，引导一件事从概念走向产品，而这意味着你必须覆盖公司的各个角落。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "在今天这个世界里，策展、引导和对齐变成了最重要的工作。每个人都在不断抛出想法，整个"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "环境充满噪声，过去那种自上而下、按年度制定计划的方式已经行不通了。我们需要有人作为"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "品味的把关者，引导一件事从概念走向产品，而这意味着你必须覆盖公司的各个角落。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "所以，你需要把团队铺开来看，谁擅长什么？让彼此保持一定距离，确保覆盖面足够全面。然后再去填补缺口，比如：「我们想招一位产品思维很强的工程师。」我们不希望出现这样的情况，一群人先写出大量代码，最后还需要整个产品团队来审核和校准产品的一致性。我们希望每个人都具备这些能力，只是各自深入钻研的方向需要发生变化。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "所以，你需要把团队铺开来看，谁擅长什么？让彼此保持一定距离，确保覆盖面足够全面。然"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "后再去填补缺口，比如：「我们想招一位产品思维很强的工程师。」我们不希望出现这样的情"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "况，一群人先写出大量代码，最后还需要整个产品团队来审核和校准产品的一致性。我们希望"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "每个人都具备这些能力，只是各自深入钻研的方向需要发生变化。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：所以现在最有价值的人，是能从想法到完成全程推动、并且有品味知道「这个很棒」的人？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：所以现在最有价值的人，是能从想法到完成全程推动、并且有品味知道「这个很棒」"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "的人？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 对，我觉得这就是当下最核心的变化。这也反映了我对 IC（个人贡献者）和管理者关系的理解。不是说管理会消失，也不是说每个人都只是 IC，而是现在每个人在某种程度上同时承担着这两种角色。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 对，我觉得这就是当下最核心的变化。这也反映了我对 IC（个人贡献"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "者）和管理者关系的理解。不是说管理会消失，也不是说每个人都只是 IC，而是现在每个人"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "在某种程度上同时承担着这两种角色。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "如果你是 IC，你已经不再是一个字符一个字符地敲代码。你其实是在管理某些东西，管理 agents，管理那些被组织起来共同完成任务的工作。如果你是团队管理者，本质上做的也是同样的事，只不过管理的粒度不同。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "如果你是 IC，你已经不再是一个字符一个字符地敲代码。你其实是在管理某些东西，管理 "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "agents，管理那些被组织起来共同完成任务的工作。如果你是团队管理者，本质上做的也是"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "同样的事，只不过管理的粒度不同。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "我通常寻找的人，除了具备扎实的专业能力之外，还必须有品味。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "我通常寻找的人，除了具备扎实的专业能力之外，还必须有品味。"
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "因为在一个「拥有无限 tokens」的世界里，我们不能生产垃圾内容。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "因为在一个「拥有无限 "
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "tokens」的世界里，我们不能生产垃圾内容。"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": "你必须具备从海量内容中分辨信号与噪音的能力。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "你必须具备从海量内容中分辨信号与噪音的能"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "力。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "每次有人问 Codex 团队有多少人，我的回答都是：「大概在 10 到几千人之间。」听起来像句玩笑话，但实际上，所有人的工作都会汇聚到这个产品里，模型研究、浏览器使用、模型人格、前端基础设施、用户体验，这些都构成了产品的一部分。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "每次有人问 Codex 团队有多少人，我的回答都是：「大概在 10 到几千人之间。」听起来像句"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "玩笑话，但实际上，所有人的工作都会汇聚到这个产品里，模型研究、浏览器使用、模型人"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "格、前端基础设施、用户体验，这些都构成了产品的一部分。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "但与此同时，我们也不是每天都在接收几千个人提交的 PR（代码提交请求）。团队有两位数规模的工程师，设计师数量大约是工程师的一半，再加上几位产品经理，绝大多数人都是 IC。团队的影响范围很大，但管理层级并不厚。这里有很多曾经创办过公司的人，也有很多在大公司里以「创始人心态」做事的人，还有许多品味极佳的人。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "但与此同时，我们也不是每天都在接收几千个人提交的 PR（代码提交请求）。团队有两位数"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "规模的工程师，设计师数量大约是工程师的一半，再加上几位产品经理，绝大多数人都是 "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "IC。团队的影响范围很大，但管理层级并不厚。这里有很多曾经创办过公司的人，也有很多在"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "大公司里以「创始人心态」做事的人，还有许多品味极佳的人。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "整个 Codex 应用都是被 dogfooding 的循环塑造出来的。我们所有人都有一种共同的愿望，尽可能多地在应用里完成自己的工作，即便它暂时还不是最好的工具，因为只有这样，它最终才有机会成为最好的工具。我们经常会刻意不去改进某些内部流程，而是让产品自己变得更好，从而能够支撑这些流程。这其实是一种非常不舒服的状态。但一周又一周地，它确实在持续发生变化。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "整个 Codex 应用都是被 dogfooding 的循环塑造出来的。我们所有人都有一种共同的愿望，"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "尽可能多地在应用里完成自己的工作，即便它暂时还不是最好的工具，因为只有这样，它最终"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "才有机会成为最好的工具。我们经常会刻意不去改进某些内部流程，而是让产品自己变得更"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "好，从而能够支撑这些流程。这其实是一种非常不舒服的状态。但一周又一周地，它确实在持"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "续发生变化。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "LineBreak",
+                "name": "\n",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "\n"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "03",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "03",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "03"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "Codex 早发三个月会死，",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "Codex 早发三个月会死，",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Codex 早发三个月会死，"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "唯一区别是模型进步了",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "唯一区别是模型进步了",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "唯一区别是模型进步了"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：在事情变化这么快的节奏下，你们怎么做规划？看多远？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：在事情变化这么快的节奏下，你们怎么做规划？看多远？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 我们在规划上没有什么革命性的做法。基本原则就是，越接近当下的事情，规划就需要越具体。不是不做九个月的计划，而是那个计划必须保持非常模糊。因为你现在在九个月计划上加的任何精度，都是虚假精度，只会浪费时间。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 我们在规划上没有什么革命性的做法。基本原则就是，越接近当下的"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "事情，规划就需要越具体。不是不做九个月的计划，而是那个计划必须保持非常模糊。因为你"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "现在在九个月计划上加的任何精度，都是虚假精度，只会浪费时间。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "在应用产品这边，你在 11 月能规划的东西，到 12 月可能还是对的，但到了 2 月就完全不是那回事了。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "在应用产品这边，你在 11 月能规划的东西，到 12 月可能还是对的，但到了 2 月就完全不是"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "那回事了。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "在我上一家公司，当我们开始基于模型能力来驱动功能开发时，原有的产品流程基本上崩溃了。后来变成了把所有感兴趣的方向都列出来，给它们做原型，判断哪些现在已经可行，然后把其他的暂时搁置。每当模型能力出现新的跃升，就把那些搁置的东西重新拿出来再试一遍。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "在我上一家公司，当我们开始基于模型能力来驱动功能开发时，原有的产品流程基本上崩溃"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "了。后来变成了把所有感兴趣的方向都列出来，给它们做原型，判断哪些现在已经可行，然后"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "把其他的暂时搁置。每当模型能力出现新的跃升，就把那些搁置的东西重新拿出来再试一遍。"
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "因为一个功能最终是否足够好，前提往往不是功能本身的形态，而是模型到底够不够聪明。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "因为一个功能最终是否足够好，前提往往不是功能本身的形态，而是模型到底够不够聪明。"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": "很多人一直对我的规划方式感到不满。但这件事确实非常难。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "很"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "多人一直对我的规划方式感到不满。但这件事确实非常难。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：有没有一个具体的例子说明时机有多重要？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：有没有一个具体的例子说明时机有多重要？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 关于 Codex 有个很好的故事。我非常确定，我们 2 月发布的那个 Codex 应用，如果在 11 月准备好了就发布，它会在市场上彻底失败。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 关于 Codex 有个很好的故事。我非常确定，我们 2 月发布的那个 "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Codex 应用，如果在 11 月准备好了就发布，它会在市场上彻底失败。"
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "唯一的区别就是 11 月到 2 月之间模型进步了。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "唯一的区别就是 11 月"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "到 2 月之间模型进步了。"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 同一个产品，完全相同的形态，结果完全不同，就差了几个月。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 同一个产品，完全相同的形态，结果完全不同，就差了几个月。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：所以现在不行的东西以后可能行？要保持更大的野心？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：所以现在不行的东西以后可能行？要保持更大的野心？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 对。我推荐人们不要轻易认定「这个东西现在不行，所以它就是个坏功能」，它可能只是还没到时候。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 对。我推荐人们不要轻易认定「这个东西现在不行，所以它就是个坏"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "功能」，它可能只是还没到时候。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "回到 Codex 最初的发布，Codex web。基本上你给模型一个任务，它去干，干完了回来给你结果。听起来不激进，但问题是它干得不够好，那个形态太超前了。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "回到 Codex 最初的发布，Codex web。基本上你给模型一个任务，它去干，干完了回来给你"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "结果。听起来不激进，但问题是它干得不够好，那个形态太超前了。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "然后 Claude Code 出来了，完全本地化，不连云端，不假装自己多 AGI。它会问你问题，会在那里等着，你不能把整个人生委托给它。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "然后 Claude Code 出来了，完全本地化，不连云端，不假装自己多 AGI。它会问你问题，会"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "在那里等着，你不能把整个人生委托给它。"
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "它好用太多了，因为它匹配了当时模型的能力水平。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "它好用太多了，因为它匹配了当时模型的能力水"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "平。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "我们当时太「AGI 了」，我经常想这个教训。过去，一个产品在市场上的失败，往往能告诉你很多关于产品形态或沟通方式的问题。现在不一样了，",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "我们当时太「AGI 了」，我经常想这个教训。过去，一个产品在市场上的失败，往往能告诉你"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "很多关于产品形态或沟通方式的问题。现在不一样了，"
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "你可能需要把同一个东西发布六次，直到它成功，形态可能完全不变。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "你可能需要把同一个东西发布六次，直"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "到它成功，形态可能完全不变。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "应用内浏览器也是这样的情况。我们曾经有一个可以工作的版本，回到 Atlas 时期，我们就已经有 agent 在浏览器里执行任务了。再往前是 ChatGPT 里的 Operator，那个没成功。但如果把 Operator、Atlas、Codex 和 ChatGPT 串起来看，你会发现它们之间其实可以画出一条连续的演进路线。本质上是同一个功能，只是随着智能水平的变化，被不断重新发布，而结果也因此彻底改变。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "应用内浏览器也是这样的情况。我们曾经有一个可以工作的版本，回到 Atlas 时期，我们就已"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "经有 agent 在浏览器里执行任务了。再往前是 ChatGPT 里的 Operator，那个没成功。但如"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "果把 Operator、Atlas、Codex 和 ChatGPT 串起来看，你会发现它们之间其实可以画出一条"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "连续的演进路线。本质上是同一个功能，只是随着智能水平的变化，被不断重新发布，而结果"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "也因此彻底改变。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "一旦一个产品或功能已经存在，人们很容易把注意力放在各种细节问题和微优化上，而且他们确实应该这么做。但这也是为什么我们始终保留一种自下而上的探索文化。因为有时候，就像 Codex 应用曾以某种方式颠覆 ChatGPT 一样，Codex 自己未来也可能被新的尝试所颠覆。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "一旦一个产品或功能已经存在，人们很容易把注意力放在各种细节问题和微优化上，而且他们"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "确实应该这么做。但这也是为什么我们始终保留一种自下而上的探索文化。因为有时候，就像 "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Codex 应用曾以某种方式颠覆 ChatGPT 一样，Codex 自己未来也可能被新的尝试所颠覆。"
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "你不能指望同一个团队既持续产出颠覆性的创新，又始终专注于产品质量和细节打磨。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "你不能指望同一个团队既持续产出颠覆性的创新，又始终专注于产品质量和细节打磨。"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": "在某个阶段，你必须设计出一种机制，让这两种能力能够同时存在。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "在某个"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "阶段，你必须设计出一种机制，让这两种能力能够同时存在。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：Codex 的愿景是什么？你要把它带到哪里？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：Codex 的愿景是什么？你要把它带到哪里？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 今年 1 月和 2 月，我们在内部自用测试的过程中发现工程和研究工作流上形成了很清晰的 PMF。但同时，市场、传播、财务、法务的人也都在用 Codex，哪怕这个应用对他们来说并不友好，它会给他们展示代码，让他们批准命令行搜索工具的执行。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 今年 1 月和 2 月，我们在内部自用测试的过程中发现工程和研究工作"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "流上形成了很清晰的 PMF。但同时，市场、传播、财务、法务的人也都在用 Codex，哪怕这"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "个应用对他们来说并不友好，它会给他们展示代码，让他们批准命令行搜索工具的执行。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "我们试过把 Codex 的能力加到其他产品里，ChatGPT 桌面应用、Atlas 浏览器。结果最烦人的事情发生了，没人愿意离开 Codex 应用，去用那些据说专门为他们打造的产品。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "我们试过把 Codex 的能力加到其他产品里，ChatGPT 桌面应用、Atlas 浏览器。结果最烦人"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "的事情发生了，没人愿意离开 Codex 应用，去用那些据说专门为他们打造的产品。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "这给我们的启发是，开发者工具和通用知识工作工具之间，其实存在很多微妙的共通之处。我们确实相信，我们正在构建的这种产品形态，是承载各种深度垂直场景的正确形态。从简单开始，再根据需要逐步增加复杂度。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这给我们的启发是，开发者工具和通用知识工作工具之间，其实存在很多微妙的共通之处。我"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "们确实相信，我们正在构建的这种产品形态，是承载各种深度垂直场景的正确形态。从简单开"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "始，再根据需要逐步增加复杂度。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "它不是那种「在屏幕上画一个矩形，然后所有事情都必须在里面完成」的产品。更像一个大本营，",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "它不是那种「在屏幕上画一个矩形，然后所有事情都必须在里面完成」的产品。更像一个大本"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "营，"
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "你在这里开始工作、结束工作、管理自动化流程，而它会调用你所需要的一切工具。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "你在这里开始工作、结束工作、管理自动化流程，而它会调用你所需要的一切工具。"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": "有人把这种形态称作「super app」，我真希望他们当时没这么叫，因为现在我几乎每天都得听到这个词。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "有人"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "把这种形态称作「super app」，我真希望他们当时没这么叫，因为现在我几乎每天都得听到"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这个词。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "Dan Shipper 有个很有意思的想法，他觉得未来我们会在 Codex 里面「由内而外」地使用 SaaS 工具，Notion、Linear、Salesforce 都不是你去浏览器里打开的，而是 agent 在 Codex 里帮你操作的。我们也确实在做这些，应用内浏览器、Chrome 扩展、computer use，所有这些都是让 Codex 能跟外部工具交互的方式。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Dan Shipper 有个很有意思的想法，他觉得未来我们会在 Codex 里面「由内而外」地使用 "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "SaaS 工具，Notion、Linear、Salesforce 都不是你去浏览器里打开的，而是 agent 在 "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Codex 里帮你操作的。我们也确实在做这些，应用内浏览器、Chrome 扩展、computer "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "use，所有这些都是让 Codex 能跟外部工具交互的方式。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "一个最好的例子，我们内部的视频制作人 Brent 用 Codex 剪辑了 Codex 的发布视频。Codex 不是视频编辑器，没有那些 UI。但它理解 Brent 在用 Premiere Pro，能通过编辑 Premiere Pro 背后的文件做一些修改。当它发现不能做所有事的时候，它自己写了一个 Premiere Pro 扩展插件，安装到 Premiere Pro 里，然后通过这个插件跟 Premiere Pro 对话。看到这个的时候我们都震惊了。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "一个最好的例子，我们内部的视频制作人 Brent 用 Codex 剪辑了 Codex 的发布视频。"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Codex 不是视频编辑器，没有那些 UI。但它理解 Brent 在用 Premiere Pro，能通过编辑 "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Premiere Pro 背后的文件做一些修改。当它发现不能做所有事的时候，它自己写了一个 "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Premiere Pro 扩展插件，安装到 Premiere Pro 里，然后通过这个插件跟 Premiere Pro 对"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "话。看到这个的时候我们都震惊了。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "这是一个很好的模式，有专业工具做专业的事。Codex 不需要成为更好的视频编辑器，它能无缝地跟专业工具交互就行了。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这是一个很好的模式，有专业工具做专业的事。Codex 不需要成为更好的视频编辑器，它能"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "无缝地跟专业工具交互就行了。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "LineBreak",
+                "name": "\n",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "\n"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "04 ",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "04",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "04"
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "LineBreak",
+                    "name": "\n",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "\n"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "会写代码不重要了，",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "会写代码不重要了，",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "会写代码不重要了，"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "会删代码才重要",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "会删代码才重要",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "会删代码才重要"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：从手写代码到 AI 写 100% 的代码，再到现在的 agents 和循环。最前沿的团队现在到底怎么工作？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：从手写代码到 AI 写 100% 的代码，再到现在的 agents 和循环。最前沿的团队现在"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "到底怎么工作？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " Loops（循环）？那是上周的事了。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " Loops（循环）？那是上周的事了。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "我们一直在讨论「产品有多少比例是 AI 写的代码」这个问题。用去年的标准来看，我们现在 100% 的代码都是 AI 写的。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "我们一直在讨论「产品有多少比例是 AI 写的代码」这个问题。用去年的标准来看，我们现在 "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "100% 的代码都是 AI 写的。"
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "所以问题不再是「多少是 AI 写的」，而是「代码是在监督下写的还是无监督写的」，",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "所以问题不再是「多少是 AI 写的」，而是「代码是在监督下写的"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "还是无监督写的」，"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": "这是一个完全不同的维度。我欢迎这种标准不断被刷新，因为这意味着我们在取得产品进展。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这是一个完全不同的维度。我欢迎这种标准不断被刷新，因为这意味着我"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "们在取得产品进展。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "我们在自主开发软件方面做了很多探索，比如大量的 harness engineering，比如「如果模型在夜里自动做代码库的垃圾回收和清理呢？」",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "我们在自主开发软件方面做了很多探索，比如大量的 harness engineering，比如「如果模型"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "在夜里自动做代码库的垃圾回收和清理呢？」"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "但目前所有模型都有一个问题，它们总是在增加复杂度。如果做研究的人在听：",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "但目前所有模型都有一个问题，它们总是在增加复杂度。如果做研究的人在听："
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "拜托，让模型学会删代码吧。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "拜托，让模型"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "学会删代码吧。"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 当你尝试把开发完全交给自动驾驶的时候，这就成了一个严重的问题，不管是在人的层面还是在代码库的层面。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 当你尝试把开发完全交给自动驾驶的时候，这就成了一个严重的问题，不管"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "是在人的层面还是在代码库的层面。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "Feature requests（功能请求）也是如此。你该如何教会模型判断哪些功能值得做、哪些应该被忽略、哪些应该合并后重新定义？又该如何教会模型构建正确的抽象？",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Feature requests（功能请求）也是如此。你该如何教会模型判断哪些功能值得做、哪些应该"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "被忽略、哪些应该合并后重新定义？又该如何教会模型构建正确的抽象？"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "这些能力都在持续进步。但我并不认为我们已经发展到这样一个阶段，设置一个循环，让模型自动「改进应用」，持续监听 Twitter、Slack 和邮件，然后自主完成迭代。虽然，我们确实正在尝试把这件事变成现实。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这些能力都在持续进步。但我并不认为我们已经发展到这样一个阶段，设置一个循环，让模型"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "自动「改进应用」，持续监听 Twitter、Slack 和邮件，然后自主完成迭代。虽然，我们确实正"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "在尝试把这件事变成现实。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：你觉得我们会到那一步吗？就是设置一个目标：「赢」？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：你觉得我们会到那一步吗？就是设置一个目标：「赢」？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": "「/goal 给我赚十亿美元。」我不知道。我不会说永远不会或者永远会怎样。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "「/goal 给我赚十亿美元。」我不知道。我不会说永远不会或者永远会"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "怎样。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：你作为产品和工程负责人，自己是怎么用 AI 工作的？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：你作为产品和工程负责人，自己是怎么用 AI 工作的？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 我觉得我现在可能拥有世界上最好的工作。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 我觉得我现在可能拥有世界上最好的工作。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "一开始做 Codex 的时候，我个人的目标就是让它好到我可以用它来写 Codex 的代码。那是一个超级紧密的自用产品循环，我不能做某件事，那就修好它，然后我能做了，然后能做更多的事。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "一开始做 Codex 的时候，我个人的目标就是让它好到我可以用它来写 Codex 的代码。那是一"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "个超级紧密的自用产品循环，我不能做某件事，那就修好它，然后我能做了，然后能做更多的"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "事。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "后来我的角色变了。我需要做更多产品发现、搞清楚团队在做什么、纠正偏离方向的东西。于是 Codex 变成了我做这些事的工具。「帮我建一个电子表格把这些数据整理出来。」「帮我做一个内部深度调研，看看过去在这个方向上做过哪些探索。」",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "后来我的角色变了。我需要做更多产品发现、搞清楚团队在做什么、纠正偏离方向的东西。于"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "是 Codex 变成了我做这些事的工具。「帮我建一个电子表格把这些数据整理出来。」「帮我做一"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "个内部深度调研，看看过去在这个方向上做过哪些探索。」"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "5 月的一系列发布，应用内浏览器、计算机使用（computer use）、工件创建（artifact creation），那是我们第一次用 vibe coordination（氛围式协调）管理发布。我有一个 Notion 文档记录所有待办事项，然后用 Codex 自动去 PR、Slack 频道收集进展，更新状态跟踪器，当时觉得这是管理产品发布方式的最前沿。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "5 月的一系列发布，应用内浏览器、计算机使用（computer use）、工件创建（artifact "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "creation），那是我们第一次用 vibe coordination（氛围式协调）管理发布。我有一个 "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Notion 文档记录所有待办事项，然后用 Codex 自动去 PR、Slack 频道收集进展，更新状态"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "跟踪器，当时觉得这是管理产品发布方式的最前沿。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "现在我每天早上起来，会看 Codex 帮我生成的日报，从我加入的 3000 个 Slack 频道里筛选出需要我关注的事。我可以回复说「给我五个问题，我来回答」。它会自我调整，我说「下次跑的时候，少关注这个工作流」或者「这件事发生了但没出现在日报里，确保以后能抓到」，它会更新通知方式、调整关注重点。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "现在我每天早上起来，会看 Codex 帮我生成的日报，从我加入的 3000 个 Slack 频道里筛选"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "出需要我关注的事。我可以回复说「给我五个问题，我来回答」。它会自我调整，我说「下次"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "跑的时候，少关注这个工作流」或者「这件事发生了但没出现在日报里，确保以后能抓到」，"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "它会更新通知方式、调整关注重点。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：这怎么设置的？工作流是什么？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：这怎么设置的？工作流是什么？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 现在还在发现阶段。就是做一个定时任务：「过一遍我的 Slack 频道，这些是我关心的事情，按这些分类整理，这里有些上下文。」头几次跑可能需要引导。好在我不需要去找怎么编辑指令，我直接对话说「下次帮我改一下这个」，它就更新了。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 现在还在发现阶段。就是做一个定时任务：「过一遍我的 Slack 频"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "道，这些是我关心的事情，按这些分类整理，这里有些上下文。」头几次跑可能需要引导。好"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "在我不需要去找怎么编辑指令，我直接对话说「下次帮我改一下这个」，它就更新了。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "但我觉得这也是聊天机器人形态的核心问题，我知道怎么设置，因为对我来说这就是产品发现。但如果你不在 OpenAI 工作、不在开发这个东西，你不会想去搞清楚这些。我们需要想清楚怎么让这些对普通人也能用的形态。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "但我觉得这也是聊天机器人形态的核心问题，我知道怎么设置，因为对我来说这就是产品发"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "现。但如果你不在 OpenAI 工作、不在开发这个东西，你不会想去搞清楚这些。我们需要想清"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "楚怎么让这些对普通人也能用的形态。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：我自己也用 Codex 做了一个过滤垃圾邮件的自动化。其中一步要去 Google Cloud 控制台设置一堆 API 触发器，那个界面特别烦。我就让 Codex 帮我做，它直接接管了我的电脑，用计算机使用功能操作。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：我自己也用 Codex 做了一个过滤垃圾邮件的自动化。其中一步要去 Google Cloud "
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "控制台设置一堆 API 触发器，那个界面特别烦。我就让 Codex 帮我做，它直接接管了我的电"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "脑，用计算机使用功能操作。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 它就是：「我不管你有没有连接器，老兄，我直接开始点击。」",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 它就是：「我不管你有没有连接器，老兄，我直接开始点击。」"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "如何划分连接器、应用内浏览器、Chrome 扩展以及计算机使用之间的边界，是一件非常有意思的事情。很多时候，这些边界其实都是凭感觉摸索出来的。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "如何划分连接器、应用内浏览器、Chrome 扩展以及计算机使用之间的边界，是一件非常有意"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "思的事情。很多时候，这些边界其实都是凭感觉摸索出来的。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "我觉得这些个人工作流特别有意思。大家都在尝试各种各样的东西，每个人都会搭建出完全不同的系统。但慢慢地，一些共同模式会浮现出来。然后我们就会意识到：「这个应该成为产品里的一级体验。」",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "我觉得这些个人工作流特别有意思。大家都在尝试各种各样的东西，每个人都会搭建出完全不"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "同的系统。但慢慢地，一些共同模式会浮现出来。然后我们就会意识到：「这个应该成为产品"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "里的一级体验。」"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "比如记忆（memory），很多人在设置 Obsidian 知识库或 Notion 空间来构建自己的心智宫殿。你不应该需要自己做这个，应该有一个足够通用的记忆功能替你做。我们一直在筛选，什么对个人有效但应该留在个人层面、什么应该进入产品成为基础组件。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "比如记忆（memory），很多人在设置 Obsidian 知识库或 Notion 空间来构建自己的心智宫"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "殿。你不应该需要自己做这个，应该有一个足够通用的记忆功能替你做。我们一直在筛选，什"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "么对个人有效但应该留在个人层面、什么应该进入产品成为基础组件。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：外面的人看到的都是你在赢。但肯定有事情没成功过的时候？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：外面的人看到的都是你在赢。但肯定有事情没成功过的时候？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 听你这么描述挺搞笑的。这其实是我第一次觉得自己没在失败。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 听你这么描述挺搞笑的。这其实是我第一次觉得自己没在失败。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "我之前创业做了很多年，最后基本上是把公司拆了卖掉的。在高度监管的行业里做，整个过程就像持续的失败。后来去了另一家创业公司，在另一个封闭的受管制行业里做 AI 工具，也是一次又一次地不行。我实际上失败了很多。有时候只是一个时间点，技能、热情和市场窗口恰好对齐了。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "我之前创业做了很多年，最后基本上是把公司拆了卖掉的。在高度监管的行业里做，整个过程"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "就像持续的失败。后来去了另一家创业公司，在另一个封闭的受管制行业里做 AI 工具，也是"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "一次又一次地不行。我实际上失败了很多。有时候只是一个时间点，技能、热情和市场窗口恰"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "好对齐了。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "就算是现在这个把 Codex 和 ChatGPT 结合的项目里，也有数不清的小失败。我们说「应该长这样」，发到 Slack 里，下面就是 2000 条消息说我们有多蠢。这是我喜欢 OpenAI 的地方，人们会直接告诉我们，对内部产品的失败毫不留情，这也是为什么外部产品做得不错。我在到达现在这个位置之前，失败了大概 10 到 15 年。所以我每天都还觉得有点惊讶，事情竟然在顺利进行。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "就算是现在这个把 Codex 和 ChatGPT 结合的项目里，也有数不清的小失败。我们说「应该"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "长这样」，发到 Slack 里，下面就是 2000 条消息说我们有多蠢。这是我喜欢 OpenAI 的地"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "方，人们会直接告诉我们，对内部产品的失败毫不留情，这也是为什么外部产品做得不错。我"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "在到达现在这个位置之前，失败了大概 10 到 15 年。所以我每天都还觉得有点惊讶，事情竟"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "然在顺利进行。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Lenny：对读者有什么最后的建议？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Lenny：对读者有什么最后的建议？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "Andrew Ambrosino：",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "Andrew Ambrosino："
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " 不要和你现在的工作流程「绑定终身」。真正应该坚持的，是那些只有你能够独特交付的成果。然后，持续尝试改变你的流程。如果你最引以为豪的技能是「我最懂 Figma 的 auto layout（自动布局）」，那你在干什么？AI 也会变得比你更好。找到值得做的事，然后想办法去做那些事。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " 不要和你现在的工作流程「绑定终身」。真正应该坚持的，是那些只"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "有你能够独特交付的成果。然后，持续尝试改变你的流程。如果你最引以为豪的技能是「我最"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "懂 Figma 的 auto layout（自动布局）」，那你在干什么？AI 也会变得比你更好。找到值得做"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "的事，然后想办法去做那些事。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "image",
+                "name": "图片"
+              }
+            ]
+          },
+          [
+            [
+              {
+                "role": "image",
+                "name": "图片"
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "更多阅读",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "更多阅读"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "heading",
+                "name": "红杉高瓴投资，前美团民宿 CEO 联合伯克利教授，做了一只 AI 蘑菇 ",
+                "children": [
+                  {
+                    "role": "link",
+                    "name": "红杉高瓴投资，前美团民宿 CEO 联合伯克利教授，做了一只 AI 蘑菇",
+                    "ref": "@e4",
+                    "children": [
+                      {
+                        "role": "StaticText",
+                        "name": "红杉高瓴投资，前美团民宿 CEO 联合伯克利教授，做了一只 AI 蘑菇",
+                        "children": [
+                          {
+                            "role": "InlineTextBox",
+                            "name": "红杉高瓴投资，前美团民宿 CEO 联合伯克利教授，做了一只 AI 蘑菇"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "role": "LineBreak",
+                    "name": "\n",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "\n"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "link",
+                    "name": "怎么做 IP 这件事，大家都在学迪士尼，但还没人真正学会",
+                    "ref": "@e5",
+                    "children": [
+                      {
+                        "role": "StaticText",
+                        "name": "怎么做 IP 这件事，大家都在学迪士尼，但还没人真正学会",
+                        "children": [
+                          {
+                            "role": "InlineTextBox",
+                            "name": "怎么做 IP 这件事，大家都在学迪士尼，但还没人真正学会"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "link",
+                    "name": "上线 14 个月，Notion 关掉了自己的 AI 邮件产品",
+                    "ref": "@e6",
+                    "children": [
+                      {
+                        "role": "StaticText",
+                        "name": "上线 14 个月，Notion 关掉了自己的 AI 邮件产品",
+                        "children": [
+                          {
+                            "role": "InlineTextBox",
+                            "name": "上线 14 个月，Notion 关掉了自己的 AI 邮件产品"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "link",
+                    "name": "做 AI 产品，最重要的是尊重常识",
+                    "ref": "@e7",
+                    "children": [
+                      {
+                        "role": "StaticText",
+                        "name": "做 AI 产品，最重要的是尊重常识",
+                        "children": [
+                          {
+                            "role": "InlineTextBox",
+                            "name": "做 AI 产品，最重要的是尊重常识"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "link",
+                    "name": "近100个团队报名Founder Show了，就等你了！",
+                    "ref": "@e8",
+                    "children": [
+                      {
+                        "role": "StaticText",
+                        "name": "近100个团队报名Founder Show了，就等你了！",
+                        "children": [
+                          {
+                            "role": "InlineTextBox",
+                            "name": "近100个团队报名Founder Show了，就等你了！"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "strong",
+                    "children": [
+                      {
+                        "role": "link",
+                        "name": "Founder Park ， 来自极客公园，专注与科技创业者聊「真问题」。 580篇原创内容 公众号",
+                        "ref": "@e9",
+                        "children": [
+                          {
+                            "role": "option",
+                            "name": "Founder Park 来自极客公园，专注与科技创业者聊「真问题」。 580篇原创内容",
+                            "ref": "@e10"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            {
+              "role": "paragraph",
+              "children": [
+                {
+                  "role": "StaticText",
+                  "name": "转载原创文章请添加微信：founderparker",
+                  "children": [
+                    {
+                      "role": "InlineTextBox",
+                      "name": "转载原创文章请添加微信：founderparker"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        ]
+      ],
+      [
+        [
+          {
+            "role": "image"
+          },
+          {
+            "role": "link",
+            "name": "Founder Park",
+            "ref": "@e11",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "Founder Park",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Founder Park"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "role": "button",
+            "name": "赞",
+            "ref": "@e12"
+          },
+          {
+            "role": "button",
+            "name": "分享",
+            "ref": "@e13"
+          },
+          {
+            "role": "button",
+            "name": "在看",
+            "ref": "@e14"
+          },
+          {
+            "role": "button",
+            "name": "留言 写留言",
+            "ref": "@e15",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "写留言",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "写留言"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    ]
+  }
+}

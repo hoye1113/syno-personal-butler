@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/action.schema.json",
+  "title": "Action",
+  "type": "object",
+  "required": ["id", "title", "status", "created"],
+  "properties": {
+    "id": { "type": "string" },
+    "title": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["pending", "scheduled", "completed", "rejected", "failed", "archived"] },
+    "created": { "type": "string", "format": "date-time" },
+    "scheduledStart": { "type": "string", "format": "date-time" },
+    "sourcePaths": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+  },
+  "additionalProperties": true
+}

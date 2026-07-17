@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/content-idea.schema.json",
+  "title": "ContentIdea",
+  "type": "object",
+  "required": ["id", "title", "claim", "status"],
+  "properties": {
+    "id": { "type": "string" },
+    "title": { "type": "string", "minLength": 1 },
+    "claim": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["idea", "planned", "scheduled", "archived"] },
+    "sourceNotes": { "type": "array", "items": { "type": "string" } }
+  }
+}

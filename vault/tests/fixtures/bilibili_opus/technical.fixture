@@ -1,0 +1,59 @@
+---
+title: "技术步骤型 S级专栏"
+tags: [ai_agent, video_transcript, bilibili]
+created: 2026-07-13
+source: "https://www.bilibili.com/opus/1234567890123456789"
+description: "对谈外壳内保留连续技术步骤的样板。"
+ingest_workflow: bilibili_opus_ingest_v2
+source_type: bilibili_opus
+source_url: "https://www.bilibili.com/opus/1234567890123456789"
+opus_id: "1234567890123456789"
+column_id: "cv12345678"
+video_url: "https://www.bilibili.com/video/BVTECH001/"
+bv: "BVTECH001"
+uploader: "Easonlee的AI笔记"
+source_tier: C1
+primary_source: column
+material_tier: S
+source_form: lecture
+content_form: dialogue
+dialogue_fidelity: reconstructed
+question_source: editorial
+voice_basis: attributed_paraphrase
+factual_status: verified
+factual_reviewed: 2026-07-13
+verification_scope: column_only
+verification_basis: [column]
+---
+# 技术步骤型 S级专栏
+
+> 用一个问题解释步骤的目的，再完整保留操作顺序。
+
+## 开场
+
+**编者问：** 这套流程解决什么问题？
+
+**讲者观点：** 它让 Agent 在执行前先固定验证条件。
+
+## 01 应该按什么顺序执行？
+
+**编者问：** 连续操作怎样保持可回溯？
+
+**讲者观点：** 按以下顺序执行：
+
+1. 读取项目契约。
+2. 建立输入清单。
+3. 执行任务。
+4. 运行验证器。
+
+## 限制与边界
+
+步骤顺序来自该专栏，不自动推广到所有项目。
+
+## 知识连接
+
+- **应用于** [[Agent实战-打造一个AI Agent的完整教程]]：把抽象工作流落到可验证的执行顺序。
+
+## 来源说明
+
+根据专栏文字转述，问题由编者组织。

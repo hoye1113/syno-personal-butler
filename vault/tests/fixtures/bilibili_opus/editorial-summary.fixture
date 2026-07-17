@@ -1,0 +1,56 @@
+---
+title: "第三方总结声音安全样板"
+tags: [ai_agent, video_transcript, bilibili]
+created: 2026-07-13
+source: "https://www.bilibili.com/opus/1234567890123456790"
+description: "第三方总结使用专栏整理角色，不冒充嘉宾。"
+ingest_workflow: bilibili_opus_ingest_v2
+source_type: bilibili_opus
+source_url: "https://www.bilibili.com/opus/1234567890123456790"
+opus_id: "1234567890123456790"
+column_id: "cv12345679"
+video_url: "https://www.bilibili.com/video/BVTECH002/"
+bv: "BVTECH002"
+uploader: "Easonlee的AI笔记"
+source_tier: C2
+primary_source: column
+material_tier: S
+source_form: lecture
+content_form: dialogue
+dialogue_fidelity: reconstructed
+question_source: editorial
+voice_basis: editorial_summary
+factual_status: partial
+factual_reviewed: 2026-07-13
+verification_scope: column_only
+verification_basis: [column]
+unresolved_facts:
+  - "专栏未提供可核对的逐字原话。"
+---
+# 第三方总结声音安全样板
+
+> 专栏总结了讲者观点，但没有提供可确认的原始问答。
+
+## 开场
+
+**编者问：** 文章认为问题的核心是什么？
+
+**专栏整理：** 专栏把核心归纳为可靠执行环境，而不是单独追求模型能力。
+
+## 01 这项判断依赖什么机制？
+
+**编者问：** 为什么执行环境会影响结果？
+
+**专栏整理：** 文章认为工具、权限和验证共同决定模型能力能否落地。
+
+## 限制与边界
+
+这些是专栏整理出的观点，不能当作讲者逐字引语。
+
+## 知识连接
+
+- **补充** [[Harness Engineering]]：把模型能力与执行约束放在同一系统中理解。
+
+## 来源说明
+
+只读取专栏文字，未读取原视频或转写，因此保留 partial。

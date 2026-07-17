@@ -1,0 +1,58 @@
+---
+title: "Together AI：语音Agent延迟质量与规模"
+tags: [ai_agent, video_transcript, bilibili]
+created: 2026-07-13
+source: "https://www.bilibili.com/opus/1224198797632995337"
+description: "单人主题演讲带末尾问答，A 级保持 lecture。"
+ingest_workflow: bilibili_opus_ingest_v2
+source_type: bilibili_opus
+source_url: "https://www.bilibili.com/opus/1224198797632995337"
+opus_id: "1224198797632995337"
+column_id: "cv51417405"
+video_url: "https://www.bilibili.com/video/BV1U4Tz6CEzu/"
+bv: "BV1U4Tz6CEzu"
+uploader: "Easonlee的AI笔记"
+source_tier: C1
+primary_source: column
+material_tier: A
+source_form: lecture
+content_form: lecture
+dialogue_fidelity: none
+question_source: none
+voice_basis: mixed
+factual_status: partial
+factual_reviewed: 2026-07-13
+verification_scope: column_only
+verification_basis: [column]
+unresolved_facts:
+  - "现场问答存在 unknown 和人物归属缺口。"
+---
+# Together AI：语音Agent延迟质量与规模
+
+> 围绕实时语音 Agent 的延迟、质量和规模边界整理主题演讲。
+
+## 开场
+
+实时语音 Agent 的延迟、工具调用质量和规模不能分开评估。
+
+## 01 护栏如何影响实时体验
+
+每一道检查都会进入实时链路，必须与质量收益一起衡量。
+
+## 现场问答
+
+**现场提问：** 增加护栏时，怎样理解额外延迟？
+
+专栏整理保留了回答，但部分人物标签尚未确认。
+
+## 限制与边界
+
+专栏只说明工程权衡，没有提供适用于所有产品的固定阈值。
+
+## 知识连接
+
+- **补充** [[Agent实战-打造一个AI Agent的完整教程]]：把通用 Agent 流程补充为实时语音场景下的延迟约束。
+
+## 来源说明
+
+根据 B站专栏文字整理；图片和转写未读取。

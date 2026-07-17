@@ -1,0 +1,27 @@
+node_modules/
+.runtime/
+.cache/
+*.log
+*.tmp
+*.sqlite
+*.sqlite3
+coverage/
+
+# Local configuration and credentials
+config/local.json
+apps/syno/topic-planner.config.json
+.env
+.env.*
+!.env.example
+
+# Agent worktrees and generated state
+.worktrees/
+ops/artifacts/quarantine/*
+!ops/artifacts/quarantine/.gitkeep
+
+# OS/editor state
+.DS_Store
+Thumbs.db
+.obsidian/
+.pytest_cache/
+

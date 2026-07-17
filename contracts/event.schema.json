@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/event.schema.json",
+  "title": "Event",
+  "type": "object",
+  "required": ["id", "type", "at", "subjectId"],
+  "properties": {
+    "id": { "type": "string" },
+    "type": { "type": "string" },
+    "at": { "type": "string", "format": "date-time" },
+    "subjectId": { "type": "string" },
+    "data": { "type": "object" }
+  }
+}

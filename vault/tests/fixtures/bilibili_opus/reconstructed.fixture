@@ -1,0 +1,56 @@
+---
+title: "Rely AI：让Agent从生产反馈中持续学习"
+tags: [ai_agent, video_transcript, bilibili, harness_engineering]
+created: 2026-07-13
+source: "https://www.bilibili.com/opus/1222491144375500806"
+description: "真实 S级主题演讲使用编者问重构的样板。"
+ingest_workflow: bilibili_opus_ingest_v2
+source_type: bilibili_opus
+source_url: "https://www.bilibili.com/opus/1222491144375500806"
+opus_id: "1222491144375500806"
+column_id: "cv51255399"
+video_url: "https://www.bilibili.com/video/BV1f7Mh66Ejm/"
+bv: "BV1f7Mh66Ejm"
+uploader: "Easonlee的AI笔记"
+source_tier: C1
+primary_source: column
+material_tier: S
+source_form: lecture
+content_form: dialogue
+dialogue_fidelity: reconstructed
+question_source: editorial
+voice_basis: attributed_paraphrase
+factual_status: partial
+factual_reviewed: 2026-07-13
+verification_scope: column_only
+verification_basis: [column]
+unresolved_facts:
+  - "专栏中的人名、品牌拼写与 78%/87% 基线数字存在冲突。"
+---
+# Rely AI：让Agent从生产反馈中持续学习
+
+> 根据 Soheil 的主题演讲，讨论 Agent 如何利用生产反馈持续优化；问题由编者组织。
+
+## 开场
+
+**编者问：** 为什么一次性训练好的 Agent 很快会落后于真实环境？
+
+**讲者观点：** 据专栏整理，生产环境会持续产生训练阶段没有覆盖的新反馈。
+
+## 01 持续学习需要哪几层更新？
+
+**编者问：** 系统应该更新模型，还是先更新执行环境？
+
+**讲者观点：** 专栏把更新分成 Harness、记忆和模型三层；可重现环境与回归检查决定优化能否安全进入生产。
+
+## 限制与边界
+
+演示中的品牌拼写和性能基线存在专栏内部矛盾，不能作为已核验事实直接引用。
+
+## 知识连接
+
+- **补充** [[OpenAI研究员-Harness工程软件开发新范式]]：把 Harness 从静态执行约束扩展到生产反馈驱动的持续优化。
+
+## 来源说明
+
+只读取 B站专栏文字；问题为编辑重构，图片、视频页、转写和 Recastory 未读取。

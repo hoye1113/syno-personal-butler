@@ -1,0 +1,114 @@
+{
+  "batch": "P3-2026-07-07",
+  "note": "Agent/harness/eval/platform priority; see bilibili-ingest-exclude-2026-07-07.md",
+  "entries": [
+    {
+      "bv": "BV19GAqzSE9K",
+      "wave": 1,
+      "vault_path": "行业观点与组织/圆桌讨论-打造世界级AI原生团队.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV1Ltw8zYErt",
+      "wave": 1,
+      "vault_path": "AI评估与研究/OpenAI评估团队-AI编程评估集历史现状与未来.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV1VczqBREQ8",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/亚马逊Kiro团队-规范驱动开发.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV1dC5268Ei1",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/Shopify CTO-AI时代CI范式重构.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV15moTBXEmk",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/Peter Yang-Agent未来与职场内耗.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV11mTi6aEiP",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/GitHub COO-为什么程序员还没被替代.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV1AGJx6fE3A",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/GitHub COO-GitHub的AI革命与14倍PR增长.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV1uiGd6gECC",
+      "wave": 1,
+      "vault_path": "行业观点与组织/Intercom首席-全员AI转型实践.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV1xXDjBUE8S",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/DeepMind研究员-递归循环中AI构建AI.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV1Dd9CBGEmK",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/Neo4J CEO-文档转化为知识.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV1D9ojBzEAd",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/Deepset工程师-小模型领域微调.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV1nWLA6EEv2",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/Notius创始人-AI研究工具与检索.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV1xC7R6VEWv",
+      "wave": 2,
+      "vault_path": "Agent架构与平台/OpenCode创始人-研发内幕.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV1uBTi6BEfd",
+      "wave": 2,
+      "vault_path": "Agent架构与平台/Gray Swan创始人-Codex之后AI安全重写.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV11s526kEAk",
+      "wave": 2,
+      "vault_path": "Agent架构与平台/TypeScript专家-AI编程生产级代码.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV1FzQhBUETs",
+      "wave": 2,
+      "vault_path": "Agent架构与平台/DHH-编写代码的新方式.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV1SfXxBpExT",
+      "wave": 2,
+      "vault_path": "AI评估与研究/前OpenAI研究员-持续学习瓶颈.md",
+      "tier_hint": "S/A"
+    },
+    {
+      "bv": "BV1tzJc6PE82",
+      "wave": 2,
+      "vault_path": "AI评估与研究/Transformer作者-AI泛化与类人学习.md",
+      "tier_hint": "S/A"
+    }
+  ]
+}

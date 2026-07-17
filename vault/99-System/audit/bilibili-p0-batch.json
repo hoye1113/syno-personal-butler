@@ -1,0 +1,95 @@
+{
+  "batch": "P0-2026-07-06",
+  "entries": [
+    {
+      "bv": "BV1QM5G6xEdB",
+      "wave": 3,
+      "vault_path": "Agent架构与平台/Anthropic团队-解析Claude Agent平台内幕.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1Qh7R6HEf5",
+      "wave": 2,
+      "vault_path": "AI评估与研究/DeepMind团队-AI评估规划化与民主化.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV161o1BBERH",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/OpenAI研究员-Harness工程软件开发新范式.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1HTXFBAE68",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/Agent工程-从第一性原理讲解Ralph Loop.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1H59yBFECR",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/Geoff-Ralph Loops的基础设施.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1ADobBcECX",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/Cloudflare专家-Sandbox确保AI代码安全.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV17AQhBVEje",
+      "wave": 2,
+      "vault_path": "AI评估与研究/Agenta CEO-构建真正有效的AI评估.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1UqGd6BEzj",
+      "wave": 4,
+      "vault_path": "Agent架构与平台/OpenAI播客-用Codex处理日常工作.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1NMJx6aEci",
+      "wave": 2,
+      "vault_path": "行业观点与组织/微软CEO-AI竞争终局与企业私有评估.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV19V5t6ME6c",
+      "wave": 4,
+      "vault_path": "Agent架构与平台/Claude Code之父-编程已被解决接下来发展.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1tR9zB4Ezv",
+      "wave": 4,
+      "vault_path": "Agent架构与平台/Claude Code实战-Gstack把AI变成团队.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1ohDzBwEJN",
+      "wave": 4,
+      "vault_path": "Agent架构与平台/Claude设计主管-Cowork揭秘40分钟教程.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1iKdvBhEYJ",
+      "wave": 4,
+      "vault_path": "Agent架构与平台/Codex产品负责人-Codex团队如何用Codex.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1jPQhBkEvz",
+      "wave": 3,
+      "vault_path": "Agent架构与平台/Cowork负责人-揭秘Cowork与Mythos.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV18QE56zEVr",
+      "wave": 4,
+      "vault_path": "Agent架构与平台/Every增长主管-Codex成为知识工作的OS.md",
+      "tier_hint": "S"
+    }
+  ]
+}

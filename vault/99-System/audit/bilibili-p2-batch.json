@@ -1,0 +1,26 @@
+{
+  "batch": "P2-2026-07-06",
+  "note": "Agent-first; Wave A architecture then Wave B tooling. Curate after reconcile per BV.",
+  "entries": [
+    {"bv": "BV1jhogBwEzo", "wave": 1, "vault_path": "Agent架构与平台/Databricks专家-如何构建有效的Agent架构.md", "tier_hint": "S"},
+    {"bv": "BV1kt5266EyW", "wave": 1, "vault_path": "Agent架构与平台/Raindrop CEO-打造Agent可观测性.md", "tier_hint": "A"},
+    {"bv": "BV1W39yBwEhp", "wave": 1, "vault_path": "Agent架构与平台/Jeff-AGENTS.md历史与最佳实践.md", "tier_hint": "A"},
+    {"bv": "BV1tZw4zLEX8", "wave": 1, "vault_path": "Agent架构与平台/姚顺雨-预测性Agent设计.md", "tier_hint": "A"},
+    {"bv": "BV11nRmB1EkH", "wave": 1, "vault_path": "Agent架构与平台/Karpathy-从Vibe Code到Agentic Code.md", "tier_hint": "A"},
+    {"bv": "BV1dwAczDEXY", "wave": 1, "vault_path": "Agent架构与平台/Karpathy-Code Agent与Auto Research.md", "tier_hint": "A"},
+    {"bv": "BV1mDDzBEEWH", "wave": 1, "vault_path": "Agent架构与平台/Turbopuffer CEO-Agent时代RAG与检索.md", "tier_hint": "A"},
+    {"bv": "BV1sKDdBWETM", "wave": 1, "vault_path": "行业观点与组织/Linear CEO-把AI Agent当一级员工.md", "tier_hint": "A"},
+    {"bv": "BV1MM9xBHEsQ", "wave": 1, "vault_path": "Agent架构与平台/Banking负责人-Agent时代平台设计.md", "tier_hint": "A"},
+    {"bv": "BV1FEAVzbEWq", "wave": 1, "vault_path": "Agent架构与平台/Notion联合创始人-从工具到AI Agent.md", "tier_hint": "A"},
+    {"bv": "BV13fGm6HETj", "wave": 1, "vault_path": "Agent架构与平台/Google-端侧智能体微调微型LLM.md", "tier_hint": "A"},
+    {"bv": "BV1psDXByEwV", "wave": 1, "vault_path": "行业观点与组织/给每位员工配备AI智能体.md", "tier_hint": "A"},
+    {"bv": "BV18qTi6uEDX", "wave": 2, "vault_path": "Agent架构与平台/Cursor CEO-云端智能体上线.md", "tier_hint": "A"},
+    {"bv": "BV1nyo1BuEd9", "wave": 2, "vault_path": "Agent架构与平台/Hermes Agent-新OpenClaw体验.md", "tier_hint": "A"},
+    {"bv": "BV1SJ93B2EBo", "wave": 2, "vault_path": "Agent架构与平台/Claude Code负责人-创造内幕.md", "tier_hint": "A"},
+    {"bv": "BV19uzXBeEMp", "wave": 2, "vault_path": "Agent架构与平台/Claude Code之父-亲自讲解Cowork.md", "tier_hint": "A"},
+    {"bv": "BV1xEzqBVEeb", "wave": 2, "vault_path": "Agent架构与平台/Claude Cowork-另一种Claude Code.md", "tier_hint": "A"},
+    {"bv": "BV1BHKX68Ee5", "wave": 2, "vault_path": "Agent架构与平台/Codex实战-构建个人操作系统.md", "tier_hint": "A"},
+    {"bv": "BV12irNBtE7D", "wave": 2, "vault_path": "Agent架构与平台/ElevenLabs联创-语音AI现状与未来.md", "tier_hint": "A"},
+    {"bv": "BV1gFGU6DEkW", "wave": 2, "vault_path": "AI评估与研究/Langfuse-LLM评估与准确训练.md", "tier_hint": "A"}
+  ]
+}

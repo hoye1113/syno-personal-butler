@@ -1,0 +1,125 @@
+{
+  "batch": "P1-2026-07-06",
+  "entries": [
+    {
+      "bv": "BV18o526DEFr",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/Anthropic CPO-Claude团队为什么迭代这么快.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV19sGH6UECj",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/Anthropic团队-如何构建运行数小时的Agent.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1uDLz6iEX3",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/Anthropic团队-我们如何打造下一代Claude.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1txdABtEWF",
+      "wave": 1,
+      "vault_path": "行业观点与组织/Anthropic联创-AI影响比工业革命大10倍快10倍.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1G9Gm6REdy",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/Anthropic-3亿收购开发工具初创创始人访谈.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1CpQfBAE5N",
+      "wave": 2,
+      "vault_path": "行业观点与组织/OpenAI健康团队-AI在医疗领域的进展.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1tV7Q6TEcf",
+      "wave": 2,
+      "vault_path": "行业观点与组织/OpenAI团队-FDE工程师的未来.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1CdGU6GE6m",
+      "wave": 2,
+      "vault_path": "行业观点与组织/OpenAI Yann Dubois-AI进步为何突然如此真实.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1zKDbBzEeT",
+      "wave": 2,
+      "vault_path": "行业观点与组织/OpenAI前副总裁-AI走出比特世界重构物理世界.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1yWRmBCEDc",
+      "wave": 3,
+      "vault_path": "行业观点与组织/DeepMind CEO-AGI倒计时2030年见分晓.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1CnDXBjEmH",
+      "wave": 3,
+      "vault_path": "行业观点与组织/DeepMind CEO-为什么AGI比工业革命大10倍.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1QSzzBfELB",
+      "wave": 3,
+      "vault_path": "行业观点与组织/DeepMind CEO-AI未来10年科学与技术发展.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1TwjN6NEuA",
+      "wave": 4,
+      "vault_path": "Agent架构与平台/Qodo研究员-长上下文越多Agent越笨.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1oZ536AE4T",
+      "wave": 4,
+      "vault_path": "Agent架构与平台/Claude Code实战-用AI实现生活自动化.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1HwdjBHENb",
+      "wave": 4,
+      "vault_path": "Agent架构与平台/Claude Code实战-鲜为人知的Claude Code工作流.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1j15A6gEcL",
+      "wave": 4,
+      "vault_path": "Agent架构与平台/Codex实战-100分钟完整教程.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1bpdAB8Ejp",
+      "wave": 4,
+      "vault_path": "Agent架构与平台/Codex实战-30分钟掌握95%核心功能.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV16e526iENH",
+      "wave": 4,
+      "vault_path": "Agent架构与平台/Codex实战-演示开发一个手机App.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1ik526cEsp",
+      "wave": 4,
+      "vault_path": "Agent架构与平台/Codex实战-用AI颠覆视频剪辑流程.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1itEh6FEUW",
+      "wave": 4,
+      "vault_path": "Agent架构与平台/Cognition CPO-Devin的80%时刻与后台Agent.md",
+      "tier_hint": "S"
+    }
+  ]
+}

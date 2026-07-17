@@ -1,0 +1,10 @@
+{
+  "timeZone": "Asia/Shanghai",
+  "jobs": [
+    { "id": "morning-brief", "days": "daily", "time": "08:30" },
+    { "id": "evening-review", "days": "daily", "time": "22:00" },
+    { "id": "weekly-review", "days": "sunday", "time": "20:00" }
+  ],
+  "missedRunPolicy": "latest-only"
+}
+

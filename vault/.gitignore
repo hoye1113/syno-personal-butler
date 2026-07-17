@@ -1,0 +1,23 @@
+# Obsidian app/plugin config (personal; contains compiled JS with secrets)
+.obsidian/
+
+# MCP config with tokens
+.mcp.json
+
+# Claude Code personal config
+.claude/
+
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Script temporary files
+__pycache__/
+*.pyc

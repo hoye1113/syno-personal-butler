@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/channel-message.schema.json",
+  "title": "ChannelMessage",
+  "type": "object",
+  "required": ["id", "channel", "senderId", "kind", "text", "receivedAt"],
+  "properties": {
+    "id": { "type": "string" },
+    "channel": { "enum": ["web", "windows", "weixin", "fake"] },
+    "senderId": { "type": "string" },
+    "kind": { "enum": ["text", "voice", "url", "image", "file", "video"] },
+    "text": { "type": "string" },
+    "receivedAt": { "type": "string", "format": "date-time" }
+  }
+}

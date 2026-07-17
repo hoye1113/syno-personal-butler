@@ -1,0 +1,20 @@
+{
+  "workspaceMode": "obsidian",
+  "vaultRoot": "D:\\workSpace\\syno-personal-butler",
+  "topicDir": "ops/content/ideas",
+  "inboxDir": "vault/00-Inbox",
+  "archiveDir": "ops/content/archive",
+  "wikiMode": "agent",
+  "wikiDir": "vault",
+  "wikiIndexPath": "vault/MOC - 知识库导航.md",
+  "wikiLogPath": "ops/events/wiki-log.md",
+  "calendarProvider": "none",
+  "larkCalendarId": "",
+  "larkCalendarName": "",
+  "dailyCapacity": 2,
+  "scheduleTimeSlots": [
+    { "label": "上午深度", "start": "09:30", "end": "11:00" },
+    { "label": "下午制作", "start": "14:00", "end": "15:30" },
+    { "label": "晚上发布", "start": "20:00", "end": "20:30" }
+  ]
+}

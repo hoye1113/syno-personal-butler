@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/job.schema.json",
+  "title": "Job",
+  "type": "object",
+  "required": ["id", "intent", "status", "profile", "approval", "created", "updated", "request"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^job-[a-z0-9-]+$" },
+    "intent": { "type": "string" },
+    "status": { "enum": ["pending", "awaiting_approval", "running", "validating", "completed", "failed", "rejected", "canceled"] },
+    "profile": { "enum": ["syno-read", "syno-ops", "syno-curate", "syno-code"] },
+    "approval": { "enum": ["none", "single", "double"] },
+    "approvalsReceived": { "type": "integer", "minimum": 0, "maximum": 2 },
+    "created": { "type": "string", "format": "date-time" },
+    "updated": { "type": "string", "format": "date-time" },
+    "request": { "type": "object" },
+    "changedPaths": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+  },
+  "additionalProperties": true
+}
+

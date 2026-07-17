@@ -1,0 +1,16 @@
+{
+  "opencode": {
+    "models": [
+      "opencode/mimo-v2.5-free",
+      "opencode/hy3-free",
+      "opencode/deepseek-v4-flash-free"
+    ],
+    "timeoutMs": 300000,
+    "forbiddenFlags": ["--auto"]
+  },
+  "claude": {
+    "timeoutMs": 600000,
+    "passModel": false
+  }
+}
+

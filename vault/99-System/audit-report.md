@@ -1,0 +1,396 @@
+# Vault 审计报告
+
+**审计时间**：2026-06-11  
+**审计对象**：`${VAULT_ROOT}`  
+**脚本版本**：vault-audit.py v1.0  
+**总文件数**：546
+
+---
+
+## 1. 需要关注的 wikilink
+
+**说明**：非文件、非目录、不在白名单中的 `[[wikilink]]`。可能是真死链或需要创建对应笔记。
+
+
+共 224 个唯一目标，304 处引用。
+
+- `[[1-2 从"能聊天"到"能干活"——给 Agent 装上 while 循环]]`
+- `[[2026 年 Agent 最重要的工程概念 Harness Engineering\]]`
+- `[[80% 的 App 未来会消失吗]]`
+- `[[80% 的 App 未来会消失吗？我不这么认为\]]`
+- `[[AGENTS.md]]`
+- `[[AI Agent 微调与后训练]]`
+- `[[AI Agent 核心能力清单 - 胖哥]]`
+- `[[AI Agent 记忆系统 从会话缓存到持久记忆]]`
+- `[[AI 时代如何面试工程师\]]`
+- `[[AI反思与自我纠错机制]]`
+- `[[AI编程工具-2026年趋势与Vibe Code]]`
+- `[[Agent 评估应该关注什么]]`
+- `[[Agent 越用越翻车...]]`
+- `[[Agent 越用越翻车，怎么破局？答案藏在经典管理学里\]]`
+- `[[Al Harris]]`
+- `[[Alex Albert]]`
+- `[[Alex Embirico]]`
+- `[[Alex Finn]]`
+- `[[Alex Kantrowitz]]`
+- `[[Alex Rattray]]`
+- `[[Amjad Masad]]`
+- `[[Amy Boyd]]`
+- `[[Andrej Karpathy]]`
+- `[[Andrew Wilson]]`
+- `[[Angela Jiang]]`
+- `[[Anish Acharya]]`
+- `[[Anthropic]]`
+- `[[Anthropic-3个最聪明的人想离开Anthropic创业]]`
+- `[[Anton Osika]]`
+- `[[Arnab Bose]]`
+- `[[Arnab Maiti]]`
+- `[[Ash Prabaker]]`
+- `[[Austin]]`
+- `[[Austin Tedesco]]`
+- `[[Ben Borca]]`
+- `[[Ben Hylak]]`
+- `[[Boris Cherny]]`
+- `[[Boyuan Chen]]`
+- `[[Brandon]]`
+- `[[Brandon Gell]]`
+- `[[Brex CEO-打造全公司共用AI型CEO]]`
+- `[[Brian Scanlan]]`
+- `[[B站收录工作流五篇实测]]`
+- `[[Caitlin Lesse]]`
+- `[[Charlie O'Neill]]`
+- `[[Chris Lovejoy]]`
+- `[[Chris Nicholson]]`
+- `[[Codex实战-用Codex处理日常工作]]`
+- `[[Cole Murray]]`
+- `[[Cormac Brick]]`
+- `[[Dan]]`
+- `[[Dan Koe]]`
+- `[[Dan Shipper]]`
+- `[[Danny]]`
+- `[[David Heinemeier Hansson]]`
+- `[[Dax Raad]]`
+- `[[Demis Hassabis]]`
+- `[[Dmytro Dzhulgakov]]`
+- `[[Easonlee]]`
+- `[[Easonlee的AI笔记]]`
+- `[[Elon Musk]]`
+- `[[Emil Eifrem]]`
+- `[[Ethan He]]`
+- `[[Evan Spiegel]]`
+- `[[Eve Bodnia]]`
+- `[[Federico Cassano]]`
+- `[[Felix Rieseberg]]`
+- `[[François Chollet]]`
+- `[[Gabriel Goh]]`
+- `[[Garry Tan]]`
+- `[[Greg Brockman]]`
+- `[[Greg Isenberg]]`
+- `[[Harrison Chase]]`
+- `[[Harry Partridge]]`
+- `[[Harshil Agrawal]]`
+- `[[Hermes Agent-比 OpenClaw 更好]]`
+- `[[Ivan Zhao]]`
+- `[[Jack Clark]]`
+- `[[Jakub Pachocki]]`
+- `[[Jeanne Grosser]]`
+- `[[Jeff]]`
+- `[[Jenny Wen]]`
+- `[[Jensen Huang]]`
+- `[[Jerry Tworek]]`
+- `[[Jonathan Courtney]]`
+- `[[Josh Pigford]]`
+- `[[Josh Siebert]]`
+- `[[Juan Herreros Elorza]]`
+- `[[Karan Singhal]]`
+- `[[Karri Saarinen]]`
+- `[[Kat Wu]]`
+- `[[Katie Dill]]`
+- `[[Kenji Hata]]`
+- `[[Kobie Crawford]]`
+- `[[Kyle Daigle]]`
+- `[[Lauren Reeder]]`
+- `[[Lenny Rachitsky]]`
+- `[[Liam Fedus]]`
+- `[[Logan Kilpatrick]]`
+- `[[Loop-Engineering橙皮书-v260615.pdf]]`
+- `[[Lukasz Kaiser]]`
+- `[[Luke Bailey]]`
+- `[[Lukens Orthwein]]`
+- `[[MCP服务器模式实战]]`
+- `[[MOC - {相关主题}]]`
+- `[[MOC - 横切主题]]`
+- `[[Mahmoud Mabrouk]]`
+- `[[Marina Mogilko]]`
+- `[[Mati Staniszewski]]`
+- `[[Matias Castello]]`
+- `[[Matt]]`
+- `[[Matt Fredrikson]]`
+- `[[Matt Pocock]]`
+- `[[Matt Turck]]`
+- `[[Matt Turk]]`
+- `[[Matthew Berman]]`
+- `[[Matthias Luebken]]`
+- `[[Mia]]`
+- `[[Michael Aaron]]`
+- `[[Mikhail Parakhin]]`
+- `[[Mitchell Hashimoto]]`
+- `[[Moritz Kremb]]`
+- `[[Mostafa Dehghani]]`
+- `[[Nate Gross]]`
+- `[[Nathan Lambert]]`
+- `[[Nicholas Kang]]`
+- `[[Nikhyl Singhal]]`
+- `[[Nitya Narasimhan]]`
+- `[[Noah Brier]]`
+- `[[Notion CEO-AI原生组织...]]`
+- `[[Nupur Sharma]]`
+- `[[Olivia]]`
+- `[[OpenAI官方-Codex新]]`
+- `[[OpenAI总裁-AI要让每个人都受益]]`
+- `[[OpenClaw养虾指南-打造数字员工]]`
+- `[[OpenClaw创始人-如何安全使用OpenClaw]]`
+- `[[OpenClaw创始人-我是如何使用OpenClaw的？]]`
+- `[[OpenClaw教程-实战完整指南]]`
+- `[[Owen Jennings]]`
+- `[[Pedro Franceschi]]`
+- `[[Pete Koomen]]`
+- `[[Peter Steinberger]]`
+- `[[Peter Yang]]`
+- `[[Peter Yang-Agent时代的职业]]`
+- `[[Prompt Rewriter与视频生成]]`
+- `[[Rachel Lee Nabors]]`
+- `[[Rachel Williamson]]`
+- `[[Rajiv]]`
+- `[[Replit CEO-...]]`
+- `[[Riley Brown]]`
+- `[[Rishabh]]`
+- `[[Robert George]]`
+- `[[Romain Huet]]`
+- `[[Ryan Lopopolo]]`
+- `[[Ryan Wiggins]]`
+- `[[Sally Ann O'Malley]]`
+- `[[Sam Altman]]`
+- `[[Sam Stephenson]]`
+- `[[Sam Whitmore]]`
+- `[[Sandipan Bhaumik]]`
+- `[[Sarah Friar]]`
+- `[[Satya Nadella]]`
+- `[[Sebastian Raschke]]`
+- `[[Simon Eskildsen]]`
+- `[[Simon Last]]`
+- `[[Sirio]]`
+- `[[Solaria]]`
+- `[[Sonya Huang]]`
+- `[[Stefano Fiorucci]]`
+- `[[Tejas Kumar]]`
+- `[[The-Founders-Playbook-05062026.pdf]]`
+- `[[Theo Tabah]]`
+- `[[Thibault Sottiaux]]`
+- `[[Thomas Dohmke]]`
+- `[[Tido Carriero]]`
+- `[[Tina Huang]]`
+- `[[Tom Krcha]]`
+- `[[Varun Vummadi]]`
+- `[[Vercel COO-2026...GTM]]`
+- `[[Vibhu]]`
+- `[[Vibhu Sapra]]`
+- `[[Vinod Khosla]]`
+- `[[Walden Yan]]`
+- `[[Willie]]`
+- `[[Winston Weinberg]]`
+- `[[Yann Dubois]]`
+- `[[Yann LeCun]]`
+- `[[Yasa Baig]]`
+- `[[Yasser Elsaid]]`
+- `[[Zico Kolter]]`
+- `[[Zubin]]`
+- `[[martinskxu]]`
+- `[[swyx]]`
+- `[[vskill-vault-curate/SKILL.md]]`
+- `[[{anchor_note_1}]]`
+- `[[{anchor_note_2}]]`
+- `[[{vault 内相关笔记}]]`
+- `[[{作者}]]`
+- `[[{笔记标题}]]`
+- `[[万人大厂宣布裁员 40% 利润在涨人却多余了\]]`
+- `[[世界模型]]`
+- `[[人不自信的最根本原因是什么]]`
+- `[[垂直领域的AI数字员工与Agent封装器]]`
+- `[[姚顺雨]]`
+- `[[所谓的agent开发到底是个啥岗位\]]`
+- `[[李飞飞]]`
+- `[[杨植麟]]`
+- `[[某笔记]]`
+- `[[沐洒]]`
+- `[[流畅性错觉]]`
+- `[[用AI的这三年想跟你分享这9条心得\]]`
+- `[[硅谷今年最火的岗位 FDE，我们闷头干了三年\]]`
+- `[[祝贺Claude Code成功越狱]]`
+- `[[祝贺Claude Code成功越狱，获得永生\]]`
+- `[[笔记 1]]`
+- `[[笔记 2]]`
+- `[[笔记1]]`
+- `[[笔记2]]`
+- `[[笔记标题]]`
+- `[[笔记（孤儿但相关）]]`
+- `[[苏格拉底式追问]]`
+- `[[视频代理]]`
+- `[[角色 vs 工具]]`
+- `[[陶哲轩]]`
+
+## 2. 孤岛笔记（0 个被链入）
+
+- `AGENTS.md` （真孤岛）
+- `CLAUDE.md` （真孤岛）
+- `README.md` （真孤岛）
+- `issues/infrastructure_baseline_hardening.md` （真孤岛）
+- `issues/scripts_runbook_backfill.md` （真孤岛）
+- `99-System/Agent/DENSITY-PROFILE.md` （真孤岛）
+- `99-System/Agent/INGEST-CONTRACT.md` （真孤岛）
+- `99-System/Agent/PROJECT.md` （真孤岛）
+- `99-System/Agent/ROUTER.md` （真孤岛）
+- `99-System/audit/bilibili-a-tier-v3-rewrite-2026-07-03.md` （真孤岛）
+- `99-System/audit/bilibili-enrich-partial-2026-07-03.md` （真孤岛）
+- `99-System/audit/bilibili-exclude-review-tiers-2026-07-07.md` （真孤岛）
+- `99-System/audit/bilibili-ingest-exclude-2026-07-07.md` （真孤岛）
+- `99-System/audit/bilibili-ingest-field-study-2026-07-13.md` （真孤岛）
+- `99-System/audit/bilibili-ingest-priority-2026-07-06.md` （真孤岛）
+- `99-System/audit/bilibili-ingest-priority-p2-2026-07-06.md` （真孤岛）
+- `99-System/audit/bilibili-ingest-priority-p3-2026-07-07.md` （真孤岛）
+- `99-System/audit/bilibili-opus-field-study-2026-07-13.md` （真孤岛）
+- `99-System/audit/bilibili-r1a-review-results-2026-07-07.md` （真孤岛）
+- `99-System/audit/bilibili-source-inventory-2026-07-13.md` （真孤岛）
+- `99-System/audit/bilibili-spot-check-2026-07-02.md` （真孤岛）
+- `99-System/audit/bilibili-trust-audit-2026-07-13.md` （真孤岛）
+- `99-System/audit/bilibili-trust-first-batch-2026-07-13.md` （真孤岛）
+- `99-System/audit/bilibili-unmapped-2026-07-07.md` （真孤岛）
+- `99-System/audit/easonlee-opus-ingest-audit-2026-07-08.md` （真孤岛）
+- `99-System/audit/easonlee-pilot10-2026-07-08.md` （真孤岛）
+- `99-System/audit/recastory-unmapped-2026-07-06.md` （真孤岛）
+- `99-System/audit/spot-check-BV1BLGH6REyX.md` （真孤岛）
+- `99-System/audit/spot-check-BV1Dd9CBGEmK-2026-07-13.md` （真孤岛）
+- `99-System/audit/spot-check-BV1dwAczDEXY-2026-07-13.md` （真孤岛）
+- `99-System/audit/spot-check-BV1H59yBFECR-2026-07-13.md` （真孤岛）
+- `99-System/audit/spot-check-BV1iH7R6tEfJ.md` （真孤岛）
+- `99-System/audit/spot-check-BV1j15A6gEcL-2026-07-13.md` （真孤岛）
+- `99-System/audit/spot-check-BV1Mpf9B5Egk.md` （真孤岛）
+- `99-System/audit/spot-check-BV1NuGU6yE1b.md` （真孤岛）
+- `99-System/audit/spot-check-BV1tZw4zLEX8-2026-07-13.md` （真孤岛）
+- `99-System/audit/spot-check-BV1VczqBREQ8-2026-07-13.md` （真孤岛）
+- `99-System/scripts/README.md` （真孤岛）
+- `99-System/Skills/INDEX.md` （真孤岛）
+- `99-System/working/opus-trace/1220311027565985864.trace.md` （真孤岛）
+- `99-System/working/opus-trace/1220419260720873510.trace.md` （真孤岛）
+- `99-System/working/opus-trace/1221006820893523977.trace.md` （真孤岛）
+- `99-System/working/opus-trace/1221903592888205347.trace.md` （真孤岛）
+- `99-System/working/opus-trace/1222120059228389384.trace.md` （真孤岛）
+- `99-System/working/opus-trace/1222346069005828103.trace.md` （真孤岛）
+- `99-System/working/opus-trace/1222491144375500806.trace.md` （真孤岛）
+- `99-System/working/opus-trace/1222537534343479317.trace.md` （真孤岛）
+- `99-System/working/opus-trace/1222645767471104034.trace.md` （真孤岛）
+- `99-System/working/opus-trace/1222862229567701014.trace.md` （真孤岛）
+- `99-System/working/opus-trace/1222908619516805124.trace.md` （真孤岛）
+- `99-System/working/opus-trace/1223016848358899717.trace.md` （真孤岛）
+- `99-System/working/opus-trace/1224198789037817860.trace.md` （真孤岛）
+- `99-System/working/opus-trace/1224198806222929928.trace.md` （真孤岛）
+- `99-System/working/opus-trace/1224198831997976579.trace.md` （真孤岛）
+- `99-System/Skills/vskill-vault-curate/LEGACY - B站 ASR 与 Recastory.md` （真孤岛）
+- `99-System/Skills/vskill-vault-curate/SKILL.md` （真孤岛）
+- `99-System/Skills/vskill-vault-curate/SUBDOC - ASR内容分轨与收录决策.md` （真孤岛）
+- `99-System/Skills/vskill-vault-curate/SUBDOC - ASR后处理与manifest.md` （真孤岛）
+- `99-System/Skills/vskill-vault-curate/SUBDOC - B站图文专栏精华收录.md` （真孤岛）
+- `99-System/Skills/vskill-vault-curate/SUBDOC - B站视频 v3 工作流.md` （真孤岛）
+- `99-System/Skills/vskill-vault-curate/SUBDOC - B站视频转写收录.md` （真孤岛）
+- `99-System/Skills/vskill-vault-curate/SUBDOC - Spot check（长视频 factual）.md` （真孤岛）
+- `99-System/Skills/vskill-vault-discuss/SKILL.md` （真孤岛）
+- `99-System/Skills/vskill-vault-moc-builder/SKILL.md` （真孤岛）
+- `99-System/Skills/vskill-vault-relate/SKILL.md` （真孤岛）
+- `99-System/Skills/vskill-vault-write/SKILL.md` （真孤岛）
+- `99-System/Skills/vskill-vault-write/SUBDOC - Host-Guest 对谈稿.md` （真孤岛）
+- `02-Resources/AI and Agents/B站视频知识库/README.md` （真孤岛）
+
+## 3. 无 frontmatter 的文件
+
+- `AGENTS.md`
+- `CLAUDE.md`
+- `README.md`
+- `issues/infrastructure_baseline_hardening.md`
+- `issues/scripts_runbook_backfill.md`
+- `99-System/audit/bilibili-spot-check-2026-07-02.md`
+- `99-System/audit/easonlee-opus-ingest-audit-2026-07-08.md`
+- `99-System/audit/easonlee-pilot10-2026-07-08.md`
+- `99-System/audit/spot-check-BV1BLGH6REyX.md`
+- `99-System/audit/spot-check-BV1iH7R6tEfJ.md`
+- `99-System/audit/spot-check-BV1Mpf9B5Egk.md`
+- `99-System/audit/spot-check-BV1NuGU6yE1b.md`
+- `99-System/working/opus-trace/1220311027565985864.trace.md`
+- `99-System/working/opus-trace/1220419260720873510.trace.md`
+- `99-System/working/opus-trace/1221006820893523977.trace.md`
+- `99-System/working/opus-trace/1221903592888205347.trace.md`
+- `99-System/working/opus-trace/1222120059228389384.trace.md`
+- `99-System/working/opus-trace/1222346069005828103.trace.md`
+- `99-System/working/opus-trace/1222491144375500806.trace.md`
+- `99-System/working/opus-trace/1222537534343479317.trace.md`
+- `99-System/working/opus-trace/1222645767471104034.trace.md`
+- `99-System/working/opus-trace/1222862229567701014.trace.md`
+- `99-System/working/opus-trace/1222908619516805124.trace.md`
+- `99-System/working/opus-trace/1223016848358899717.trace.md`
+- `99-System/working/opus-trace/1224198789037817860.trace.md`
+- `99-System/Skills/vskill-vault-curate/SUBDOC - ASR后处理与manifest.md`
+- `99-System/Skills/vskill-vault-curate/SUBDOC - Spot check（长视频 factual）.md`
+
+## 4. frontmatter 必填字段缺失
+
+- `99-System/audit/bilibili-a-tier-v3-rewrite-2026-07-03.md` 缺失: source
+- `99-System/audit/bilibili-enrich-partial-2026-07-03.md` 缺失: source
+- `99-System/audit/bilibili-exclude-review-tiers-2026-07-07.md` 缺失: source
+- `99-System/audit/bilibili-ingest-exclude-2026-07-07.md` 缺失: source
+- `99-System/audit/bilibili-ingest-priority-2026-07-06.md` 缺失: source
+- `99-System/audit/bilibili-ingest-priority-p2-2026-07-06.md` 缺失: source
+- `99-System/audit/bilibili-ingest-priority-p3-2026-07-07.md` 缺失: source
+- `99-System/audit/bilibili-ingest-reconcile-2026-07-03.md` 缺失: source
+- `99-System/audit/bilibili-r1a-review-results-2026-07-07.md` 缺失: source
+- `99-System/audit/bilibili-unmapped-2026-07-07.md` 缺失: source
+- `99-System/audit/bilibili-v3-rollout-2026-07-03.md` 缺失: source
+- `99-System/audit/recastory-unmapped-2026-07-06.md` 缺失: source
+- `99-System/working/opus-trace/1224198806222929928.trace.md` 缺失: tags, created, source
+- `99-System/working/opus-trace/1224198831997976579.trace.md` 缺失: tags, created, source
+- `99-System/Skills/vskill-vault-curate/LEGACY - B站 ASR 与 Recastory.md` 缺失: tags, source
+- `99-System/Skills/vskill-vault-curate/SKILL.md` 缺失: source
+- `99-System/Skills/vskill-vault-curate/SUBDOC - ASR内容分轨与收录决策.md` 缺失: tags, source
+- `99-System/Skills/vskill-vault-curate/SUBDOC - B站图文专栏精华收录.md` 缺失: tags, source
+- `99-System/Skills/vskill-vault-curate/SUBDOC - B站视频 v3 工作流.md` 缺失: tags, source
+- `99-System/Skills/vskill-vault-curate/SUBDOC - B站视频转写收录.md` 缺失: tags, source
+- `99-System/Skills/vskill-vault-discuss/SKILL.md` 缺失: title, source
+- `99-System/Skills/vskill-vault-moc-builder/SKILL.md` 缺失: source
+- `99-System/Skills/vskill-vault-relate/SKILL.md` 缺失: source
+- `99-System/Skills/vskill-vault-write/SKILL.md` 缺失: source
+- `02-Resources/AI and Agents/B站视频知识库/README.md` 缺失: source
+
+## 5. tag 风格违规（按 §4 字典）
+
+✅ 所有 tag 符合字典规范
+
+
+## 6. 文件名反模式
+
+- `01-Areas/AI Agent Development/05-Multi-Agent/5-2 Agent Swarm：让多个 Agent 像团队一样协作.md` (全角冒号)
+- `01-Areas/AI Agent Development/06-Harness Engineering/6-1 Harness：模型外面的这层壳.md` (全角冒号)
+- `01-Areas/AI Agent Development/06-Harness Engineering/6-4 ACP：标准化 Agent 的控制接口.md` (全角冒号)
+- `01-Areas/AI Agent Development/08-结语/结课：从 10 行代码到 Agent 六大支柱.md` (全角冒号)
+- `01-Areas/AI Agent Development/Super Agent 实战课/02-Tool System/2-3 小试牛刀——把工具组装成应用：代码分析、Research Agent、Vibe Coding.md` (全角冒号)
+- `01-Areas/AI Agent Development/Super Agent 实战课/02-Tool System/2-4 加餐：Agent 的 Search 工具究竟是如何来实现的？.md` (全角冒号)
+
+## 7. 被链入最多的文件（Top 10 hub）
+
+- `MOC - Agent Theory and Design` (150 个反向链)
+- `Loock AI` (142 个反向链)
+- `MOC - Loock AI 全栈课程` (133 个反向链)
+- `MOC - Harness Engineering` (114 个反向链)
+- `AI Agent Development` (94 个反向链)
+- `3-1 Function Calling 与 Structured Output` (85 个反向链)
+- `3-6 生产级权限系统的四层防线` (83 个反向链)
+- `2-3 Agent Loop 保险丝` (71 个反向链)
+- `4-9 Agent 的记忆系统` (63 个反向链)
+- `Sitor AI` (60 个反向链)
