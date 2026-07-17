@@ -665,6 +665,7 @@
       <section class="syno-pane" data-syno-pane="settings" hidden>
         <div class="syno-pane-intro"><p class="panel-tag">SETTINGS · 本机配置</p><h3>Agent 与外部连接</h3><p>Token 只经 Windows DPAPI 加密保存，不在页面回显。</p></div>
         <form id="synoProviderForm" class="syno-stack-form">
+          <label class="visually-hidden">Provider 账户<input type="text" name="username" value="syno-local-provider" autocomplete="username" tabindex="-1" /></label>
           <label>OpenAI 兼容 Base URL<input id="synoProviderBaseUrl" type="url" required /></label>
           <label>Token<input id="synoProviderToken" type="password" autocomplete="new-password" required placeholder="保存后不会回显" /></label>
           <label>固定 Model ID<input id="synoProviderModel" required /></label>

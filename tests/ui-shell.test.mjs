@@ -30,3 +30,9 @@ test("paper-cut guardian is layered and reduced-motion safe", async () => {
   assert.match(css, /\.guardian-layer \{ transform: none !important; \}/);
   assert.match(css, /:focus-visible/);
 });
+
+test("Provider secret form exposes username semantics without exposing a real identity", async () => {
+  const html = await fs.readFile(path.join(root, "apps", "syno", "public", "index.html"), "utf8");
+  assert.match(html, /name="username" value="syno-local-provider" autocomplete="username"/);
+  assert.match(html, /id="synoProviderToken" type="password"/);
+});
