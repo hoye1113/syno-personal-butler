@@ -560,6 +560,7 @@
               <small id="synoIntakeHint">收录会先进入审批中心，不会直接改知识库。</small>
               <button id="synoIntakeSubmit" class="accent-btn" type="button">提交收录候选</button>
             </div>
+            <div id="synoIntakeProposal" class="syno-list" aria-live="polite"></div>
           </div>
         </details>
         <details class="syno-intake syno-memory-box">
@@ -601,7 +602,7 @@
           <fieldset class="syno-rubric"><legend>四维掌握证据</legend><label><input id="synoRubricAccurate" type="checkbox" />事实与逻辑准确</label><label><input id="synoRubricExplained" type="checkbox" />能解释为什么</label><label><input id="synoRubricApplied" type="checkbox" />能用于新场景</label><label><input id="synoRubricDiscriminated" type="checkbox" />能区分相近概念</label></fieldset>
           <label>提交前自评<select id="synoLearningSelf"><option value="solid">很扎实</option><option value="mostly">基本掌握</option><option value="shaky">不太稳</option><option value="lost">还没理解</option></select></label>
           <label class="switch-line"><input id="synoLearningReview" type="checkbox" /><span>这是一次到期复习，而不是首次学习</span></label>
-          <label>原始输出引用<input id="synoLearningArtifact" required placeholder="转录、文章或实践记录的 Artifact ID" /></label>
+          <label>你的原始输出<textarea id="synoLearningArtifact" required minlength="20" rows="6" placeholder="请直接粘贴你的口述转录、打字解释、答题过程或实践复盘；只填一个引用不会提升掌握度。"></textarea></label>
           <label>发现的误区<textarea id="synoLearningMisconceptions" rows="3" placeholder="每行一个误区"></textarea></label>
           <button class="accent-btn" type="submit">提交学习证据</button>
           <p id="synoLearningHint" class="form-hint" aria-live="polite"></p>
@@ -621,10 +622,11 @@
         <form id="synoOutputForm" class="syno-stack-form">
           <label>输出标题<input id="synoOutputTitle" required /></label>
           <label>为什么现在值得输出<textarea id="synoOutputReason" rows="3" required></textarea></label>
-          <label>形式<select id="synoOutputFormat"><option value="deep-article">证据型深度文章</option><option value="conversation-outline">对话提纲</option><option value="video-brief">视频简报</option></select></label>
+          <label>形式<select id="synoOutputFormat"><option value="deep-article">证据型深度文章</option><option value="dialogue-outline">对话提纲</option><option value="video-brief">视频简报</option></select></label>
           <button class="accent-btn" type="submit">建立输出机会</button>
           <p id="synoOutputHint" class="form-hint" aria-live="polite"></p>
         </form>
+        <div id="synoOutputOpportunities" class="syno-list" aria-live="polite"></div>
       </section>
       <section class="syno-pane" data-syno-pane="notifications" hidden>
         <section class="syno-channel-setup" aria-labelledby="synoWeixinTitle">
@@ -673,6 +675,15 @@
           <label>上下文长度<input id="synoProviderContext" type="number" min="4096" value="128000" required /></label>
           <button class="accent-btn" type="submit">安全保存 Provider</button>
           <p id="synoProviderHint" class="form-hint" aria-live="polite"></p>
+        </form>
+        <form id="synoPreferenceForm" class="syno-stack-form">
+          <h3>主动节奏与复习</h3>
+          <label>通知节奏<select id="synoCadence"><option value="minimal">克制（每天最多 1 次）</option><option value="balanced">平衡（每天最多 2 次）</option><option value="active">主动（事件优先，每天最多 3 次）</option></select></label>
+          <label>每日复习数量<input id="synoReviewCount" type="number" min="1" max="20" required /></label>
+          <div class="syno-search-row"><label>安静开始<input id="synoQuietStart" type="time" required /></label><label>安静结束<input id="synoQuietEnd" type="time" required /></label></div>
+          <label class="switch-line"><input id="synoReducedDensity" type="checkbox" /><span>紧凑显示</span></label>
+          <button class="ghost-btn" type="submit">保存主动偏好</button>
+          <p id="synoPreferenceHint" class="form-hint" aria-live="polite"></p>
         </form>
         <section class="syno-channel-setup"><p class="panel-tag">飞书个人通道</p><h3>扫码注册并绑定 Owner</h3><p id="synoFeishuStatus">尚未注册。</p><div class="syno-job-actions"><button id="synoFeishuRegister" class="ghost-btn" type="button">开始注册</button><button id="synoFeishuConnect" class="accent-btn" type="button">连接</button><button id="synoFeishuDisconnect" class="ghost-btn" type="button">断开</button></div><div id="synoFeishuQr"></div></section>
       </section>

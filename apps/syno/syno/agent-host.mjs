@@ -41,6 +41,7 @@ class AgentHost {
       decision,
       channel: context.channel || "web",
       senderId: context.senderId || "local-user",
+      conversationId: context.conversationId || "",
       requestKey: context.messageId ? `${context.channel || "web"}:${context.senderId || "local-user"}:${context.messageId}` : "",
     });
     if (job.deduplicated) {

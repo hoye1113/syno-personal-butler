@@ -6,6 +6,7 @@ import { ChannelHub, WebChannelAdapter, WindowsNotificationAdapter } from "./cha
 import { ClaimEvidenceService } from "./claim-evidence-service.mjs";
 import { NativeCognitiveRuntime } from "./cognitive-runtime.mjs";
 import { ConversationStore } from "./conversation-store.mjs";
+import { ConversationRouter } from "./conversation-router.mjs";
 import { executeDomainOperation } from "./domain-operations.mjs";
 import { FeishuChannelAdapter } from "./feishu-channel.mjs";
 import { GitGuard } from "./git-guard.mjs";
@@ -14,6 +15,7 @@ import { IngestService } from "./ingest-service.mjs";
 import { JobStore } from "./job-store.mjs";
 import { IntakeService } from "./intake.mjs";
 import { KnowledgeStore } from "./knowledge-store.mjs";
+import { KnowledgeMaintenanceSource } from "./knowledge-maintenance-source.mjs";
 import { LearningService } from "./learning-service.mjs";
 import { NotificationStore } from "./notification-store.mjs";
 import { OperationExecutor } from "./operation-executor.mjs";
@@ -25,6 +27,7 @@ import { ProviderCredentialStore } from "./provider-credential-store.mjs";
 import { ProactiveOrchestrator } from "./proactive-orchestrator.mjs";
 import { ReportService } from "./reports.mjs";
 import { SettingsRegistry } from "./settings-registry.mjs";
+import { SignalSourceRegistry } from "./signal-source-registry.mjs";
 import { SynoCore } from "./syno-core.mjs";
 import { ToolLoopAgent } from "./tool-loop-agent.mjs";
 import { ToolLoopExecutor } from "./tool-loop-executor.mjs";
@@ -55,6 +58,7 @@ function createSynoRuntime(options = {}) {
   const credentials = options.credentials || new ProviderCredentialStore();
   const provider = options.provider || new ProviderClient({ credentials });
   const conversations = options.conversations || new ConversationStore();
+  const conversationRouter = options.conversationRouter || new ConversationRouter();
   const settingsRegistry = options.settingsRegistry || new SettingsRegistry();
   const sourceIntake = options.intake || new IntakeService();
   const ingest = options.ingest || new IngestService({ intake: sourceIntake, knowledge });
@@ -62,6 +66,8 @@ function createSynoRuntime(options = {}) {
   const outputs = options.outputs || new OutputService();
   const goals = options.goals || new GoalService();
   const claims = options.claims || new ClaimEvidenceService();
+  const knowledgeMaintenance = options.knowledgeMaintenance || new KnowledgeMaintenanceSource();
+  const signalSources = options.signalSources || new SignalSourceRegistry({ claims, ingest, outputs, maintenance: knowledgeMaintenance });
   let host;
   let core;
   const tools = options.tools || new ToolRegistry([
@@ -164,10 +170,11 @@ function createSynoRuntime(options = {}) {
     fallback: baseExecutor,
     execute: async (operation, payload, { workspace } = {}) => {
       const root = workspace || PATHS.repoRoot;
-      if (operation === "ingest.apply") return ingest.apply(payload.artifactId, { workspace: root });
-      if (operation === "ingest.apply-batch") return ingest.applyBatch(payload.artifactIds, { workspace: root });
+      if (operation === "ingest.apply") return ingest.apply(payload.artifactId, { workspace: root, decision: payload.decision });
+      if (operation === "ingest.apply-batch") return ingest.applyBatch(payload.artifactIds, { workspace: root, decision: payload.decision });
       if (operation === "learning.evidence.record") return learning.record(payload, { opsRoot: path.join(root, "ops") });
       if (operation === "outputs.opportunity.create") return outputs.createOpportunity(payload, { opsRoot: path.join(root, "ops") });
+      if (operation === "outputs.opportunity.progress") return outputs.progress(payload.id, payload, { opsRoot: path.join(root, "ops") });
       if (operation === "goals.create") return goals.create(payload, { opsRoot: path.join(root, "ops") });
       if (operation === "claims.create") return claims.createClaim(payload, { opsRoot: path.join(root, "ops") });
       if (operation === "evidence.candidates.create") return claims.createEvidenceCandidate(payload, { opsRoot: path.join(root, "ops") });
@@ -195,6 +202,12 @@ function createSynoRuntime(options = {}) {
     gitGuard,
     onCommitted: async ({ job, changedPaths, execution }) => {
       const effects = {};
+      if (job.request?.operation === "ingest.apply" && execution?.operationResult?.artifactId) {
+        await ingest.markApplied(execution.operationResult.artifactId, execution.operationResult);
+      }
+      if (job.request?.operation === "ingest.apply-batch") {
+        for (const item of execution?.operationResult?.results || []) await ingest.markApplied(item.artifactId, item);
+      }
       if (changedPaths.some((item) => item.startsWith("vault/"))) knowledge.invalidate();
       if (job.request?.operation === "reports.create") {
         const report = execution?.operationResult;
@@ -235,10 +248,12 @@ function createSynoRuntime(options = {}) {
           text: trimmed || `收到 ${message.artifacts?.length || 0} 个隔离附件候选，请在 Web 中查看后决定是否收录。`,
           artifacts: message.artifacts || [],
         };
+        const conversationId = await conversationRouter.resolve({ ownerKey: "local-user" });
         const result = await core.execute(request, {
           channel: "weixin",
           senderId: message.senderId,
           messageId: message.id,
+          conversationId,
         });
         return { text: result.error?.message || (result.requiresApproval ? `任务 ${result.job.id} 等待审批，审批码 ${result.job.approvalCode}` : result.job?.result?.text || `任务 ${result.job?.id || ""} 已处理`) };
       } catch (error) {
@@ -254,15 +269,16 @@ function createSynoRuntime(options = {}) {
         ingest.propose(receipt.artifact.id).catch(() => {});
         return { text: `已接收 Artifact ${receipt.artifact.id}，正在生成收录方案。` };
       }
-      const result = await core.execute({ text: trimmed }, { channel: "feishu", senderId: message.senderId, messageId: message.id });
+      const conversationId = await conversationRouter.resolve({ ownerKey: "local-user" });
+      const result = await core.execute({ text: trimmed }, { channel: "feishu", senderId: message.senderId, messageId: message.id, conversationId });
       return { text: result.error?.message || result.job?.result?.text || `任务 ${result.job?.id || ""} 已记录` };
     },
   });
   const channels = options.channels || new ChannelHub({ web, windows, weixin, feishu });
   reports = new ReportService({ host, knowledge, notifications, channels, gitGuard });
-  const today = options.today || new TodayService({ goals, learning, host });
+  const today = options.today || new TodayService({ goals, learning, host, settingsRegistry, signalSources });
   core = new SynoCore({ host, knowledge, notifications, channels, reports, today });
-  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, settingsRegistry });
+  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, settingsRegistry, signalSources });
   let channelRecoveryTimer = null;
 
   return {
@@ -279,12 +295,14 @@ function createSynoRuntime(options = {}) {
     notifications,
     channels,
     proactive,
+    signalSources,
     scheduler: proactive,
     weixin,
     feishu,
     credentials,
     provider,
     conversations,
+    conversationRouter,
     tools,
     agent,
     cognitiveRuntime,
@@ -315,7 +333,10 @@ function createSynoRuntime(options = {}) {
 
 async function routeSynoApi(runtime, req, url, readBody) {
   const method = req.method || "GET";
-  const webContext = { channel: "web", senderId: "local-user", developmentMode: runtime.developmentMode };
+  const webContext = {
+    channel: "web", senderId: "local-user", developmentMode: runtime.developmentMode,
+    conversationId: runtime.conversationRouter ? await runtime.conversationRouter.resolve({ ownerKey: "local-user" }) : undefined,
+  };
   if (!url.pathname.startsWith("/api/syno/")) return null;
   if (method === "GET" && url.pathname === "/api/syno/snapshot") return runtime.core.snapshot({ search: url.searchParams.get("q") || "" });
   if (method === "GET" && url.pathname === "/api/syno/search") return { results: await runtime.core.search(url.searchParams.get("q") || "", { limit: url.searchParams.get("limit") }) };
@@ -361,12 +382,15 @@ async function routeSynoApi(runtime, req, url, readBody) {
   const intakeStatus = /^\/api\/syno\/intake\/([^/]+)$/.exec(url.pathname);
   if (method === "GET" && intakeStatus) return runtime.ingest.status(decodeURIComponent(intakeStatus[1]));
   const intakeApply = /^\/api\/syno\/intake\/([^/]+)\/apply$/.exec(url.pathname);
-  if (method === "POST" && intakeApply) return runtime.core.execute(buildOperationRequest("ingest.apply", { artifactId: decodeURIComponent(intakeApply[1]) }), webContext);
+  if (method === "POST" && intakeApply) {
+    const body = await readBody(req);
+    return runtime.core.execute(buildOperationRequest("ingest.apply", { artifactId: decodeURIComponent(intakeApply[1]), decision: body.decision }), webContext);
+  }
   const intakeRetry = /^\/api\/syno\/intake\/([^/]+)\/retry$/.exec(url.pathname);
   if (method === "POST" && intakeRetry) return runtime.ingest.propose(decodeURIComponent(intakeRetry[1]));
   if (method === "POST" && url.pathname === "/api/syno/intake/apply-batch") {
     const body = await readBody(req);
-    return runtime.core.execute(buildOperationRequest("ingest.apply-batch", { artifactIds: body.artifactIds }), webContext);
+    return runtime.core.execute(buildOperationRequest("ingest.apply-batch", { artifactIds: body.artifactIds, decision: body.decision }), webContext);
   }
   if (method === "GET" && url.pathname === "/api/syno/learning/due") return { reviews: await runtime.learning.due() };
   if (method === "POST" && url.pathname === "/api/syno/learning/evidence") {
@@ -375,6 +399,9 @@ async function routeSynoApi(runtime, req, url, readBody) {
   }
   if (method === "POST" && url.pathname === "/api/syno/learning/teach-back") return runtime.outputs.teachBackPrompt(await readBody(req));
   if (method === "POST" && url.pathname === "/api/syno/outputs/opportunities") return runtime.core.execute(buildOperationRequest("outputs.opportunity.create", await readBody(req)), webContext);
+  if (method === "GET" && url.pathname === "/api/syno/outputs/opportunities") return { opportunities: await runtime.outputs.list() };
+  const outputProgress = /^\/api\/syno\/outputs\/opportunities\/([^/]+)\/progress$/.exec(url.pathname);
+  if (method === "POST" && outputProgress) return runtime.core.execute(buildOperationRequest("outputs.opportunity.progress", { id: decodeURIComponent(outputProgress[1]), ...await readBody(req) }), webContext);
   if (method === "GET" && url.pathname === "/api/syno/goals") return { goals: await runtime.goals.list() };
   if (method === "POST" && url.pathname === "/api/syno/goals") return runtime.core.execute(buildOperationRequest("goals.create", await readBody(req)), webContext);
   if (method === "POST" && url.pathname === "/api/syno/claims") return runtime.core.execute(buildOperationRequest("claims.create", await readBody(req)), webContext);

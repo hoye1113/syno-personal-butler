@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { IntakeService } from "./intake.mjs";
-import { writeRecord } from "./markdown-record.mjs";
+import { parseRecord, writeRecord } from "./markdown-record.mjs";
 import { PATHS } from "./paths.mjs";
 
 function slug(value) {
@@ -37,16 +37,14 @@ class IngestService {
     const now = this.clock().toISOString();
     const id = `artifact-${now.slice(0, 10).replaceAll("-", "")}-${randomUUID().slice(0, 8)}`;
     const serialized = JSON.stringify(payload);
-    const localFile = path.join(this.stateRoot, `${id}.json`);
-    await atomicJson(localFile, { payload, ownerId, channel, status: "received", created: now });
     const record = {
       id, kind: String(payload.kind || "text"), path: `local-state://ingest/${id}`, created: now, isolated: true,
       size: Buffer.byteLength(serialized), status: "received", ownerId,
       ...(payload.kind === "url" ? { sourceUrl: String(payload.value || "") } : {}),
       dedupeKey: createHash("sha256").update(serialized).digest("hex"),
     };
-    const file = path.join(this.opsRoot, "artifacts", now.slice(0, 4), now.slice(5, 7), `${id}.md`);
-    await writeRecord(file, record, { schema: "artifact", title: `Artifact ${id}`, summaryKeys: ["id", "kind", "created", "isolated", "status", "sourceUrl"] });
+    const localFile = path.join(this.stateRoot, `${id}.json`);
+    await atomicJson(localFile, { payload, ownerId, channel, status: "received", created: now, artifact: record });
     return { artifact: record, proposalPending: true };
   }
 
@@ -68,8 +66,6 @@ class IngestService {
       suggestedLinks: matches.slice(0, 3).map((item) => item.path), risk: matches.length ? "merge" : "additive", created: now,
       ...(matches[0] ? { existingNoteRef: matches[0].path } : {}),
     };
-    await writeRecord(path.join(this.opsRoot, "artifacts", "candidates", `${candidate.id}.md`), candidate, { schema: "inbox-candidate", title: candidate.title, summaryKeys: ["id", "artifactId", "title", "status", "confidence", "created"] });
-    await writeRecord(path.join(this.opsRoot, "artifacts", "proposals", `${proposal.id}.md`), proposal, { schema: "ingest-proposal", title: `Ingest proposal: ${title}`, summaryKeys: ["id", "candidateId", "status", "suggestedPath", "risk", "created"] });
     await atomicJson(stateFile, { ...state, status: "proposed", prepared, candidate, proposal });
     return { candidate, proposal };
     } catch (error) {
@@ -85,17 +81,49 @@ class IngestService {
     } catch (error) { if (error.code === "ENOENT") return null; throw error; }
   }
 
-  async apply(id, { workspace = PATHS.repoRoot } = {}) {
+  async pending({ limit = 50 } = {}) {
+    let entries = [];
+    try { entries = await fs.readdir(this.stateRoot, { withFileTypes: true }); } catch (error) { if (error.code === "ENOENT") return []; throw error; }
+    const pending = [];
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+      const state = JSON.parse(await fs.readFile(path.join(this.stateRoot, entry.name), "utf8"));
+      if (["received", "proposed", "failed"].includes(state.status)) pending.push({ id: state.candidate?.artifactId || entry.name.replace(/\.json$/, ""), title: state.candidate?.title, status: state.status, proposal: state.proposal });
+    }
+    return pending.slice(0, limit);
+  }
+
+  async apply(id, { workspace = PATHS.repoRoot, decision } = {}) {
     const state = JSON.parse(await fs.readFile(path.join(this.stateRoot, `${id}.json`), "utf8"));
-    if (!state.proposal || state.proposal.risk !== "additive") throw Object.assign(new Error("只有纯新增收录可在单次审批后应用"), { code: "INGEST_REQUIRES_REVIEW" });
-    const relative = state.proposal.suggestedPath;
-    const target = path.join(workspace, relative);
-    try { await fs.access(target); throw Object.assign(new Error("目标笔记已存在，需要重新查重"), { code: "INGEST_TARGET_EXISTS" }); } catch (error) { if (error.code !== "ENOENT") throw error; }
+    if (!state.proposal) throw Object.assign(new Error("收录方案尚未生成"), { code: "INGEST_PROPOSAL_MISSING" });
+    const action = String(decision?.action || "");
+    if (!action) throw Object.assign(new Error("必须提供显式收录决策"), { code: "INGEST_DECISION_REQUIRED" });
+    const allowed = state.proposal.risk === "additive"
+      ? new Set(["create", "reject"])
+      : new Set(["append-source", "link-only", "keep-separate", "reject"]);
+    if (!allowed.has(action)) throw Object.assign(new Error(`收录决策 ${action} 不适用于 ${state.proposal.risk} 方案`), { code: "INGEST_DECISION_INVALID" });
+    const relative = action === "append-source" || action === "link-only" ? state.proposal.existingNoteRef : state.proposal.suggestedPath;
+    const target = relative ? path.join(workspace, relative) : null;
     const source = state.prepared.sourceUrl ? `source_url: ${JSON.stringify(state.prepared.sourceUrl)}\n` : "";
     const content = `---\ntitle: ${JSON.stringify(state.candidate.title)}\nstatus: captured\nfactual_status: unverified\n${source}---\n\n# ${state.candidate.title}\n\n${state.prepared.content || state.prepared.text}\n\n## 关系状态\n\n${state.proposal.suggestedLinks.length ? state.proposal.suggestedLinks.map((item) => `- 候选关联：[[${item.replace(/^vault\//, "").replace(/\.md$/, "")}]]`).join("\n") : "当前标记为 orphan，等待后续渐进关联。"}\n`;
-    await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.writeFile(target, content, "utf8");
-    return { applied: true, path: relative, changedPaths: [relative] };
+    const changedPaths = [];
+    if (action === "create" || action === "keep-separate") {
+      try { await fs.access(target); throw Object.assign(new Error("目标笔记已存在，需要重新查重"), { code: "INGEST_TARGET_EXISTS" }); } catch (error) { if (error.code !== "ENOENT") throw error; }
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      await fs.writeFile(target, content, "utf8");
+      changedPaths.push(relative);
+    } else if (action === "append-source" || action === "link-only") {
+      const existing = await fs.readFile(target, "utf8");
+      const addition = action === "append-source"
+        ? `\n\n## 收录补充 · ${state.candidate.title}\n\n${state.prepared.content || state.prepared.text}\n`
+        : `\n\n## 候选关联\n\n- 收录候选：${state.candidate.title}（Artifact ${id}）\n`;
+      await fs.writeFile(target, `${existing.trimEnd()}${addition}`, "utf8");
+      changedPaths.push(relative);
+    }
+
+    const lifecycle = await this.#writeLifecycle(state, { workspace, action, applied: action !== "reject" });
+    changedPaths.push(...lifecycle.changedPaths);
+    return { artifactId: id, applied: action !== "reject", action, path: relative || "", lifecycle, changedPaths: [...new Set(changedPaths)] };
   }
 
   async applyBatch(ids, options = {}) {
@@ -103,6 +131,38 @@ class IngestService {
     const results = [];
     for (const id of [...new Set(ids)]) results.push(await this.apply(id, options));
     return { applied: results.length, results, changedPaths: [...new Set(results.flatMap((item) => item.changedPaths))] };
+  }
+
+  async markApplied(id, result = {}) {
+    const stateFile = path.join(this.stateRoot, `${id}.json`);
+    const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
+    await atomicJson(stateFile, { ...state, status: result.applied === false ? "rejected" : "applied", decision: result.action, appliedAt: this.clock().toISOString() });
+  }
+
+  async #writeLifecycle(state, { workspace, action, applied }) {
+    const artifactFile = path.join(workspace, "ops", "artifacts", state.created.slice(0, 4), state.created.slice(5, 7), `${state.candidate.artifactId}.md`);
+    const candidateFile = path.join(workspace, "ops", "artifacts", "candidates", `${state.candidate.id}.md`);
+    const proposalFile = path.join(workspace, "ops", "artifacts", "proposals", `${state.proposal.id}.md`);
+    let existingArtifact = state.artifact || {
+      id: state.candidate.artifactId,
+      kind: String(state.payload?.kind || "text"),
+      path: `local-state://ingest/${state.candidate.artifactId}`,
+      created: state.created,
+      isolated: true,
+      size: Buffer.byteLength(JSON.stringify(state.payload || {})),
+      ownerId: state.ownerId || "local-user",
+    };
+    try { existingArtifact = parseRecord(await fs.readFile(artifactFile, "utf8")); } catch (error) { if (error.code !== "ENOENT") throw error; }
+    const artifact = { ...existingArtifact, status: applied ? "accepted" : "rejected" };
+    const candidate = { ...state.candidate, status: applied ? "accepted" : "rejected" };
+    const proposal = { ...state.proposal, status: applied ? "applied" : "rejected" };
+    await writeRecord(artifactFile, artifact, { schema: "artifact", title: `Artifact ${artifact.id}`, summaryKeys: ["id", "kind", "created", "isolated", "status", "sourceUrl"] });
+    await writeRecord(candidateFile, candidate, { schema: "inbox-candidate", title: candidate.title, summaryKeys: ["id", "artifactId", "title", "status", "confidence", "created"] });
+    await writeRecord(proposalFile, proposal, { schema: "ingest-proposal", title: `Ingest proposal: ${candidate.title}`, summaryKeys: ["id", "candidateId", "status", "suggestedPath", "risk", "created"] });
+    return {
+      artifact, candidate, proposal, action,
+      changedPaths: [artifactFile, candidateFile, proposalFile].map((file) => path.relative(workspace, file).replace(/\\/g, "/")),
+    };
   }
 }
 

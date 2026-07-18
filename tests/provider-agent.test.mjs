@@ -132,6 +132,18 @@ test("ToolLoopAgent pins one Provider configuration for the entire tool loop", a
   assert.deepEqual(requestedModels, ["fixed", "fixed"]);
 });
 
+test("ToolLoopAgent reuses the routed conversation across messages", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-conversation-continuity-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const observed = [];
+  const provider = { async bindRun() { return { async complete(messages) { observed.push(messages.filter((item) => item.role === "user").map((item) => item.content)); return { message: { role: "assistant", content: "ok" }, model: "fixed" }; } }; } };
+  const agent = new ToolLoopAgent({ provider, tools: new ToolRegistry(), conversations: new ConversationStore({ root }) });
+  await agent.run({ text: "第一条" }, { conversationId: "conversation-owner" });
+  await agent.run({ text: "追问" }, { conversationId: "conversation-owner", channel: "weixin" });
+  assert.deepEqual(observed, [["第一条"], ["第一条", "追问"]]);
+  assert.equal((await agent.conversations.get("conversation-owner")).channel, "web");
+});
+
 test("ToolRegistry denies non-whitelisted and unapproved write tools", async () => {
   const registry = new ToolRegistry([{ name: "jobs.create", description: "create", risk: "low", permission: "syno-ops", retry: "idempotent", version: "1", inputSchema: { type: "object", properties: {}, additionalProperties: false }, outputSchema: { type: "object", required: ["ok"], properties: { ok: { type: "boolean" } } }, execute: async () => ({ ok: true }) }]);
   await assert.rejects(registry.execute("source.edit", {}), /不在白名单/);
@@ -186,6 +198,7 @@ test("SettingsRegistry persists only valid Agent-adjustable preferences", async 
   assert.equal(await registry.get("learning.dailyReviewCount"), 7);
   await assert.rejects(registry.set("learning.dailyReviewCount", 100, { actor: "agent" }), /1–20/);
   await assert.rejects(registry.set("channels", ["weixin"], { actor: "agent", confirmed: true }), /用户确认/);
+  await assert.rejects(registry.set("notifications.quietHours", { start: "99:00", end: "07:00" }, { actor: "agent" }), /安静时间/);
 });
 
 test("Provider API never returns the submitted token", async () => {

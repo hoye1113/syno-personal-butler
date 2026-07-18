@@ -2240,3 +2240,6 @@ button:disabled {
   .hero-flow { grid-template-columns: 1fr; }
   .syno-drawer { width: 100vw; }
 }
+.syno-reduced-density .syno-job,
+.syno-reduced-density .syno-reader,
+.syno-reduced-density .syno-stack-form { padding: .7rem; }

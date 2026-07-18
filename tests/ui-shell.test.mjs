@@ -12,7 +12,21 @@ test("Web shell exposes the five knowledge-loop areas and always-reachable appro
   assert.match(html, /id="synoProviderForm"/);
   assert.match(html, /id="synoLearningForm"/);
   assert.match(html, /id="synoOutputForm"/);
+  assert.match(html, /id="synoIntakeProposal"/);
+  assert.match(html, /id="synoOutputOpportunities"/);
+  assert.match(html, /id="synoPreferenceForm"/);
+  assert.match(html, /id="synoLearningArtifact"[^>]*minlength="20"/);
+  assert.doesNotMatch(html, /value="conversation-outline"/);
   assert.match(html, /class="ghost-btn mobile-settings-trigger"[^>]*data-syno-panel="settings">连接设置</);
+});
+
+test("knowledge-loop Web actions use inline evidence and explicit lifecycle decisions", async () => {
+  const script = await fs.readFile(path.join(root, "apps", "syno", "public", "syno.js"), "utf8");
+  assert.match(script, /decision: \{ action \}/);
+  assert.match(script, /rawOutput: document\.querySelector\("#synoLearningArtifact"\)/);
+  assert.match(script, /loadOutputOpportunities/);
+  assert.match(script, /savePreferences/);
+  assert.doesNotMatch(script, /window\.prompt/);
 });
 
 test("paper-cut guardian is layered and reduced-motion safe", async () => {

@@ -6,7 +6,7 @@ class ToolLoopExecutor {
 
   async submit(job, options = {}) {
     return this.runtime.run(job.request, {
-      conversationId: job.request?.conversationId,
+      conversationId: job.conversationId || job.request?.conversationId,
       channel: job.channel,
       ownerId: job.senderId,
       workspace: options.workspace,

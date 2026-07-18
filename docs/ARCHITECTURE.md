@@ -39,6 +39,11 @@ Web / Weixin / Feishu / Scheduler
 - `ToolRegistry.resolve` exposes only schema-validated Syno capabilities; shell, arbitrary files, browser, Git and source editing are never tools.
 - `ProviderClient.complete` owns non-streaming `chat/completions`, authentication, timeout, cancellation and structured errors.
 - `ConversationStore` keeps recoverable local conversation and retry state with explicit, separately enforced chat/raw-voice/failed-payload retention.
+- `ConversationRouter.resolve` maps the single Owner and an optional explicit thread key to one canonical Conversation ID across Web, Weixin and Feishu. `ConversationStore.runExclusive` serializes each routed conversation so concurrent channel messages cannot lose context.
+- `SignalSourceRegistry.collect` is the deterministic seam for due volatile Claims, pending ingestion, output opportunities and knowledge-maintenance events. The model cannot invent or self-schedule a signal.
+- `IngestService` keeps unapproved source payloads and proposals in rebuildable local state. Only an approved Job writes the Artifact, InboxCandidate, IngestProposal and resulting Note into `ops/`/`vault/` in one isolated diff.
+- `LearningService.record` requires the Owner's actual raw output and creates its Artifact in the same approved diff as LearningEvidence; a caller-supplied reference alone cannot increase mastery.
+- `OutputService.progress` owns the suggested → accepted → drafting/practiced → published/dismissed lifecycle and retains the Owner's draft Artifact plus feedback.
 - `StateArchive` exports only non-credential local state, records a versioned SHA-256 manifest and restores only into an empty target.
 - `SynoCore.execute/snapshot` is the application interface. Callers do not learn storage, index or Git details.
 - `AgentHost.receive/inspect/cancel/approve` owns the Job lifecycle but delegates all model loops to an Executor Adapter.

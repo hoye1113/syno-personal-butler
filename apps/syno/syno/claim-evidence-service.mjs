@@ -49,12 +49,40 @@ class ClaimEvidenceService {
     await validateContractRecord("evidence", evidence);
     const evidenceFile = path.join(opsRoot, "evidence", "records", `${evidence.id}.md`);
     await writeRecord(evidenceFile, evidence, { schema: "evidence", title: `Evidence ${evidence.id}`, summaryKeys: ["id", "sourceRef", "sourceTier", "stance", "status", "observedAt", "verifiedAt"] });
+    const claimFile = path.join(opsRoot, "evidence", "claims", `${candidate.claimId}.md`);
+    const claim = parseRecord(await fs.readFile(claimFile, "utf8"));
+    const evidenceRefs = [...new Set([...(claim.evidenceRefs || []), evidence.id])];
+    const conflictsWith = evidence.stance === "contradicts"
+      ? [...new Set([...(claim.conflictsWith || []), evidence.id])]
+      : [...new Set(claim.conflictsWith || [])];
+    const updatedClaim = {
+      ...claim,
+      evidenceRefs,
+      conflictsWith,
+      status: conflictsWith.length ? "contested" : "supported",
+      updated: now,
+    };
+    await validateContractRecord("claim", updatedClaim);
+    await writeRecord(claimFile, updatedClaim, { schema: "claim", title: updatedClaim.statement, summaryKeys: ["id", "stability", "status", "reviewAfter", "updated"] });
     const updated = { ...candidate, evidence, status: "approved" };
     await writeRecord(candidateFile, updated, { schema: "evidence-candidate", title: `Evidence candidate for ${candidate.claimId}`, summaryKeys: ["id", "claimId", "status", "created"] });
     return {
       evidence, claimId: candidate.claimId,
-      changedPaths: [candidateFile, evidenceFile].map((file) => path.relative(path.dirname(opsRoot), file).replace(/\\/g, "/")),
+      changedPaths: [candidateFile, evidenceFile, claimFile].map((file) => path.relative(path.dirname(opsRoot), file).replace(/\\/g, "/")),
     };
+  }
+
+  async dueClaims({ opsRoot = this.opsRoot, now = this.clock(), limit = 50 } = {}) {
+    const root = path.join(opsRoot, "evidence", "claims");
+    let entries = [];
+    try { entries = await fs.readdir(root, { withFileTypes: true }); } catch (error) { if (error.code === "ENOENT") return []; throw error; }
+    const claims = [];
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+      const claim = parseRecord(await fs.readFile(path.join(root, entry.name), "utf8"));
+      if (claim.reviewAfter && new Date(claim.reviewAfter) <= now && claim.status !== "superseded") claims.push(claim);
+    }
+    return claims.sort((a, b) => a.reviewAfter.localeCompare(b.reviewAfter)).slice(0, limit);
   }
 }
 

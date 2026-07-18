@@ -31,6 +31,9 @@ pnpm probe:feishu -- --confirm-live
 3. 主人发送唯一私聊文本，确认只执行并回复一次；成功去重和失败待处理状态必须跨 Worker 重启保持。
 4. 验证陌生人和群聊不进入 Agent、重复 message ID 不重复处理。
 5. 授权目标日历，验证创建、重复事件、乱序回执、权限拒绝、断网降级和恢复；飞书不得成为知识事实源。
+6. 模拟 Agent 已处理但回复返回 `delivered: false`，确认事件仍为 pending，恢复后只产生一个成功标记。
+
+消息注册/长连接与日历授权当前是两个独立 Feishu Adapter。两者都受 Syno Policy 和 Markdown 事实源约束，但真实验收必须分别完成消息与日历设置。
 
 ## 记录格式
 

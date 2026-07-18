@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { PATHS } from "./paths.mjs";
+import { ProcessFileLock } from "./process-lock.mjs";
 
 const RETENTION = Object.freeze({ completedChatDays: 30, confirmedVoiceDays: 7, failedPayloadDays: 30 });
 const DAY_MS = 86_400_000;
@@ -26,11 +27,18 @@ class ConversationStore {
     return path.join(this.root, `${id}.json`);
   }
 
-  async create({ channel = "web", ownerId = "local-user", messages = [] } = {}) {
+  async create({ id = `conversation-${randomUUID()}`, channel = "web", ownerId = "local-user", messages = [] } = {}) {
     const now = this.clock().toISOString();
-    const conversation = { id: `conversation-${randomUUID()}`, channel, ownerId, status: "active", messages, createdAt: now, updatedAt: now };
+    this.file(id);
+    const conversation = { id, channel, ownerId, status: "active", messages, createdAt: now, updatedAt: now };
     await this.save(conversation);
     return conversation;
+  }
+
+  async runExclusive(id, operation) {
+    const lockName = createHash("sha256").update(String(id)).digest("hex");
+    const lock = new ProcessFileLock({ file: path.join(this.root, ".locks", `${lockName}.lock`) });
+    return lock.run(operation);
   }
 
   async save(conversation) {

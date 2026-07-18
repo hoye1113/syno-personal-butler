@@ -23,6 +23,10 @@
 | Provider 密钥显示 | 通过 | Token 输入框为空，页面不回显已保存密钥；本隔离环境显示“尚未配置” |
 | 减少动画 | 通过 | 模拟 `prefers-reduced-motion: reduce` 后媒体查询命中，守护者 `animation-name: none`、`transform: none`，抽屉过渡压缩为 `0.000001s` |
 | 控制台 | 通过 | 完整流程 0 error、0 warning |
+| 主动偏好 | 通过 | 隔离状态中将通知节奏改为 active、每日复习改为 7、启用紧凑显示；保存后立即回读并生效 |
+| 学习原始证据 | 通过 | Learn 使用至少 20 字的内联原始输出，不再接受仅填写 Artifact 引用冒充学习证据 |
+| 创作生命周期 | 通过 | Create 可列出机会并使用卡片内原文/反馈输入推进状态，不使用阻断式 prompt |
+| 响应式闭环入口 | 通过 | 390×844 下 Learn、Create、Settings 仍在五入口导航和全屏抽屉内可访问；控制台 0 error、0 warning |
 
 针对上述行为的静态回归位于 `tests/ui-shell.test.mjs`。本轮修复还补上了移动端此前不可达的 Provider/渠道设置入口。
 
@@ -31,6 +35,8 @@
 - [桌面完整工作台](../output/playwright/syno-desktop-2026-07-18.png)
 - [移动端完整工作台](../output/playwright/syno-mobile-main-2026-07-18.png)
 - [移动端 Provider 与渠道设置](../output/playwright/syno-mobile-settings-2026-07-18.png)
+- [桌面 Create 闭环](../output/playwright/syno-create-2026-07-18.png)
+- [移动端 Create 闭环](../output/playwright/syno-mobile-create-2026-07-18.png)
 
 ## 尚未覆盖
 

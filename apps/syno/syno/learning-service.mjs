@@ -49,12 +49,17 @@ class LearningService {
 
   async record(input, { opsRoot = this.opsRoot } = {}) {
     if (input.producer !== "user") throw Object.assign(new Error("只有主人亲自输出才能成为 LearningEvidence"), { code: "AI_EVIDENCE_FORBIDDEN" });
+    const rawOutput = String(input.rawOutput || "").trim();
+    if (rawOutput.length < 20) throw Object.assign(new Error("必须提交至少 20 个字符的主人原始输出，不能只填写或伪造引用"), { code: "LEARNING_RAW_OUTPUT_REQUIRED" });
     const now = this.clock();
     const rawScore = Number(rubricScore(input.rubric).toFixed(3));
     const effectiveScore = Number((rawScore * (ASSISTANCE[input.assistedLevel] ?? 0)).toFixed(3));
     const passed = rawScore >= 0.75 && effectiveScore >= 0.6;
     const calibration = calibrationFor(input.selfAssessment, rawScore);
     const id = `learning-evidence-${randomUUID().slice(0, 8)}`;
+    const artifactId = `artifact-${now.toISOString().slice(0, 10).replaceAll("-", "")}-${randomUUID().slice(0, 8)}`;
+    const artifactFile = path.join(opsRoot, "artifacts", "learning", `${artifactId}.md`);
+    const rawArtifactRef = path.relative(path.dirname(opsRoot), artifactFile).replace(/\\/g, "/");
     const stateFile = path.join(opsRoot, "reviews", "learning", "states", `${stateId(input.knowledgeRef)}.md`);
     let previous = null;
     try { previous = parseRecord(await fs.readFile(stateFile, "utf8")); } catch (error) { if (error.code !== "ENOENT") throw error; }
@@ -64,13 +69,19 @@ class LearningService {
     const next = new Date(now.getTime() + intervalDays * 86_400_000);
     const evidence = {
       id, knowledgeRef: input.knowledgeRef, producer: "user", inputMode: input.inputMode,
-      rawArtifactRef: input.rawArtifactRef, assistedLevel: input.assistedLevel,
+      rawArtifactRef, assistedLevel: input.assistedLevel,
       rubric: Object.fromEntries(RUBRIC_KEYS.map((key) => [key, Number(input.rubric?.[key] || 0)])),
       rubricScore: effectiveScore, selfAssessment: input.selfAssessment, calibration,
       passed, isReview, misconceptions: input.misconceptions || [],
       demonstratedAt: now.toISOString(), nextReviewAt: next.toISOString(),
     };
     await validateContractRecord("learning-evidence", evidence);
+    const artifact = {
+      id: artifactId, kind: input.inputMode === "voice" ? "voice" : "text", path: rawArtifactRef,
+      created: now.toISOString(), isolated: false, status: "accepted", size: Buffer.byteLength(rawOutput),
+      ownerId: "local-user", content: rawOutput, purpose: "learning-evidence",
+    };
+    await validateContractRecord("artifact", artifact);
     const refs = [...new Set([...(previous?.evidenceRefs || []), id])];
     const observed = demonstratedStage(input.inputMode, effectiveScore, refs.length, reviewCount, passed);
     const previousIndex = Math.max(0, STAGES.indexOf(previous?.stage || "captured"));
@@ -85,9 +96,10 @@ class LearningService {
     };
     await validateContractRecord("learning-state", state);
     const evidenceFile = path.join(opsRoot, "reviews", "learning", "evidence", `${id}.md`);
+    await writeRecord(artifactFile, artifact, { schema: "artifact", title: `User learning artifact ${artifactId}`, summaryKeys: ["id", "kind", "path", "created", "status", "size", "purpose"] });
     await writeRecord(evidenceFile, evidence, { schema: "learning-evidence", title: `Learning evidence ${id}`, summaryKeys: ["id", "knowledgeRef", "producer", "inputMode", "assistedLevel", "rubricScore", "selfAssessment", "calibration", "passed", "isReview", "demonstratedAt", "nextReviewAt"] });
     await writeRecord(stateFile, state, { schema: "learning-state", title: `Learning state: ${input.knowledgeRef}`, summaryKeys: ["id", "knowledgeRef", "stage", "mastery", "reviewCount", "reviewIntervalDays", "lastTestedAt", "nextReviewAt", "updated"] });
-    return { evidence, state, changedPaths: [evidenceFile, stateFile].map((file) => path.relative(path.dirname(opsRoot), file).replace(/\\/g, "/")) };
+    return { artifact, evidence, state, changedPaths: [artifactFile, evidenceFile, stateFile].map((file) => path.relative(path.dirname(opsRoot), file).replace(/\\/g, "/")) };
   }
 
   async due({ opsRoot = this.opsRoot, now = this.clock(), limit = 20 } = {}) {

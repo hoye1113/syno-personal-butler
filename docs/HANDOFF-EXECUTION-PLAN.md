@@ -54,6 +54,7 @@ Syno 是 Windows 本地、单用户、主动式且可审计的知识闭环私人
 - 渠道安全提交 `04005b2` 将微信 Bot/回复 context 改为 DPAPI、分离可备份运行状态、迁移旧明文格式，并为微信/飞书提供显式确认且不输出凭据的真实健康探针；主工作树与 `C:\tmp\syno-fresh-04005b2` 均通过 Node 118/118、vault 57/57 和仓库校验。
 - 飞书恢复提交 `1540b66` 将 Owner 私聊事件持久化为 30 天 pending，成功回复后才写 durable dedupe，失败可重试或跨 Worker 重启恢复；主工作树与 `C:\tmp\syno-fresh-1540b66` 均通过 Node 120/120、vault 57/57 和仓库校验。
 - Provider 采用门提交 `fdd0c04` 将本地上下文/超时/离线故障注入与五轮真实工具调用串联，要求故障后仍由同一固定 Model ID 全部成功；主工作树与 `C:\tmp\syno-fresh-fdd0c04` 均通过 Node 121/121、vault 57/57 和仓库校验。真实断网仍保留为主人验收。
+- 2026-07-18 封板审计后的闭环加固新增 ConversationRouter、逐会话排他执行、真实用户原文 Artifact、Claim/Evidence 原子聚合、显式 IngestDecision 与三层生命周期、OutputOpportunity 进度、SignalSourceRegistry 和实际生效的主动偏好；同时修复飞书未送达却去重及微信轮询重复 DPAPI 的问题。批准前收录载荷不再提前污染 `ops/`。
 5. **知识技能**：低成本收录、渐进整理、Teach-back、间隔复习、证据型创作、时效查证。
 6. **外部渠道**：Web 完整控制；微信快速入口；飞书日程和结构化通知；同一 Agent/Policy/Store。
 7. **Web 与品牌**：Today、Capture、Knowledge、Learn、Create；纸片法老知识守护者；WCAG AA。

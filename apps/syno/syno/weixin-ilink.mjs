@@ -128,11 +128,12 @@ class LocalCredentialStore {
     }, null, 2)}\n`);
     await this.saveRuntime(value);
   }
-  async saveRuntime(value) {
-    const current = await fs.readFile(this.secretFile, "utf8")
-      .then(async (protectedValue) => JSON.parse(await this.unprotect(protectedValue)))
-      .catch((error) => { if (error.code === "ENOENT") return null; throw error; });
-    if (current && value.contexts) {
+  async saveRuntime(value, { contextsChanged = false } = {}) {
+    if (contextsChanged && value.contexts) {
+      const current = await fs.readFile(this.secretFile, "utf8")
+        .then(async (protectedValue) => JSON.parse(await this.unprotect(protectedValue)))
+        .catch((error) => { if (error.code === "ENOENT") return null; throw error; });
+      if (!current) throw new Error("微信加密凭据不存在");
       await atomicWrite(this.secretFile, await this.protect(JSON.stringify({ token: current.token, contexts: value.contexts })));
     }
     await atomicWrite(this.stateFile, `${JSON.stringify({ version: 1, cursor: value.cursor || "", seenIds: (value.seenIds || []).slice(-2_000) }, null, 2)}\n`);
@@ -242,6 +243,7 @@ class WeixinIlinkAdapter {
     this.abortController = null;
     this.seen = new Set();
     this.contexts = new Map();
+    this.contextsDirty = false;
     this.lastError = null;
   }
 
@@ -284,6 +286,7 @@ class WeixinIlinkAdapter {
     }
     try {
       this.contexts = new Map(Object.entries(credential.contexts || {}));
+      this.contextsDirty = false;
       this.seen = new Set((credential.seenIds || []).slice(-2_000));
       this.client = this.clientFactory(credential);
       this.lastError = null;
@@ -343,8 +346,9 @@ class WeixinIlinkAdapter {
     if (!this.credential) return;
     this.credential.contexts = Object.fromEntries(this.contexts);
     this.credential.seenIds = [...this.seen].slice(-2_000);
-    if (this.credentials.saveRuntime) await this.credentials.saveRuntime(this.credential);
+    if (this.credentials.saveRuntime) await this.credentials.saveRuntime(this.credential, { contextsChanged: this.contextsDirty });
     else await this.credentials.save(this.credential);
+    this.contextsDirty = false;
   }
 
   async handleInbound(raw) {
@@ -362,7 +366,10 @@ class WeixinIlinkAdapter {
       await this.#markProcessed(message.id);
       return;
     }
-    this.contexts.set(message.senderId, message.contextToken);
+    if (this.contexts.get(message.senderId) !== message.contextToken) {
+      this.contexts.set(message.senderId, message.contextToken);
+      this.contextsDirty = true;
+    }
     const video = message.items.some((item) => item.type === 5);
     if (video) {
       await this.send({ toUserId: message.senderId, contextToken: message.contextToken, text: "当前版本暂不处理视频，请发送文字、语音、链接、图片或文件。" });

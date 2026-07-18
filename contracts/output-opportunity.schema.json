@@ -13,7 +13,11 @@
     "reason": { "type": "string", "minLength": 1 },
     "priority": { "type": "integer", "minimum": 0, "maximum": 100 },
     "status": { "enum": ["suggested", "accepted", "drafting", "practiced", "published", "dismissed"] },
-    "created": { "type": "string", "format": "date-time" }
+    "created": { "type": "string", "format": "date-time" },
+    "outline": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "userArtifactRef": { "type": "string" },
+    "feedback": { "type": "string" },
+    "updated": { "type": "string", "format": "date-time" }
   },
   "additionalProperties": false
 }

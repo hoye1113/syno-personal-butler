@@ -19,7 +19,10 @@ const DEFAULT_VALUES = Object.freeze({
 
 function validateValue(key, value) {
   if (key === "notifications.cadence" && !["minimal", "balanced", "active"].includes(value)) throw new Error("通知节奏无效");
-  if (key === "notifications.quietHours" && (!/^\d{2}:\d{2}$/.test(value?.start || "") || !/^\d{2}:\d{2}$/.test(value?.end || ""))) throw new Error("安静时间无效");
+  if (key === "notifications.quietHours") {
+    const valid = (item) => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(item || "");
+    if (!valid(value?.start) || !valid(value?.end)) throw new Error("安静时间无效");
+  }
   if (key === "learning.dailyReviewCount" && (!Number.isInteger(value) || value < 1 || value > 20)) throw new Error("每日复习数量必须为 1–20");
   if (key === "ui.displayOrder") {
     const allowed = ["today", "capture", "knowledge", "learn", "create"];

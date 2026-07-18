@@ -14,4 +14,6 @@ Public requests cannot supply intent, Profile, risk, approval, executor or ToolR
 
 Agent-adjustable settings are limited to reminders, notification cadence, quiet hours, review counts, display ordering and interface preferences. Model ID, budget, channels, calendar, owner allowlist, retention and action allowlist require user confirmation. Provider endpoint/token, Policy, allowed roots, ToolRegistry, approval/security rules, source and schemas are never Agent-modifiable.
 
+Learning mastery requires an approved `LearningEvidence` carrying an actual Owner-authored raw output Artifact. A caller-supplied Artifact reference, AI draft or unapproved intake payload cannot increase mastery. Ingest payloads and proposals remain rebuildable local state until an explicit `IngestDecision` is approved; only then may the isolated Job write `ops/` or `vault/`.
+
 Weixin may approve only a low-risk single-approval Job. Double approval and destructive operations require Web. Low-risk automation is bounded by a deterministic whitelist and a default budget of three proactive notifications per day.

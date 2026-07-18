@@ -47,7 +47,7 @@ class JobStore {
     this.clock = clock;
   }
 
-  async create({ request, decision, channel = "web", senderId = "local-user", requestKey = "" }) {
+  async create({ request, decision, channel = "web", senderId = "local-user", conversationId = "", requestKey = "" }) {
     if (requestKey) {
       const existing = (await this.list({ limit: 2_000 })).find((job) => job.requestKey === requestKey);
       if (existing) return { ...existing, deduplicated: true };
@@ -67,6 +67,7 @@ class JobStore {
       risk: decision.risk,
       channel,
       senderId,
+      conversationId: conversationId || undefined,
       requestKey: requestKey || undefined,
       created: now,
       updated: now,

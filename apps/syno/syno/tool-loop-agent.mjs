@@ -23,8 +23,15 @@ class ToolLoopAgent {
   }
 
   async run(request, { conversationId, channel = "web", ownerId = "local-user", signal } = {}) {
+    if (conversationId && typeof this.conversations.runExclusive === "function") {
+      return this.conversations.runExclusive(conversationId, () => this.#run(request, { conversationId, channel, ownerId, signal }));
+    }
+    return this.#run(request, { conversationId, channel, ownerId, signal });
+  }
+
+  async #run(request, { conversationId, channel, ownerId, signal }) {
     let conversation = conversationId ? await this.conversations.get(conversationId) : null;
-    if (!conversation) conversation = await this.conversations.create({ channel, ownerId });
+    if (!conversation) conversation = await this.conversations.create({ id: conversationId || undefined, channel, ownerId });
     const userMessage = { role: "user", content: String(request?.text || request?.message || "") };
     conversation.messages.push(userMessage);
     await this.conversations.save(conversation);

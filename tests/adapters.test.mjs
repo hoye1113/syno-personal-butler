@@ -179,6 +179,26 @@ test("Feishu persists successful dedupe and recovers a failed owner DM after res
   await second.stop();
 });
 
+test("Feishu keeps a message pending when reply delivery returns false", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-feishu-undelivered-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const stateStore = new FeishuStateStore({ file: path.join(root, "state.json") });
+  const handlers = new Map();
+  const adapter = new FeishuChannelAdapter({
+    credentials: { async load() { return { appId: "app", appSecret: "secret", ownerOpenId: "owner" }; } },
+    stateStore, retryDelayMs: 60_000,
+    channelFactory: () => ({ on(name, handler) { handlers.set(name, handler); }, async connect() {}, async disconnect() {}, async send() {} }),
+    onMessage: async () => ({ text: "ok" }),
+  });
+  await adapter.start();
+  adapter.send = async () => ({ delivered: false, reason: "not_connected" });
+  handlers.get("message")({ messageId: "undelivered", chatId: "chat", chatType: "p2p", senderId: "owner", content: "hello" });
+  for (let index = 0; index < 30 && !adapter.lastError; index += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal((await stateStore.snapshot()).pending[0].messageId, "undelivered");
+  assert.match(adapter.lastError, /not_connected/);
+  await adapter.stop();
+});
+
 test("Feishu prunes failed payloads after the 30-day retention window", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-feishu-retention-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));

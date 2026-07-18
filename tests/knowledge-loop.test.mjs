@@ -10,6 +10,21 @@ import { GoalService } from "../apps/syno/syno/goal-service.mjs";
 import { LearningService, calibrationFor, reviewIntervalDays } from "../apps/syno/syno/learning-service.mjs";
 import { OutputService } from "../apps/syno/syno/output-service.mjs";
 import { TodayService } from "../apps/syno/syno/today-service.mjs";
+import { ConversationRouter } from "../apps/syno/syno/conversation-router.mjs";
+import { SignalSourceRegistry } from "../apps/syno/syno/signal-source-registry.mjs";
+import { KnowledgeMaintenanceSource } from "../apps/syno/syno/knowledge-maintenance-source.mjs";
+
+test("ConversationRouter keeps one owner conversation across channels and explicit threads", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-conversation-router-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const router = new ConversationRouter({ stateFile: path.join(root, "routing.json") });
+  const web = await router.resolve({ ownerKey: "owner", channel: "web" });
+  const weixin = await router.resolve({ ownerKey: "owner", channel: "weixin" });
+  assert.equal(weixin, web);
+  const focused = await router.resolve({ ownerKey: "owner", channel: "web", threadKey: "project-hermes" });
+  assert.notEqual(focused, web);
+  assert.equal(await router.resolve({ ownerKey: "owner", channel: "feishu", threadKey: "project-hermes" }), focused);
+});
 
 test("ingest returns an immediate Artifact then builds an additive proposal", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-ingest-"));
@@ -27,9 +42,17 @@ test("ingest returns an immediate Artifact then builds an additive proposal", as
   const { proposal } = await service.propose(receipt.artifact.id);
   assert.equal(proposal.risk, "additive");
   assert.match(proposal.suggestedPath, /^vault\/00-Inbox\//);
-  const applied = await service.apply(receipt.artifact.id, { workspace: root });
+  await assert.rejects(fs.access(path.join(root, "ops", "artifacts")), { code: "ENOENT" });
+  const legacyStateFile = path.join(root, "state", `${receipt.artifact.id}.json`);
+  const legacyState = JSON.parse(await fs.readFile(legacyStateFile, "utf8"));
+  delete legacyState.artifact;
+  await fs.writeFile(legacyStateFile, JSON.stringify(legacyState), "utf8");
+  const applied = await service.apply(receipt.artifact.id, { workspace: root, decision: { action: "create" } });
   assert.equal(applied.applied, true);
   assert.match(await fs.readFile(path.join(root, applied.path), "utf8"), /factual_status: unverified/);
+  assert.equal(applied.lifecycle.proposal.status, "applied");
+  assert.equal(applied.lifecycle.candidate.status, "accepted");
+  assert.equal(applied.lifecycle.artifact.status, "accepted");
 });
 
 test("dedupe matches force merge review instead of silent overwrite", async (t) => {
@@ -43,7 +66,12 @@ test("dedupe matches force merge review instead of silent overwrite", async (t) 
   const receipt = await service.receive({ kind: "text", value: "重复素材" });
   const { proposal } = await service.propose(receipt.artifact.id);
   assert.equal(proposal.risk, "merge");
-  await assert.rejects(service.apply(receipt.artifact.id, { workspace: root }), /纯新增/);
+  await assert.rejects(service.apply(receipt.artifact.id, { workspace: root }), /显式收录决策/);
+  await fs.mkdir(path.join(root, "vault"), { recursive: true });
+  await fs.writeFile(path.join(root, "vault", "existing.md"), "# Existing\n", "utf8");
+  const merged = await service.apply(receipt.artifact.id, { workspace: root, decision: { action: "append-source" } });
+  assert.match(await fs.readFile(path.join(root, "vault", "existing.md"), "utf8"), /收录补充/);
+  assert.equal(merged.lifecycle.proposal.status, "applied");
 });
 
 test("ingest failures are durable and additive proposals support one approved batch", async (t) => {
@@ -61,9 +89,10 @@ test("ingest failures are durable and additive proposals support one approved ba
   await service.propose(failed.artifact.id);
   const second = await service.receive({ kind: "text", value: "second" });
   await service.propose(second.artifact.id);
-  const batch = await service.applyBatch([failed.artifact.id, second.artifact.id], { workspace: root });
+  const batch = await service.applyBatch([failed.artifact.id, second.artifact.id], { workspace: root, decision: { action: "create" } });
   assert.equal(batch.applied, 2);
-  assert.equal(batch.changedPaths.length, 2);
+  assert.equal(batch.changedPaths.filter((item) => item.startsWith("vault/")).length, 2);
+  assert.equal(batch.changedPaths.filter((item) => item.startsWith("ops/artifacts/")).length, 6);
 });
 
 test("only user-produced practice updates mastery and schedules repetition", async (t) => {
@@ -71,9 +100,11 @@ test("only user-produced practice updates mastery and schedules repetition", asy
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const service = new LearningService({ opsRoot: path.join(root, "ops"), clock: () => new Date("2026-07-17T08:00:00.000Z") });
   await assert.rejects(service.record({ producer: "ai" }), /主人亲自输出/);
+  await assert.rejects(service.record({ producer: "user", rawArtifactRef: "invented" }), /原始输出/);
   const result = await service.record({
     producer: "user", knowledgeRef: "vault/agent-loop.md", inputMode: "teach-back",
-    rawArtifactRef: "local-state://voice/answer-1", assistedLevel: "prompted",
+    rawOutput: "我会先用自己的话解释 Tool Loop，然后给出失败恢复的例子、适用边界和在 Syno 中的具体应用。",
+    assistedLevel: "prompted",
     rubric: { accurate: 1, explained: 1, applied: 1, discriminated: 1 }, selfAssessment: "mostly", isReview: false,
     misconceptions: ["忽略了失败恢复"],
   });
@@ -83,7 +114,7 @@ test("only user-produced practice updates mastery and schedules repetition", asy
   assert.equal(result.state.reviewIntervalDays, 1);
   const reviewed = await service.record({
     producer: "user", knowledgeRef: "vault/agent-loop.md", inputMode: "quiz",
-    rawArtifactRef: "local-state://typed/review-1", assistedLevel: "none",
+    rawOutput: "这次复习我重新说明了工具白名单、审批边界，以及 Provider 离线后为什么必须保持相同模型重试。", assistedLevel: "none",
     rubric: { accurate: 1, explained: 1, applied: 1, discriminated: 0 }, selfAssessment: "solid", isReview: true,
     misconceptions: [],
   });
@@ -108,6 +139,36 @@ test("output opportunities and teach-back prompts make output a mastery mechanis
   });
   assert.equal(opportunity.status, "suggested");
   assert.equal(opportunity.priority, 90);
+  const accepted = await service.progress(opportunity.id, { action: "accept" });
+  assert.equal(accepted.opportunity.status, "accepted");
+  assert.equal(accepted.opportunity.outline.length, 4);
+  const drafted = await service.progress(opportunity.id, { action: "draft", userOutput: "这是我基于证据写出的完整观点草稿，包含主张、证据、反方观点、边界以及下一步实践。" });
+  assert.equal(drafted.opportunity.status, "drafting");
+  assert.match(drafted.opportunity.userArtifactRef, /^ops\/artifacts\/output\//);
+  const published = await service.progress(opportunity.id, { action: "publish", feedback: "读者仍不理解 Harness 与 Agent 的区别，需要补一个小白例子。" });
+  assert.equal(published.opportunity.status, "published");
+  assert.match(published.opportunity.feedback, /小白例子/);
+});
+
+test("SignalSourceRegistry exposes stale claims, pending intake, output opportunities and maintenance", async () => {
+  const registry = new SignalSourceRegistry({
+    claims: { async dueClaims() { return [{ id: "claim-1", statement: "模型能力已到复核时间", reviewAfter: "2026-07-17T07:00:00.000Z" }]; } },
+    ingest: { async pending() { return [{ id: "artifact-1", title: "待处理资料" }]; } },
+    outputs: { async list() { return [{ id: "output-1", title: "待写文章", priority: 90, status: "suggested" }]; } },
+    maintenance: { async inspect() { return [{ id: "orphan-1", title: "孤立笔记" }]; } },
+  });
+  const events = await registry.collect({ now: new Date("2026-07-17T08:00:00.000Z") });
+  assert.deepEqual(events.map((item) => item.kind), ["claim-review", "ingest-pending", "output-opportunity", "knowledge-maintenance"]);
+});
+
+test("KnowledgeMaintenanceSource reports orphan notes without inventing writes", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-maintenance-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.writeFile(path.join(root, "orphan.md"), "# Orphan\n\n没有关系。", "utf8");
+  await fs.writeFile(path.join(root, "linked.md"), "# Linked\n\n[[target]]", "utf8");
+  await fs.writeFile(path.join(root, "target.md"), "# Target", "utf8");
+  const findings = await new KnowledgeMaintenanceSource({ vaultRoot: root }).inspect();
+  assert.deepEqual(findings.map((item) => item.path), ["vault/orphan.md"]);
 });
 
 test("time-sensitive claims keep supporting and conflicting evidence side by side", async (t) => {
@@ -123,6 +184,10 @@ test("time-sensitive claims keep supporting and conflicting evidence side by sid
   assert.equal(first.evidence.stance, "supports");
   assert.equal(second.evidence.stance, "contradicts");
   assert.equal((await fs.readdir(path.join(root, "ops", "evidence", "records"))).length, 2);
+  const updatedClaim = JSON.parse((await fs.readFile(path.join(root, "ops", "evidence", "claims", `${claim.id}.md`), "utf8")).match(/```json\n([\s\S]*?)\n```/)[1]);
+  assert.deepEqual(updatedClaim.evidenceRefs.sort(), [first.evidence.id, second.evidence.id].sort());
+  assert.equal(updatedClaim.status, "contested");
+  assert.deepEqual(updatedClaim.conflictsWith, [second.evidence.id]);
 });
 
 test("Today ranks goals before commitments and reviews with the fixed work mix", async (t) => {
@@ -139,5 +204,5 @@ test("Today ranks goals before commitments and reviews with the fixed work mix",
   const snapshot = await today.snapshot({ capacity: 20 });
   assert.equal(snapshot.priorities[0].kind, "goal");
   assert.deepEqual(snapshot.allocation, { digest: 12, ingest: 5, maintenance: 3 });
-  assert.deepEqual(snapshot.counts, { goals: 1, commitments: 1, reviews: 1 });
+  assert.deepEqual(snapshot.counts, { goals: 1, commitments: 1, reviews: 1, signals: 0 });
 });
