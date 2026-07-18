@@ -52,6 +52,7 @@ Syno 是 Windows 本地、单用户、主动式且可审计的知识闭环私人
 - 备份恢复、单向迁移、已知限制、最终切换清单和逐项验收矩阵分别由 `docs/OPERATIONS.md`、`docs/MIGRATION.md`、`docs/KNOWN-LIMITATIONS.md`、`docs/CUTOVER-CHECKLIST.md` 与 `docs/FINAL-ACCEPTANCE.md` 维护；未通过的真实外部门槛必须保持显式未完成。
 - 切换控制提交 `2a8d195` 已在主工作树与 `C:\tmp\syno-fresh-2a8d195` 复验：Node 114/114、vault 57/57、仓库校验通过；状态归档 CLI 完成隔离 backup/verify/restore 演练。
 - 渠道安全提交 `04005b2` 将微信 Bot/回复 context 改为 DPAPI、分离可备份运行状态、迁移旧明文格式，并为微信/飞书提供显式确认且不输出凭据的真实健康探针；主工作树与 `C:\tmp\syno-fresh-04005b2` 均通过 Node 118/118、vault 57/57 和仓库校验。
+- 飞书恢复提交 `1540b66` 将 Owner 私聊事件持久化为 30 天 pending，成功回复后才写 durable dedupe，失败可重试或跨 Worker 重启恢复；主工作树与 `C:\tmp\syno-fresh-1540b66` 均通过 Node 120/120、vault 57/57 和仓库校验。
 5. **知识技能**：低成本收录、渐进整理、Teach-back、间隔复习、证据型创作、时效查证。
 6. **外部渠道**：Web 完整控制；微信快速入口；飞书日程和结构化通知；同一 Agent/Policy/Store。
 7. **Web 与品牌**：Today、Capture、Knowledge、Learn、Create；纸片法老知识守护者；WCAG AA。
