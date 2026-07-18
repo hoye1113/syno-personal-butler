@@ -12,6 +12,7 @@ test("Web shell exposes the five knowledge-loop areas and always-reachable appro
   assert.match(html, /id="synoProviderForm"/);
   assert.match(html, /id="synoLearningForm"/);
   assert.match(html, /id="synoOutputForm"/);
+  assert.match(html, /class="ghost-btn mobile-settings-trigger"[^>]*data-syno-panel="settings">连接设置</);
 });
 
 test("paper-cut guardian is layered and reduced-motion safe", async () => {
@@ -35,4 +36,19 @@ test("Provider secret form exposes username semantics without exposing a real id
   const html = await fs.readFile(path.join(root, "apps", "syno", "public", "index.html"), "utf8");
   assert.match(html, /name="username" value="syno-local-provider" autocomplete="username"/);
   assert.match(html, /id="synoProviderToken" type="password"/);
+});
+
+test("closed work drawer is inert and restores a bounded modal focus loop when opened", async () => {
+  const publicRoot = path.join(root, "apps", "syno", "public");
+  const [html, script] = await Promise.all([
+    fs.readFile(path.join(publicRoot, "index.html"), "utf8"),
+    fs.readFile(path.join(publicRoot, "syno.js"), "utf8"),
+  ]);
+  assert.match(html, /id="synoDrawer"[^>]*role="dialog"[^>]*aria-modal="true"[^>]*aria-labelledby="synoDrawerTitle"[^>]*aria-hidden="true"[^>]*inert hidden/);
+  assert.match(script, /drawer\.hidden = false/);
+  assert.match(script, /drawer\.inert = false/);
+  assert.match(script, /drawer\.inert = true/);
+  assert.match(script, /drawer\.hidden = true/);
+  assert.match(script, /function keepFocusInside\(event\)/);
+  assert.match(script, /lastTrigger\?\.focus\?\.\(\)/);
 });

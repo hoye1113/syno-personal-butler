@@ -8,6 +8,16 @@
   let active = "knowledge";
   let lastTrigger = null;
 
+  const focusableSelector = [
+    "a[href]",
+    "button:not([disabled])",
+    "input:not([disabled]):not([type='hidden'])",
+    "select:not([disabled])",
+    "textarea:not([disabled])",
+    "details > summary:first-of-type",
+    "[tabindex]:not([tabindex='-1'])",
+  ].join(",");
+
   function node(tag, className, text) {
     const element = document.createElement(tag);
     if (className) element.className = className;
@@ -25,6 +35,8 @@
   function show(panel = active, trigger) {
     active = labels[panel] ? panel : "knowledge";
     lastTrigger = trigger || document.activeElement;
+    drawer.hidden = false;
+    drawer.inert = false;
     drawer.classList.add("is-open");
     drawer.setAttribute("aria-hidden", "false");
     scrim.hidden = false;
@@ -35,8 +47,25 @@
   function close() {
     drawer.classList.remove("is-open");
     drawer.setAttribute("aria-hidden", "true");
+    drawer.inert = true;
+    drawer.hidden = true;
     scrim.hidden = true;
     lastTrigger?.focus?.();
+  }
+
+  function keepFocusInside(event) {
+    if (event.key !== "Tab" || !drawer.classList.contains("is-open")) return;
+    const focusable = [...drawer.querySelectorAll(focusableSelector)].filter((element) => !element.closest("[hidden]"));
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   function select(panel) {
@@ -476,7 +505,10 @@
   for (const tab of tabs) tab.addEventListener("click", () => select(tab.dataset.synoTab));
   document.querySelector("#synoDrawerClose")?.addEventListener("click", close);
   scrim?.addEventListener("click", close);
-  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && drawer.classList.contains("is-open")) close(); });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && drawer.classList.contains("is-open")) close();
+    else keepFocusInside(event);
+  });
   document.querySelector("#synoKnowledgeSearch")?.addEventListener("click", loadKnowledge);
   document.querySelector("#synoKnowledgeQuery")?.addEventListener("keydown", (event) => { if (event.key === "Enter") loadKnowledge(); });
   document.querySelector("#synoJobsRefresh")?.addEventListener("click", loadJobs);

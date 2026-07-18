@@ -281,6 +281,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   flex-wrap: wrap;
 }
 
+.mobile-settings-trigger { display: none; }
+
 .syno-drawer-scrim {
   position: fixed;
   inset: 0;
@@ -439,6 +441,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 @media (max-width: 700px) {
   .hero-actions { justify-content: flex-start; }
+  .mobile-settings-trigger { display: inline-flex; }
   .syno-drawer { width: 100vw; }
   .syno-split { grid-template-columns: 1fr; }
   .syno-reader { border-top: 1px solid var(--line); padding-top: 20px; }

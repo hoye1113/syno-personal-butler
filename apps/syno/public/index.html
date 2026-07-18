@@ -37,6 +37,7 @@
             <div class="hero-actions">
               <button class="ghost-btn" type="button" data-syno-panel="jobs">任务与审批</button>
               <button class="ghost-btn" type="button" data-syno-panel="notifications">通知</button>
+              <button class="ghost-btn mobile-settings-trigger" type="button" data-syno-panel="settings">连接设置</button>
               <button class="accent-btn" type="button" data-syno-panel="chat">交给赛诺</button>
               <button id="themeToggleBtn" class="theme-toggle" type="button">◑ 深色</button>
             </div>
@@ -524,7 +525,7 @@
       </article>
     </template>
 
-    <aside id="synoDrawer" class="syno-drawer" aria-label="赛诺工作抽屉" aria-hidden="true">
+    <aside id="synoDrawer" class="syno-drawer" role="dialog" aria-modal="true" aria-labelledby="synoDrawerTitle" aria-hidden="true" inert hidden>
       <header class="syno-drawer-head">
         <div>
           <p class="panel-tag">SYNO · 赛诺</p>
