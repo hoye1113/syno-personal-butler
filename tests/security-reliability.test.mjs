@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 
 import { buildClaudeArgs, runProcess } from "../apps/syno/syno/executors.mjs";
 import { securityHeaders } from "../apps/syno/syno/http-security.mjs";
@@ -14,6 +16,8 @@ import { backupState, restoreState, verifyArchive } from "../apps/syno/syno/stat
 import { validateContractRecord } from "../apps/syno/syno/schema-registry.mjs";
 import { isPrivateAddress } from "../apps/syno/syno/source-fetcher.mjs";
 import { frontmatterData } from "../apps/syno/syno/validator.mjs";
+
+const execFileAsync = promisify(execFile);
 
 test("public Job API rejects Policy fields and maps only server-owned modes", async () => {
   const calls = [];
@@ -130,4 +134,32 @@ test("state archive excludes credentials, verifies hashes and restores only to a
   assert.equal((await verifyArchive(archive)).entries.length, 1);
   assert.deepEqual(await restoreState({ archiveRoot: archive, targetRoot: restored }), { restored: 1, version: 1 });
   await assert.rejects(restoreState({ archiveRoot: archive, targetRoot: restored }), /必须为空/);
+});
+
+test("state archive CLI completes an isolated backup, verify and restore cycle", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-archive-cli-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const localData = path.join(root, "local-data");
+  const state = path.join(localData, "state");
+  const archive = path.join(root, "archive");
+  const original = path.join(root, "original-state");
+  await fs.mkdir(path.join(state, "conversations"), { recursive: true });
+  await fs.mkdir(path.join(state, "jobs"), { recursive: true });
+  await fs.writeFile(path.join(state, "conversations", "safe.json"), "{\"safe\":true}", "utf8");
+  await fs.writeFile(path.join(state, "jobs", "waiting.json"), "{\"status\":\"waiting_provider\"}", "utf8");
+  const command = path.resolve("scripts", "state-archive.mjs");
+  const env = { ...process.env, SYNO_LOCAL_DATA: localData };
+
+  const backup = await execFileAsync(process.execPath, [command, "backup", archive], { env, windowsHide: true });
+  const manifest = JSON.parse(backup.stdout);
+  assert.equal(manifest.credentialsIncluded, false);
+  assert.deepEqual(manifest.entries.map((entry) => entry.path), ["conversations/safe.json", "jobs/waiting.json"]);
+
+  const verified = JSON.parse((await execFileAsync(process.execPath, [command, "verify", archive], { env, windowsHide: true })).stdout);
+  assert.equal(verified.entries.length, 2);
+  await fs.rename(state, original);
+  const restored = JSON.parse((await execFileAsync(process.execPath, [command, "restore", archive], { env, windowsHide: true })).stdout);
+  assert.deepEqual(restored, { restored: 2, version: 1 });
+  assert.equal(await fs.readFile(path.join(state, "jobs", "waiting.json"), "utf8"), "{\"status\":\"waiting_provider\"}");
+  await assert.rejects(execFileAsync(process.execPath, [command, "restore", archive], { env, windowsHide: true }), /Command failed/);
 });

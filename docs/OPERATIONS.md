@@ -20,9 +20,12 @@
 ```powershell
 pnpm state:archive -- backup D:\Backups\syno-state-20260717
 pnpm state:archive -- verify D:\Backups\syno-state-20260717
+pnpm state:archive -- restore D:\Backups\syno-state-20260717
 ```
 
 归档仅包含 `%LOCALAPPDATA%\Syno\state`，不会包含 DPAPI credentials；`manifest.json` 记录版本、文件大小与 SHA-256。请再使用系统加密备份保护归档目录。
+
+完整测试包含一次使用隔离 `SYNO_LOCAL_DATA` 的 CLI 端到端演练：创建等待 Provider 的 Job 与对话状态，依次执行 backup、verify、restore，并验证二次恢复因目标非空而失败。该测试不会访问真实 `%LOCALAPPDATA%\Syno`。
 
 ## 恢复与回滚
 
@@ -47,3 +50,9 @@ pnpm state:archive -- verify D:\Backups\syno-state-20260717
 3. 运行配置、契约和仓库验证。
 4. 运行针对性测试后再跑完整测试。
 5. 生成 `BugReport` 或 `ImprovementProposal`；不要让 Agent 修改源码绕过故障。
+
+## 发布和切换
+
+- 发布前逐项执行 `docs/CUTOVER-CHECKLIST.md`，结果写入 `docs/FINAL-ACCEPTANCE.md`。
+- 任何真实 Provider、微信或飞书门槛未通过时，只能继续本地隔离运行，不得宣称完成最终切换。
+- 已知限制统一维护在 `docs/KNOWN-LIMITATIONS.md`；修复后必须附对应测试或真实验收证据再移除。

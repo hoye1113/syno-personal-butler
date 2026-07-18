@@ -1,0 +1,48 @@
+# Syno 最终切换清单
+
+所有步骤必须保留可复核输出。真实外部步骤由主人在本机完成扫码、授权或凭据录入；Token 不进入聊天、日志、截图或 Git。
+
+## A. 代码与事实源
+
+- [x] 分支保持 `codex/round3-remediation`，没有 reset 原有整改历史。
+- [x] 原始 `D:\workSpace\obsidian_repository` 不属于运行写入根，保持只读。
+- [x] `vault/` 与 `ops/` 分别是知识和行动事实源；`.runtime/` 可删除重建。
+- [x] 原生 `ToolLoopAgent` 是唯一活动 `CognitiveRuntime`；Hermes 淘汰且无静默回退。
+- [x] Syno 不具备源码、Shell、任意文件、Git、Policy 或 Skill 修改工具。
+
+## B. 自动验证
+
+- [x] 主工作树完整 Node、vault 与仓库验证通过。
+- [x] 全新克隆完成锁文件安装、完整测试和仓库验证。
+- [x] Provider 固定配置、Model ID 漂移、上下文上限、错误脱敏和 durable retry 有自动测试。
+- [x] 收录、去重、冲突证据、Teach-back、用户学习证据和输出机会有自动测试。
+- [x] 微信/飞书 Adapter 的鉴权、去重、顺序、降级和恢复边界有 Fake/契约测试。
+- [x] 状态归档 CLI 在隔离目录完成 backup、verify、restore 和拒绝覆盖演练。
+- [x] Playwright 完成桌面/移动、键盘、减少动画、Token 不回显和控制台验收。
+
+## C. 主人本机外部验收
+
+- [ ] 在 Settings 安全录入 token-cloud Token、固定 Model ID 和上下文长度。
+- [ ] 执行 `pnpm probe:provider-real -- --confirm-live --trials 5`，五轮均通过原生工具循环且 Model ID 不漂移。
+- [ ] 验证 Provider 超时、离线后 Job 进入 `waiting_provider`，恢复后只重试原模型。
+- [ ] 微信完成扫码、Owner 绑定、重复消息、处理失败不推进 cursor、恢复后单次交付。
+- [ ] 飞书完成扫码/授权、目标日历选择、重复与乱序事件、权限拒绝和恢复。
+
+## D. 数据保护与启动
+
+- [ ] 停止 Web/Worker，确认没有 `running` Job。
+- [ ] 记录精确 Git commit 与干净 `git status --short`。
+- [ ] 备份仓库 `vault/`、`ops/`、`contracts/` 和配置文档。
+- [ ] 执行状态 backup/verify；确认 manifest 的 `credentialsIncluded` 为 `false`。
+- [ ] 在空状态目录完成一次恢复演练，再切回正式状态。
+- [ ] 启动 Web/Worker，验证 Today、本地搜索、审批、提醒和外部渠道健康状态。
+- [ ] 检查 `docs/KNOWN-LIMITATIONS.md`，确认所有发布门槛已关闭或由主人明确接受。
+
+## E. 封板
+
+- [ ] 更新 `docs/FINAL-ACCEPTANCE.md` 为全部必选项通过，并附真实外部证据摘要。
+- [ ] 再次运行完整测试、配置、仓库、fresh-clone 和 Playwright 核心流程。
+- [ ] 仅精确暂存本 Job 路径并创建本地提交；禁止 `git add -A`。
+- [ ] 不自动 Push。Push 或远端发布只能由主人另行明确要求。
+
+若 C、D 或 E 中任一必选项未完成，保持全局 Goal active，不把“本地功能可用”等同于“最终切换完成”。
