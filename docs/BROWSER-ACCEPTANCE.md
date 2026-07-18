@@ -3,7 +3,7 @@
 ## 验收基线
 
 - 日期：2026-07-18（Asia/Shanghai）
-- Git 基线：`a901a2a`，外加本记录同批的抽屉无障碍修复
+- Git 基线：`200fb1f`
 - 浏览器：Playwright Chromium 150（Windows 10 user agent）
 - 服务地址：`http://127.0.0.1:4327`
 - 隔离数据：`C:\tmp\syno-browser-state-a901a2a`

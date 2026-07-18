@@ -48,6 +48,7 @@ Syno 是 Windows 本地、单用户、主动式且可审计的知识闭环私人
 - 当前决定：**该固定版本未通过硬门槛，不采用且不再接触真实 Token**。不以额外私有钩子、广域网络 monkey-patch、Hermes 专用过滤代理或安全 fork 绕过；原生 Runtime 是唯一活动实现。真实 Provider 验收仅验证原生固定模型。
 - 决策与原生单次 Run 固定配置加固已提交 `f015921`；主工作树及 fresh clone 均通过 Node 112/112、vault 57/57 和仓库校验。
 - 隔离 Web 验收已覆盖 1440×1000 与 390×844、键盘焦点循环与恢复、关闭抽屉的 `hidden/inert` 边界、减少动画、Token 不回显和控制台错误；同时补上移动端可实际点击的“连接设置”入口。证据见 `docs/BROWSER-ACCEPTANCE.md`。
+- Web 修复提交 `200fb1f` 已在主工作树与全新克隆复验：Node 113/113、vault 57/57、仓库校验通过。
 5. **知识技能**：低成本收录、渐进整理、Teach-back、间隔复习、证据型创作、时效查证。
 6. **外部渠道**：Web 完整控制；微信快速入口；飞书日程和结构化通知；同一 Agent/Policy/Store。
 7. **Web 与品牌**：Today、Capture、Knowledge、Learn、Create；纸片法老知识守护者；WCAG AA。
