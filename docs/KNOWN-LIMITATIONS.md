@@ -12,7 +12,7 @@
 
 ## 运行时限制
 
-- 仅支持 Windows；Provider Token 使用当前 Windows 用户的 DPAPI，不可作为跨用户可移植凭据。
+- 仅支持 Windows；Provider Token、微信 Bot/回复上下文和飞书 App Secret 使用当前 Windows 用户的 DPAPI，不可作为跨用户可移植凭据。
 - 只启用一个固定 OpenAI-compatible Provider 和一个 Model ID，没有自动模型分层、Provider 切换或 fallback。
 - Hermes `0.18.2` 因会访问 Chat Completions 以外的模型元数据路径而被淘汰；Hermes sidecar 代码仅保留审计和回归用途，不可选用。
 - Provider 不可用时，本地搜索、任务、提醒与审批继续工作；需要模型的 Job 保留为 `waiting_provider`，不会自动换模型。

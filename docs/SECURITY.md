@@ -20,7 +20,7 @@ The Hermes sidecar inherits a minimal environment allowlist rather than the Syno
 - Provider credentials use Windows DPAPI under `%LOCALAPPDATA%\Syno\credentials`; the API and logs expose only `configured` status and non-secret metadata.
 - Provider failure is fail-closed: no provider/model fallback, no silent privilege expansion, and durable retry for LLM jobs.
 - HTTP responses set a restrictive CSP, MIME sniffing protection, frame denial and referrer/permissions policies.
-- Weixin polling uses an inter-process lock, durable cursor ordering and post-delivery deduplication. Attachments accept only exact Tencent CDN hosts, are streamed with a 10 MB limit, signature/MIME checked and left unread in quarantine.
+- Weixin Bot Token and reply context tokens use Windows DPAPI under the credentials root; only cursor and deduplication markers enter non-credential state archives. Legacy plaintext credential JSON is migrated once and rewritten without secrets. Polling uses an inter-process lock, durable cursor ordering and post-delivery deduplication. Attachments accept only exact Tencent CDN hosts, are streamed with a 10 MB limit, signature/MIME checked and left unread in quarantine.
 - Feishu callbacks authenticate, deduplicate and enqueue quickly; knowledge facts remain in `vault/`, never in a channel-specific store.
 - Syno cannot modify its source. Codex is the external development authority; runtime may emit only BugReport and ImprovementProposal records.
 - State archives exclude the credentials directory, use a versioned SHA-256 manifest, reject path traversal and never overwrite a non-empty restore target.

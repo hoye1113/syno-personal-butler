@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { PATHS, resolveInside } from "./paths.mjs";
+import { runDpapi } from "./provider-credential-store.mjs";
 
 const DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com/";
 const CDN_ALLOWLIST = new Set(["novac2c.cdn.weixin.qq.com"]);
@@ -80,21 +81,65 @@ class WeixinIlinkClient {
   }
 }
 
+async function atomicWrite(file, value) {
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  const temporary = `${file}.${process.pid}.tmp`;
+  await fs.writeFile(temporary, value, { encoding: "utf8", mode: 0o600 });
+  await fs.rename(temporary, file);
+  await fs.chmod(file, 0o600).catch(() => {});
+}
+
+async function readJson(file, fallback = null) {
+  try { return JSON.parse(await fs.readFile(file, "utf8")); }
+  catch (error) { if (error.code === "ENOENT") return fallback; throw error; }
+}
+
 class LocalCredentialStore {
-  constructor({ file = path.join(PATHS.credentialsRoot, "weixin-ilink.json") } = {}) { this.file = file; }
+  constructor({ file, root = PATHS.credentialsRoot, stateFile = path.join(PATHS.stateRoot, "weixin-runtime.json"), protect = (value) => runDpapi("protect", value), unprotect = (value) => runDpapi("unprotect", value) } = {}) {
+    this.metadataFile = file || path.join(root, "weixin-ilink.json");
+    this.secretFile = path.join(path.dirname(this.metadataFile), "weixin-ilink.dpapi");
+    this.stateFile = stateFile;
+    this.protect = protect;
+    this.unprotect = unprotect;
+  }
   async load() {
-    try { return JSON.parse(await fs.readFile(this.file, "utf8")); } catch (error) {
-      if (error.code === "ENOENT") return null;
-      throw error;
+    const metadata = await readJson(this.metadataFile);
+    if (!metadata) return null;
+    if (metadata.token) {
+      const legacy = { ...metadata };
+      await this.save(legacy);
+      return legacy;
     }
+    const protectedValue = await fs.readFile(this.secretFile, "utf8");
+    const secret = JSON.parse(await this.unprotect(protectedValue));
+    const runtime = await readJson(this.stateFile, {});
+    return { ...metadata, token: secret.token, contexts: secret.contexts || {}, cursor: runtime.cursor || "", seenIds: runtime.seenIds || [] };
   }
   async save(value) {
-    await fs.mkdir(path.dirname(this.file), { recursive: true });
-    const temporary = `${this.file}.${process.pid}.tmp`;
-    await fs.writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-    await fs.rename(temporary, this.file);
+    if (!value?.token) throw new Error("微信 iLink Token 不能为空");
+    const secret = await this.protect(JSON.stringify({ token: value.token, contexts: value.contexts || {} }));
+    await atomicWrite(this.secretFile, secret);
+    await atomicWrite(this.metadataFile, `${JSON.stringify({
+      version: 2,
+      baseUrl: validateIlinkBaseUrl(value.baseUrl || DEFAULT_BASE_URL).toString(),
+      botId: value.botId || "",
+      ownerId: value.ownerId || "",
+      savedAt: value.savedAt || new Date().toISOString(),
+    }, null, 2)}\n`);
+    await this.saveRuntime(value);
   }
-  async clear() { await fs.rm(this.file, { force: true }); }
+  async saveRuntime(value) {
+    const current = await fs.readFile(this.secretFile, "utf8")
+      .then(async (protectedValue) => JSON.parse(await this.unprotect(protectedValue)))
+      .catch((error) => { if (error.code === "ENOENT") return null; throw error; });
+    if (current && value.contexts) {
+      await atomicWrite(this.secretFile, await this.protect(JSON.stringify({ token: current.token, contexts: value.contexts })));
+    }
+    await atomicWrite(this.stateFile, `${JSON.stringify({ version: 1, cursor: value.cursor || "", seenIds: (value.seenIds || []).slice(-2_000) }, null, 2)}\n`);
+  }
+  async clear() {
+    await Promise.all([this.metadataFile, this.secretFile, this.stateFile].map((file) => fs.rm(file, { force: true })));
+  }
 }
 
 class LocalProcessLock {
@@ -298,7 +343,8 @@ class WeixinIlinkAdapter {
     if (!this.credential) return;
     this.credential.contexts = Object.fromEntries(this.contexts);
     this.credential.seenIds = [...this.seen].slice(-2_000);
-    await this.credentials.save(this.credential);
+    if (this.credentials.saveRuntime) await this.credentials.saveRuntime(this.credential);
+    else await this.credentials.save(this.credential);
   }
 
   async handleInbound(raw) {

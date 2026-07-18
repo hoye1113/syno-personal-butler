@@ -9,7 +9,7 @@ import { ChannelHub, FakeChannelAdapter } from "../apps/syno/syno/channels.mjs";
 import { FeishuChannelAdapter, FeishuCredentialStore } from "../apps/syno/syno/feishu-channel.mjs";
 import { parseWeixinApproval } from "../apps/syno/syno/runtime.mjs";
 import { Scheduler, occurrenceFor } from "../apps/syno/syno/scheduler.mjs";
-import { LocalProcessLock, normalizeInbound, readLimitedBody, sniffMime, validateIlinkBaseUrl, WeixinIlinkAdapter } from "../apps/syno/syno/weixin-ilink.mjs";
+import { LocalCredentialStore, LocalProcessLock, normalizeInbound, readLimitedBody, sniffMime, validateIlinkBaseUrl, WeixinIlinkAdapter } from "../apps/syno/syno/weixin-ilink.mjs";
 
 test("Channel and Calendar fake Adapters satisfy their contracts", async () => {
   const channel = new FakeChannelAdapter();
@@ -58,6 +58,49 @@ test("Weixin Adapter normalizes text/voice and keeps login behind a seam", async
   assert.equal((await adapter.pollLogin()).status, "confirmed");
   assert.equal(saved.ownerId, "owner");
   assert.throws(() => validateIlinkBaseUrl("https://attacker.example/api"), /官方域名/);
+});
+
+test("Weixin credentials keep token and reply contexts outside metadata and backup state", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-weixin-credentials-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const stateFile = path.join(root, "state", "weixin-runtime.json");
+  const store = new LocalCredentialStore({
+    root: path.join(root, "credentials"),
+    stateFile,
+    protect: async (value) => Buffer.from(value, "utf8").toString("base64"),
+    unprotect: async (value) => Buffer.from(value, "base64").toString("utf8"),
+  });
+  await store.save({ token: "bot-secret", baseUrl: "https://ilinkai.weixin.qq.com/", botId: "bot", ownerId: "owner", cursor: "cursor", contexts: { owner: "reply-secret" }, seenIds: ["m1"] });
+  const metadata = await fs.readFile(store.metadataFile, "utf8");
+  const state = await fs.readFile(stateFile, "utf8");
+  assert.doesNotMatch(metadata, /bot-secret|reply-secret/);
+  assert.doesNotMatch(state, /bot-secret|reply-secret/);
+  assert.equal(JSON.parse(metadata).version, 2);
+  assert.deepEqual(await store.load(), {
+    version: 2, baseUrl: "https://ilinkai.weixin.qq.com/", botId: "bot", ownerId: "owner",
+    savedAt: JSON.parse(metadata).savedAt, token: "bot-secret", contexts: { owner: "reply-secret" }, cursor: "cursor", seenIds: ["m1"],
+  });
+});
+
+test("Weixin legacy plaintext credentials migrate to the DPAPI split on first load", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-weixin-legacy-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const credentialRoot = path.join(root, "credentials");
+  const stateFile = path.join(root, "state", "weixin-runtime.json");
+  const store = new LocalCredentialStore({
+    root: credentialRoot,
+    stateFile,
+    protect: async (value) => Buffer.from(value, "utf8").toString("base64"),
+    unprotect: async (value) => Buffer.from(value, "base64").toString("utf8"),
+  });
+  await fs.mkdir(credentialRoot, { recursive: true });
+  await fs.writeFile(store.metadataFile, JSON.stringify({ token: "legacy-token", baseUrl: "https://ilinkai.weixin.qq.com/", ownerId: "owner", cursor: "old", contexts: { owner: "legacy-context" }, seenIds: ["old-message"] }), "utf8");
+  const loaded = await store.load();
+  assert.equal(loaded.token, "legacy-token");
+  assert.equal(loaded.contexts.owner, "legacy-context");
+  assert.doesNotMatch(await fs.readFile(store.metadataFile, "utf8"), /legacy-token|legacy-context/);
+  assert.doesNotMatch(await fs.readFile(stateFile, "utf8"), /legacy-token|legacy-context/);
+  assert.equal((await store.load()).cursor, "old");
 });
 
 test("Weixin approval commands are parsed deterministically", () => {
