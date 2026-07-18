@@ -6,7 +6,7 @@ import path from "node:path";
 
 import { FakeCalendarAdapter, MarkdownCalendarAdapter } from "../apps/syno/syno/calendar-adapters.mjs";
 import { ChannelHub, FakeChannelAdapter } from "../apps/syno/syno/channels.mjs";
-import { FeishuChannelAdapter, FeishuCredentialStore } from "../apps/syno/syno/feishu-channel.mjs";
+import { FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore } from "../apps/syno/syno/feishu-channel.mjs";
 import { parseWeixinApproval } from "../apps/syno/syno/runtime.mjs";
 import { Scheduler, occurrenceFor } from "../apps/syno/syno/scheduler.mjs";
 import { LocalCredentialStore, LocalProcessLock, normalizeInbound, readLimitedBody, sniffMime, validateIlinkBaseUrl, WeixinIlinkAdapter } from "../apps/syno/syno/weixin-ilink.mjs";
@@ -111,7 +111,9 @@ test("Weixin approval commands are parsed deterministically", () => {
   assert.equal(parseWeixinApproval("批准全部任务"), null);
 });
 
-test("Feishu long connection accepts only owner DMs and deduplicates messages", async () => {
+test("Feishu long connection accepts only owner DMs and deduplicates messages", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-feishu-channel-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
   const handlers = new Map();
   const sent = [];
   const channel = {
@@ -122,6 +124,7 @@ test("Feishu long connection accepts only owner DMs and deduplicates messages", 
   const received = [];
   const adapter = new FeishuChannelAdapter({
     credentials: { async load() { return { appId: "cli_test", appSecret: "secret", ownerOpenId: "owner" }; } },
+    stateStore: new FeishuStateStore({ file: path.join(root, "state.json") }),
     channelFactory: () => channel,
     onMessage: async (message) => { received.push(message); return { text: "已记录" }; },
   });
@@ -135,6 +138,56 @@ test("Feishu long connection accepts only owner DMs and deduplicates messages", 
   assert.equal(received[0].text, "hello");
   assert.equal(sent.length, 1);
   await adapter.stop();
+});
+
+test("Feishu persists successful dedupe and recovers a failed owner DM after restart", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-feishu-recovery-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const stateFile = path.join(root, "state.json");
+  const credentials = { async load() { return { appId: "cli_test", appSecret: "secret", ownerOpenId: "owner" }; } };
+  const channels = [];
+  const channelFactory = () => {
+    const handlers = new Map();
+    const sent = [];
+    const channel = { handlers, sent, on(name, handler) { handlers.set(name, handler); }, async connect() {}, async disconnect() {}, async send(chatId, body) { sent.push({ chatId, body }); } };
+    channels.push(channel);
+    return channel;
+  };
+  let attempts = 0;
+  const first = new FeishuChannelAdapter({
+    credentials, stateStore: new FeishuStateStore({ file: stateFile }), channelFactory, retryDelayMs: 60_000,
+    onMessage: async () => { attempts += 1; if (attempts === 2) throw new Error("forced"); return { text: "ok" }; },
+  });
+  await first.start();
+  channels[0].handlers.get("message")({ messageId: "done", chatId: "c1", chatType: "p2p", senderId: "owner", content: "once" });
+  for (let index = 0; index < 30 && channels[0].sent.length < 1; index += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+  channels[0].handlers.get("message")({ messageId: "retry", chatId: "c2", chatType: "p2p", senderId: "owner", content: "retry" });
+  for (let index = 0; index < 30 && attempts < 2; index += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+  await first.stop();
+
+  const recovered = [];
+  const second = new FeishuChannelAdapter({
+    credentials, stateStore: new FeishuStateStore({ file: stateFile }), channelFactory,
+    onMessage: async (message) => { recovered.push(message.id); return { text: "recovered" }; },
+  });
+  await second.start();
+  for (let index = 0; index < 30 && !recovered.length; index += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+  channels[1].handlers.get("message")({ messageId: "done", chatId: "c1", chatType: "p2p", senderId: "owner", content: "duplicate" });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.deepEqual(recovered, ["retry"]);
+  assert.deepEqual((await new FeishuStateStore({ file: stateFile }).snapshot()).pending, []);
+  await second.stop();
+});
+
+test("Feishu prunes failed payloads after the 30-day retention window", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-feishu-retention-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  let now = new Date("2026-07-01T00:00:00.000Z");
+  const store = new FeishuStateStore({ file: path.join(root, "state.json"), clock: () => now });
+  await store.reserve({ messageId: "expired", chatId: "chat", chatType: "p2p", senderId: "owner", content: "payload" });
+  now = new Date("2026-08-01T00:00:01.000Z");
+  assert.deepEqual((await store.snapshot()).pending, []);
+  assert.doesNotMatch(await fs.readFile(path.join(root, "state.json"), "utf8"), /payload/);
 });
 
 test("Feishu credentials keep App Secret outside metadata", async (t) => {

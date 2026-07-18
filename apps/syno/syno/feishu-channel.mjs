@@ -11,6 +11,72 @@ async function atomicWrite(file, value) {
   await fs.rename(temporary, file);
 }
 
+const FAILED_PAYLOAD_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
+
+class FeishuStateStore {
+  constructor({ file = path.join(PATHS.stateRoot, "feishu-channel.json"), clock = () => new Date() } = {}) {
+    this.file = file;
+    this.clock = clock;
+    this.tail = Promise.resolve();
+  }
+  async snapshot() {
+    return this.#serialized(async () => {
+      const state = await this.#read();
+      await this.#write(state);
+      return state;
+    });
+  }
+  async reserve(message) {
+    return this.#serialized(async () => {
+      const state = await this.#read();
+      if (state.seenIds.includes(message.messageId) || state.pending.some((item) => item.messageId === message.messageId)) return false;
+      state.pending.push({
+        messageId: message.messageId,
+        chatId: message.chatId,
+        chatType: message.chatType,
+        senderId: message.senderId,
+        content: String(message.content || ""),
+        createdAt: this.clock().toISOString(),
+      });
+      await this.#write(state);
+      return true;
+    });
+  }
+  async complete(messageId) {
+    return this.#serialized(async () => {
+      const state = await this.#read();
+      state.pending = state.pending.filter((item) => item.messageId !== messageId);
+      state.seenIds = [...state.seenIds.filter((id) => id !== messageId), messageId].slice(-2_000);
+      await this.#write(state);
+      return state;
+    });
+  }
+  #serialized(operation) {
+    const result = this.tail.then(operation, operation);
+    this.tail = result.catch(() => {});
+    return result;
+  }
+  async #read() {
+    let parsed = { version: 1, seenIds: [], pending: [] };
+    try { parsed = JSON.parse(await fs.readFile(this.file, "utf8")); }
+    catch (error) { if (error.code !== "ENOENT") throw error; }
+    const cutoff = this.clock().getTime() - FAILED_PAYLOAD_RETENTION_MS;
+    return {
+      version: 1,
+      seenIds: Array.isArray(parsed.seenIds) ? parsed.seenIds.map(String).slice(-2_000) : [],
+      pending: Array.isArray(parsed.pending)
+        ? parsed.pending.filter((item) => item?.messageId && Date.parse(item.createdAt) >= cutoff).map((item) => ({
+          messageId: String(item.messageId), chatId: String(item.chatId || ""), chatType: String(item.chatType || ""),
+          senderId: String(item.senderId || ""), content: String(item.content || ""), createdAt: item.createdAt,
+        }))
+        : [],
+    };
+  }
+  async #write(state) {
+    await atomicWrite(this.file, `${JSON.stringify(state, null, 2)}\n`);
+  }
+}
+
 class FeishuCredentialStore {
   constructor({ root = PATHS.credentialsRoot, protect = (value) => runDpapi("protect", value), unprotect = (value) => runDpapi("unprotect", value) } = {}) {
     this.metadataFile = path.join(root, "feishu.json");
@@ -38,9 +104,10 @@ class FeishuCredentialStore {
 async function officialSdk() { return import("@larksuiteoapi/node-sdk"); }
 
 class FeishuChannelAdapter {
-  constructor({ credentials = new FeishuCredentialStore(), sdkLoader = officialSdk, channelFactory, onMessage = async () => ({ text: "已收到" }) } = {}) {
+  constructor({ credentials = new FeishuCredentialStore(), stateStore = new FeishuStateStore(), sdkLoader = officialSdk, channelFactory, onMessage = async () => ({ text: "已收到" }), retryDelayMs = 30_000 } = {}) {
     this.credentials = credentials; this.sdkLoader = sdkLoader; this.channelFactory = channelFactory; this.onMessage = onMessage;
-    this.channel = null; this.running = false; this.lastError = ""; this.queue = []; this.draining = false; this.seen = new Set();
+    this.stateStore = stateStore; this.retryDelayMs = retryDelayMs;
+    this.channel = null; this.running = false; this.lastError = ""; this.queue = []; this.draining = false; this.seen = new Set(); this.inflight = new Set(); this.retryTimer = null;
     this.registration = null; this.registrationState = { status: "idle" };
   }
 
@@ -51,14 +118,17 @@ class FeishuChannelAdapter {
     const sdk = this.channelFactory ? null : await this.sdkLoader();
     const factory = this.channelFactory || ((options) => sdk.createLarkChannel(options));
     this.channel = factory({ appId: credential.appId, appSecret: credential.appSecret, transport: "websocket", policy: { dmMode: "open", requireMention: true, groupAllowlist: [] }, includeRawInMessage: false });
-    this.channel.on("message", (message) => this.#enqueue(message, credential));
+    this.channel.on("message", (message) => this.#enqueue(message, credential).catch((error) => { this.lastError = error.message; }));
     this.channel.on?.("error", (error) => { this.lastError = error.message; });
     await this.channel.connect();
     this.running = true;
+    await this.#recoverPending(credential);
     return this.status();
   }
 
   async stop() {
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = null;
     await this.channel?.disconnect?.();
     this.channel = null; this.running = false;
     return this.status();
@@ -103,13 +173,35 @@ class FeishuChannelAdapter {
 
   registrationStatus() { return this.registrationState; }
 
-  #enqueue(message, credential) {
-    if (!message?.messageId || this.seen.has(message.messageId)) return;
-    this.seen.add(message.messageId);
-    if (this.seen.size > 2_000) this.seen.delete(this.seen.values().next().value);
+  async #enqueue(message, credential) {
+    if (!message?.messageId || this.seen.has(message.messageId) || this.inflight.has(message.messageId)) return;
     if (message.chatType !== "p2p" || !credential.ownerOpenId || message.senderId !== credential.ownerOpenId) return;
+    if (!await this.stateStore.reserve(message)) return;
+    this.#queueReserved(message);
+  }
+
+  #queueReserved(message) {
+    if (this.seen.has(message.messageId) || this.inflight.has(message.messageId)) return;
+    this.inflight.add(message.messageId);
     this.queue.push(message);
     queueMicrotask(() => this.#drain());
+  }
+
+  async #recoverPending(credential) {
+    const state = await this.stateStore.snapshot();
+    this.seen = new Set(state.seenIds);
+    for (const message of state.pending) {
+      if (message.chatType === "p2p" && credential.ownerOpenId && message.senderId === credential.ownerOpenId) this.#queueReserved(message);
+    }
+  }
+
+  #scheduleRetry() {
+    if (this.retryTimer || !this.running) return;
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      this.credentials.load().then((credential) => credential && this.#recoverPending(credential)).catch((error) => { this.lastError = error.message; });
+    }, this.retryDelayMs);
+    this.retryTimer.unref?.();
   }
 
   async #drain() {
@@ -121,10 +213,19 @@ class FeishuChannelAdapter {
         try {
           const response = await this.onMessage({ channel: "feishu", id: message.messageId, senderId: message.senderId, text: message.content, chatId: message.chatId });
           await this.send({ chatId: message.chatId, replyTo: message.messageId, text: response?.text || "任务已记录，请在 Syno 查看状态。" });
-        } catch (error) { this.lastError = error.message; }
+          await this.stateStore.complete(message.messageId);
+          this.seen.add(message.messageId);
+          if (this.seen.size > 2_000) this.seen.delete(this.seen.values().next().value);
+          this.lastError = "";
+        } catch (error) {
+          this.lastError = error.message;
+          this.#scheduleRetry();
+        } finally {
+          this.inflight.delete(message.messageId);
+        }
       }
     } finally { this.draining = false; }
   }
 }
 
-export { FeishuChannelAdapter, FeishuCredentialStore, officialSdk };
+export { FAILED_PAYLOAD_RETENTION_MS, FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, officialSdk };

@@ -28,7 +28,7 @@ pnpm probe:weixin -- --confirm-live --duration-ms 2000
 pnpm probe:feishu -- --confirm-live
 ```
 
-3. 主人发送唯一私聊文本，确认只回复一次。
+3. 主人发送唯一私聊文本，确认只执行并回复一次；成功去重和失败待处理状态必须跨 Worker 重启保持。
 4. 验证陌生人和群聊不进入 Agent、重复 message ID 不重复处理。
 5. 授权目标日历，验证创建、重复事件、乱序回执、权限拒绝、断网降级和恢复；飞书不得成为知识事实源。
 
