@@ -31,9 +31,10 @@ class ToolLoopAgent {
     const messages = [{ role: "system", content: this.systemPrompt }, ...conversation.messages];
 
     try {
+      const provider = typeof this.provider.bindRun === "function" ? await this.provider.bindRun() : this.provider;
       for (let turn = 1; turn <= this.maxTurns; turn += 1) {
         if (signal?.aborted) throw Object.assign(new Error("Agent 已取消"), { code: "AGENT_CANCELED" });
-        const completion = await this.provider.complete(messages, this.tools.list(), { signal });
+        const completion = await provider.complete(messages, this.tools.list(), { signal });
         const assistant = completion.message;
         messages.push(assistant);
         conversation.messages.push(assistant);
@@ -42,7 +43,7 @@ class ToolLoopAgent {
           conversation.status = "completed";
           conversation.model = completion.model;
           await this.conversations.save(conversation);
-          return { text: String(assistant.content || ""), conversationId: conversation.id, turns: turn, usage: completion.usage };
+          return { text: String(assistant.content || ""), conversationId: conversation.id, turns: turn, usage: completion.usage, model: completion.model };
         }
         for (const call of calls) {
           const name = call?.function?.name;

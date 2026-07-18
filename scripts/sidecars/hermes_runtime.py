@@ -152,6 +152,11 @@ def execute_run(request: dict[str, Any]) -> None:
             f"  context_length: {context_length}\n",
             encoding="utf-8",
         )
+        from hermes_cli.config import load_config  # noqa: PLC0415
+
+        loaded_context_length = int((load_config().get("model") or {}).get("context_length") or 0)
+        if loaded_context_length != context_length:
+            raise RuntimeError("Hermes isolated context configuration was not applied")
         register_tools(request.get("tools") or [], run_id)
         agent = AIAgent(
             base_url=str(provider["baseUrl"]), api_key=secret, provider="custom",
@@ -165,6 +170,8 @@ def execute_run(request: dict[str, Any]) -> None:
         agent._persist_disabled = True
         agent._cached_system_prompt = SAFE_SYSTEM_PROMPT
         agent._dump_api_request_debug = lambda *_args, **_kwargs: None
+        if int(getattr(agent, "_config_context_length", 0) or 0) != context_length:
+            raise RuntimeError("Hermes runtime did not retain the fixed context length")
         with STATE_LOCK:
             ACTIVE[run_id] = agent
         emit({"type": "event", "runId": run_id, "event": {"type": "provider.started"}})

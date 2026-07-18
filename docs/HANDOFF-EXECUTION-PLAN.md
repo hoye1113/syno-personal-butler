@@ -37,14 +37,15 @@ Syno 是 Windows 本地、单用户、主动式且可审计的知识闭环私人
 3. **知识闭环契约**：Goal、Artifact、Ingest、Claim/Evidence、Learning、Output、Memory、Settings。
 4. **运行时**：`SignalEngine → PriorityEngine → CognitiveRuntime → ToolRegistry`，Provider 离线持久等待。当前启用原生适配器；Hermes 只有通过全部硬门槛后才能显式切换。
 
-## Hermes 候选执行状态（2026-07-17）
+## Hermes 候选执行状态（2026-07-18）
 
 - 已建立窄接口：`run / cancel / health / capabilities`，并将原生循环迁入该接口。
 - 已锁定上游 `0f102fa4dc04b7dfdab048169aaaa640d09d7523`（Hermes `0.18.2`，MIT），本地源码只读。
 - 无凭据 Fake Provider Spike 已通过：空 toolset 不暴露工具、白名单只含 Syno 代理工具、固定模型、无 fallback/memory/context/Gateway/CLI，并完成两轮非流式原生工具调用。
 - Hermes 该版本必须设置固定 SHA 下的私有 `_disable_streaming` 标志才能满足 Syno 非流式契约；升级必须重新审计。
 - 生产 JSONL sidecar 已通过最小环境、Token 脱敏、固定 SHA、恶意工具名、控制命令、取消、超时、崩溃重启、无效 JSON 和 Provider 429 门禁；取消采用终止单 Run 隔离进程并干净重启的语义。
-- 当前决定：**候选可行但不采用/不启用**。Hermes 专项回归已证明 `jobs.submit` 只能建立待审批 Job、直接写仍被拒绝，共享全量测试继续覆盖知识闭环与 GitGuard；尚缺真实 token-cloud 工具成功率对比，原生 Runtime 继续是唯一活动实现。
+- 收紧 Fake Provider 后确认上游仍会探测 `/api/v1/models`、`/api/tags`、`/v1/props`、`/props`、`/version`、`/v1/models` 或 `/models`，违反只允许 `POST /chat/completions` 的 Provider 契约。
+- 当前决定：**该固定版本未通过硬门槛，不采用且不再接触真实 Token**。不以额外私有钩子、广域网络 monkey-patch、Hermes 专用过滤代理或安全 fork 绕过；原生 Runtime 是唯一活动实现。真实 Provider 验收仅验证原生固定模型。
 5. **知识技能**：低成本收录、渐进整理、Teach-back、间隔复习、证据型创作、时效查证。
 6. **外部渠道**：Web 完整控制；微信快速入口；飞书日程和结构化通知；同一 Agent/Policy/Store。
 7. **Web 与品牌**：Today、Capture、Knowledge、Learn、Create；纸片法老知识守护者；WCAG AA。

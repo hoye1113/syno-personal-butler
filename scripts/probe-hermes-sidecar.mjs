@@ -22,16 +22,12 @@ const server = createServer((request, response) => {
   let body = "";
   request.on("data", (chunk) => { body += chunk; });
   request.on("end", () => {
-    if (request.url === "/api/show") {
-      response.writeHead(200, { "content-type": "application/json" });
-      return response.end("{}");
-    }
     const payload = JSON.parse(body || "{}");
     const systemPrompt = (payload.messages || []).find((message) => message.role === "system")?.content || "";
     const systemPromptSafe = request.url !== "/v1/chat/completions" || (systemPrompt.startsWith("You are Syno's constrained cognitive runtime.") && !/Hermes Agent|User home directory|terminal tool/iu.test(systemPrompt));
-    observed.push({ url: request.url, model: payload.model, stream: payload.stream ?? "omitted", tools: (payload.tools || []).map((tool) => tool.function?.name), systemPromptSafe });
+    observed.push({ method: request.method, url: request.url, model: payload.model, stream: payload.stream ?? "omitted", tools: (payload.tools || []).map((tool) => tool.function?.name), systemPromptSafe });
     if (request.url !== "/v1/chat/completions" || payload.model !== "fixed-model" || payload.stream === true || observed.at(-1).tools.join() !== "knowledge.search") {
-      response.writeHead(400);
+      response.writeHead(404);
       return response.end();
     }
     const userText = [...(payload.messages || [])].reverse().find((message) => message.role === "user")?.content || "";
@@ -109,7 +105,10 @@ try {
   const cancellationOk = cancelSent && cancellation.code === "AGENT_CANCELED" && cancellation.retryable === false;
   const requestDumps = (await fs.readdir(probeHome, { recursive: true }).catch(() => [])).filter((name) => /request_dump_/u.test(String(name)));
   const promptsSafe = observed.every((item) => item.systemPromptSafe !== false);
-  console.log(JSON.stringify({ ok: result.text === "sidecar complete" && completionCount === 2 && failuresOk && cancellationOk && promptsSafe && requestDumps.length === 0, capabilities, health, result: { text: result.text, model: result.model }, failures, cancellation, promptsSafe, requestDumps, providerRequests: observed }, null, 2));
+  const providerSurfaceSafe = observed.every((item) => item.method === "POST" && item.url === "/v1/chat/completions");
+  const report = { ok: result.text === "sidecar complete" && completionCount === 2 && failuresOk && cancellationOk && promptsSafe && providerSurfaceSafe && requestDumps.length === 0, capabilities, health, result: { text: result.text, model: result.model }, failures, cancellation, promptsSafe, providerSurfaceSafe, requestDumps, providerRequests: observed };
+  console.log(JSON.stringify(report, null, 2));
+  if (!report.ok) process.exitCode = 2;
 } finally {
   await bridge.close();
   await new Promise((resolve) => server.close(resolve));

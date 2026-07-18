@@ -21,8 +21,20 @@ class ProviderClient {
     this.timeoutMs = timeoutMs;
   }
 
-  async complete(messages, tools = [], { signal, temperature = 0.2 } = {}) {
-    const config = await this.credentials.load();
+  async bindRun() {
+    const config = Object.freeze({ ...await this.credentials.load() });
+    return Object.freeze({
+      modelId: config.modelId,
+      complete: (messages, tools = [], options = {}) => this.completeWithConfig(config, messages, tools, options),
+    });
+  }
+
+  async complete(messages, tools = [], options = {}) {
+    const run = await this.bindRun();
+    return run.complete(messages, tools, options);
+  }
+
+  async completeWithConfig(config, messages, tools = [], { signal, temperature = 0.2 } = {}) {
     const estimatedTokens = estimateTokens(messages, tools);
     if (estimatedTokens > config.contextLength - 1_024) {
       throw new ProviderError("PROVIDER_CONTEXT_LIMIT", `请求上下文约 ${estimatedTokens} tokens，超过配置长度 ${config.contextLength} 的安全预算`, { retryable: false });
@@ -51,7 +63,11 @@ class ProviderClient {
       const body = await response.json().catch(() => { throw new ProviderError("PROVIDER_INVALID_JSON", "Provider 返回了无效 JSON", { retryable: true }); });
       const message = body?.choices?.[0]?.message;
       if (!message || (!message.content && !message.tool_calls?.length)) throw new ProviderError("PROVIDER_INVALID_RESPONSE", "Provider 响应缺少 message", { retryable: true });
-      return { message, usage: body.usage || null, model: body.model || config.modelId };
+      const responseModel = String(body.model || config.modelId);
+      if (responseModel !== config.modelId) {
+        throw new ProviderError("PROVIDER_MODEL_DRIFT", `Provider 返回模型 ${responseModel}，与本次 Run 固定模型 ${config.modelId} 不一致`, { retryable: false });
+      }
+      return { message, usage: body.usage || null, model: responseModel };
     } catch (error) {
       if (error instanceof ProviderError) throw error;
       if (controller.signal.aborted) {

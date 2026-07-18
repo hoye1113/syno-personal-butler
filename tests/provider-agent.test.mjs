@@ -61,6 +61,18 @@ test("Provider errors never expose tokens and mark retryable outages", async () 
   });
 });
 
+test("Provider rejects a response that drifts from the fixed model", async () => {
+  const client = new ProviderClient({
+    credentials: { async load() { return { baseUrl: "https://provider.example/v1", token: "secret", modelId: "fixed", contextLength: 64_000 }; } },
+    fetchImpl: async () => new Response(JSON.stringify({ model: "other-model", choices: [{ message: { role: "assistant", content: "done" } }] }), { status: 200 }),
+  });
+  await assert.rejects(client.complete([{ role: "user", content: "hi" }]), (error) => {
+    assert.equal(error.code, "PROVIDER_MODEL_DRIFT");
+    assert.equal(error.retryable, false);
+    return true;
+  });
+});
+
 test("Provider enforces the configured context budget before network access", async () => {
   let called = false;
   const client = new ProviderClient({
@@ -87,6 +99,37 @@ test("ToolLoopAgent completes a bounded native tool-call loop", async (t) => {
   assert.equal(result.text, "找到一条知识。");
   assert.equal(result.turns, 2);
   assert.equal((await conversations.get(result.conversationId)).status, "completed");
+});
+
+test("ToolLoopAgent pins one Provider configuration for the entire tool loop", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-fixed-provider-run-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  let loads = 0;
+  const requestedModels = [];
+  const client = new ProviderClient({
+    credentials: { async load() {
+      loads += 1;
+      return { baseUrl: "https://provider.example/v1", token: "secret", modelId: loads === 1 ? "fixed" : "changed", contextLength: 64_000 };
+    } },
+    fetchImpl: async (_url, init) => {
+      const body = JSON.parse(init.body);
+      requestedModels.push(body.model);
+      const message = requestedModels.length === 1
+        ? { role: "assistant", content: null, tool_calls: [{ id: "call-1", type: "function", function: { name: "knowledge.search", arguments: "{\"query\":\"agent\"}" } }] }
+        : { role: "assistant", content: "done" };
+      return new Response(JSON.stringify({ model: "fixed", choices: [{ message }] }), { status: 200 });
+    },
+  });
+  const tools = new ToolRegistry([{
+    name: "knowledge.search", description: "search", risk: "read", permission: "syno-read", retry: "safe", version: "1",
+    inputSchema: { type: "object", required: ["query"], properties: { query: { type: "string" } }, additionalProperties: false },
+    outputSchema: { type: "array", items: { type: "object" } }, execute: async () => [{ ok: true }],
+  }]);
+  const agent = new ToolLoopAgent({ provider: client, tools, conversations: new ConversationStore({ root }) });
+  const result = await agent.run({ text: "search" });
+  assert.equal(result.model, "fixed");
+  assert.equal(loads, 1);
+  assert.deepEqual(requestedModels, ["fixed", "fixed"]);
 });
 
 test("ToolRegistry denies non-whitelisted and unapproved write tools", async () => {

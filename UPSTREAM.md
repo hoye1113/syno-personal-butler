@@ -29,5 +29,5 @@ Syno 使用全新 Git 历史，不合并任何上游提交历史，也不自动�
 - Observed version: `0.18.2`
 - License: MIT
 - Integration form: read-only, pinned-source Python sidecar candidate behind Syno's `CognitiveRuntime`; no Hermes files are copied or modified.
-- Status: credential-free capability spike passed, but Hermes is not an active product runtime. Real Provider, process recovery, cancellation and injection gates remain.
+- Status: rejected for the pinned version. Capability, process recovery, cancellation and injection gates passed, but the sidecar still attempted multiple model-metadata endpoints outside Syno's sole `POST /chat/completions` Provider contract. No real credential was supplied; native `ToolLoopAgent` remains the only active runtime.
 

@@ -34,7 +34,7 @@ Web / Weixin / Feishu / Scheduler
 
 - `SignalEngine.collect` deterministically decides when active work is due. The model cannot wake itself.
 - `PriorityEngine.rank` applies the fixed goal/commitment/review/news/exploration order and the 60/25/15 digest/ingest/maintenance budget.
-- `CognitiveRuntime` is the only model-loop seam: `run(request)`, `cancel(runId)`, `health()` and `capabilities()`. The active native adapter wraps `ToolLoopAgent`; the inactive Hermes adapter can only proxy declared calls back to the same Node `ToolRegistry`.
+- `CognitiveRuntime` is the only model-loop seam: `run(request)`, `cancel(runId)`, `health()` and `capabilities()`. The active native adapter wraps `ToolLoopAgent`. The pinned Hermes adapter remains inactive test/spike code after failing the Provider single-endpoint gate and cannot be selected.
 - A runtime uses one fixed OpenAI-compatible model and cannot select providers, permissions or approval levels. Runtime selection is explicit, mutually exclusive and has no automatic fallback.
 - `ToolRegistry.resolve` exposes only schema-validated Syno capabilities; shell, arbitrary files, browser, Git and source editing are never tools.
 - `ProviderClient.complete` owns non-streaming `chat/completions`, authentication, timeout, cancellation and structured errors.
