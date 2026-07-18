@@ -2,7 +2,7 @@
 
 1. 完整读取 `AGENTS.md` 与 `docs/HANDOFF-EXECUTION-PLAN.md`，再读取架构、策略、安全和设计文档。
 2. 保持 `codex/round3-remediation`，不得 reset、checkout、修改原 Obsidian 知识库仓库或自动 Push。
-3. R3-0 已提交 `c34ba05`，知识闭环首轮 `3ff0484`，可靠性基线 `9a0a61a`，CognitiveRuntime `f003276`，sidecar 隔离 `b0ede01`，审批对比 `2bb4195`；当前工作树 Node 112/112、vault 57/57、仓库校验通过，fresh-clone 与 Playwright 需在本阶段提交后重跑。
+3. R3-0 已提交 `c34ba05`，知识闭环首轮 `3ff0484`，可靠性基线 `9a0a61a`，CognitiveRuntime `f003276`，Hermes 决策与固定 Provider 加固提交 `f015921`；主工作树和 fresh clone 均为 Node 112/112、vault 57/57、仓库校验通过。Web 未改动，沿用此前 Playwright 桌面/移动验收。
 4. 已落地领域契约、单一 `CognitiveRuntime` 接口、原生 `ToolLoopAgent` 可信适配器、固定 Provider、收录/学习/创作闭环、微信/飞书 Adapter、Today 五入口 Web 与四层纸片法老。不要恢复旧 OpenCode 产品运行时或 3D 品牌方向。
 5. 所有写入继续经过 Policy、审批、validator 和 GitGuard；Syno 永远不能修改自身源码。
 6. 只精确暂存当前阶段路径，不用 `git add -A`，不 Push。

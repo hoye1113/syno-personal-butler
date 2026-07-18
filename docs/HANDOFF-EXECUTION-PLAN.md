@@ -46,6 +46,7 @@ Syno 是 Windows 本地、单用户、主动式且可审计的知识闭环私人
 - 生产 JSONL sidecar 已通过最小环境、Token 脱敏、固定 SHA、恶意工具名、控制命令、取消、超时、崩溃重启、无效 JSON 和 Provider 429 门禁；取消采用终止单 Run 隔离进程并干净重启的语义。
 - 收紧 Fake Provider 后确认上游仍会探测 `/api/v1/models`、`/api/tags`、`/v1/props`、`/props`、`/version`、`/v1/models` 或 `/models`，违反只允许 `POST /chat/completions` 的 Provider 契约。
 - 当前决定：**该固定版本未通过硬门槛，不采用且不再接触真实 Token**。不以额外私有钩子、广域网络 monkey-patch、Hermes 专用过滤代理或安全 fork 绕过；原生 Runtime 是唯一活动实现。真实 Provider 验收仅验证原生固定模型。
+- 决策与原生单次 Run 固定配置加固已提交 `f015921`；主工作树及 fresh clone 均通过 Node 112/112、vault 57/57 和仓库校验。
 5. **知识技能**：低成本收录、渐进整理、Teach-back、间隔复习、证据型创作、时效查证。
 6. **外部渠道**：Web 完整控制；微信快速入口；飞书日程和结构化通知；同一 Agent/Policy/Store。
 7. **Web 与品牌**：Today、Capture、Knowledge、Learn、Create；纸片法老知识守护者；WCAG AA。

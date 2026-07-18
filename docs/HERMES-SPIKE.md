@@ -68,6 +68,6 @@ Hermes must not be selected in runtime configuration for this pinned version.
 ## Current verification snapshot
 
 - main worktree after the decision patch: Node `112/112`, vault `57/57`, repository verification passed;
-- fresh clone at commit `2bb4195`: Node `108/108`, vault `57/57`, repository verification passed;
+- fresh clone at commit `f015921`: Node `112/112`, vault `57/57`, repository verification passed;
 - browser acceptance is unchanged from the prior desktop/mobile Playwright pass because this phase has no Web changes;
 - no Push was performed and the native runtime remains active.
