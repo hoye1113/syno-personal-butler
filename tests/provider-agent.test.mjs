@@ -8,8 +8,8 @@ import { ConversationStore } from "../apps/syno/syno/conversation-store.mjs";
 import { executeDomainOperation } from "../apps/syno/syno/domain-operations.mjs";
 import { PriorityEngine } from "../apps/syno/syno/priority-engine.mjs";
 import { ProactiveOrchestrator, isQuietTime } from "../apps/syno/syno/proactive-orchestrator.mjs";
-import { ProviderClient, ProviderError, estimateTokens } from "../apps/syno/syno/provider-client.mjs";
-import { ProviderCredentialStore } from "../apps/syno/syno/provider-credential-store.mjs";
+import { ProviderClient, ProviderError, estimateTokens, matchesFixedModel } from "../apps/syno/syno/provider-client.mjs";
+import { ProviderCredentialStore, runDpapi } from "../apps/syno/syno/provider-credential-store.mjs";
 import { SettingsRegistry } from "../apps/syno/syno/settings-registry.mjs";
 import { SignalEngine, localDateKey } from "../apps/syno/syno/signal-engine.mjs";
 import { routeSynoApi } from "../apps/syno/syno/runtime.mjs";
@@ -29,6 +29,13 @@ test("Provider credentials separate DPAPI token material from public metadata", 
   assert.equal(Object.hasOwn(status, "token"), false);
   assert.doesNotMatch(await fs.readFile(store.metadataFile, "utf8"), /super-secret-token/);
   assert.equal((await store.load()).token, "super-secret-token");
+});
+
+test("Windows DPAPI adapter protects and restores a UTF-8 value", { skip: process.platform !== "win32" }, async () => {
+  const fixture = "syno-dpapi-roundtrip-凭据";
+  const encrypted = await runDpapi("protect", fixture);
+  assert.notEqual(encrypted, fixture);
+  assert.equal(await runDpapi("unprotect", encrypted), fixture);
 });
 
 test("ProviderClient uses non-streaming chat completions and native tools", async () => {
@@ -71,6 +78,16 @@ test("Provider rejects a response that drifts from the fixed model", async () =>
     assert.equal(error.retryable, false);
     return true;
   });
+});
+
+test("Provider accepts only the deterministic AIPC response-model normalization", async () => {
+  assert.equal(matchesFixedModel("AIPC-deepseek-v4-flash", "deepseek-v4-flash"), true);
+  assert.equal(matchesFixedModel("AIPC-deepseek-v4-flash", "MiniMax/MiniMax-M2.7"), false);
+  const client = new ProviderClient({
+    credentials: { async load() { return { baseUrl: "https://provider.example/v1", token: "secret", modelId: "AIPC-deepseek-v4-flash", contextLength: 64_000 }; } },
+    fetchImpl: async () => new Response(JSON.stringify({ model: "deepseek-v4-flash", choices: [{ message: { role: "assistant", content: "done" } }] }), { status: 200 }),
+  });
+  assert.equal((await client.complete([{ role: "user", content: "hi" }])).model, "AIPC-deepseek-v4-flash");
 });
 
 test("Provider enforces the configured context budget before network access", async () => {

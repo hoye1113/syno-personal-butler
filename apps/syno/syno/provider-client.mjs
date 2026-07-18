@@ -13,6 +13,11 @@ function estimateTokens(messages, tools = []) {
   return Math.ceil(characters / 3.2) + 256;
 }
 
+function matchesFixedModel(configuredModel, responseModel) {
+  return responseModel === configuredModel
+    || (configuredModel.startsWith("AIPC-") && responseModel === configuredModel.slice("AIPC-".length));
+}
+
 class ProviderClient {
   constructor({ credentials, fetchImpl = globalThis.fetch, timeoutMs = 60_000 } = {}) {
     if (!credentials || !fetchImpl) throw new Error("ProviderClient 缺少凭据或 fetch Adapter");
@@ -64,10 +69,10 @@ class ProviderClient {
       const message = body?.choices?.[0]?.message;
       if (!message || (!message.content && !message.tool_calls?.length)) throw new ProviderError("PROVIDER_INVALID_RESPONSE", "Provider 响应缺少 message", { retryable: true });
       const responseModel = String(body.model || config.modelId);
-      if (responseModel !== config.modelId) {
+      if (!matchesFixedModel(config.modelId, responseModel)) {
         throw new ProviderError("PROVIDER_MODEL_DRIFT", `Provider 返回模型 ${responseModel}，与本次 Run 固定模型 ${config.modelId} 不一致`, { retryable: false });
       }
-      return { message, usage: body.usage || null, model: responseModel };
+      return { message, usage: body.usage || null, model: config.modelId };
     } catch (error) {
       if (error instanceof ProviderError) throw error;
       if (controller.signal.aborted) {
@@ -82,4 +87,4 @@ class ProviderClient {
   }
 }
 
-export { ProviderClient, ProviderError, estimateTokens };
+export { ProviderClient, ProviderError, estimateTokens, matchesFixedModel };
