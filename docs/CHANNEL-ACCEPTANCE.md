@@ -39,7 +39,7 @@ pnpm probe:feishu -- --confirm-live
 
 | 项目 | 时间 | 结果 | 脱敏错误码/说明 |
 | --- | --- | --- | --- |
-| 微信连接健康 | 待验收 | pending | 不记录二维码或 Bot Token |
+| 微信连接健康 | 2026-07-18 | passed | 从主人授权的 OpenClaw 本机配置迁入 DPAPI；Owner 已绑定，2 秒真实轮询健康且无错误 |
 | 微信 Owner/去重/恢复 | 待验收 | pending | 仅记录不可逆消息摘要 |
 | 飞书连接健康 | 待验收 | pending | 不记录 App ID/App Secret |
 | 飞书 Owner/日历/恢复 | 待验收 | pending | 仅记录日历别名和脱敏事件摘要 |

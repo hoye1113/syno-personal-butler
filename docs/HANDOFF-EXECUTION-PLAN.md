@@ -56,6 +56,7 @@ Syno 是 Windows 本地、单用户、主动式且可审计的知识闭环私人
 - Provider 采用门提交 `fdd0c04` 将本地上下文/超时/离线故障注入与五轮真实工具调用串联，要求故障后仍由同一固定 Model ID 全部成功；主工作树与 `C:\tmp\syno-fresh-fdd0c04` 均通过 Node 121/121、vault 57/57 和仓库校验。真实断网仍保留为主人验收。
 - 2026-07-18 封板审计后的闭环加固新增 ConversationRouter、逐会话排他执行、真实用户原文 Artifact、Claim/Evidence 原子聚合、显式 IngestDecision 与三层生命周期、OutputOpportunity 进度、SignalSourceRegistry 和实际生效的主动偏好；同时修复飞书未送达却去重及微信轮询重复 DPAPI 的问题。批准前收录载荷不再提前污染 `ops/`。
 - 闭环封板加固提交 `620b8d6` 已在主工作树与 `C:\tmp\syno-fresh-620b8d6` 复验：Node 127/127、vault 57/57、仓库校验通过；内部工程门槛已收口，剩余仅为真实 Provider、微信、飞书和最终切换的主人验收门。
+- Windows Provider 凭据修复提交 `cbfa882` 显式加载 DPAPI 所需的 `System.Security` 程序集，并只允许 AIPC 请求 ID 到无前缀响应 ID 的确定性规范化。主人授权的 OpenClaw last-good Token 已迁入 Syno DPAPI；真实 Provider 五轮工具调用 5/5、微信 Owner 绑定与连接健康均通过。该提交已在 `C:\tmp\syno-fresh-cbfa882` 复验 Node 129/129、vault 57/57 和仓库校验。
 5. **知识技能**：低成本收录、渐进整理、Teach-back、间隔复习、证据型创作、时效查证。
 6. **外部渠道**：Web 完整控制；微信快速入口；飞书日程和结构化通知；同一 Agent/Policy/Store。
 7. **Web 与品牌**：Today、Capture、Knowledge、Learn、Create；纸片法老知识守护者；WCAG AA。

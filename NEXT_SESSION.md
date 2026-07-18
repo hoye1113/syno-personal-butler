@@ -2,12 +2,12 @@
 
 1. 完整读取 `AGENTS.md` 与 `docs/HANDOFF-EXECUTION-PLAN.md`，再读取架构、策略、安全和设计文档。
 2. 保持 `codex/round3-remediation`，不得 reset、checkout、修改原 Obsidian 知识库仓库或自动 Push。
-3. R3-0 已提交 `c34ba05`，知识闭环首轮 `3ff0484`，可靠性基线 `9a0a61a`，CognitiveRuntime `f003276`，Hermes 决策与固定 Provider 加固 `f015921`，Web 无障碍和浏览器验收 `200fb1f`，最终切换控制 `2a8d195`，渠道凭据与探针加固 `04005b2`，飞书 durable delivery `1540b66`，Provider 采用门 `fdd0c04`，闭环封板加固 `620b8d6`；主工作树和 `C:\tmp\syno-fresh-620b8d6` 均为 Node 127/127、vault 57/57、仓库校验通过。
+3. R3-0 已提交 `c34ba05`，知识闭环首轮 `3ff0484`，可靠性基线 `9a0a61a`，CognitiveRuntime `f003276`，Hermes 决策与固定 Provider 加固 `f015921`，Web 无障碍和浏览器验收 `200fb1f`，最终切换控制 `2a8d195`，渠道凭据与探针加固 `04005b2`，飞书 durable delivery `1540b66`，Provider 采用门 `fdd0c04`，闭环封板加固 `620b8d6`，Windows Provider 凭据修复 `cbfa882`；主工作树和 `C:\tmp\syno-fresh-cbfa882` 均为 Node 129/129、vault 57/57、仓库校验通过。
 4. 已落地领域契约、单一 `CognitiveRuntime` 接口、原生 `ToolLoopAgent` 可信适配器、固定 Provider、收录/学习/创作闭环、微信/飞书 Adapter、Today 五入口 Web 与四层纸片法老。不要恢复旧 OpenCode 产品运行时或 3D 品牌方向。
 5. 所有写入继续经过 Policy、审批、validator 和 GitGuard；Syno 永远不能修改自身源码。
 6. 只精确暂存当前阶段路径，不用 `git add -A`，不 Push。
 7. Hermes 候选锁定 `0f102fa4dc04b7dfdab048169aaaa640d09d7523`，但已确认会在 Chat Completions 外探测多个模型元数据路径，违反 Syno Provider 单端点契约，故该版本正式不采用且不得接触真实 Token。原生 Runtime 是唯一活动实现。
-8. 用户级 `npx 11.7.0` 与 Playwright CLI 已安装。主人通过 Settings 安全配置后，用 `pnpm probe:provider-real -- --confirm-live --trials 5` 验证原生固定模型；微信与飞书扫码往返仍依赖主人设备。
+8. 用户级 `npx 11.7.0` 与 Playwright CLI 已安装。主人授权后已从 OpenClaw last-good 认证档案直接迁移 token-cloud 到 Syno DPAPI；固定 `AIPC-deepseek-v4-flash` 五轮真实工具调用 5/5 通过。微信凭据也已迁移，Owner 绑定与真实连接健康通过；仍需主人完成真实断网、微信消息往返和飞书授权。
 9. 2026-07-18 已重新完成隔离 Playwright 验收，并修复关闭抽屉仍暴露焦点/可访问性树及移动端 Provider 设置入口不可达的问题；记录与截图见 `docs/BROWSER-ACCEPTANCE.md`，最新 Web/闭环基线为 `620b8d6`。
 10. 备份恢复 CLI、单向迁移、运维、已知限制、最终切换清单和验收矩阵已固化；见 `docs/OPERATIONS.md`、`docs/MIGRATION.md`、`docs/KNOWN-LIMITATIONS.md`、`docs/CUTOVER-CHECKLIST.md` 和 `docs/FINAL-ACCEPTANCE.md`。封板审计发现的会话连续性、真实学习原文、Claim/Evidence 聚合、重复收录决策、创作生命周期、主动信号/有效设置和飞书未送达竞态已完成修复并通过 fresh clone；下一步只执行真实 Provider、微信和飞书主人验收，再完成最终切换。
 11. 微信 Bot Token 与回复 context 已改为 DPAPI，加密凭据与可备份 cursor/去重状态分离；旧明文 JSON 首次加载自动安全迁移。微信/飞书真实探针必须 `--confirm-live`，拒绝命令行凭据且只输出脱敏状态；流程见 `docs/CHANNEL-ACCEPTANCE.md`。

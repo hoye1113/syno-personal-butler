@@ -1,6 +1,6 @@
 # token-cloud Provider 真实验收
 
-Provider 只允许 `https://server.flowyaipc.cn/claw/v1`、一个固定 Model ID、非流式原生工具调用。Token 只能由主人在 Syno Settings 中录入并由 Windows DPAPI 保存，禁止通过命令行或聊天传递。
+Provider 只允许 `https://server.flowyaipc.cn/claw/v1`、一个固定 Model ID、非流式原生工具调用。Token 只能由主人在 Syno Settings 中录入，或在主人明确授权后从本机 OpenClaw last-good 认证档案直接迁移到 Windows DPAPI；禁止通过命令行参数、日志或聊天传递。
 
 ## 自动采用门
 
@@ -36,8 +36,8 @@ pnpm probe:provider-real -- --confirm-live --trials 5
 
 | 项目 | 状态 | 证据 |
 | --- | --- | --- |
-| 五轮真实工具调用 | pending | 等待 Settings 配置 |
-| 固定 Model ID / 无 fallback | pending | 等待真实探针 |
-| 本地上下文/超时/离线故障注入 | ready | 由探针自动执行 |
+| 五轮真实工具调用 | passed | 2026-07-18，原生 ToolLoop 5/5 成功，每轮恰好一次合成 `knowledge.search` |
+| 固定 Model ID / 无 fallback | passed | 固定请求 `AIPC-deepseek-v4-flash`；仅接受 Provider 确定性的 `deepseek-v4-flash` 响应规范化，其他模型继续拒绝 |
+| 本地上下文/超时/离线故障注入 | passed | `PROVIDER_CONTEXT_LIMIT` 未触网；超时和离线均为 retryable，随后五轮恢复成功 |
 | 真实断网进入 waiting_provider | pending | 等待主人网络操作 |
 | 恢复后同一 Job/模型完成 | pending | 等待主人网络操作 |
