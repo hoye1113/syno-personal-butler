@@ -16,7 +16,7 @@
 | Policy、审批、GitGuard 和源码禁改 | 通过自动验收 | policy、knowledge-and-git、cognitive-runtime、reports tests |
 | Web 桌面/移动/键盘/减少动画 | 通过 | `docs/BROWSER-ACCEPTANCE.md`；新增桌面/移动 Create 与主动偏好真实交互，0 error/0 warning |
 | 状态备份、校验、空目录恢复 | 通过自动验收 | `state-archive.mjs`、库级测试和隔离 CLI 端到端测试 |
-| fresh clone 可重复安装与验证 | 待本轮提交后刷新 | 上一基线 `C:\tmp\syno-fresh-fdd0c04` 已通过；本轮闭环加固将在精确提交后重新克隆验证 |
+| fresh clone 可重复安装与验证 | 通过 | `620b8d6` 在 `C:\tmp\syno-fresh-620b8d6` 按锁文件安装；Node 127/127、vault 57/57、仓库校验通过 |
 | token-cloud 真实 Provider | 待主人验收 | 安全探针已覆盖本地上下文/超时/离线故障注入；Settings 配置后仍需五轮真实调用和主人真实断网/恢复 |
 | 微信真实 Owner 与设备链路 | 待主人验收 | DPAPI/旧格式迁移、Fake/契约和安全探针已通过；缺真实扫码与往返 |
 | 飞书真实账号与日历链路 | 待主人验收 | DPAPI、durable pending/dedupe/restart recovery、Fake/契约和安全探针已通过；缺真实授权与往返 |

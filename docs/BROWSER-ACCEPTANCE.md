@@ -3,11 +3,10 @@
 ## 验收基线
 
 - 日期：2026-07-18（Asia/Shanghai）
-- Git 基线：`200fb1f`
+- Git 基线：`620b8d6`
 - 浏览器：Playwright Chromium 150（Windows 10 user agent）
-- 服务地址：`http://127.0.0.1:4327`
-- 隔离数据：`C:\tmp\syno-browser-state-a901a2a`
-- 隔离运行时：`C:\tmp\syno-browser-runtime-a901a2a`
+- 服务地址：`http://127.0.0.1:4318`
+- 隔离数据与运行时：`C:\tmp\syno-ui-audit-20260718`
 - 未读取或修改真实 `%LOCALAPPDATA%\Syno`、真实 Token 和原始 Obsidian 仓库
 
 ## 验收结果
