@@ -15,7 +15,7 @@
 | Web 桌面/移动/键盘/减少动画 | 通过 | `200fb1f`、`docs/BROWSER-ACCEPTANCE.md` 和截图索引 |
 | 状态备份、校验、空目录恢复 | 通过自动验收 | `state-archive.mjs`、库级测试和隔离 CLI 端到端测试 |
 | fresh clone 可重复安装与验证 | 通过 | `C:\tmp\syno-fresh-1540b66`：Node 120/120、vault 57/57、repository verify |
-| token-cloud 真实 Provider | 待主人验收 | Settings 配置后运行安全探针；当前无真实凭据证据 |
+| token-cloud 真实 Provider | 待主人验收 | 安全探针已覆盖本地上下文/超时/离线故障注入；Settings 配置后仍需五轮真实调用和主人真实断网/恢复 |
 | 微信真实 Owner 与设备链路 | 待主人验收 | DPAPI/旧格式迁移、Fake/契约和安全探针已通过；缺真实扫码与往返 |
 | 飞书真实账号与日历链路 | 待主人验收 | DPAPI、durable pending/dedupe/restart recovery、Fake/契约和安全探针已通过；缺真实授权与往返 |
 | 最终备份、启动、回滚和切换 | 待外部门槛后执行 | `docs/CUTOVER-CHECKLIST.md` D/E |

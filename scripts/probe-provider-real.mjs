@@ -77,6 +77,44 @@ function createProbeTools(counter) {
   }]);
 }
 
+async function captureProviderGate(client, expectedCode, messages) {
+  try {
+    await client.complete(messages);
+    return { passed: false, errorCode: "EXPECTED_FAILURE_MISSING", retryable: false };
+  } catch (error) {
+    return { passed: error.code === expectedCode, errorCode: error.code || "PROVIDER_GATE_FAILED", retryable: error.retryable === true };
+  }
+}
+
+async function runLocalFaultGates(credentials) {
+  const credentialAdapter = { load: async () => credentials };
+  let contextNetworkCalls = 0;
+  const contextCharacters = Math.ceil(Math.max(4_096, credentials.contextLength) * 3.3);
+  const context = await captureProviderGate(new ProviderClient({
+    credentials: credentialAdapter,
+    fetchImpl: async () => { contextNetworkCalls += 1; throw new Error("context gate reached network"); },
+  }), "PROVIDER_CONTEXT_LIMIT", [{ role: "user", content: "x".repeat(contextCharacters) }]);
+  context.networkCalls = contextNetworkCalls;
+  context.passed = context.passed && contextNetworkCalls === 0 && context.retryable === false;
+
+  const timeout = await captureProviderGate(new ProviderClient({
+    credentials: credentialAdapter,
+    timeoutMs: 10,
+    fetchImpl: async (_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener("abort", () => reject(options.signal.reason || new Error("aborted")), { once: true });
+    }),
+  }), "PROVIDER_TIMEOUT", [{ role: "user", content: "timeout-probe" }]);
+  timeout.passed = timeout.passed && timeout.retryable === true;
+
+  const offline = await captureProviderGate(new ProviderClient({
+    credentials: credentialAdapter,
+    fetchImpl: async () => { throw new Error("synthetic offline"); },
+  }), "PROVIDER_UNAVAILABLE", [{ role: "user", content: "offline-probe" }]);
+  offline.passed = offline.passed && offline.retryable === true;
+
+  return { allPassed: context.passed && timeout.passed && offline.passed, context, timeout, offline };
+}
+
 async function runTrials(runtime, counter, count, fixedModelId) {
   const trials = [];
   for (let index = 0; index < count; index += 1) {
@@ -106,15 +144,18 @@ async function main(argv = process.argv.slice(2)) {
   try {
     const counter = { count: 0 };
     const tools = createProbeTools(counter);
+    const localFaultInjection = await runLocalFaultGates(credentials);
     const provider = new ProviderClient({ credentials: { load: async () => credentials } });
     const agent = new ToolLoopAgent({ provider, tools, conversations: new ConversationStore({ root: path.join(temporaryRoot, "conversations") }), maxTurns: 4 });
     const runtime = new NativeCognitiveRuntime({ agent, tools });
     const native = await runTrials(runtime, counter, options.trials, credentials.modelId);
     const report = {
-      ok: native.attempts > 0 && native.successes === native.attempts,
+      ok: localFaultInjection.allPassed && native.attempts > 0 && native.successes === native.attempts,
       provider: { baseUrl: credentials.baseUrl, modelId: credentials.modelId, contextLength: credentials.contextLength },
       runtime: "native-tool-loop",
       syntheticDataOnly: true,
+      localFaultInjection,
+      recoveredToLiveFixedModel: localFaultInjection.allPassed && native.successes === native.attempts,
       native,
     };
     console.log(JSON.stringify(report, null, 2));
@@ -133,4 +174,4 @@ if (isDirect) {
   });
 }
 
-export { EXPECTED_BASE_URL, main, parseOptions, runTrials, summarizeTrials };
+export { EXPECTED_BASE_URL, main, parseOptions, runLocalFaultGates, runTrials, summarizeTrials };

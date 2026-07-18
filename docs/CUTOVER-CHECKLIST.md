@@ -29,6 +29,7 @@
 - [ ] 飞书完成扫码/授权、目标日历选择、重复与乱序事件、权限拒绝和恢复。
 
 真实渠道步骤与安全记录格式见 `docs/CHANNEL-ACCEPTANCE.md`。
+Provider 自动采用门、故障注入与主人真实断网步骤见 `docs/PROVIDER-ACCEPTANCE.md`。
 
 ## D. 数据保护与启动
 

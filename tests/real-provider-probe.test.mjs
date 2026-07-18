@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { parseOptions, summarizeTrials } from "../scripts/probe-provider-real.mjs";
+import { parseOptions, runLocalFaultGates, summarizeTrials } from "../scripts/probe-provider-real.mjs";
 
 test("real Provider probe requires explicit live confirmation and never accepts a token argument", () => {
   assert.throws(() => parseOptions([]), (error) => error.code === "LIVE_PROBE_CONFIRMATION_REQUIRED");
@@ -13,4 +13,14 @@ test("real Provider probe summarizes only operational evidence", () => {
   const summary = summarizeTrials([{ success: true, latencyMs: 10 }, { success: false, latencyMs: 20 }]);
   assert.equal(summary.successRate, 0.5);
   assert.deepEqual(summary.latencyMs, { p50: 10, p95: 20 });
+});
+
+test("real Provider probe fault gates stay local and preserve retry semantics", async () => {
+  const gates = await runLocalFaultGates({ baseUrl: "https://provider.invalid/v1", token: "never-sent", modelId: "fixed-model", contextLength: 4096 });
+  assert.equal(gates.allPassed, true);
+  assert.deepEqual(gates.context, { passed: true, errorCode: "PROVIDER_CONTEXT_LIMIT", retryable: false, networkCalls: 0 });
+  assert.equal(gates.timeout.errorCode, "PROVIDER_TIMEOUT");
+  assert.equal(gates.timeout.retryable, true);
+  assert.equal(gates.offline.errorCode, "PROVIDER_UNAVAILABLE");
+  assert.equal(gates.offline.retryable, true);
 });
