@@ -107,7 +107,7 @@ class FeishuChannelAdapter {
   constructor({ credentials = new FeishuCredentialStore(), stateStore = new FeishuStateStore(), sdkLoader = officialSdk, channelFactory, onMessage = async () => ({ text: "已收到" }), retryDelayMs = 30_000 } = {}) {
     this.credentials = credentials; this.sdkLoader = sdkLoader; this.channelFactory = channelFactory; this.onMessage = onMessage;
     this.stateStore = stateStore; this.retryDelayMs = retryDelayMs;
-    this.channel = null; this.running = false; this.lastError = ""; this.queue = []; this.draining = false; this.seen = new Set(); this.inflight = new Set(); this.retryTimer = null;
+    this.channel = null; this.running = false; this.lastError = ""; this.queue = []; this.draining = false; this.drainPromise = null; this.seen = new Set(); this.inflight = new Set(); this.retryTimer = null;
     this.registration = null; this.registrationState = { status: "idle" };
   }
 
@@ -129,6 +129,7 @@ class FeishuChannelAdapter {
   async stop() {
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = null;
+    await this.drainPromise;
     await this.channel?.disconnect?.();
     this.channel = null; this.running = false;
     return this.status();
@@ -184,7 +185,17 @@ class FeishuChannelAdapter {
     if (this.seen.has(message.messageId) || this.inflight.has(message.messageId)) return;
     this.inflight.add(message.messageId);
     this.queue.push(message);
-    queueMicrotask(() => this.#drain());
+    this.#ensureDrain();
+  }
+
+  #ensureDrain() {
+    if (this.drainPromise) return this.drainPromise;
+    const drain = this.#drain();
+    this.drainPromise = drain.finally(() => {
+      this.drainPromise = null;
+      if (this.queue.length) this.#ensureDrain();
+    });
+    return this.drainPromise;
   }
 
   async #recoverPending(credential) {
