@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import QRCode from "qrcode";
 
 import { PATHS, resolveInside } from "./paths.mjs";
 import { runDpapi } from "./provider-credential-store.mjs";
@@ -16,6 +17,23 @@ function validateIlinkBaseUrl(value) {
     throw new Error("iLink base URL 不在微信官方域名范围");
   }
   return url;
+}
+
+function validateLoginQrUrl(value) {
+  const url = new URL(value || "");
+  if (url.protocol !== "https:" || !(url.hostname === "liteapp.weixin.qq.com" || url.hostname.endsWith(".weixin.qq.com"))) {
+    throw new Error("微信登录二维码 URL 不在官方域名范围");
+  }
+  return url.toString();
+}
+
+async function renderLoginQr(value) {
+  return QRCode.toDataURL(validateLoginQrUrl(value), {
+    type: "image/png",
+    errorCorrectionLevel: "M",
+    margin: 2,
+    width: 320,
+  });
 }
 
 function randomWechatUin() {
@@ -231,13 +249,14 @@ function normalizeInbound(message) {
 }
 
 class WeixinIlinkAdapter {
-  constructor({ client, clientFactory, credentialStore = new LocalCredentialStore(), processLock = new LocalProcessLock(), fetchImpl = fetch, onMessage = async () => ({ text: "已收到" }), quarantineRoot = path.join(PATHS.runtimeRoot, "quarantine", "weixin") } = {}) {
+  constructor({ client, clientFactory, credentialStore = new LocalCredentialStore(), processLock = new LocalProcessLock(), fetchImpl = fetch, qrRenderer = renderLoginQr, onMessage = async () => ({ text: "已收到" }), quarantineRoot = path.join(PATHS.runtimeRoot, "quarantine", "weixin") } = {}) {
     this.credentials = credentialStore;
     this.client = client || new WeixinIlinkClient();
     this.clientFactory = clientFactory || ((credential) => client || new WeixinIlinkClient({ baseUrl: credential.baseUrl, token: credential.token }));
     this.onMessage = onMessage;
     this.processLock = processLock;
     this.fetchImpl = fetchImpl;
+    this.qrRenderer = qrRenderer;
     this.quarantineRoot = quarantineRoot;
     this.running = false;
     this.abortController = null;
@@ -251,7 +270,8 @@ class WeixinIlinkAdapter {
     const result = await this.client.getQrCode();
     if (result.ret && result.ret !== 0) throw new Error(result.errmsg || "获取微信二维码失败");
     this.pendingQr = result.qrcode;
-    return { qrcode: result.qrcode, imageUrl: result.qrcode_img_content, expiresInSeconds: result.expire_seconds || 300 };
+    const loginUrl = validateLoginQrUrl(result.qrcode_img_content);
+    return { qrcode: result.qrcode, imageUrl: await this.qrRenderer(loginUrl), expiresInSeconds: result.expire_seconds || 300 };
   }
 
   async pollLogin() {
@@ -444,6 +464,8 @@ export {
   fetchJson,
   normalizeInbound,
   readLimitedBody,
+  renderLoginQr,
   sniffMime,
   validateIlinkBaseUrl,
+  validateLoginQrUrl,
 };

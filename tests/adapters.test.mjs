@@ -9,7 +9,7 @@ import { ChannelHub, FakeChannelAdapter } from "../apps/syno/syno/channels.mjs";
 import { FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore } from "../apps/syno/syno/feishu-channel.mjs";
 import { parseWeixinApproval } from "../apps/syno/syno/runtime.mjs";
 import { Scheduler, occurrenceFor } from "../apps/syno/syno/scheduler.mjs";
-import { LocalCredentialStore, LocalProcessLock, normalizeInbound, readLimitedBody, sniffMime, validateIlinkBaseUrl, WeixinIlinkAdapter } from "../apps/syno/syno/weixin-ilink.mjs";
+import { LocalCredentialStore, LocalProcessLock, normalizeInbound, readLimitedBody, renderLoginQr, sniffMime, validateIlinkBaseUrl, validateLoginQrUrl, WeixinIlinkAdapter } from "../apps/syno/syno/weixin-ilink.mjs";
 
 test("Channel and Calendar fake Adapters satisfy their contracts", async () => {
   const channel = new FakeChannelAdapter();
@@ -48,16 +48,27 @@ test("Weixin Adapter normalizes text/voice and keeps login behind a seam", async
   const inbound = normalizeInbound({ message_id: 9, from_user_id: "owner", context_token: "ctx", item_list: [{ type: 3, voice_item: { text: "语音转写" } }] });
   assert.equal(inbound.text, "语音转写");
   const client = {
-    async getQrCode() { return { ret: 0, qrcode: "qr", qrcode_img_content: "https://example.invalid/qr" }; },
+    async getQrCode() { return { ret: 0, qrcode: "qr", qrcode_img_content: "https://liteapp.weixin.qq.com/q/example?bot_type=3" }; },
     async getQrStatus() { return { status: "confirmed", bot_token: "test-token", ilink_user_id: "owner" }; },
   };
   let saved;
+  let renderedQrUrl;
   const credentials = { async save(value) { saved = value; }, async load() { return null; }, async clear() {} };
-  const adapter = new WeixinIlinkAdapter({ client, credentialStore: credentials });
-  assert.equal((await adapter.beginLogin()).qrcode, "qr");
+  const adapter = new WeixinIlinkAdapter({ client, credentialStore: credentials, qrRenderer: async (value) => { renderedQrUrl = value; return "data:image/png;base64,fixture"; } });
+  const login = await adapter.beginLogin();
+  assert.equal(login.qrcode, "qr");
+  assert.equal(login.imageUrl, "data:image/png;base64,fixture");
+  assert.equal(renderedQrUrl, "https://liteapp.weixin.qq.com/q/example?bot_type=3");
   assert.equal((await adapter.pollLogin()).status, "confirmed");
   assert.equal(saved.ownerId, "owner");
   assert.throws(() => validateIlinkBaseUrl("https://attacker.example/api"), /官方域名/);
+  assert.throws(() => validateLoginQrUrl("https://attacker.example/qr"), /官方域名/);
+});
+
+test("Weixin login URL renders to an in-memory PNG data URL", async () => {
+  const rendered = await renderLoginQr("https://liteapp.weixin.qq.com/q/example?bot_type=3");
+  assert.match(rendered, /^data:image\/png;base64,/);
+  assert.ok(rendered.length > 1_000);
 });
 
 test("Weixin credentials keep token and reply contexts outside metadata and backup state", async (t) => {
