@@ -115,7 +115,12 @@ class AgentHost {
       if (!alreadyRunning) await this.store.transition(job, "running");
       const dirtyBefore = await this.gitGuard.changedPaths(PATHS.repoRoot);
       const unrelated = dirtyBefore.filter((item) => !isSystemPath(item));
-      if (unrelated.length) throw new Error(`主工作区有未受管变更，拒绝执行：${unrelated.join(", ")}`);
+      // A read-only run has no filesystem mutation tools, so unrelated edits in
+      // the developer's main worktree are a baseline to preserve, not a reason
+      // to stop chat/search. Writable jobs still require a clean merge target.
+      if (job.decision.needsWorktree && unrelated.length) {
+        throw new Error(`主工作区有未受管变更，拒绝执行：${unrelated.join(", ")}`);
+      }
 
       await this.#commitSystemRecords(job, `syno: start ${job.id}`);
 
@@ -198,7 +203,8 @@ class AgentHost {
       const changes = typeof this.gitGuard.changes === "function"
         ? await this.gitGuard.changes(workspace)
         : (await this.gitGuard.changedPaths(workspace)).map((item) => ({ status: "M", path: item, kind: "existing" }));
-      const executorChanges = changes.filter((item) => !isSystemPath(item.path));
+      const baselinePaths = new Set(dirtyBefore.filter((item) => !isSystemPath(item)));
+      const executorChanges = changes.filter((item) => !isSystemPath(item.path) && !baselinePaths.has(item.path));
       const executorPaths = [...new Set(executorChanges.flatMap((item) => [item.path, item.sourcePath].filter(Boolean)))];
       const validation = await this.validator({ repoRoot: workspace, changedPaths: executorPaths, decision: job.decision });
       job.changedPaths = validation.changedPaths;

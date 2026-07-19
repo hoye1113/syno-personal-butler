@@ -155,6 +155,28 @@ test("channel message request keys deduplicate retried jobs", async (t) => {
   assert.equal(second.job.id, first.job.id);
 });
 
+test("read-only channel jobs preserve unrelated developer changes", async (t) => {
+  const opsRoot = path.join(PATHS.runtimeRoot, "tests", `dirty-read-${Date.now()}`);
+  t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
+  const store = new JobStore({ opsRoot });
+  const commits = [];
+  const git = {
+    async changedPaths() { return ["apps/syno/public/syno.js"]; },
+    async changes() { return [{ status: " M", path: "apps/syno/public/syno.js", kind: "existing" }]; },
+    async commitPaths(paths) { commits.push(paths); return { committed: false }; },
+  };
+  const host = new AgentHost({ store, executor: new FakeExecutor(), gitGuard: git });
+
+  const first = await host.receive({ intent: "chat", text: "first" }, { channel: "weixin", senderId: "owner", messageId: "dirty-1" });
+  const second = await host.receive({ intent: "chat", text: "second" }, { channel: "weixin", senderId: "owner", messageId: "dirty-2" });
+
+  assert.equal(first.job.status, "completed");
+  assert.equal(second.job.status, "completed");
+  assert.deepEqual(first.job.changedPaths, []);
+  assert.deepEqual(second.job.changedPaths, []);
+  assert.equal(commits.flat().includes("apps/syno/public/syno.js"), false);
+});
+
 test("retryable Provider failures stay durable without switching executors", async (t) => {
   const opsRoot = path.join(PATHS.runtimeRoot, "tests", `provider-wait-${Date.now()}`);
   t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));

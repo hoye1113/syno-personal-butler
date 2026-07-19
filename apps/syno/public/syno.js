@@ -7,6 +7,9 @@
   const labels = { knowledge: "知识", learn: "学习", create: "创作", jobs: "任务与审批", notifications: "通知", settings: "设置", chat: "问赛诺" };
   let active = "knowledge";
   let lastTrigger = null;
+  let weixinLoginGeneration = 0;
+  let weixinLoginTimer = null;
+  let weixinLoginInFlight = 0;
 
   const focusableSelector = [
     "a[href]",
@@ -299,31 +302,58 @@
   async function beginWeixinLogin() {
     const status = document.querySelector("#synoWeixinStatus");
     status.textContent = "正在获取二维码…";
+    const generation = ++weixinLoginGeneration;
+    clearTimeout(weixinLoginTimer);
     try {
       const result = await api("/api/syno/weixin/login/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      if (generation !== weixinLoginGeneration) return;
       const image = document.querySelector("#synoWeixinQr");
       image.src = result.imageUrl;
       image.hidden = false;
-      document.querySelector("#synoWeixinPoll").hidden = false;
-      status.textContent = "请用 Android 微信扫码并在手机确认。二维码过期后重新获取。";
+      status.textContent = "请用 Android 微信扫码并在手机确认；赛诺正在自动等待连接。";
+      scheduleWeixinLoginPoll(generation, 0);
     } catch (error) { status.textContent = error.message; }
   }
 
-  async function pollWeixinLogin() {
+  function scheduleWeixinLoginPoll(generation, delayMs = 750) {
+    if (generation !== weixinLoginGeneration) return;
+    clearTimeout(weixinLoginTimer);
+    weixinLoginTimer = setTimeout(() => pollWeixinLogin(generation), delayMs);
+  }
+
+  async function pollWeixinLogin(generation) {
+    if (generation !== weixinLoginGeneration) return;
+    if (weixinLoginInFlight) { scheduleWeixinLoginPoll(generation, 250); return; }
+    weixinLoginInFlight = generation;
     const status = document.querySelector("#synoWeixinStatus");
-    status.textContent = "正在确认扫码状态…";
     try {
       const result = await api("/api/syno/weixin/login/poll", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      if (generation !== weixinLoginGeneration) return;
       if (result.status === "confirmed") {
+        weixinLoginGeneration += 1;
+        clearTimeout(weixinLoginTimer);
         const connection = await api("/api/syno/weixin/connect", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
         status.textContent = connection.running
           ? "已连接。请在 ClawBot 私聊发送一条文字完成收发验证。"
           : (connection.lastError || "凭据已保存，后台 Worker 将接管连接。");
         document.querySelector("#synoWeixinQr").hidden = true;
-        document.querySelector("#synoWeixinPoll").hidden = true;
         await loadChannelStatus();
-      } else status.textContent = `当前状态：${result.status}。请在手机完成确认后重试。`;
-    } catch (error) { status.textContent = error.message; }
+      } else if (["expired", "verify_code_blocked"].includes(result.status)) {
+        status.textContent = "二维码已失效，请重新获取。";
+      } else {
+        status.textContent = result.status === "scaned"
+          ? "已扫码，等待手机确认…"
+          : "等待扫码确认中…";
+        scheduleWeixinLoginPoll(generation);
+      }
+    } catch {
+      if (generation === weixinLoginGeneration) {
+        status.textContent = "扫码状态连接暂时中断，正在自动重试…";
+        scheduleWeixinLoginPoll(generation, 1_500);
+      }
+    } finally {
+      if (weixinLoginInFlight === generation) weixinLoginInFlight = 0;
+    }
   }
 
   async function setWeixinHome() {
@@ -634,7 +664,6 @@
   document.querySelector("#synoIntakeSubmit")?.addEventListener("click", submitIntake);
   document.querySelector("#synoChatForm")?.addEventListener("submit", submitChat);
   document.querySelector("#synoWeixinLogin")?.addEventListener("click", beginWeixinLogin);
-  document.querySelector("#synoWeixinPoll")?.addEventListener("click", pollWeixinLogin);
   document.querySelector("#synoWeixinHome")?.addEventListener("click", setWeixinHome);
   document.querySelector("#synoLearningForm")?.addEventListener("submit", submitLearning);
   document.querySelector("#synoTeachBackForm")?.addEventListener("submit", submitTeachBack);

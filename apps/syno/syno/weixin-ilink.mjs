@@ -54,10 +54,11 @@ async function fetchJson(url, options = {}, timeoutMs = 20_000) {
 }
 
 class WeixinIlinkClient {
-  constructor({ baseUrl = DEFAULT_BASE_URL, token = "", fetcher = fetchJson } = {}) {
+  constructor({ baseUrl = DEFAULT_BASE_URL, token = "", fetcher = fetchJson, fetchImpl = fetch } = {}) {
     this.baseUrl = validateIlinkBaseUrl(baseUrl);
     this.token = token;
     this.fetcher = fetcher;
+    this.fetch = fetchImpl;
   }
   headers({ authenticated = true } = {}) {
     return {
@@ -76,16 +77,29 @@ class WeixinIlinkClient {
   async getQrStatus(qrcode) {
     return this.fetcher(this.url(`ilink/bot/get_qrcode_status?qrcode=${encodeURIComponent(qrcode)}`), { headers: this.headers({ authenticated: false }) }, 40_000);
   }
-  async getUpdates(cursor = "", signal) {
-    const response = await fetch(this.url("ilink/bot/getupdates"), {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify({ get_updates_buf: cursor, base_info: { channel_version: "1.0.0", bot_agent: "Syno/1.0.0" } }),
-      signal,
-      redirect: "error",
-    });
-    if (!response.ok) throw new Error(`getUpdates HTTP ${response.status}`);
-    return response.json();
+  async getUpdates(cursor = "", signal, timeoutMs = 45_000) {
+    const controller = new AbortController();
+    let timedOut = false;
+    const abort = () => controller.abort(signal?.reason || new Error("canceled"));
+    signal?.addEventListener("abort", abort, { once: true });
+    const timer = setTimeout(() => { timedOut = true; controller.abort(new Error("long-poll timeout")); }, timeoutMs);
+    try {
+      const response = await this.fetch(this.url("ilink/bot/getupdates"), {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify({ get_updates_buf: cursor, base_info: { channel_version: "1.0.0", bot_agent: "Syno/1.0.0" } }),
+        signal: controller.signal,
+        redirect: "error",
+      });
+      if (!response.ok) throw new Error(`getUpdates HTTP ${response.status}`);
+      return response.json();
+    } catch (error) {
+      if (timedOut && !signal?.aborted) return { ret: 0, msgs: [], get_updates_buf: cursor };
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+    }
   }
   async sendText({ toUserId, contextToken, text }) {
     return this.fetcher(this.url("ilink/bot/sendmessage"), {
@@ -338,19 +352,27 @@ class WeixinIlinkAdapter {
     const contextToken = message.contextToken || this.contexts.get(toUserId);
     if (!toUserId || !contextToken) return { delivered: false, reason: "no_active_context" };
     const result = await this.client.sendText({ toUserId, contextToken, text: String(message.text || message.body || "") });
-    return { delivered: result.ret === 0 || result.ret === undefined };
+    const explicitFailure = (result.ret !== undefined && Number(result.ret) !== 0)
+      || (result.errcode !== undefined && Number(result.errcode) !== 0);
+    const accepted = result.message_id !== undefined || Number(result.ret) === 0;
+    return { delivered: !explicitFailure && accepted, ...(!explicitFailure && accepted ? {} : { reason: "provider_rejected" }) };
   }
 
   async #pollLoop(signal) {
     let backoff = 1_000;
+    let longPollingTimeoutMs = 45_000;
     while (!signal.aborted && this.running) {
       try {
-        const result = await this.client.getUpdates(this.credential.cursor || "", signal);
+        const result = await this.client.getUpdates(this.credential.cursor || "", signal, longPollingTimeoutMs);
         if (result.errcode === -14) throw Object.assign(new Error("微信 Token 已失效，请重新扫码"), { code: "TOKEN_EXPIRED" });
         if (result.ret && result.ret !== 0) throw new Error(result.errmsg || `getUpdates ret=${result.ret}`);
         for (const message of result.msgs || []) await this.handleInbound(message);
         this.credential.cursor = result.get_updates_buf || this.credential.cursor || "";
         await this.#persistRuntimeState();
+        if (Number.isFinite(Number(result.longpolling_timeout_ms))) {
+          longPollingTimeoutMs = Math.min(120_000, Math.max(15_000, Number(result.longpolling_timeout_ms) + 5_000));
+        }
+        this.lastError = null;
         backoff = 1_000;
       } catch (error) {
         if (signal.aborted || error.name === "AbortError") break;

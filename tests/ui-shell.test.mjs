@@ -29,6 +29,17 @@ test("knowledge-loop Web actions use inline evidence and explicit lifecycle deci
   assert.doesNotMatch(script, /window\.prompt/);
 });
 
+test("Weixin login auto-polls without a manual scan-confirm button", async () => {
+  const publicRoot = path.join(root, "apps", "syno", "public");
+  const [html, script] = await Promise.all([
+    fs.readFile(path.join(publicRoot, "index.html"), "utf8"),
+    fs.readFile(path.join(publicRoot, "syno.js"), "utf8"),
+  ]);
+  assert.doesNotMatch(html, /id="synoWeixinPoll"/);
+  assert.match(script, /scheduleWeixinLoginPoll\(generation, 0\)/);
+  assert.match(script, /扫码状态连接暂时中断，正在自动重试/);
+});
+
 test("paper-cut guardian is layered and reduced-motion safe", async () => {
   const publicRoot = path.join(root, "apps", "syno", "public");
   const [html, css] = await Promise.all([

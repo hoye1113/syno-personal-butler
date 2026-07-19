@@ -9,7 +9,7 @@ import { ChannelHub, FakeChannelAdapter } from "../apps/syno/syno/channels.mjs";
 import { FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore } from "../apps/syno/syno/feishu-channel.mjs";
 import { parseWeixinApproval } from "../apps/syno/syno/runtime.mjs";
 import { Scheduler, occurrenceFor } from "../apps/syno/syno/scheduler.mjs";
-import { LocalCredentialStore, LocalProcessLock, normalizeInbound, readLimitedBody, renderLoginQr, sniffMime, validateIlinkBaseUrl, validateLoginQrUrl, WeixinIlinkAdapter } from "../apps/syno/syno/weixin-ilink.mjs";
+import { LocalCredentialStore, LocalProcessLock, normalizeInbound, readLimitedBody, renderLoginQr, sniffMime, validateIlinkBaseUrl, validateLoginQrUrl, WeixinIlinkAdapter, WeixinIlinkClient } from "../apps/syno/syno/weixin-ilink.mjs";
 
 test("Channel and Calendar fake Adapters satisfy their contracts", async () => {
   const channel = new FakeChannelAdapter();
@@ -69,6 +69,47 @@ test("Weixin login URL renders to an in-memory PNG data URL", async () => {
   const rendered = await renderLoginQr("https://liteapp.weixin.qq.com/q/example?bot_type=3");
   assert.match(rendered, /^data:image\/png;base64,/);
   assert.ok(rendered.length > 1_000);
+});
+
+test("Weixin long poll times out locally and preserves its cursor", async () => {
+  const client = new WeixinIlinkClient({
+    fetchImpl: async (_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })), { once: true });
+    }),
+  });
+  assert.deepEqual(await client.getUpdates("cursor-one", undefined, 5), { ret: 0, msgs: [], get_updates_buf: "cursor-one" });
+});
+
+test("Weixin poller replies to consecutive owner messages and advances each state", async () => {
+  let saved = { token: "test", baseUrl: "https://ilinkai.weixin.qq.com/", ownerId: "owner", cursor: "", contexts: {}, seenIds: [] };
+  const credentials = {
+    async load() { return structuredClone(saved); },
+    async save(value) { saved = structuredClone(value); },
+    async clear() {},
+  };
+  let updateCall = 0;
+  const sent = [];
+  const client = {
+    async getUpdates(_cursor, signal) {
+      updateCall += 1;
+      if (updateCall <= 2) return {
+        ret: 0,
+        get_updates_buf: `cursor-${updateCall}`,
+        msgs: [{ message_id: `message-${updateCall}`, message_type: 1, from_user_id: "owner", context_token: `context-${updateCall}`, item_list: [{ type: 1, text_item: { text: `message ${updateCall}` } }] }],
+      };
+      return new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })), { once: true }));
+    },
+    async sendText(value) { sent.push(value); return { message_id: `reply-${sent.length}` }; },
+  };
+  const processLock = { async acquire() { return true; }, async release() {} };
+  const adapter = new WeixinIlinkAdapter({ client, clientFactory: () => client, credentialStore: credentials, processLock, onMessage: async ({ text }) => ({ text: `reply to ${text}` }) });
+  await adapter.start();
+  for (let index = 0; index < 40 && (sent.length < 2 || saved.cursor !== "cursor-2"); index += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(sent.length, 2);
+  assert.equal(saved.cursor, "cursor-2");
+  assert.deepEqual(saved.seenIds, ["message-1", "message-2"]);
+  assert.equal(adapter.status().lastError, null);
+  await adapter.stop();
 });
 
 test("Weixin credentials keep token and reply contexts outside metadata and backup state", async (t) => {
