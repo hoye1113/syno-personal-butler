@@ -12,6 +12,10 @@ import { createWeixinMessageHandler, parseWeixinApproval } from "../apps/syno/sy
 import { Scheduler, occurrenceFor } from "../apps/syno/syno/scheduler.mjs";
 import { LocalCredentialStore, LocalProcessLock, normalizeInbound, parseAttachmentKey, readLimitedBody, renderLoginQr, resolveAttachmentUrl, sniffMime, validateIlinkBaseUrl, validateLoginQrUrl, WeixinIlinkAdapter, WeixinIlinkClient } from "../apps/syno/syno/weixin-ilink.mjs";
 
+async function removeTemp(root) {
+  await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+}
+
 test("Channel and Calendar fake Adapters satisfy their contracts", async () => {
   const channel = new FakeChannelAdapter();
   const hub = new ChannelHub({ fake: channel });
@@ -402,7 +406,7 @@ test("Feishu registration URL renders to an in-memory PNG data URL", async () =>
 
 test("Feishu registration starts the long connection after Owner confirmation", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-feishu-registration-"));
-  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  t.after(() => removeTemp(root));
   let saved = null;
   let connects = 0;
   const adapter = new FeishuChannelAdapter({
