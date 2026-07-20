@@ -4,6 +4,7 @@ import path from "node:path";
 import QRCode from "qrcode";
 
 import { PATHS } from "./paths.mjs";
+import { ProcessFileLock } from "./process-lock.mjs";
 import { runDpapi } from "./provider-credential-store.mjs";
 
 async function atomicWrite(file, value) {
@@ -134,9 +135,9 @@ class FeishuCredentialStore {
 async function officialSdk() { return import("@larksuiteoapi/node-sdk"); }
 
 class FeishuChannelAdapter {
-  constructor({ credentials = new FeishuCredentialStore(), stateStore = new FeishuStateStore(), sdkLoader = officialSdk, channelFactory, onMessage = async () => ({ text: "已收到" }), retryDelayMs = 30_000 } = {}) {
+  constructor({ credentials = new FeishuCredentialStore(), stateStore = new FeishuStateStore(), processLock = new ProcessFileLock({ file: path.join(PATHS.runtimeRoot, "locks", "feishu-channel.lock"), timeoutMs: 250 }), sdkLoader = officialSdk, channelFactory, onMessage = async () => ({ text: "已收到" }), retryDelayMs = 30_000 } = {}) {
     this.credentials = credentials; this.sdkLoader = sdkLoader; this.channelFactory = channelFactory; this.onMessage = onMessage;
-    this.stateStore = stateStore; this.retryDelayMs = retryDelayMs;
+    this.stateStore = stateStore; this.processLock = processLock; this.processLease = null; this.retryDelayMs = retryDelayMs;
     this.channel = null; this.running = false; this.ownerBound = false; this.lastError = ""; this.queue = []; this.draining = false; this.drainPromise = null; this.seen = new Set(); this.inflight = new Set(); this.retryTimer = null;
     this.registration = null; this.registrationState = { status: "idle" };
   }
@@ -146,30 +147,42 @@ class FeishuChannelAdapter {
     const credential = await this.credentials.load();
     this.ownerBound = Boolean(credential?.ownerOpenId);
     if (!credential) return this.status();
-    const sdk = this.channelFactory ? null : await this.sdkLoader();
-    const factory = this.channelFactory || ((options) => sdk.createLarkChannel(options));
-    this.channel = factory({
-      appId: credential.appId,
-      appSecret: credential.appSecret,
-      transport: "websocket",
-      policy: { dmMode: "open", requireMention: true, groupAllowlist: [] },
-      includeRawInMessage: false,
-      logger: SILENT_SDK_LOGGER,
-      loggerLevel: 0,
-    });
-    this.channel.on("message", (message) => this.#enqueue(message, credential).catch((error) => { this.lastError = error.message; }));
-    this.channel.on?.("error", (error) => { this.lastError = error.message; });
-    await this.channel.connect();
-    this.running = true;
-    await this.#recoverPending(credential);
-    return this.status();
+    try { this.processLease = await this.processLock.acquire(); }
+    catch (error) {
+      if (error.code !== "PROCESS_LOCK_TIMEOUT") throw error;
+      this.lastError = "FEISHU_PROCESS_LOCKED";
+      return this.status();
+    }
+    try {
+      const sdk = this.channelFactory ? null : await this.sdkLoader();
+      const factory = this.channelFactory || ((options) => sdk.createLarkChannel(options));
+      this.channel = factory({
+        appId: credential.appId,
+        appSecret: credential.appSecret,
+        transport: "websocket",
+        policy: { dmMode: "open", requireMention: true, groupAllowlist: [] },
+        includeRawInMessage: false,
+        logger: SILENT_SDK_LOGGER,
+        loggerLevel: 0,
+      });
+      this.channel.on("message", (message) => this.#enqueue(message, credential).catch((error) => { this.lastError = error.message; }));
+      this.channel.on?.("error", (error) => { this.lastError = error.message; });
+      await this.channel.connect();
+      this.running = true; this.lastError = "";
+      await this.#recoverPending(credential);
+      return this.status();
+    } catch (error) {
+      await this.processLease?.release(); this.processLease = null; this.channel = null;
+      throw error;
+    }
   }
 
   async stop() {
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = null;
     await this.drainPromise;
-    await this.channel?.disconnect?.();
+    try { await this.channel?.disconnect?.(); }
+    finally { await this.processLease?.release(); this.processLease = null; }
     this.channel = null; this.running = false;
     return this.status();
   }

@@ -8,6 +8,7 @@ import path from "node:path";
 import { FakeCalendarAdapter, MarkdownCalendarAdapter } from "../apps/syno/syno/calendar-adapters.mjs";
 import { ChannelHub, FakeChannelAdapter } from "../apps/syno/syno/channels.mjs";
 import { FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, renderRegistrationQr, SILENT_SDK_LOGGER, validateRegistrationUrl } from "../apps/syno/syno/feishu-channel.mjs";
+import { ProcessFileLock } from "../apps/syno/syno/process-lock.mjs";
 import { createWeixinMessageHandler, parseWeixinApproval } from "../apps/syno/syno/runtime.mjs";
 import { Scheduler, occurrenceFor } from "../apps/syno/syno/scheduler.mjs";
 import { LocalCredentialStore, LocalProcessLock, normalizeInbound, parseAttachmentKey, readLimitedBody, renderLoginQr, resolveAttachmentUrl, sniffMime, validateIlinkBaseUrl, validateLoginQrUrl, WeixinIlinkAdapter, WeixinIlinkClient } from "../apps/syno/syno/weixin-ilink.mjs";
@@ -356,6 +357,35 @@ test("Feishu persists successful dedupe and recovers a failed owner DM after res
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.deepEqual(recovered, ["retry"]);
   assert.deepEqual((await new FeishuStateStore({ file: stateFile }).snapshot()).pending, []);
+  await second.stop();
+});
+
+test("Feishu process lock permits only one connected recovery owner", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-feishu-lock-"));
+  t.after(() => removeTemp(root));
+  const lockFile = path.join(root, "feishu.lock");
+  const credentials = { async load() { return { appId: "app", appSecret: "secret", ownerOpenId: "owner" }; } };
+  let connected = 0;
+  const channelFactory = () => ({
+    on() {},
+    async connect() { connected += 1; },
+    async disconnect() {},
+    async send() {},
+  });
+  const makeAdapter = () => new FeishuChannelAdapter({
+    credentials,
+    stateStore: new FeishuStateStore({ file: path.join(root, "state.json") }),
+    processLock: new ProcessFileLock({ file: lockFile, timeoutMs: 5, pollMs: 1 }),
+    channelFactory,
+  });
+  const first = makeAdapter();
+  const second = makeAdapter();
+  assert.equal((await first.start()).running, true);
+  assert.equal((await second.start()).running, false);
+  assert.equal(connected, 1);
+  await first.stop();
+  assert.equal((await second.start()).running, true);
+  assert.equal(connected, 2);
   await second.stop();
 });
 
