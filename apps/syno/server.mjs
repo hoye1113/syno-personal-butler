@@ -42,6 +42,13 @@ const TIMEZONE = normalizeTimeZone(
 );
 const LARK_CLI_CANDIDATES = [
   process.env.LARK_CLI_PATH,
+  ...(process.platform === "win32" ? [
+    path.join(path.dirname(process.execPath), "lark-cli.ps1"),
+    path.join(path.dirname(process.execPath), "lark-cli.cmd"),
+    process.env.APPDATA ? path.join(process.env.APPDATA, "npm", "lark-cli.cmd") : "",
+    process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "pnpm", "lark-cli.cmd") : "",
+    process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "pnpm", "lark-cli.ps1") : "",
+  ] : []),
   process.env.HOME ? path.join(process.env.HOME, ".npm-global/bin/lark-cli") : "",
   "/opt/homebrew/bin/lark-cli",
   "/usr/local/bin/lark-cli",
@@ -2120,6 +2127,7 @@ function buildCommandEnv(command) {
   if (command !== "lark-cli") return process.env;
   const pathEntries = [
     path.dirname(process.env.LARK_CLI_PATH || ""),
+    ...(process.platform === "win32" ? [path.dirname(process.execPath)] : []),
     process.env.HOME ? path.join(process.env.HOME, ".npm-global/bin") : "",
     "/opt/homebrew/bin",
     "/usr/local/bin",

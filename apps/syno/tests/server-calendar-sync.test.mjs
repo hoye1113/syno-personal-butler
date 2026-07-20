@@ -77,6 +77,23 @@ test("Windows npm lark-cli wrappers resolve to their Node entry", { timeout: 45_
   assert.equal(response.body.job.result.sideEffects.external.results[0].syncStatus, "已同步");
 });
 
+test("Windows restart discovers lark-cli beside node without LARK_CLI_PATH", { timeout: 45_000, skip: process.platform !== "win32" }, async (t) => {
+  const fixture = await createFixture("npm-restart-discovery", { calendarProvider: "lark" });
+  const nodeExecutable = path.join(fixture.tempRoot, "node.exe");
+  try { await fs.link(process.execPath, nodeExecutable); }
+  catch { await fs.copyFile(process.execPath, nodeExecutable); }
+  const wrapper = path.join(fixture.tempRoot, "lark-cli.ps1");
+  const npmEntry = path.join(fixture.tempRoot, "node_modules", "@larksuite", "cli", "scripts", "run.js");
+  await fs.mkdir(path.dirname(npmEntry), { recursive: true });
+  await fs.copyFile(fixture.fakeLarkCliPath, npmEntry);
+  await fs.writeFile(wrapper, "throw 'this wrapper must not be spawned directly'\n", "utf8");
+  const server = await startFixtureServer(t, fixture, {}, { executable: nodeExecutable, includeLarkCliPath: false });
+  const response = await requestJson(server.port, "/api/topics");
+  assert.equal(response.statusCode, 200, server.logs.text());
+  assert.equal(response.body.lark.available, true, JSON.stringify(response.body.lark));
+  assert.equal(response.body.lark.cliVersion, "1.0.0");
+});
+
 async function createFixture(name, overrides = {}) {
   const tempRoot = await fs.mkdtemp(path.join(tmpdir(), `syno-calendar-${name}-`));
   const vaultRoot = tempRoot;
@@ -117,9 +134,9 @@ else if (args[0] === "calendar" && args[1] === "events" && args[2] === "create")
   return { tempRoot, vaultRoot, configPath, fakeLarkCliPath, topicPath };
 }
 
-async function startFixtureServer(t, fixture, extraEnv = {}) {
+async function startFixtureServer(t, fixture, extraEnv = {}, { executable = process.execPath, includeLarkCliPath = true } = {}) {
   const port = await getFreePort();
-  const child = spawn(process.execPath, ["server.mjs"], {
+  const child = spawn(executable, ["server.mjs"], {
     cwd: PROJECT_ROOT,
     env: {
       ...process.env,
@@ -130,7 +147,7 @@ async function startFixtureServer(t, fixture, extraEnv = {}) {
       SYNO_LOCAL_DATA: path.join(fixture.tempRoot, "local-data"),
       SYNO_RUNTIME_ROOT: path.join(fixture.tempRoot, "runtime"),
       SYNO_EXECUTOR: "fake",
-      LARK_CLI_PATH: fixture.fakeLarkCliPath,
+      ...(includeLarkCliPath ? { LARK_CLI_PATH: fixture.fakeLarkCliPath } : { LARK_CLI_PATH: "" }),
       PORT: String(port),
       TOPIC_PLANNER_CONFIG: fixture.configPath,
     },
