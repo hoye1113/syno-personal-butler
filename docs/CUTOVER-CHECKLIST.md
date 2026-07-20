@@ -36,8 +36,8 @@ Provider 自动采用门、故障注入与主人真实断网步骤见 `docs/PROV
 ## D. 数据保护与启动
 
 - [x] 停止 Web/Worker，确认没有 `running` Job。
-- [x] 记录精确 Git commit 与 `git status --short`（当前验收代码基线 `bc5937b`；封板文档和缓存稳定性修复为本 Job 明确差异）。
-- [x] 备份仓库 `vault/`、`ops/`、`contracts/`、`config/` 和配置文档到 `C:\tmp\syno-repository-backup-20260720.zip`；407 项，敏感根排除，SHA-256 前缀 `9FF69A0E4A86E2ED`。
+- [x] 记录精确 Git commit 与干净 `git status --short`（当前验收代码基线 `3c2b362`）。
+- [x] 使用 `git archive` 备份当前跟踪事实、源码和配置到 `C:\tmp\syno-repository-backup-3c2b362.zip`；650 项，不包含本机忽略目录或凭据，SHA-256 `430BA4B9440AB011308A43EA24EEF1F149DBA39A7D59A6795A312B2B32E491F6`。
 - [x] 执行状态 backup/verify；`C:\tmp\syno-state-final-bc5937b` 真实归档 52 项，manifest 的 `credentialsIncluded` 为 `false`，SHA-256 为 `DE0AD96C68170CA10498721C53F625A8405205DA912E095C2EFD026F70DAD969`。
 - [x] 在空隔离状态目录完成恢复演练，并验证二次恢复被拒绝；正式状态未被覆盖。
 - [x] 启动 Web/Worker，验证 Today、本地搜索、审批、提醒和微信/飞书消息通道健康；日历授权与选择在重启后恢复。
@@ -46,8 +46,7 @@ Provider 自动采用门、故障注入与主人真实断网步骤见 `docs/PROV
 ## E. 封板
 
 - [ ] 更新 `docs/FINAL-ACCEPTANCE.md` 为全部必选项通过，并附真实外部证据摘要。
-- [x] 对 `bc5937b` 再次运行完整测试、仓库和 `C:\tmp\syno-fresh-bc5937b`；锁文件离线安装下载 0，Node 150/150、vault 57/57、仓库校验通过。最新服务已完成桌面/移动无溢出、焦点恢复、减少动画、Token 不回显与 0 error/0 warning 浏览器复验。
-- [ ] 对最终封板提交再执行一次 fresh-clone 安装、Node/vault/verify 和启动检查。
+- [x] 对 `3c2b362` 再次运行完整测试、仓库和 `C:\tmp\syno-fresh-3c2b362`；锁文件离线安装下载 0，Node 150/150、vault 57/57、主/fresh 仓库校验均为 570 项；隔离 4327 端口冷启动通过。最新服务已完成桌面/移动无溢出、焦点恢复、减少动画、Token 不回显与 0 error/0 warning 浏览器复验。
 - [ ] 仅精确暂存本 Job 路径并创建本地提交；禁止 `git add -A`。
 - [ ] 不自动 Push。Push 或远端发布只能由主人另行明确要求。
 
