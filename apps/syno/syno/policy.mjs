@@ -14,6 +14,7 @@ const HIGH_RISK_INTENTS = new Set([
   "code_change",
 ]);
 const COMPLEX_INTENTS = new Set(["complex_analysis"]);
+const LOCAL_CONTROL_INTENTS = new Set(["system_control"]);
 
 const WRITE_INTENTS = new Set([
   "create_action",
@@ -54,8 +55,11 @@ function evaluate(request = {}, context = {}) {
   const intent = inferIntent(request);
   const developmentMode = context.developmentMode === true;
   const highRisk = HIGH_RISK_INTENTS.has(intent);
+  const localControl = LOCAL_CONTROL_INTENTS.has(intent);
   const writes = WRITE_INTENTS.has(intent);
-  const profile = intent === "code_change"
+  const profile = localControl
+    ? "syno-read"
+    : intent === "code_change"
     ? "syno-code"
     : highRisk || intent === "curate_note"
       ? "syno-curate"
@@ -63,8 +67,8 @@ function evaluate(request = {}, context = {}) {
         ? "syno-ops"
         : "syno-read";
   const trustedAutomation = context.trustedAutomation === true && intent === "create_report";
-  const approval = highRisk ? "double" : writes && !trustedAutomation ? "single" : "none";
-  const risk = highRisk ? "high" : writes ? "low" : "read";
+  const approval = highRisk ? "double" : localControl || (writes && !trustedAutomation) ? "single" : "none";
+  const risk = highRisk ? "high" : localControl || writes ? "low" : "read";
   const executor = "cognitive-runtime";
   const denied = intent === "code_change" && !developmentMode;
   return Object.freeze({
@@ -82,6 +86,8 @@ function evaluate(request = {}, context = {}) {
     allowed: !denied,
     reason: denied
       ? "开发模式默认关闭，拒绝由 Syno 修改自身代码"
+      : localControl
+        ? "本机生命周期控制需要主人显式确认并写入审计事件"
       : highRisk
         ? "命中确定性高风险意图，需要隔离工作区与双审批"
       : writes
@@ -90,4 +96,4 @@ function evaluate(request = {}, context = {}) {
   });
 }
 
-export { COMPLEX_INTENTS, HIGH_RISK_INTENTS, PROFILE_ROOTS, evaluate, inferIntent };
+export { COMPLEX_INTENTS, HIGH_RISK_INTENTS, LOCAL_CONTROL_INTENTS, PROFILE_ROOTS, evaluate, inferIntent };

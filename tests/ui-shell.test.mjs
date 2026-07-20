@@ -34,6 +34,9 @@ test("Today and settings disclose the daily decision before technical configurat
   assert.match(html, /id="synoQuickCaptureFileButton"/);
   for (const id of ["synoKnowledgeFilters", "synoKnowledgeTags", "synoKnowledgeSource", "synoKnowledgeStability", "synoKnowledgeFrom", "synoKnowledgeTo"]) assert.match(html, new RegExp(`id="${id}"`));
   assert.match(html, /id="synoDataSettings"[\s\S]*保留策略[\s\S]*诊断[\s\S]*id="synoPreferenceForm"/);
+  assert.match(html, /src="\.\/syno-ui-model\.js"[\s\S]*src="\.\/syno\.js"/);
+  assert.match(html, /id="synoSettingWeixin"[^>]*data-setting-target="synoWeixinSettings"/);
+  assert.match(html, /<details[^>]*id="synoWeixinSettings"[\s\S]*id="synoWeixinLogin"/);
   assert.match(html, /id="synoWorkspaceSettings"[^>]*hidden/);
   assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
   assert.match(html, /data-syno-panel="jobs">审批中心/);
@@ -48,8 +51,12 @@ test("knowledge-loop Web actions use inline evidence and explicit lifecycle deci
   assert.match(script, /rawOutput: document\.querySelector\("#synoLearningArtifact"\)/);
   assert.match(script, /loadOutputOpportunities/);
   assert.match(script, /savePreferences/);
-  assert.match(script, /needTargets = \{ approval: "jobs", review: "learn", output: "create" \}/);
+  assert.match(script, /uiModel\.todayTarget/);
+  assert.match(script, /action\.addEventListener\("click", \(\) => show\(/);
+  assert.match(script, /button\.addEventListener\("click", \(\) => show\(/);
   assert.match(script, /windowsServiceMutation/);
+  assert.match(script, /uiModel\.outputActions/);
+  assert.doesNotMatch(script, /\["published", "dismissed"\]\.includes\(opportunity\.status\)/);
   assert.match(script, /aria-busy/);
   assert.doesNotMatch(script, /window\.prompt/);
 });

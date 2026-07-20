@@ -1,4 +1,5 @@
 import { PriorityEngine } from "./priority-engine.mjs";
+import { isActionableOutput } from "./output-lifecycle.mjs";
 
 const JOB_TITLES = Object.freeze({
   "claims.create": "确认一条观点与证据",
@@ -44,7 +45,7 @@ class TodayService {
         .map((job) => ({ id: job.id, kind: "approval", title: jobTitle(job), status: job.status, ref: job })),
       ...reviews.map((review) => ({ id: review.id, kind: "review", title: `复习：${review.knowledgeRef}`, status: "due", dueAt: review.nextReviewAt, ref: review })),
       ...signals
-        .filter((signal) => signal.kind === "output-opportunity" && ["accepted", "drafting", "practiced"].includes(signal.ref?.status))
+        .filter((signal) => signal.kind === "output-opportunity" && isActionableOutput(signal.ref) && signal.ref?.status !== "suggested")
         .map((signal) => ({ id: signal.ref.id, kind: "output", title: signal.title, status: signal.ref.status, ref: signal.ref })),
     ];
     const recentIntake = signals

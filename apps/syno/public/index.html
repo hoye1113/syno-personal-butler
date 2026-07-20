@@ -622,18 +622,6 @@
         </details>
       </section>
       <section class="syno-pane" data-syno-pane="notifications" hidden>
-        <section class="syno-channel-setup" aria-labelledby="synoWeixinTitle">
-          <div>
-            <p class="panel-tag">可选外部渠道</p>
-            <h3 id="synoWeixinTitle">微信 ClawBot 私聊</h3>
-            <p id="synoWeixinStatus">未连接。只允许扫码者本人，不启用群聊。</p>
-          </div>
-          <div class="syno-channel-actions">
-            <button id="synoWeixinLogin" class="ghost-btn" type="button">获取二维码</button>
-            <button id="synoWeixinHome" class="ghost-btn" type="button">设为主渠道</button>
-          </div>
-          <img id="synoWeixinQr" class="syno-weixin-qr" alt="微信 iLink 登录二维码" hidden />
-        </section>
         <div id="synoNotifications" class="syno-list" aria-live="polite"></div>
       </section>
       <section class="syno-pane" data-syno-pane="chat" hidden>
@@ -661,7 +649,7 @@
         <div class="syno-pane-intro"><p class="panel-tag">SETTINGS · 本机配置</p><h3>连接与运行</h3><p>先看五个状态；需要时再进入配置。凭据不会在页面回显。</p><button id="synoShowOnboarding" class="ghost-btn" type="button">重新查看首次使用引导</button></div>
         <div class="settings-status-list" aria-label="设置概览">
           <button id="synoSettingAi" type="button" data-setting-target="synoAiSettings"><span><strong>AI 服务</strong><small>理解、整理和创作</small></span><em>检测中</em></button>
-          <button id="synoSettingWeixin" type="button" data-syno-panel="notifications"><span><strong>微信</strong><small>快速收录与提醒</small></span><em>检测中</em></button>
+          <button id="synoSettingWeixin" type="button" data-setting-target="synoWeixinSettings"><span><strong>微信</strong><small>快速收录与提醒</small></span><em>检测中</em></button>
           <button id="synoSettingFeishu" type="button" data-setting-target="synoFeishuSettings"><span><strong>飞书</strong><small>日程与结构化通知</small></span><em>检测中</em></button>
           <button id="synoSettingAutostart" type="button" data-setting-target="synoAutostartSettings"><span><strong>开机自动运行</strong><small>登录 Windows 后后台启动</small></span><em>检测中</em></button>
           <button id="synoSettingData" type="button" data-setting-target="synoDataSettings"><span><strong>数据与备份</strong><small>本地事实源与恢复</small></span><em>本机保存</em></button>
@@ -681,6 +669,7 @@
             </form>
           </details>
         </details>
+        <details id="synoWeixinSettings" class="setting-detail"><summary>微信连接</summary><section class="syno-channel-setup" aria-labelledby="synoWeixinTitle"><div><h3 id="synoWeixinTitle">微信 ClawBot 私聊</h3><p id="synoWeixinStatus">未连接。只允许扫码者本人，不启用群聊。</p></div><div class="syno-channel-actions"><button id="synoWeixinLogin" class="ghost-btn" type="button">获取二维码</button><button id="synoWeixinHome" class="ghost-btn" type="button">设为主渠道</button></div><img id="synoWeixinQr" class="syno-weixin-qr" alt="微信 iLink 登录二维码" hidden /></section></details>
         <details id="synoFeishuSettings" class="setting-detail"><summary>飞书连接</summary><section class="syno-channel-setup"><p>扫码注册并绑定本人账号。</p><p id="synoFeishuStatus">尚未注册。</p><div class="syno-job-actions"><button id="synoFeishuRegister" class="ghost-btn" type="button">开始注册</button><button id="synoFeishuConnect" class="accent-btn" type="button">连接</button><button id="synoFeishuDisconnect" class="ghost-btn" type="button">断开</button></div><div id="synoFeishuQr"></div></section></details>
         <details id="synoAutostartSettings" class="setting-detail"><summary>开机自动运行</summary><p id="synoWindowsServiceHint">检测 Windows 后台服务…</p><div class="syno-job-actions"><button id="synoWindowsInstall" class="accent-btn" type="button">开启</button><button id="synoWindowsUninstall" class="ghost-btn" type="button">关闭</button></div></details>
         <details id="synoDataSettings" class="setting-detail"><summary>数据与备份</summary><p>知识保存在 vault，任务和审批保存在 ops；卸载开机任务不会删除它们。</p>
@@ -701,6 +690,7 @@
     <div id="synoDrawerScrim" class="syno-drawer-scrim" hidden></div>
 
     <script src="./app.js" defer></script>
+    <script src="./syno-ui-model.js" defer></script>
     <script src="./syno.js" defer></script>
   </body>
 </html>

@@ -189,6 +189,25 @@ test("SignalSourceRegistry exposes stale claims, pending intake, output opportun
   assert.deepEqual(events.map((item) => item.kind), ["claim-review", "ingest-pending", "output-opportunity", "knowledge-maintenance"]);
 });
 
+test("output lifecycle exposes one canonical actionable flag to every consumer", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-output-lifecycle-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const service = new OutputService({ opsRoot: path.join(root, "ops"), clock: () => new Date("2026-07-20T08:00:00.000Z") });
+  const { opportunity } = await service.createOpportunity({ title: "讲清 Agent Harness", reason: "需要输出验证理解", priority: 80 });
+  let records = await service.list();
+  assert.equal(records[0].id, opportunity.id);
+  assert.equal(records[0].actionable, true);
+  assert.deepEqual(records[0].allowedActions, ["accept", "dismiss"]);
+  await service.progress(opportunity.id, { action: "accept" });
+  await service.progress(opportunity.id, { action: "dismiss" });
+  records = await service.list();
+  assert.equal(records[0].actionable, false);
+  assert.deepEqual(records[0].allowedActions, []);
+
+  const events = await new SignalSourceRegistry({ outputs: { async list() { return records; } } }).collect();
+  assert.equal(events.some((item) => item.kind === "output-opportunity"), false);
+});
+
 test("KnowledgeMaintenanceSource reports orphan notes without inventing writes", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-maintenance-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));

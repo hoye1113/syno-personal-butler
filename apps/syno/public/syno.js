@@ -12,6 +12,7 @@
   let weixinLoginInFlight = 0;
   const setupState = { ai: false, channel: false, windows: false };
   const healthIssues = new Map();
+  const uiModel = window.SynoUiModel;
 
   const focusableSelector = [
     "a[href]",
@@ -570,7 +571,7 @@
       const item = snapshot.primary;
       const action = node("button", "accent-btn", item ? (item.kind === "review" ? "开始复习" : item.kind === "commitment" ? "去处理" : "开始") : "去收录一条内容");
       action.id = "synoTodayPrimaryAction"; action.type = "button";
-      action.addEventListener("click", () => select(item?.kind === "review" ? "learn" : item?.kind === "commitment" ? "jobs" : item ? "create" : "knowledge"));
+      action.addEventListener("click", () => show(uiModel.todayTarget(item), action));
       primary.replaceChildren(
         node("span", "", item ? priorityKind(item.kind) : "今日清场"),
         node("strong", "", item?.title || "从一条真正想理解的内容开始"),
@@ -581,8 +582,7 @@
       const needLabels = { approval: "待确认", review: "到期复习", output: "需要你的输出" };
       for (const entry of snapshot.needsYou || []) needs.append(node("button", "today-row", `${needLabels[entry.kind] || "待处理"} · ${entry.title}`));
       if (!needs.children.length) needs.append(node("p", "syno-empty", "没有需要你确认的事项。"));
-      const needTargets = { approval: "jobs", review: "learn", output: "create" };
-      needs.querySelectorAll("button").forEach((button, index) => button.addEventListener("click", () => select(needTargets[snapshot.needsYou[index].kind] || "today")));
+      needs.querySelectorAll("button").forEach((button, index) => button.addEventListener("click", () => show(uiModel.todayTarget(snapshot.needsYou[index]), button)));
       const recent = document.querySelector("#synoTodayRecent"); recent.replaceChildren();
       for (const entry of snapshot.recentIntake || []) recent.append(node("p", "today-row", `${entry.title} · ${entry.status === "proposed" ? "待确认收录方案" : entry.status}`));
       if (!recent.children.length) recent.append(node("p", "syno-empty", "今天还没有新收录。"));
@@ -699,10 +699,7 @@
             } catch (error) { card.append(node("p", "syno-error", error.message)); }
           }); actions.append(button);
         };
-        if (opportunity.status === "suggested") add("accept", "接受机会");
-        if (["accepted", "drafting"].includes(opportunity.status)) add("draft", "提交我的草稿", true);
-        if (["drafting", "practiced"].includes(opportunity.status)) add("publish", "记录发布与反馈");
-        if (!["published", "dismissed"].includes(opportunity.status)) add("dismiss", "暂不创作");
+        for (const descriptor of uiModel.outputActions(opportunity)) add(descriptor.action, descriptor.label, descriptor.needsOutput === true);
         card.append(actions); (index === 0 ? target : moreList).append(card);
       }
       if (moreList.children.length) target.append(more);

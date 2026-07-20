@@ -35,10 +35,12 @@ class WindowsServiceManager {
 
   async #invoke(action) {
     const script = path.join(this.repoRoot, "scripts", "manage-windows-task.ps1");
-    const { stdout = "" } = await this.run([
+    const args = [
       "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script,
       "-Action", action, "-RepoRoot", this.repoRoot, "-NodePath", this.nodePath, "-OutputJson",
-    ]);
+    ];
+    if (["Install", "Uninstall"].includes(action)) args.push("-KeepHostRunning");
+    const { stdout = "" } = await this.run(args);
     const line = String(stdout).trim().split(/\r?\n/).filter(Boolean).at(-1);
     if (!line) throw new Error("Windows 服务管理器没有返回状态");
     try { return JSON.parse(line); } catch { throw new Error("Windows 服务管理器返回了无效状态"); }

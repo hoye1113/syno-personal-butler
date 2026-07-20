@@ -22,6 +22,13 @@ test("Policy routes read, write and high-risk intents deterministically", () => 
   assert.equal(evaluate({ intent: "create_report" }, { trustedAutomation: true }).approval, "none");
   assert.equal(evaluate({ intent: "code_change" }).allowed, false);
   assert.equal(evaluate({ intent: "code_change" }, { developmentMode: true }).allowed, true);
+  const systemControl = evaluate({ intent: "system_control" });
+  assert.equal(systemControl.profile, "syno-read");
+  assert.equal(systemControl.approval, "single");
+  assert.equal(systemControl.risk, "low");
+  assert.equal(systemControl.needsWorktree, false);
+  assert.deepEqual(systemControl.allowedRoots, []);
+  assert.match(systemControl.reason, /主人显式确认/);
 });
 
 test("changed path validator enforces Profile roots", () => {

@@ -113,15 +113,14 @@ test("Windows service Web API exposes only fixed status, install and uninstall a
   const calls = [];
   const windowsService = {
     async status() { calls.push(["status"]); return { supported: true, installed: false, running: false, startup: "at_logon", webUrl: "http://127.0.0.1:4317/", legacyTaskDetected: true, lastTaskResult: null }; },
-    async install() { calls.push(["install"]); return { installed: true, running: true }; },
-    async uninstall() { calls.push(["uninstall"]); return { installed: false, running: false }; },
+    async mutate(action, context) { calls.push(["mutate", action, context.channel, context.senderId]); return { installed: action === "install", running: action === "install", jobId: "job-audit" }; },
   };
   const runtime = { developmentMode: false, windowsService };
   const readBody = async () => ({ taskName: "attacker", command: "calc.exe" });
   assert.equal((await routeSynoApi(runtime, { method: "GET" }, new URL("http://localhost/api/syno/windows-service"), readBody)).legacyTaskDetected, true);
   await routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/windows-service/install"), readBody);
   await routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/windows-service/uninstall"), readBody);
-  assert.deepEqual(calls, [["status"], ["install"], ["uninstall"]]);
+  assert.deepEqual(calls, [["status"], ["mutate", "install", "web", "local-user"], ["mutate", "uninstall", "web", "local-user"]]);
   await assert.rejects(routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/windows-service/restart"), readBody), /未知 Syno API/);
 });
 

@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { parseRecord, writeRecord } from "./markdown-record.mjs";
 import { PATHS } from "./paths.mjs";
+import { isActionableOutput, outputTransition, presentOutputOpportunity } from "./output-lifecycle.mjs";
 
 class OutputService {
   constructor({ opsRoot = PATHS.opsRoot, clock = () => new Date() } = {}) { this.opsRoot = opsRoot; this.clock = clock; }
@@ -44,9 +45,8 @@ class OutputService {
       const value = parseRecord(await fs.readFile(path.join(root, entry.name), "utf8"));
       if (!status || value.status === status) records.push(value);
     }
-    const actionable = new Set(["suggested", "accepted", "drafting", "practiced"]);
-    return records.sort((a, b) => Number(actionable.has(b.status)) - Number(actionable.has(a.status))
-      || b.priority - a.priority || String(b.created || "").localeCompare(String(a.created || ""))).slice(0, limit);
+    return records.sort((a, b) => Number(isActionableOutput(b)) - Number(isActionableOutput(a))
+      || b.priority - a.priority || String(b.created || "").localeCompare(String(a.created || ""))).slice(0, limit).map(presentOutputOpportunity);
   }
 
   async progress(id, input = {}, { opsRoot = this.opsRoot } = {}) {
@@ -55,15 +55,8 @@ class OutputService {
     const current = parseRecord(await fs.readFile(file, "utf8"));
     const action = String(input.action || "");
     const now = this.clock().toISOString();
-    const transitions = {
-      accept: { from: ["suggested"], status: "accepted" },
-      draft: { from: ["accepted", "drafting"], status: "drafting" },
-      practice: { from: ["drafting", "practiced"], status: "practiced" },
-      publish: { from: ["drafting", "practiced"], status: "published" },
-      dismiss: { from: ["suggested", "accepted", "drafting", "practiced"], status: "dismissed" },
-    };
-    const transition = transitions[action];
-    if (!transition || !transition.from.includes(current.status)) throw new Error(`创作状态不允许 ${current.status} -> ${action}`);
+    const transition = outputTransition(action, current.status);
+    if (!transition) throw new Error(`创作状态不允许 ${current.status} -> ${action}`);
     const outline = current.outline || ["核心主张", "第一方或原始证据", "反方观点与适用边界", "给小白的例子和下一步实践"];
     let userArtifactRef = current.userArtifactRef;
     const changedPaths = [];

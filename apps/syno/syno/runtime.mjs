@@ -36,6 +36,7 @@ import { ToolRegistry } from "./tool-registry.mjs";
 import { TodayService } from "./today-service.mjs";
 import { WeixinIlinkAdapter } from "./weixin-ilink.mjs";
 import { WindowsServiceManager } from "./windows-service-manager.mjs";
+import { WindowsServiceControl } from "./windows-service-control.mjs";
 import { createWeixinMessageHandler, parseWeixinApproval } from "./weixin-message-handler.mjs";
 
 const PUBLIC_COMMAND_INTENTS = Object.freeze({
@@ -64,7 +65,8 @@ function createSynoRuntime(options = {}) {
   const conversations = options.conversations || new ConversationStore();
   const conversationRouter = options.conversationRouter || new ConversationRouter();
   const settingsRegistry = options.settingsRegistry || new SettingsRegistry();
-  const windowsService = options.windowsService || new WindowsServiceManager();
+  const windowsServiceManager = options.windowsServiceManager || new WindowsServiceManager();
+  const windowsService = options.windowsService || new WindowsServiceControl({ manager: windowsServiceManager, jobs: jobStore });
   const sourceIntake = options.intake || new IntakeService();
   const ingest = options.ingest || new IngestService({ intake: sourceIntake, knowledge });
   const learning = options.learning || new LearningService();
@@ -315,8 +317,8 @@ async function routeSynoApi(runtime, req, url, readBody) {
     repoFingerprint: REPO_FINGERPRINT, now: new Date().toISOString(),
   };
   if (method === "GET" && url.pathname === "/api/syno/windows-service") return runtime.windowsService.status();
-  if (method === "POST" && url.pathname === "/api/syno/windows-service/install") return runtime.windowsService.install();
-  if (method === "POST" && url.pathname === "/api/syno/windows-service/uninstall") return runtime.windowsService.uninstall();
+  if (method === "POST" && url.pathname === "/api/syno/windows-service/install") return runtime.windowsService.mutate("install", webContext);
+  if (method === "POST" && url.pathname === "/api/syno/windows-service/uninstall") return runtime.windowsService.mutate("uninstall", webContext);
   if (method === "GET" && url.pathname === "/api/syno/snapshot") return runtime.core.snapshot({ search: url.searchParams.get("q") || "" });
   if (method === "GET" && url.pathname === "/api/syno/search") return { results: await runtime.core.search(url.searchParams.get("q") || "", {
     limit: url.searchParams.get("limit"),
