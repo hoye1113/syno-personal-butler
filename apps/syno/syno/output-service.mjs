@@ -57,6 +57,8 @@ class OutputService {
     const now = this.clock().toISOString();
     const transition = outputTransition(action, current.status);
     if (!transition) throw new Error(`创作状态不允许 ${current.status} -> ${action}`);
+    const feedback = String(input.feedback || "").trim();
+    if (action === "publish" && feedback.length < 5) throw new Error("记录发布必须提交至少 5 个字符的发布反馈");
     const outline = current.outline || ["核心主张", "第一方或原始证据", "反方观点与适用边界", "给小白的例子和下一步实践"];
     let userArtifactRef = current.userArtifactRef;
     const changedPaths = [];
@@ -72,7 +74,7 @@ class OutputService {
     }
     const opportunity = {
       ...current, status: transition.status, outline, ...(userArtifactRef ? { userArtifactRef } : {}),
-      ...(input.feedback ? { feedback: String(input.feedback).trim() } : {}), updated: now,
+      ...(feedback ? { feedback } : {}), updated: now,
     };
     await writeRecord(file, opportunity, { schema: "output-opportunity", title: opportunity.title, summaryKeys: ["id", "title", "format", "reason", "priority", "status", "created", "updated"] });
     changedPaths.push(path.relative(path.dirname(opsRoot), file).replace(/\\/g, "/"));

@@ -137,7 +137,7 @@ function Stop-SynoHost {
 
 function Stop-SynoWrappers {
   $wrappers = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
-    Test-SynoWrapperProcess $_ $startScript $resolvedRoot
+    Test-SynoWrapperProcess $_ $startScript $resolvedRoot $resolvedNode
   }
   foreach ($wrapper in $wrappers) {
     Stop-Process -Id $wrapper.ProcessId -Force -ErrorAction Stop

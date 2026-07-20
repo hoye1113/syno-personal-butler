@@ -23,10 +23,12 @@ function Test-SynoOwnershipRecord($Ownership, $Process, $Details, [string]$Resol
     $Details.CommandLine.IndexOf($ServerPath, [StringComparison]::OrdinalIgnoreCase) -ge 0
 }
 
-function Test-SynoWrapperProcess($Details, [string]$StartScript, [string]$RepoRoot) {
+function Test-SynoWrapperProcess($Details, [string]$StartScript, [string]$RepoRoot, [string]$NodePath) {
   if (-not $Details -or [string]::IsNullOrWhiteSpace([string]$Details.CommandLine)) { return $false }
   if ([string]$Details.Name -notmatch "(?i)^powershell(?:_ise)?\.exe$") { return $false }
-  $commandLine = [string]$Details.CommandLine
-  return $commandLine.IndexOf([IO.Path]::GetFullPath($StartScript), [StringComparison]::OrdinalIgnoreCase) -ge 0 -and
-    $commandLine.IndexOf([IO.Path]::GetFullPath($RepoRoot), [StringComparison]::OrdinalIgnoreCase) -ge 0
+  $start = [Regex]::Escape([IO.Path]::GetFullPath($StartScript))
+  $repo = [Regex]::Escape([IO.Path]::GetFullPath($RepoRoot))
+  $node = [Regex]::Escape([IO.Path]::GetFullPath($NodePath))
+  $pattern = "(?i)^(?:`"[^`"]*powershell(?:_ise)?\.exe`"|\S*powershell(?:_ise)?\.exe)\s+-NoProfile\s+-WindowStyle\s+Hidden\s+-ExecutionPolicy\s+Bypass\s+-File\s+`"?$start`"?\s+-RepoRoot\s+`"?$repo`"?\s+-NodePath\s+`"?$node`"?\s*$"
+  return [Regex]::IsMatch([string]$Details.CommandLine, $pattern)
 }

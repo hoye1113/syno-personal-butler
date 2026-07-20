@@ -11,7 +11,8 @@ The Hermes sidecar inherits a minimal environment allowlist rather than the Syno
 - External messages are untrusted input. They cannot alter Policy or Profile.
 - Attachments require scheme/host allowlist, size limit, MIME sniffing and quarantine storage.
 - Weixin groups are disabled. Unknown direct messages require pairing and cannot execute work.
-- Every write happens in an isolated worktree. Only a pure additive low-risk diff may merge after its initial approval.
+- Every domain-fact write happens in an isolated worktree. Only a pure additive low-risk diff may merge after its initial approval.
+- Append-only `ops/jobs` and `ops/events` are the sole control-plane audit exception: JobStore writes them before execution so approvals, failures and cancellation remain durable. They may describe an operation but never contain or apply its knowledge/action diff; all non-audit `ops/` and `vault/` writes still use a worktree and validators.
 - Mutation routes use a server-owned operation registry; clients cannot spoof intent, Profile, risk or approval decisions.
 - Existing-file changes, deletion, rename and sensitive paths are promoted from the actual Git diff to a pinned second approval.
 - Git staging receives an explicit path list and rejects paths outside allowed roots.

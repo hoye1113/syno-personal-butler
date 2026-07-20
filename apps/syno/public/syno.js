@@ -689,15 +689,18 @@
         if (opportunity.outline?.length) { const list = node("ol"); opportunity.outline.forEach((item) => list.append(node("li", "", item))); card.append(list); }
         const outputField = node("textarea", "syno-source-editor"); outputField.rows = 6; outputField.placeholder = "粘贴你的原始草稿或实践复盘（至少 20 字）"; outputField.setAttribute("aria-label", `${opportunity.title} 的原始输出`);
         const feedbackField = node("textarea", "syno-source-editor"); feedbackField.rows = 3; feedbackField.placeholder = "记录发布反馈、仍不清楚的地方或下一次要补的例子"; feedbackField.setAttribute("aria-label", `${opportunity.title} 的输出反馈`);
-        if (["accepted", "drafting"].includes(opportunity.status)) card.append(outputField);
-        if (["drafting", "practiced"].includes(opportunity.status)) card.append(feedbackField);
+        const descriptors = uiModel.outputActions(opportunity);
+        if (descriptors.some((descriptor) => descriptor.needsOutput)) card.append(outputField);
+        if (descriptors.some((descriptor) => descriptor.needsFeedback)) card.append(feedbackField);
         const actions = node("div", "syno-job-actions");
-        const add = (action, label, needsOutput = false) => {
+        const add = (descriptor) => {
+          const { action, label, needsOutput = false, needsFeedback = false } = descriptor;
           const button = node("button", action === "accept" ? "accent-btn" : "ghost-btn", label); button.type = "button";
           button.addEventListener("click", async () => {
             const userOutput = needsOutput ? outputField.value.trim() : "";
             const feedback = action === "publish" ? feedbackField.value.trim() : "";
             if (needsOutput && userOutput.length < 20) { outputField.focus(); card.append(node("p", "syno-error", "请先提交至少 20 个字符的主人原始输出。")); return; }
+            if (needsFeedback && feedback.length < 5) { feedbackField.focus(); card.append(node("p", "syno-error", "请先记录至少 5 个字符的发布反馈。")); return; }
             try {
               const result = await api(`/api/syno/outputs/opportunities/${encodeURIComponent(opportunity.id)}/progress`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, userOutput, feedback }) });
               document.querySelector("#synoOutputHint").textContent = `任务 ${result.job.id} 已进入审批中心。`;
@@ -705,7 +708,7 @@
             } catch (error) { card.append(node("p", "syno-error", error.message)); }
           }); actions.append(button);
         };
-        for (const descriptor of uiModel.outputActions(opportunity)) add(descriptor.action, descriptor.label, descriptor.needsOutput === true);
+        for (const descriptor of descriptors) add(descriptor);
         card.append(actions); (index === 0 ? target : moreList).append(card);
       }
       if (moreList.children.length) target.append(more);

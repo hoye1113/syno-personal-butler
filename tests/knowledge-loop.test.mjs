@@ -167,6 +167,7 @@ test("output opportunities and teach-back prompts make output a mastery mechanis
   const drafted = await service.progress(opportunity.id, { action: "draft", userOutput: "这是我基于证据写出的完整观点草稿，包含主张、证据、反方观点、边界以及下一步实践。" });
   assert.equal(drafted.opportunity.status, "drafting");
   assert.match(drafted.opportunity.userArtifactRef, /^ops\/artifacts\/output\//);
+  await assert.rejects(service.progress(opportunity.id, { action: "publish", feedback: "" }), /发布反馈/);
   const published = await service.progress(opportunity.id, { action: "publish", feedback: "读者仍不理解 Harness 与 Agent 的区别，需要补一个小白例子。" });
   assert.equal(published.opportunity.status, "published");
   assert.match(published.opportunity.feedback, /小白例子/);
@@ -199,6 +200,7 @@ test("output lifecycle exposes one canonical actionable flag to every consumer",
   assert.equal(records[0].actionable, true);
   assert.deepEqual(records[0].allowedActions, ["accept", "dismiss"]);
   await service.progress(opportunity.id, { action: "accept" });
+  await assert.rejects(service.progress(opportunity.id, { action: "publish" }), /创作状态不允许/);
   await service.progress(opportunity.id, { action: "dismiss" });
   records = await service.list();
   assert.equal(records[0].actionable, false);

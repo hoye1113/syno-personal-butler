@@ -157,9 +157,9 @@ test("Windows service common policy rejects unknown health and stale PID ownersh
 
 test("Windows service common policy recognizes only this repository's launcher wrapper", { skip: process.platform !== "win32" }, async () => {
   const common = path.join(root, "scripts", "windows-service-common.ps1").replaceAll("'", "''");
-  const command = `. '${common}'; $good=[pscustomobject]@{Name='powershell.exe';CommandLine='powershell.exe -File "C:\\Syno\\scripts\\start-syno.ps1" -RepoRoot "C:\\Syno"'}; $wrong=[pscustomobject]@{Name='powershell.exe';CommandLine='powershell.exe -File "C:\\Other\\scripts\\start-syno.ps1" -RepoRoot "C:\\Other"'}; [ordered]@{good=(Test-SynoWrapperProcess $good 'C:\\Syno\\scripts\\start-syno.ps1' 'C:\\Syno');wrong=(Test-SynoWrapperProcess $wrong 'C:\\Syno\\scripts\\start-syno.ps1' 'C:\\Syno')} | ConvertTo-Json -Compress`;
+  const command = `. '${common}'; $good=[pscustomobject]@{Name='powershell.exe';CommandLine='powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\\Syno\\scripts\\start-syno.ps1" -RepoRoot "C:\\Syno" -NodePath "C:\\Node\\node.exe"'}; $mention=[pscustomobject]@{Name='powershell.exe';CommandLine='powershell.exe -Command "Write-Host C:\\Syno\\scripts\\start-syno.ps1 C:\\Syno C:\\Node\\node.exe"'}; $extra=[pscustomobject]@{Name='powershell.exe';CommandLine='powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\\Syno\\scripts\\start-syno.ps1" -RepoRoot "C:\\Syno" -NodePath "C:\\Node\\node.exe" -Danger yes'}; [ordered]@{good=(Test-SynoWrapperProcess $good 'C:\\Syno\\scripts\\start-syno.ps1' 'C:\\Syno' 'C:\\Node\\node.exe');mention=(Test-SynoWrapperProcess $mention 'C:\\Syno\\scripts\\start-syno.ps1' 'C:\\Syno' 'C:\\Node\\node.exe');extra=(Test-SynoWrapperProcess $extra 'C:\\Syno\\scripts\\start-syno.ps1' 'C:\\Syno' 'C:\\Node\\node.exe')} | ConvertTo-Json -Compress`;
   const { stdout } = await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], { windowsHide: true });
-  assert.deepEqual(JSON.parse(stdout.trim()), { good: true, wrong: false });
+  assert.deepEqual(JSON.parse(stdout.trim()), { good: true, mention: false, extra: false });
 });
 
 test("Windows install fails before touching Task Scheduler when Node is missing", { skip: process.platform !== "win32" }, async () => {

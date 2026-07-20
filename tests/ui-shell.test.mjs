@@ -56,6 +56,9 @@ test("knowledge-loop Web actions use inline evidence and explicit lifecycle deci
   assert.match(script, /button\.addEventListener\("click", \(\) => show\(/);
   assert.match(script, /windowsServiceMutation/);
   assert.match(script, /uiModel\.outputActions/);
+  assert.match(script, /descriptors\.some\(\(descriptor\) => descriptor\.needsOutput/);
+  assert.match(script, /descriptors\.some\(\(descriptor\) => descriptor\.needsFeedback/);
+  assert.match(script, /请先记录至少 5 个字符的发布反馈/);
   assert.match(script, /#synoWeixinStatus[\s\S]*weixin\?\.running/);
   assert.doesNotMatch(script, /\["published", "dismissed"\]\.includes\(opportunity\.status\)/);
   assert.match(script, /aria-busy/);
