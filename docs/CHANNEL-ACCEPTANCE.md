@@ -46,7 +46,7 @@ pnpm probe:feishu -- --confirm-live
 | 微信 Owner 连续往返 | 2026-07-20 | passed | 4 条连续 Owner 消息形成 4 个唯一 request key 和 4 个完成态 Job，均收到回复；回复使用每次唯一 iLink `client_id`，固定会话、轮询和 Agent 链路持续可用 |
 | 微信 Provider 故障恢复 | 2026-07-20 | passed | 同一微信 Job 曾因真实 `PROVIDER_HTTP_ERROR` 进入 `waiting_provider`，重启恢复后由固定模型完成，无 fallback |
 | 微信 durable 去重 | 2026-07-20 | passed | 17 个真实 seen ID 跨 Worker 重启保留；恢复后没有重复 Job；自动测试覆盖同 message ID 重放、失败不推进 cursor |
-| 微信附件实机 | 2026-07-20 | repaired, final confirmation pending | 主人真实发送的 MD 已完成 iLink 解密、MIME/大小检查与 quarantine；错误生成的 `curate_note` Job 已拒绝。相同真实载荷经修复后的 Intake 路径形成 Artifact `artifact-20260720-ef20760f` 与 Proposal `ingest-fd29b810`，未写入 vault。仍需主人再次从微信发送任一无隐私 MD，确认直接收到新 Artifact ID 且不再出现审批码 |
+| 微信附件实机 | 2026-07-20 | passed | 主人从微信直发真实 MD 后立即收到 Artifact 回执 `artifact-20260720-ac6c5d41`，未再出现审批码；后台状态为 `proposed`，生成 Proposal `ingest-50964b42`，风险 `additive`、无重复匹配。建议 Note 路径尚不存在，确认未绕过批准写入 vault |
 | 飞书连接健康 | 2026-07-20 | passed | 主人扫码创建应用并绑定 Owner；二维码本地渲染，注册确认后自动长连接，重启自动恢复；SDK 使用无输出 Logger，不记录 App ID/App Secret 或错误请求体 |
 | 飞书 Owner 连续往返 | 2026-07-20 | passed | 4 个真实 Owner 私聊 Job 全部完成、0 failed/0 waiting、同一 Conversation；4 个 durable seen ID 跨重启保留 |
 | 飞书真实 ID 重放 | 2026-07-20 | passed | 对一个真实已完成 message ID 做本地恢复重放，`replayAccepted=false`，pending 维持 0，未再次执行 Agent |

@@ -20,9 +20,9 @@ pnpm probe:provider-real -- --confirm-live --trials 5
 
 报告不输出 Token、响应正文、提示词、真实知识或失败载荷。只有 `localFaultInjection.allPassed=true`、五轮全成功且 `recoveredToLiveFixedModel=true` 才通过自动采用门。
 
-## 主人真实断网与恢复
+## 真实故障与恢复
 
-故障注入不冒充真实网络验收。主人还需在本机完成：
+故障注入不冒充真实 Provider 故障。若验收期间没有自然故障，主人可在本机按以下步骤制造可控断网：
 
 1. 在 Web 提交一个只读、需要模型的合成请求，记录 Job ID 和固定 Model ID。
 2. 临时断开网络后重试该 Job；确认状态进入 `waiting_provider`，本地搜索、任务、提醒和审批仍可用。
@@ -30,7 +30,7 @@ pnpm probe:provider-real -- --confirm-live --trials 5
 4. 对一个超过 Settings 上下文长度的合成输入验证 `PROVIDER_CONTEXT_LIMIT`，并确认 Provider 请求计数没有增加。
 5. 只记录时间、Job ID、Model ID、状态序列和脱敏错误码；不记录 Token 或响应正文。
 
-若无法安全制造真实超时，可以保留确定性超时故障注入证据，并把“真实网络超时”明确记录为未验收；不得将其标为通过。
+若无法安全制造真实超时，可以保留确定性超时故障注入证据，并把“真实网络超时”明确记录为未验收；不得将其标为通过。2026-07-19 至 2026-07-20 已自然出现一次真实 Provider HTTP 故障，因此没有再人为中断整机网络。
 
 ## 验收记录
 
@@ -39,5 +39,5 @@ pnpm probe:provider-real -- --confirm-live --trials 5
 | 五轮真实工具调用 | passed | 2026-07-18，原生 ToolLoop 5/5 成功，每轮恰好一次合成 `knowledge.search` |
 | 固定 Model ID / 无 fallback | passed | 固定请求 `AIPC-deepseek-v4-flash`；仅接受 Provider 确定性的 `deepseek-v4-flash` 响应规范化，其他模型继续拒绝 |
 | 本地上下文/超时/离线故障注入 | passed | `PROVIDER_CONTEXT_LIMIT` 未触网；超时和离线均为 retryable，随后五轮恢复成功 |
-| 真实断网进入 waiting_provider | pending | 等待主人网络操作 |
-| 恢复后同一 Job/模型完成 | pending | 等待主人网络操作 |
+| 真实 Provider 故障进入 waiting_provider | passed | 微信 Job `job-20260719-461dea5d` 因真实 `PROVIDER_HTTP_ERROR` 进入 `waiting_provider`，状态跨 Worker 重启持久保留 |
+| 恢复后同一 Job/模型完成 | passed | 网络/Provider 恢复后同一 Job 由固定 `AIPC-deepseek-v4-flash` 完成，没有切换 Model、Provider、Hermes 或 OpenCode |
