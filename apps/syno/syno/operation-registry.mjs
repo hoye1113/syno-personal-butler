@@ -23,6 +23,8 @@ const OPERATION_INTENTS = Object.freeze({
   "wiki.todos.generate": "curate_note",
   "wiki.todos.accept": "create_content_idea",
   "wiki.todos.reject": "create_action",
+  "vault.migration.content": "migrate_note",
+  "vault.migration.integration": "migrate_integrate",
   "topics.schedule": "create_action",
   "topics.unschedule": "create_action",
   "topics.revert-import": "delete",

@@ -131,10 +131,10 @@ async function validateVaultContract(repoRoot, changedPaths, decision) {
         if (missing) errors.push(`${relative}: 新笔记缺少 ${field}`);
       }
       if (filename.length > Number(contract.maxFilenameLength || 50) || /[<>:"/\\|?*：]/u.test(filename)) errors.push(`${relative}: 文件名不符合 Windows/长度约束`);
-      if (contract.requireSemanticLinkOrOrphan && !/\[\[[^\]]+\]\]/.test(current.body) && !/^status:\s*orphan\s*$/m.test(text)) {
+      if (contract.requireSemanticLinkOrOrphan && !/\[\[[^\]]+\]\]/.test(current.body) && !/^(?:status|link_status):\s*orphan\s*$/m.test(text)) {
         errors.push(`${relative}: 新笔记必须包含语义 wikilink 或声明 status: orphan`);
       }
-      if (/^MOC\s*-/i.test(filename) && decision.intent !== "new_moc") errors.push(`${relative}: 新 MOC 未通过 new_moc 双审批意图`);
+      if (/^MOC\s*-/i.test(filename) && !new Set(["new_moc", "migrate_integrate"]).has(decision.intent)) errors.push(`${relative}: 新 MOC 未通过双审批意图`);
     }
     const oldTags = new Set(previous?.tags || []);
     const addedTags = current.tags.filter((tag) => !oldTags.has(tag));
@@ -144,7 +144,8 @@ async function validateVaultContract(repoRoot, changedPaths, decision) {
     const previousSource = previous?.values.source_url || previous?.values.source;
     if (source !== previousSource && /^https?:\/\//i.test(source || "")) {
       const duplicates = (sourceOwners.get(source) || []).filter((item) => item !== relative);
-      if (duplicates.length) errors.push(`${relative}: source 已存在于 ${duplicates.join(", ")}`);
+      const migrationIntent = new Set(["migrate_note", "migrate_integrate"]).has(decision.intent);
+      if (duplicates.length && !migrationIntent) errors.push(`${relative}: source 已存在于 ${duplicates.join(", ")}`);
     }
   }
   if (errors.length) throw new Error(errors.join("\n"));

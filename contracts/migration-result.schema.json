@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/migration-result.schema.json",
+  "title": "MigrationResult",
+  "type": "object",
+  "required": ["id", "migrationId", "manifestDigest", "phase", "imported", "skipped", "conflicts", "sourceGitHead", "sourceDirty", "completedAt", "changedPaths"],
+  "properties": {
+    "id": { "type": "string" },
+    "migrationId": { "type": "string", "pattern": "^migration-" },
+    "manifestDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "phase": { "enum": ["content", "integration"] },
+    "imported": { "type": "integer", "minimum": 0 },
+    "skipped": { "type": "integer", "minimum": 0 },
+    "conflicts": { "type": "integer", "minimum": 0 },
+    "sourceGitHead": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sourceDirty": { "type": "boolean" },
+    "completedAt": { "type": "string", "format": "date-time" },
+    "changedPaths": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+  },
+  "additionalProperties": false
+}

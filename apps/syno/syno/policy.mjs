@@ -11,6 +11,7 @@ const HIGH_RISK_INTENTS = new Set([
   "move",
   "new_moc",
   "new_tag",
+  "migrate_integrate",
   "code_change",
 ]);
 const COMPLEX_INTENTS = new Set(["complex_analysis"]);
@@ -30,6 +31,7 @@ const WRITE_INTENTS = new Set([
   "create_report",
   "settings_change",
   "curate_note",
+  "migrate_note",
   ...HIGH_RISK_INTENTS,
 ]);
 
@@ -61,7 +63,7 @@ function evaluate(request = {}, context = {}) {
     ? "syno-read"
     : intent === "code_change"
     ? "syno-code"
-    : highRisk || intent === "curate_note"
+    : highRisk || intent === "curate_note" || intent === "migrate_note"
       ? "syno-curate"
       : writes
         ? "syno-ops"

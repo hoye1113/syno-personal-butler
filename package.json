@@ -9,6 +9,7 @@
     "test": "node --test apps/syno/tests/*.test.mjs tests/*.test.mjs",
     "verify": "node scripts/verify-repository.mjs",
     "state:archive": "node scripts/state-archive.mjs",
+    "vault:migrate": "node scripts/vault-migrate.mjs",
     "windows:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/manage-windows-task.ps1 -Action Install",
     "windows:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/manage-windows-task.ps1 -Action Status",
     "windows:restart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/manage-windows-task.ps1 -Action Restart",

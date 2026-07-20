@@ -35,6 +35,7 @@ import { ToolLoopExecutor } from "./tool-loop-executor.mjs";
 import { ToolRegistry } from "./tool-registry.mjs";
 import { TodayService } from "./today-service.mjs";
 import { WeixinIlinkAdapter } from "./weixin-ilink.mjs";
+import { VaultMigrationService } from "./vault-migration-service.mjs";
 import { WindowsServiceManager } from "./windows-service-manager.mjs";
 import { WindowsServiceControl } from "./windows-service-control.mjs";
 import { createWeixinMessageHandler, parseWeixinApproval } from "./weixin-message-handler.mjs";
@@ -74,6 +75,7 @@ function createSynoRuntime(options = {}) {
   const goals = options.goals || new GoalService();
   const claims = options.claims || new ClaimEvidenceService();
   const knowledgeMaintenance = options.knowledgeMaintenance || new KnowledgeMaintenanceSource();
+  const migration = options.migration || new VaultMigrationService({ repoRoot: PATHS.repoRoot, runtimeRoot: path.join(PATHS.runtimeRoot, "migrations") });
   const signalSources = options.signalSources || new SignalSourceRegistry({ claims, ingest, outputs, maintenance: knowledgeMaintenance });
   let host;
   let core;
@@ -186,6 +188,8 @@ function createSynoRuntime(options = {}) {
       if (operation === "claims.create") return claims.createClaim(payload, { opsRoot: path.join(root, "ops") });
       if (operation === "evidence.candidates.create") return claims.createEvidenceCandidate(payload, { opsRoot: path.join(root, "ops") });
       if (operation === "evidence.candidates.approve") return claims.approveCandidate(payload, { opsRoot: path.join(root, "ops") });
+      if (operation === "vault.migration.content") return migration.apply(payload.id, { phase: "content", workspace: root });
+      if (operation === "vault.migration.integration") return migration.apply(payload.id, { phase: "integration", workspace: root });
       const domain = await executeDomainOperation(operation, payload, { workspace: root });
       if (domain) return domain;
       if (operation === "reports.create") {
@@ -264,6 +268,7 @@ function createSynoRuntime(options = {}) {
     outputs,
     goals,
     claims,
+    migration,
     today,
     notifications,
     channels,
@@ -336,6 +341,24 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "POST" && url.pathname === "/api/syno/settings") {
     const body = await readBody(req);
     return runtime.settingsRegistry.set(String(body.key || ""), body.value, { actor: "user", confirmed: body.confirmed === true });
+  }
+  const migrationPreview = /^\/api\/syno\/migrations\/([^/]+)$/.exec(url.pathname);
+  if (method === "GET" && migrationPreview) return runtime.migration.preview(decodeURIComponent(migrationPreview[1]));
+  const migrationSubmit = /^\/api\/syno\/migrations\/([^/]+)\/submit$/.exec(url.pathname);
+  if (method === "POST" && migrationSubmit) {
+    const id = decodeURIComponent(migrationSubmit[1]);
+    const body = await readBody(req);
+    const keys = Object.keys(body || {});
+    if (keys.length !== 1 || keys[0] !== "phase") {
+      const error = new Error("迁移提交只接受 phase"); error.statusCode = 400; throw error;
+    }
+    const phase = String(body.phase || "");
+    if (!new Set(["content", "integration"]).has(phase)) {
+      const error = new Error("迁移 phase 无效"); error.statusCode = 400; throw error;
+    }
+    await runtime.migration.preview(id);
+    const operation = phase === "content" ? "vault.migration.content" : "vault.migration.integration";
+    return runtime.core.execute(buildOperationRequest(operation, { id, phase }), webContext);
   }
   if (method === "POST" && url.pathname === "/api/syno/jobs") {
     const request = await readBody(req);

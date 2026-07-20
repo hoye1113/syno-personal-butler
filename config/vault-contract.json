@@ -7,7 +7,9 @@
     "claude_code", "codex", "cursor", "devin", "chatgpt", "claude", "openai", "anthropic",
     "harness_engineering", "loop_engineering", "memory", "multi_agent", "context_engineering",
     "skills", "hooks", "mcp", "prompting", "fde", "web_clipping", "content_creation",
-    "text_refinement", "author"
+    "text_refinement", "author", "loock_ai", "coding_agent", "chatbot", "column",
+    "interview", "nextjs", "frontend_agent_interview", "dialogue", "langgraphjs_tutorial",
+    "langgraphjs_quickstart", "ai_native", "lecture", "agent_architecture", "s_tier", "taste"
   ],
   "maxFilenameLength": 50,
   "requireSemanticLinkOrOrphan": true

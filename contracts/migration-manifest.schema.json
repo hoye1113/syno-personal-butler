@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/migration-manifest.schema.json",
+  "title": "MigrationManifest",
+  "type": "object",
+  "required": ["schema", "version", "id", "createdAt", "source", "sourceFingerprint", "files", "summary", "digest"],
+  "properties": {
+    "schema": { "const": "migration-manifest" },
+    "version": { "const": 1 },
+    "id": { "type": "string", "pattern": "^migration-[0-9]{8}-[a-f0-9]{8}$" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "source": {
+      "type": "object",
+      "required": ["root", "gitHead", "gitDirty", "dirtyEntries"],
+      "properties": {
+        "root": { "type": "string", "minLength": 1 },
+        "gitHead": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "gitDirty": { "type": "boolean" },
+        "dirtyEntries": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "sourceFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "files": { "type": "array", "items": { "type": "object" } },
+    "summary": { "type": "object" },
+    "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "additionalProperties": false
+}

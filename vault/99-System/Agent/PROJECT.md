@@ -34,6 +34,9 @@ Markdown 是唯一事实源。Agent 读写文件；Obsidian 负责呈现；Git �
 - 工具：`claude_code`、`codex`、`cursor`、`devin`、`chatgpt`、`claude`、`openai`、`anthropic`
 - 细分：`harness_engineering`、`loop_engineering`、`memory`、`multi_agent`、`context_engineering`、`skills`、`hooks`、`mcp`、`prompting`、`fde`
 - 已批准扩展：`web_clipping`、`content_creation`、`text_refinement`、`author`
+- 原库迁移保留的高价值标签：`loock_ai`、`coding_agent`、`chatbot`、`column`、`interview`、`nextjs`、`frontend_agent_interview`、`dialogue`、`langgraphjs_tutorial`、`langgraphjs_quickstart`、`ai_native`、`lecture`、`agent_architecture`、`s_tier`、`taste`
+
+历史低频或非规范标签迁移到 `legacy_tags`，只参与全文检索，不进入主筛选器；中文、连字符和同义标签按固定映射归并，不由 Agent 在运行时扩充字典。
 
 Tag 只用小写英文和下划线。新 tag 先提议并取得用户确认，不直接创造。禁止中文 tag、连字符风格和旧名。
 
