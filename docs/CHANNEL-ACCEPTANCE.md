@@ -46,8 +46,8 @@ pnpm probe:feishu -- --confirm-live
 | 微信 Owner 连续往返 | 2026-07-20 | passed | 两个后续 Owner 消息分别形成完成态 Job；轮询、固定会话、Agent 执行与回复链路持续可用 |
 | 微信 Provider 故障恢复 | 2026-07-20 | passed | 同一微信 Job 曾因真实 `PROVIDER_HTTP_ERROR` 进入 `waiting_provider`，重启恢复后由固定模型完成，无 fallback |
 | 微信 durable 去重 | 2026-07-20 | passed | 17 个真实 seen ID 跨 Worker 重启保留；恢复后没有重复 Job；自动测试覆盖同 message ID 重放、失败不推进 cursor |
-| 微信附件实机 | 待验收 | pending | 附件流式限额、MIME 嗅探和隔离测试已通过；仍需主人发送一份无隐私附件完成实机往返 |
-| 飞书连接健康 | 2026-07-20 | passed | 主人扫码创建应用并绑定 Owner；二维码本地渲染，注册确认后自动长连接，重启自动恢复；未记录 App ID/App Secret |
+| 微信附件实机 | 待验收 | pending | 已按真实 iLink 协议覆盖 AES-128-ECB 图片/文件、固定腾讯 CDN fallback、流式限额、MIME 嗅探和隔离；仍需主人发送一份无隐私附件完成实机往返 |
+| 飞书连接健康 | 2026-07-20 | passed | 主人扫码创建应用并绑定 Owner；二维码本地渲染，注册确认后自动长连接，重启自动恢复；SDK 使用无输出 Logger，不记录 App ID/App Secret 或错误请求体 |
 | 飞书 Owner 连续往返 | 2026-07-20 | passed | 4 个真实 Owner 私聊 Job 全部完成、0 failed/0 waiting、同一 Conversation；4 个 durable seen ID 跨重启保留 |
 | 飞书真实 ID 重放 | 2026-07-20 | passed | 对一个真实已完成 message ID 做本地恢复重放，`replayAccepted=false`，pending 维持 0，未再次执行 Agent |
 | 飞书日历授权与 CRUD | 2026-07-20 | passed | lark-cli 1.0.72 user 身份、Token valid、主日历「Hoye」；真实创建后对同 event ID 更新两次并清理成功，无参会人通知 |

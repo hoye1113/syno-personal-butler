@@ -49,10 +49,11 @@
 
 ## 2026-07-20 增量复验
 
-- UI Git 基线：`8492d0f`；随后 `eef3ca5` 仅调整后台健康 probe 与飞书 Owner 状态字段，不改变布局或交互
+- Git 基线：`2e1dfd0`；`9837366` 与 `2e1dfd0` 只调整渠道媒体、SDK 日志和 Windows CLI 发现，但仍按最新服务状态完成浏览器复验
 - 服务地址：`http://127.0.0.1:4317`
 - 桌面：1280×720，`scrollWidth=1265 <= innerWidth=1280`，飞书日历显示已连接到「Hoye」，Provider password 输入值为空，0 error/0 warning。
 - 移动：390×844，`scrollWidth=375 <= innerWidth=390`，“连接设置”可达并打开设置 dialog，0 error/0 warning。
 - 键盘：Escape 关闭设置 dialog，并将焦点恢复到“连接设置”触发按钮。
 - 减少动画：最新 CSS 仍包含 `prefers-reduced-motion` 规则；动态静态化行为由既有真实仿真与 `tests/ui-shell.test.mjs` 持续覆盖。
 - 安全：本轮使用真实本地配置，仅核对 password 字段为空和脱敏状态文本；没有截图、读取或记录 Token、App Secret、设备码。
+- 重启恢复：不注入 `LARK_CLI_PATH` 手工重启服务后，页面恢复显示 `Hoye · Hoye`，API 为 `connected/valid`、lark-cli 1.0.72；微信与飞书消息 Worker 同时保持 Owner 已绑定运行态。

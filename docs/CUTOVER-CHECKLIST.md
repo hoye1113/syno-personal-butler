@@ -36,7 +36,7 @@ Provider 自动采用门、故障注入与主人真实断网步骤见 `docs/PROV
 ## D. 数据保护与启动
 
 - [x] 停止 Web/Worker，确认没有 `running` Job。
-- [x] 记录精确 Git commit 与干净 `git status --short`（代码基线 `eef3ca5` 完成后核对）。
+- [x] 记录精确 Git commit 与干净 `git status --short`（当前代码基线 `2e1dfd0`）。
 - [x] 备份仓库 `vault/`、`ops/`、`contracts/`、`config/` 和配置文档到 `C:\tmp\syno-repository-backup-20260720.zip`；407 项，敏感根排除，SHA-256 前缀 `9FF69A0E4A86E2ED`。
 - [x] 执行状态 backup/verify；真实归档 24 项，manifest 的 `credentialsIncluded` 为 `false`。
 - [x] 在空隔离状态目录完成恢复演练，并验证二次恢复被拒绝；正式状态未被覆盖。
@@ -46,7 +46,7 @@ Provider 自动采用门、故障注入与主人真实断网步骤见 `docs/PROV
 ## E. 封板
 
 - [ ] 更新 `docs/FINAL-ACCEPTANCE.md` 为全部必选项通过，并附真实外部证据摘要。
-- [x] 对 `eef3ca5` 再次运行完整测试、仓库和 fresh-clone；Node 141/141、vault 57/57、仓库校验通过。UI 最新变更基线 `8492d0f` 已完成桌面/移动浏览器核心流程。
+- [x] 对 `2e1dfd0` 再次运行完整测试、仓库和 `C:\tmp\syno-fresh-2e1dfd0`；Node 144/144、vault 57/57、仓库校验通过。最新服务已完成桌面/移动、焦点、减少动画、Token 不回显、Hoye 日历重启恢复与 0 error/0 warning 浏览器复验。
 - [ ] 仅精确暂存本 Job 路径并创建本地提交；禁止 `git add -A`。
 - [ ] 不自动 Push。Push 或远端发布只能由主人另行明确要求。
 

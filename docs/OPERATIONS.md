@@ -62,7 +62,7 @@ npx @larksuite/cli@1.0.72 install
 lark-cli version
 ```
 
-不要安装不存在的 `@larksuite/lark-cli` 包。若服务进程早于 CLI 安装启动，重启 Syno 让它重新读取 `PATH`；也可把 `LARK_CLI_PATH` 指向 `lark-cli.ps1` 或 `lark-cli.cmd`。Syno 在 Windows 上会将 npm 包装器解析到官方 Node 入口，避免直接 spawn `.ps1` 的 `EFTYPE` 错误。用户日历仍需 `lark-cli auth login --domain calendar` 授权，消息 App 扫码不能替代日历 user 授权。
+不要安装不存在的 `@larksuite/lark-cli` 包。若服务进程早于 CLI 安装启动，重启 Syno；它会检查 `LARK_CLI_PATH`、与当前 `node.exe` 同目录的包装器以及常见 npm/pnpm 全局目录。仍可显式把 `LARK_CLI_PATH` 指向 `lark-cli.ps1` 或 `lark-cli.cmd`。Syno 将 npm 包装器解析到官方 Node 入口，避免直接 spawn `.ps1` 的 `EFTYPE` 错误。用户日历仍需 `lark-cli auth login --domain calendar` 授权，消息 App 扫码不能替代日历 user 授权。
 
 ## 发布和切换
 

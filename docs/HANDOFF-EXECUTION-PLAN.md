@@ -62,6 +62,8 @@ Syno 是 Windows 本地、单用户、主动式且可审计的知识闭环私人
 - 飞书扫码注册在 `8492d0f` 起使用本地内存 PNG、前端状态轮询和后端确认后自动长连接；Windows npm `.ps1/.cmd` 包装器解析到官方 Node 入口。主人真实飞书消息 4/4 完成，真实 seen ID 重放被 durable dedupe 拒绝；user 日历「Hoye」完成创建、同 event ID 双更新、清理、错误拒绝与重启恢复。
 - `8492d0f` 已在主工作树与 `C:\tmp\syno-fresh-8492d0f` 通过 Node 139/139、vault 57/57 和仓库校验；2026-07-20 增量浏览器复验通过桌面 1280×720、移动 390×844、Token 不回显、日历恢复、焦点恢复与 0 error/0 warning。
 - 运行中渠道 probe 在 `eef3ca5` 起优先复用本机 Worker 脱敏状态，不再争抢微信进程锁或打开第二条飞书长连接；飞书运行状态显式包含 `ownerBound`。主工作树和 `C:\tmp\syno-fresh-eef3ca5` 通过 Node 141/141、vault 57/57 和仓库校验，两个真实 probe 均 `ok=true`。
+- 渠道媒体与日志安全提交 `9837366` 对齐真实 iLink：图片/文件 CDN 密文使用 AES-128-ECB 解密，`full_url` 缺失时只回退固定腾讯 CDN，随后仍执行流式限额、MIME/魔数和隔离规则；飞书 SDK 错误日志改为无输出 Logger，避免请求配置泄露 App Secret。
+- Windows 重启恢复提交 `2e1dfd0` 在无 `LARK_CLI_PATH` 时自动发现与 `node.exe` 同目录及常见全局目录的官方 lark-cli 包装器。真实服务重启恢复 Hoye 日历与 lark-cli 1.0.72；主工作树和 `C:\tmp\syno-fresh-2e1dfd0` 通过 Node 144/144、vault 57/57 和仓库校验，最新桌面/移动浏览器复验通过。
 5. **知识技能**：低成本收录、渐进整理、Teach-back、间隔复习、证据型创作、时效查证。
 6. **外部渠道**：Web 完整控制；微信快速入口；飞书日程和结构化通知；同一 Agent/Policy/Store。
 7. **Web 与品牌**：Today、Capture、Knowledge、Learn、Create；纸片法老知识守护者；WCAG AA。
