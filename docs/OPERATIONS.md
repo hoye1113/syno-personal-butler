@@ -3,7 +3,7 @@
 ## 状态分层
 
 - Git 跟踪：`vault/`、`ops/`、`contracts/`、应用源码与文档。
-- 本地可重建：`.runtime/` 的索引、锁、队列快照和临时状态。
+- 本地可重建：`.runtime/` 的索引、锁、队列快照、投递通知和临时状态。
 - 本地敏感：`%LOCALAPPDATA%\Syno\credentials` 的 DPAPI 凭据；严禁复制到仓库、日志或工单。
 - 本地持久：对话、等待重试的 Job、未完成摄取状态。清理前先停 Worker 并备份。
 

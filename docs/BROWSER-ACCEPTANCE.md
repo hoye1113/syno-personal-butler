@@ -70,7 +70,7 @@
 
 ## 2026-07-20 Web 收敛复验
 
-- 固定点：`1c4e782`；验收对象为本轮尚未提交的 Web 收敛与 Windows 服务差异。
+- 固定点：`1c4e782`；该轮 Web 收敛与 Windows 服务实现已提交为 `5d13db7`，后续修复见 `02d45b3`、`99b2ea2`。
 - 隔离方式：`SYNO_WEB_ONLY=true`、端口 `4318`、状态根位于仓库忽略的 `.runtime/ui-final`；未读取真实凭据，也未竞争微信/飞书连接。
 - 桌面：1280×720，`scrollWidth=1280`；首屏只突出一个行动、待处理/最近收录/今日进展，旧目录配置和周历进入二级折叠入口。
 - 设置：首层只显示 AI、微信、飞书、开机自动运行、数据与备份五行；Provider URL、Model ID、上下文长度和 Token 均在高级设置内，Token 未回显。
@@ -86,3 +86,11 @@
 - [桌面 Today 决策中心](../output/playwright/syno-desktop-converged-2026-07-20.png)
 - [桌面五行设置](../output/playwright/syno-settings-converged-2026-07-20.png)
 - [移动 Today 决策中心](../output/playwright/syno-mobile-converged-2026-07-20.png)
+
+## 2026-07-20 审查修复复验
+
+- 当前基线：`99b2ea2`；真实服务 `127.0.0.1:4317`。
+- Today 的“去处理”和“待你处理”会真实打开相应抽屉，不再只切换隐藏 pane。
+- 设置总览的微信状态与“微信连接”详情一致；点击微信行只展开常用连接设置，不跳转通知中心。
+- 390×844 下 `scrollWidth=375 <= innerWidth=390`，五入口与连接设置可见；桌面和移动合计 0 error/0 warning。
+- Web 卸载返回完整 JSON 后当前 Host 仍健康；同源 JSON API 重装后 `installed=true`、`running=true`，全程留下 canonical Job/事件。

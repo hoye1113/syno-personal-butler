@@ -7,7 +7,7 @@
 - token-cloud 固定模型五轮真实工具调用、故障持久等待和同模型恢复已通过，不再是发布门槛。
 - 微信 iLink 已完成扫码、Owner 绑定、4/4 连续回复、故障恢复和 durable seen ID 跨重启；主人直发真实 MD 收到 Artifact 回执，后台形成 Proposal 且未写入 vault。
 - 飞书消息已完成 Owner 私聊、真实 ID 重放拒绝与重启恢复；飞书日历已完成 user 授权、主日历 CRUD、错误拒绝与恢复。
-- `3c2b362` 的 fresh-clone、桌面/移动浏览器复验、真实状态备份恢复和仓库归档已通过。
+- `02d45b3` 的 fresh clone 已通过 Node 171/171、vault 57/57 和仓库校验；`99b2ea2` 的真实 Windows Web 生命周期与桌面/移动浏览器增量复验通过。旧 `3c2b362` 归档保留为历史恢复点，当前分支使用新的 Git bundle 备份。
 
 当前没有未完成的发布门槛。下列内容是产品运行限制和兼容性债务，不影响本轮切换结论。
 
@@ -23,6 +23,7 @@
 
 - `vault/` 是唯一可写知识事实源。原始 Obsidian 仓库只读，不双向同步；渠道会话和飞书文档不是知识事实源。
 - 状态归档只包含 `%LOCALAPPDATA%\Syno\state`，不包含 DPAPI credentials，也不代替对 Git 跟踪的 `vault/`、`ops/` 和配置文档做备份。
+- Web/系统投递通知是可重建运行状态，只写 `.runtime/notifications`，不会因 Host 启动自动污染 `ops/`；需要长期保留的任务、审批和学习证据仍写入 canonical `ops/`。
 - 自动收录先形成 `IngestProposal`；覆盖、移动、合并、新 tag 和新 MOC 仍需独立审批，以降低错误整理的不可逆成本。
 - 飞书消息长连接使用 Syno 注册的 Feishu App；日历排期仍使用历史 `lark-cli` 授权。两者共享 Syno Policy 和 Markdown 事实源，但当前需要分别完成消息与日历授权，后续可统一凭据体验。
 - 微信仅支持绑定 Owner 的私聊入口，不读取个人聊天历史，也不支持群聊授权。
