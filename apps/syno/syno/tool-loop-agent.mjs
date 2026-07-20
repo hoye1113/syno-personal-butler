@@ -1,6 +1,8 @@
 const DEFAULT_SYSTEM_PROMPT = `你是 Syno，一个主动但克制的知识闭环私人管家。
 你只能使用提供的工具；不能修改源码、配置权限、Provider、Policy 或 ToolRegistry。
 知识写入必须创建可审批 Job。AI 生成内容不是用户的学习证据，不能提升掌握度。
+只在用户明确要求相关操作时调用工具；连通性测试、问候和闲聊直接简短回复，不自行创建知识、抓取来源或展示工具。
+工具失败时解释失败与可行下一步，不使用相同参数无条件重试。
 回答要明确下一步，并区分已验证事实、候选证据与推断。`;
 
 function parseArguments(call) {
@@ -10,6 +12,38 @@ function parseArguments(call) {
     error.code = "TOOL_ARGUMENTS_INVALID_JSON";
     throw error;
   }
+}
+
+function repairDanglingToolCalls(messages = []) {
+  const repaired = [];
+  const pending = new Map();
+  const finishPending = () => {
+    for (const id of pending.keys()) {
+      repaired.push({
+        role: "tool",
+        tool_call_id: id,
+        content: JSON.stringify({
+          ok: false,
+          error: { code: "TOOL_RESULT_MISSING", message: "上一次工具调用未完成，未重放该操作" },
+        }),
+      });
+    }
+    pending.clear();
+  };
+
+  for (const message of messages) {
+    if (pending.size && message.role !== "tool") finishPending();
+    repaired.push(message);
+    if (message.role === "assistant") {
+      for (const call of message.tool_calls || []) {
+        if (call?.id) pending.set(call.id, true);
+      }
+    } else if (message.role === "tool" && message.tool_call_id) {
+      pending.delete(message.tool_call_id);
+    }
+  }
+  if (pending.size) finishPending();
+  return repaired;
 }
 
 class ToolLoopAgent {
@@ -32,6 +66,9 @@ class ToolLoopAgent {
   async #run(request, { conversationId, channel, ownerId, signal }) {
     let conversation = conversationId ? await this.conversations.get(conversationId) : null;
     if (!conversation) conversation = await this.conversations.create({ id: conversationId || undefined, channel, ownerId });
+    conversation.status = "active";
+    delete conversation.error;
+    conversation.messages = repairDanglingToolCalls(conversation.messages);
     const userMessage = { role: "user", content: String(request?.text || request?.message || "") };
     conversation.messages.push(userMessage);
     await this.conversations.save(conversation);
@@ -54,7 +91,19 @@ class ToolLoopAgent {
         }
         for (const call of calls) {
           const name = call?.function?.name;
-          const result = await this.tools.execute(name, parseArguments(call), { channel, ownerId, allowWrites: false, allowJobSubmission: true, allowAgentSettings: true, conversationId: conversation.id });
+          let result;
+          try {
+            result = await this.tools.execute(name, parseArguments(call), { channel, ownerId, allowWrites: false, allowJobSubmission: true, allowAgentSettings: true, conversationId: conversation.id });
+          } catch (error) {
+            if (signal?.aborted || error.name === "AbortError") throw error;
+            result = {
+              ok: false,
+              error: {
+                code: error.code || "TOOL_EXECUTION_FAILED",
+                message: String(error.message || "工具执行失败").slice(0, 500),
+              },
+            };
+          }
           const toolMessage = { role: "tool", tool_call_id: call.id, content: JSON.stringify(result) };
           messages.push(toolMessage);
           conversation.messages.push(toolMessage);
@@ -73,4 +122,4 @@ class ToolLoopAgent {
   }
 }
 
-export { DEFAULT_SYSTEM_PROMPT, ToolLoopAgent, parseArguments };
+export { DEFAULT_SYSTEM_PROMPT, ToolLoopAgent, parseArguments, repairDanglingToolCalls };

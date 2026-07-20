@@ -11,6 +11,23 @@ const DEFAULT_CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c/";
 const CDN_ALLOWLIST = new Set(["novac2c.cdn.weixin.qq.com"]);
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const ATTACHMENT_TIMEOUT_MS = 20_000;
+const STALE_SESSION_PAUSE_MS = 60 * 60 * 1_000;
+
+function abortableDelay(ms, signal) {
+  return new Promise((resolve) => {
+    if (signal?.aborted || ms <= 0) {
+      resolve();
+      return;
+    }
+    const finish = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", finish);
+      resolve();
+    };
+    const timer = setTimeout(finish, ms);
+    signal?.addEventListener("abort", finish, { once: true });
+  });
+}
 
 function validateIlinkBaseUrl(value) {
   const url = new URL(value || DEFAULT_BASE_URL);
@@ -107,7 +124,15 @@ class WeixinIlinkClient {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify({
-        msg: { to_user_id: toUserId, context_token: contextToken, message_type: 2, message_state: 2, item_list: [{ type: 1, text_item: { text } }] },
+        msg: {
+          from_user_id: "",
+          to_user_id: toUserId,
+          client_id: `syno-${randomUUID()}`,
+          context_token: contextToken,
+          message_type: 2,
+          message_state: 2,
+          item_list: [{ type: 1, text_item: { text } }],
+        },
         base_info: { channel_version: "1.0.0", bot_agent: "Syno/1.0.0" },
       }),
     }, 20_000);
@@ -305,7 +330,7 @@ function normalizeInbound(message) {
 }
 
 class WeixinIlinkAdapter {
-  constructor({ client, clientFactory, credentialStore = new LocalCredentialStore(), processLock = new LocalProcessLock(), fetchImpl = fetch, qrRenderer = renderLoginQr, onMessage = async () => ({ text: "已收到" }), quarantineRoot = path.join(PATHS.runtimeRoot, "quarantine", "weixin") } = {}) {
+  constructor({ client, clientFactory, credentialStore = new LocalCredentialStore(), processLock = new LocalProcessLock(), fetchImpl = fetch, qrRenderer = renderLoginQr, onMessage = async () => ({ text: "已收到" }), quarantineRoot = path.join(PATHS.runtimeRoot, "quarantine", "weixin"), staleSessionPauseMs = STALE_SESSION_PAUSE_MS, delay = abortableDelay } = {}) {
     this.credentials = credentialStore;
     this.client = client || new WeixinIlinkClient();
     this.clientFactory = clientFactory || ((credential) => client || new WeixinIlinkClient({ baseUrl: credential.baseUrl, token: credential.token }));
@@ -314,6 +339,8 @@ class WeixinIlinkAdapter {
     this.fetchImpl = fetchImpl;
     this.qrRenderer = qrRenderer;
     this.quarantineRoot = quarantineRoot;
+    this.staleSessionPauseMs = staleSessionPauseMs;
+    this.delay = delay;
     this.running = false;
     this.abortController = null;
     this.seen = new Set();
@@ -344,8 +371,16 @@ class WeixinIlinkAdapter {
         seenIds: [],
         savedAt: new Date().toISOString(),
       };
-      await this.credentials.save(credential);
+      const wasRunning = this.running;
+      if (wasRunning) await this.stop();
+      try {
+        await this.credentials.save(credential);
+      } catch (error) {
+        if (wasRunning) await this.start();
+        throw error;
+      }
       this.pendingQr = null;
+      if (wasRunning) await this.start();
       return { status: "confirmed", botId: credential.botId, ownerBound: Boolean(credential.ownerId) };
     }
     return { status: result.status || "waiting" };
@@ -406,7 +441,9 @@ class WeixinIlinkAdapter {
     while (!signal.aborted && this.running) {
       try {
         const result = await this.client.getUpdates(this.credential.cursor || "", signal, longPollingTimeoutMs);
-        if (result.errcode === -14) throw Object.assign(new Error("微信 Token 已失效，请重新扫码"), { code: "TOKEN_EXPIRED" });
+        if (Number(result.errcode) === -14 || Number(result.ret) === -14) {
+          throw Object.assign(new Error("微信会话暂时冷却，将自动恢复"), { code: "STALE_SESSION" });
+        }
         if (result.ret && result.ret !== 0) throw new Error(result.errmsg || `getUpdates ret=${result.ret}`);
         for (const message of result.msgs || []) await this.handleInbound(message);
         this.credential.cursor = result.get_updates_buf || this.credential.cursor || "";
@@ -419,8 +456,11 @@ class WeixinIlinkAdapter {
       } catch (error) {
         if (signal.aborted || error.name === "AbortError") break;
         this.lastError = error.message;
-        if (error.code === "TOKEN_EXPIRED") { await this.credentials.clear(); this.credential = null; this.running = false; break; }
-        await new Promise((resolve) => setTimeout(resolve, backoff));
+        if (error.code === "STALE_SESSION") {
+          await this.delay(this.staleSessionPauseMs, signal);
+          continue;
+        }
+        await this.delay(backoff, signal);
         backoff = Math.min(30_000, backoff * 2);
       }
     }

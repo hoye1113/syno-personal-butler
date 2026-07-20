@@ -81,6 +81,23 @@ test("Weixin long poll times out locally and preserves its cursor", async () => 
   assert.deepEqual(await client.getUpdates("cursor-one", undefined, 5), { ret: 0, msgs: [], get_updates_buf: "cursor-one" });
 });
 
+test("Weixin gives every consecutive reply a unique client id", async () => {
+  const requests = [];
+  const client = new WeixinIlinkClient({
+    token: "token",
+    fetcher: async (_url, options) => {
+      requests.push(JSON.parse(options.body));
+      return { ret: 0 };
+    },
+  });
+  await client.sendText({ toUserId: "owner", contextToken: "context-1", text: "reply one" });
+  await client.sendText({ toUserId: "owner", contextToken: "context-2", text: "reply two" });
+  assert.equal(requests.length, 2);
+  assert.ok(requests.every((request) => request.msg.client_id));
+  assert.notEqual(requests[0].msg.client_id, requests[1].msg.client_id);
+  assert.deepEqual(requests.map((request) => request.msg.context_token), ["context-1", "context-2"]);
+});
+
 test("Weixin poller replies to consecutive owner messages and advances each state", async () => {
   let saved = { token: "test", baseUrl: "https://ilinkai.weixin.qq.com/", ownerId: "owner", cursor: "", contexts: {}, seenIds: [] };
   const credentials = {
@@ -110,6 +127,85 @@ test("Weixin poller replies to consecutive owner messages and advances each stat
   assert.equal(saved.cursor, "cursor-2");
   assert.deepEqual(saved.seenIds, ["message-1", "message-2"]);
   assert.equal(adapter.status().lastError, null);
+  await adapter.stop();
+});
+
+test("Weixin stale session cooldown preserves credentials and resumes polling", async () => {
+  let saved = { token: "kept-token", baseUrl: "https://ilinkai.weixin.qq.com/", ownerId: "owner", cursor: "", contexts: {}, seenIds: [] };
+  let clearCalls = 0;
+  const credentials = {
+    async load() { return structuredClone(saved); },
+    async save(value) { saved = structuredClone(value); },
+    async clear() { clearCalls += 1; saved = null; },
+  };
+  let updateCall = 0;
+  const sent = [];
+  const client = {
+    async getUpdates(_cursor, signal) {
+      updateCall += 1;
+      if (updateCall === 1) return { errcode: -14 };
+      if (updateCall === 2) return {
+        ret: 0,
+        get_updates_buf: "recovered-cursor",
+        msgs: [{ message_id: "recovered-message", message_type: 1, from_user_id: "owner", context_token: "context", item_list: [{ type: 1, text_item: { text: "after cooldown" } }] }],
+      };
+      return new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })), { once: true }));
+    },
+    async sendText(value) { sent.push(value); return { message_id: "reply" }; },
+  };
+  const processLock = { async acquire() { return true; }, async release() {} };
+  const adapter = new WeixinIlinkAdapter({
+    client,
+    clientFactory: () => client,
+    credentialStore: credentials,
+    processLock,
+    staleSessionPauseMs: 1,
+    onMessage: async () => ({ text: "recovered" }),
+  });
+  await adapter.start();
+  for (let index = 0; index < 40 && !sent.length; index += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(clearCalls, 0);
+  assert.equal(saved.token, "kept-token");
+  assert.equal(saved.cursor, "recovered-cursor");
+  assert.equal(sent.length, 1);
+  assert.equal(adapter.status().running, true);
+  assert.equal(adapter.status().lastError, null);
+  await adapter.stop();
+});
+
+test("Weixin confirmed rescan replaces a running poller with the new credential", async () => {
+  let saved = { token: "old-token", baseUrl: "https://ilinkai.weixin.qq.com/", ownerId: "owner", cursor: "old-cursor", contexts: {}, seenIds: [] };
+  let clearCalls = 0;
+  const credentials = {
+    async load() { return structuredClone(saved); },
+    async save(value) { saved = structuredClone(value); },
+    async clear() { clearCalls += 1; },
+  };
+  const createdFor = [];
+  let oldPollAborted = false;
+  const waitForAbort = (signal, onAbort = () => {}) => new Promise((_resolve, reject) => signal.addEventListener("abort", () => {
+    onAbort();
+    reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+  }, { once: true }));
+  const clientFactory = (credential) => {
+    createdFor.push(credential.token);
+    return {
+      async getQrCode() { return { ret: 0, qrcode: "replacement-qr", qrcode_img_content: "https://liteapp.weixin.qq.com/q/replacement?bot_type=3" }; },
+      async getQrStatus() { return { status: "confirmed", bot_token: "new-token", ilink_user_id: "owner", ilink_bot_id: "bot" }; },
+      async getUpdates(_cursor, signal) { return waitForAbort(signal, () => { if (credential.token === "old-token") oldPollAborted = true; }); },
+    };
+  };
+  const processLock = { async acquire() { return true; }, async release() {} };
+  const adapter = new WeixinIlinkAdapter({ clientFactory, credentialStore: credentials, processLock, qrRenderer: async () => "data:image/png;base64,fixture" });
+  await adapter.start();
+  await adapter.beginLogin();
+  assert.equal((await adapter.pollLogin()).status, "confirmed");
+  assert.deepEqual(createdFor, ["old-token", "new-token"]);
+  assert.equal(oldPollAborted, true);
+  assert.equal(saved.token, "new-token");
+  assert.equal(clearCalls, 0);
+  assert.equal(adapter.status().running, true);
+  assert.equal(adapter.status().ownerBound, true);
   await adapter.stop();
 });
 

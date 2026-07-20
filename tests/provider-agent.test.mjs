@@ -118,6 +118,57 @@ test("ToolLoopAgent completes a bounded native tool-call loop", async (t) => {
   assert.equal((await conversations.get(result.conversationId)).status, "completed");
 });
 
+test("ToolLoopAgent records a failed tool result and keeps the conversation usable", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-tool-error-conversation-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const responses = [
+    { message: { role: "assistant", content: null, tool_calls: [{ id: "call-failed", type: "function", function: { name: "evidence.source_read", arguments: "{\"url\":\"https://example.com\"}" } }] }, model: "fixed" },
+    { message: { role: "assistant", content: "来源读取失败，但对话仍可继续。" }, model: "fixed" },
+  ];
+  const provider = { async complete() { return responses.shift(); } };
+  const tools = new ToolRegistry([{
+    name: "evidence.source_read", description: "read", risk: "read", permission: "syno-read", retry: "safe", version: "1",
+    inputSchema: { type: "object", required: ["url"], properties: { url: { type: "string" } }, additionalProperties: false },
+    outputSchema: { type: "object" }, execute: async () => { throw Object.assign(new Error("URL 解析到本机、内网或保留地址"), { code: "SOURCE_URL_BLOCKED" }); },
+  }]);
+  const conversations = new ConversationStore({ root });
+  const agent = new ToolLoopAgent({ provider, tools, conversations, maxTurns: 3 });
+  const result = await agent.run({ text: "检查来源" }, { conversationId: "conversation-tool-error" });
+  assert.equal(result.text, "来源读取失败，但对话仍可继续。");
+  const stored = await conversations.get("conversation-tool-error");
+  assert.equal(stored.status, "completed");
+  const failedTool = stored.messages.find((message) => message.role === "tool" && message.tool_call_id === "call-failed");
+  assert.deepEqual(JSON.parse(failedTool.content), { ok: false, error: { code: "SOURCE_URL_BLOCKED", message: "URL 解析到本机、内网或保留地址" } });
+});
+
+test("ToolLoopAgent repairs a legacy dangling tool call before the next user turn", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-dangling-tool-conversation-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const conversations = new ConversationStore({ root });
+  await conversations.create({
+    id: "conversation-dangling-tool",
+    messages: [
+      { role: "user", content: "旧请求" },
+      { role: "assistant", content: null, tool_calls: [{ id: "legacy-call", type: "function", function: { name: "evidence.source_read", arguments: "{\"url\":\"https://example.com\"}" } }] },
+    ],
+  });
+  const provider = {
+    async complete(messages) {
+      const toolIndex = messages.findIndex((message) => message.role === "tool" && message.tool_call_id === "legacy-call");
+      const newUserIndex = messages.findIndex((message) => message.role === "user" && message.content === "新请求");
+      assert.ok(toolIndex > 0 && toolIndex < newUserIndex);
+      return { message: { role: "assistant", content: "已恢复" }, model: "fixed" };
+    },
+  };
+  const agent = new ToolLoopAgent({ provider, tools: new ToolRegistry(), conversations });
+  assert.equal((await agent.run({ text: "新请求" }, { conversationId: "conversation-dangling-tool" })).text, "已恢复");
+  const repaired = await conversations.get("conversation-dangling-tool");
+  assert.deepEqual(JSON.parse(repaired.messages.find((message) => message.tool_call_id === "legacy-call").content), {
+    ok: false,
+    error: { code: "TOOL_RESULT_MISSING", message: "上一次工具调用未完成，未重放该操作" },
+  });
+});
+
 test("ToolLoopAgent pins one Provider configuration for the entire tool loop", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-fixed-provider-run-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
