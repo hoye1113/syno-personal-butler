@@ -139,6 +139,7 @@ class FeishuChannelAdapter {
     this.credentials = credentials; this.sdkLoader = sdkLoader; this.channelFactory = channelFactory; this.onMessage = onMessage;
     this.stateStore = stateStore; this.processLock = processLock; this.processLease = null; this.retryDelayMs = retryDelayMs;
     this.channel = null; this.running = false; this.ownerBound = false; this.lastError = ""; this.queue = []; this.draining = false; this.drainPromise = null; this.seen = new Set(); this.inflight = new Set(); this.retryTimer = null;
+    this.ownerGeneration = 0;
     this.registration = null; this.registrationState = { status: "idle" };
   }
 
@@ -153,6 +154,7 @@ class FeishuChannelAdapter {
       this.lastError = "FEISHU_PROCESS_LOCKED";
       return this.status();
     }
+    const ownerGeneration = ++this.ownerGeneration;
     try {
       const sdk = this.channelFactory ? null : await this.sdkLoader();
       const factory = this.channelFactory || ((options) => sdk.createLarkChannel(options));
@@ -165,14 +167,15 @@ class FeishuChannelAdapter {
         logger: SILENT_SDK_LOGGER,
         loggerLevel: 0,
       });
-      this.channel.on("message", (message) => this.#enqueue(message, credential).catch((error) => { this.lastError = error.message; }));
-      this.channel.on?.("error", (error) => { this.lastError = error.message; });
+      this.channel.on("message", (message) => this.#enqueue(message, credential, ownerGeneration).catch((error) => { if (ownerGeneration === this.ownerGeneration) this.lastError = error.message; }));
+      this.channel.on?.("error", (error) => { if (ownerGeneration === this.ownerGeneration) this.lastError = error.message; });
       await this.channel.connect();
       this.running = true; this.lastError = "";
-      await this.#recoverPending(credential);
+      await this.#recoverPending(credential, ownerGeneration);
       return this.status();
     } catch (error) {
-      await this.processLease?.release(); this.processLease = null; this.channel = null;
+      this.lastError = error.message;
+      await this.#teardown().catch(() => {});
       throw error;
     }
   }
@@ -181,10 +184,22 @@ class FeishuChannelAdapter {
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = null;
     await this.drainPromise;
+    try { await this.#teardown(); return this.status(); }
+    catch (error) { this.lastError = error.message; throw error; }
+  }
+
+  async #teardown() {
+    let failure = null;
+    this.ownerGeneration += 1;
     try { await this.channel?.disconnect?.(); }
-    finally { await this.processLease?.release(); this.processLease = null; }
-    this.channel = null; this.running = false;
-    return this.status();
+    catch (error) { failure = error; }
+    finally {
+      this.channel = null; this.running = false;
+      try { await this.processLease?.release(); }
+      catch (error) { failure ||= error; }
+      this.processLease = null;
+    }
+    if (failure) throw failure;
   }
 
   status() {
@@ -237,10 +252,12 @@ class FeishuChannelAdapter {
 
   registrationStatus() { return this.registrationState; }
 
-  async #enqueue(message, credential) {
+  async #enqueue(message, credential, ownerGeneration) {
+    if (ownerGeneration !== this.ownerGeneration || !this.running || !this.processLease) return;
     if (!message?.messageId || this.seen.has(message.messageId) || this.inflight.has(message.messageId)) return;
     if (message.chatType !== "p2p" || !credential.ownerOpenId || message.senderId !== credential.ownerOpenId) return;
     if (!await this.stateStore.reserve(message)) return;
+    if (ownerGeneration !== this.ownerGeneration || !this.running || !this.processLease) return;
     this.#queueReserved(message);
   }
 
@@ -261,8 +278,10 @@ class FeishuChannelAdapter {
     return this.drainPromise;
   }
 
-  async #recoverPending(credential) {
+  async #recoverPending(credential, ownerGeneration = this.ownerGeneration) {
+    if (ownerGeneration !== this.ownerGeneration || !this.running || !this.processLease) return;
     const state = await this.stateStore.snapshot();
+    if (ownerGeneration !== this.ownerGeneration || !this.running || !this.processLease) return;
     this.seen = new Set(state.seenIds);
     for (const message of state.pending) {
       if (message.chatType === "p2p" && credential.ownerOpenId && message.senderId === credential.ownerOpenId) this.#queueReserved(message);
@@ -273,7 +292,8 @@ class FeishuChannelAdapter {
     if (this.retryTimer || !this.running) return;
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
-      this.credentials.load().then((credential) => credential && this.#recoverPending(credential)).catch((error) => { this.lastError = error.message; });
+      const ownerGeneration = this.ownerGeneration;
+      this.credentials.load().then((credential) => credential && this.#recoverPending(credential, ownerGeneration)).catch((error) => { if (ownerGeneration === this.ownerGeneration) this.lastError = error.message; });
     }, this.retryDelayMs);
     this.retryTimer.unref?.();
   }

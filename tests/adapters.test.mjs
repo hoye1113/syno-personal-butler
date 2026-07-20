@@ -389,6 +389,57 @@ test("Feishu process lock permits only one connected recovery owner", async (t) 
   await second.stop();
 });
 
+test("Feishu startup failure tears down the connected channel before releasing ownership", async () => {
+  let disconnected = 0;
+  let released = 0;
+  const adapter = new FeishuChannelAdapter({
+    credentials: { async load() { return { appId: "app", appSecret: "secret", ownerOpenId: "owner" }; } },
+    stateStore: { async snapshot() { throw new Error("state unavailable"); } },
+    processLock: { async acquire() { return { async release() { released += 1; } }; } },
+    channelFactory: () => ({
+      on() {},
+      async connect() {},
+      async disconnect() { disconnected += 1; },
+      async send() {},
+    }),
+  });
+
+  await assert.rejects(adapter.start(), /state unavailable/);
+  assert.deepEqual(adapter.status(), { id: "feishu", running: false, available: false, ownerBound: true, registration: "idle", lastError: "state unavailable" });
+  assert.equal(disconnected, 1);
+  assert.equal(released, 1);
+});
+
+test("Feishu stop clears ownership state even when disconnect fails", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-feishu-stop-"));
+  t.after(() => removeTemp(root));
+  let released = 0;
+  let handled = 0;
+  const handlers = new Map();
+  const stateStore = new FeishuStateStore({ file: path.join(root, "state.json") });
+  const adapter = new FeishuChannelAdapter({
+    credentials: { async load() { return { appId: "app", appSecret: "secret", ownerOpenId: "owner" }; } },
+    stateStore,
+    processLock: { async acquire() { return { async release() { released += 1; } }; } },
+    channelFactory: () => ({
+      on(name, handler) { handlers.set(name, handler); },
+      async connect() {},
+      async disconnect() { throw new Error("disconnect failed"); },
+      async send() {},
+    }),
+    onMessage: async () => { handled += 1; return { text: "must not send" }; },
+  });
+
+  await adapter.start();
+  await assert.rejects(adapter.stop(), /disconnect failed/);
+  assert.deepEqual(adapter.status(), { id: "feishu", running: false, available: false, ownerBound: true, registration: "idle", lastError: "disconnect failed" });
+  assert.equal(released, 1);
+  handlers.get("message")({ messageId: "orphan", chatId: "chat", chatType: "p2p", senderId: "owner", content: "late" });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(handled, 0);
+  assert.deepEqual((await stateStore.snapshot()).pending, []);
+});
+
 test("Feishu keeps a message pending when reply delivery returns false", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-feishu-undelivered-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
