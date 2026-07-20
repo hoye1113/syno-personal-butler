@@ -49,6 +49,45 @@ test("vault contract accepts source_url and rejects duplicate sources or new tag
   );
 });
 
+test("vault contract accepts migration topology metadata without inventing an outgoing link", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-vault-migration-topology-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.mkdir(path.join(root, "config"), { recursive: true });
+  await fs.mkdir(path.join(root, "vault"), { recursive: true });
+  await fs.writeFile(path.join(root, "config", "vault-contract.json"), JSON.stringify({
+    requiredFrontmatter: ["title", "tags", "created", "source", "description"],
+    approvedTags: ["notes"],
+    maxFilenameLength: 50,
+    requireSemanticLinkOrOrphan: true,
+  }));
+  await git(root, ["init", "-b", "main"]);
+  await git(root, ["config", "user.name", "Syno Tests"]);
+  await git(root, ["config", "user.email", "syno-tests@example.invalid"]);
+  await git(root, ["add", "--", "config/vault-contract.json"]);
+  await git(root, ["commit", "-m", "fixture"]);
+
+  const connected = note({ source: "obsidian_repository_snapshot" }).replace(
+    "status: orphan",
+    [
+      "link_status: connected",
+      "migration_id: migration-20260720-deadbeef",
+      `source_sha256: ${"a".repeat(64)}`,
+    ].join("\n"),
+  );
+  await fs.writeFile(path.join(root, "vault", "Connected.md"), connected);
+  await validateVaultContract(root, ["vault/Connected.md"], { intent: "migrate_note" });
+  await assert.rejects(
+    validateVaultContract(root, ["vault/Connected.md"], { intent: "curate_note" }),
+    /语义 wikilink/,
+  );
+
+  await fs.writeFile(path.join(root, "vault", "Unpinned.md"), note({ source: "obsidian_repository_snapshot" }).replace("status: orphan", "link_status: connected"));
+  await assert.rejects(
+    validateVaultContract(root, ["vault/Unpinned.md"], { intent: "migrate_note" }),
+    /语义 wikilink/,
+  );
+});
+
 function note({ source, tag = "notes" }) {
   return [
     "---",

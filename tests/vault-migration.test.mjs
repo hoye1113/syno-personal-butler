@@ -159,6 +159,7 @@ test("apply imports only the approved phase and is idempotent", async (t) => {
   const repoRoot = path.join(root, "repo");
   const runtimeRoot = path.join(repoRoot, ".runtime", "migrations");
   await write(path.join(sourceRoot, "01-Areas", "Agent.md"), "# Agent\n\n正文。\n");
+  await write(path.join(sourceRoot, "01-Areas", "MOC - Nested.md"), "# Nested\n\n正文。\n");
   await write(path.join(sourceRoot, "MOC - 知识库导航.md"), "# 导航\n\n- [[Agent]]\n");
   await execFileAsync("git", ["init"], { cwd: sourceRoot, windowsHide: true });
   await execFileAsync("git", ["config", "user.email", "test@example.invalid"], { cwd: sourceRoot, windowsHide: true });
@@ -167,6 +168,8 @@ test("apply imports only the approved phase and is idempotent", async (t) => {
   await execFileAsync("git", ["commit", "-m", "fixture"], { cwd: sourceRoot, windowsHide: true });
   const service = new VaultMigrationService({ repoRoot, runtimeRoot, clock: () => new Date("2026-07-20T10:00:00.000Z") });
   const manifest = await service.inventory({ sourceRoot });
+
+  assert.equal(manifest.files.find((item) => item.sourcePath === "01-Areas/MOC - Nested.md").phase, "integration");
 
   await assert.rejects(service.apply(manifest.id, { phase: "content", expectedDigest: "0".repeat(64), workspace: repoRoot }), (error) => error.code === "MIGRATION_DIGEST_MISMATCH");
   const first = await service.apply(manifest.id, { phase: "content", expectedDigest: manifest.digest, workspace: repoRoot });
@@ -184,7 +187,7 @@ test("apply imports only the approved phase and is idempotent", async (t) => {
   await assert.rejects(service.nextPhase(manifest.id, { workspace: repoRoot }), (error) => error.code === "MIGRATION_REPLAY_INCONSISTENT");
   await fs.writeFile(contentAudit, validAudit, "utf8");
   const integration = await service.apply(manifest.id, { phase: "integration", expectedDigest: manifest.digest, workspace: repoRoot });
-  assert.equal(integration.imported, 1);
+  assert.equal(integration.imported, 2);
   assert.match(await fs.readFile(path.join(repoRoot, "vault", "MOC - 知识库导航.md"), "utf8"), /# 导航/);
   assert.equal(await service.nextPhase(manifest.id, { workspace: repoRoot }), "complete");
 });

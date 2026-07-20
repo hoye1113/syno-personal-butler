@@ -6,7 +6,7 @@
 
 ## 当前唯一可信状态
 
-- 工作目录：`D:\workSpace\syno-personal-butler`
+- 工作目录：当前仓库根目录（先用 `git rev-parse --show-toplevel` 核对，不在文档中固化个人绝对路径）
 - 分支：`codex/round3-remediation`
 - 最新迁移实现提交：`342983f fix: harden audited vault migration`
 - 本交接文档作为其后的独立本地提交；重启时以 `git log -1 --oneline` 核对实际 HEAD，不要把文档中的实施基线误当成分支尖端。
@@ -115,7 +115,7 @@
 - Hermes 候选固定版本未满足单端点 Provider 硬门槛，当前不采用，也不得接触真实 Token。
 - Provider 固定 token-cloud OpenAI-compatible endpoint 和单一 Model ID，无自动换模型或 fallback。
 - 微信、飞书、Web 共用同一 Owner、Conversation、Policy、审批和事实源。
-- `vault/` 是唯一可写知识事实源；`D:\workSpace\obsidian_repository` 永久只读、无双向同步。
+- `vault/` 是唯一可写知识事实源；inventory 时指定的原 Obsidian source root 永久只读、无双向同步。
 - AI 草稿不能提高掌握度；只有主人自己的口述、打字、答题或实践证据可以推进学习状态。
 
 ## 交接完成定义
