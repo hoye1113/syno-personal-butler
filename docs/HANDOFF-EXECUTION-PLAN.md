@@ -65,7 +65,7 @@ Syno 是 Windows 本地、单用户、主动式且可审计的知识闭环私人
 - 渠道媒体与日志安全提交 `9837366` 对齐真实 iLink：图片/文件 CDN 密文使用 AES-128-ECB 解密，`full_url` 缺失时只回退固定腾讯 CDN，随后仍执行流式限额、MIME/魔数和隔离规则；飞书 SDK 错误日志改为无输出 Logger，避免请求配置泄露 App Secret。
 - Windows 重启恢复提交 `2e1dfd0` 在无 `LARK_CLI_PATH` 时自动发现与 `node.exe` 同目录及常见全局目录的官方 lark-cli 包装器。真实服务重启恢复 Hoye 日历与 lark-cli 1.0.72；主工作树和 `C:\tmp\syno-fresh-2e1dfd0` 通过 Node 144/144、vault 57/57 和仓库校验，最新桌面/移动浏览器复验通过。
 - 微信长期回复修复 `e02f62b` 为每次 iLink 回复生成唯一 `client_id`，对 `-14` 采用凭据保留冷却，并串行轮换旧/新 Worker；主人连续发送 4 条消息全部得到回复。附件 Intake 修复 `2dde18d` 把真实 MD/TXT/PDF 从通用 `curate_note` Job 改为 `Artifact → IngestProposal`，不再提前请求写入审批。
-- 当前审查修复基线 `99b2ea2`；核心实现 `02d45b3` 已在主工作树与 `C:\tmp\syno-fresh-02d45b3` 通过冻结锁文件离线安装（下载 0）、Node 171/171、vault 57/57 和仓库校验。真实 Web 卸载/重装、计划任务健康、桌面/移动 Today 与微信设置均通过；主人此前从微信直发 MD 的 Artifact/Proposal 两阶段结果保持不变，未自动写 vault。
+- 当前代码基线 `0cc2669` 已在主工作树与 `C:\tmp\syno-fresh-02d45b3` 通过冻结锁文件离线安装（下载 0）、Node 172/172、vault 57/57 和仓库校验。真实 Web 卸载后 Host 健康且 launcher=0，重装后计划任务健康且 launcher=1；桌面/移动 Today 与微信设置均通过。主人此前从微信直发 MD 的 Artifact/Proposal 两阶段结果保持不变，未自动写 vault。
 5. **知识技能**：低成本收录、渐进整理、Teach-back、间隔复习、证据型创作、时效查证。
 6. **外部渠道**：Web 完整控制；微信快速入口；飞书日程和结构化通知；同一 Agent/Policy/Store。
 7. **Web 与品牌**：Today、Capture、Knowledge、Learn、Create；纸片法老知识守护者；WCAG AA。

@@ -7,7 +7,7 @@
 - token-cloud 固定模型五轮真实工具调用、故障持久等待和同模型恢复已通过，不再是发布门槛。
 - 微信 iLink 已完成扫码、Owner 绑定、4/4 连续回复、故障恢复和 durable seen ID 跨重启；主人直发真实 MD 收到 Artifact 回执，后台形成 Proposal 且未写入 vault。
 - 飞书消息已完成 Owner 私聊、真实 ID 重放拒绝与重启恢复；飞书日历已完成 user 授权、主日历 CRUD、错误拒绝与恢复。
-- `02d45b3` 的 fresh clone 已通过 Node 171/171、vault 57/57 和仓库校验；`99b2ea2` 的真实 Windows Web 生命周期与桌面/移动浏览器增量复验通过。旧 `3c2b362` 归档保留为历史恢复点，当前分支使用新的 Git bundle 备份。
+- `0cc2669` 的 fresh clone 已通过 Node 172/172、vault 57/57 和仓库校验；真实 Windows Web 生命周期与桌面/移动浏览器增量复验通过。旧 `3c2b362` 归档保留为历史恢复点，当前分支使用新的 Git bundle 备份。
 
 当前没有未完成的发布门槛。下列内容是产品运行限制和兼容性债务，不影响本轮切换结论。
 
