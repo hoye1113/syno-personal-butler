@@ -141,6 +141,10 @@ class JobStore {
     }
     const previous = job.status;
     Object.assign(job, patch, { status: next });
+    if (next === "running" || next === "completed") {
+      job.error = null;
+      job.nextRetryAt = null;
+    }
     await this.save(job);
     await this.event(job, "job.transitioned", { from: previous, to: next, phase: job.phase });
     return job;

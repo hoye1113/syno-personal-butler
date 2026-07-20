@@ -218,5 +218,7 @@ test("retryable Provider failures stay durable without switching executors", asy
   assert.equal(deferred.job.error.retryable, true);
   const retried = await host.retry(deferred.job.id);
   assert.equal(retried.job.status, "completed");
+  assert.equal(retried.job.error, null);
+  assert.equal(retried.job.nextRetryAt, null);
   assert.equal(attempts, 2);
 });
