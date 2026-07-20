@@ -4,6 +4,16 @@
 
 本文是后续开发的权威执行入口。新会话先读根目录 `AGENTS.md`、`NEXT_SESSION.md`、本文以及 `docs/ARCHITECTURE.md`、`docs/POLICY.md`、`docs/SECURITY.md`。
 
+## 2026-07-20 原知识库迁移执行状态
+
+- 用户批准的“Syno 原知识库完整迁移与私人管家封板计划”已进入执行；当前 Goal 为 active。
+- 基础设施首版提交为 `64dc6c8`，其后的第一轮 Standards/Spec 修复仍在工作树，具体文件、测试、Manifest 和恢复顺序以 `NEXT_SESSION.md` 顶部重启交接为准。
+- 尚未执行任何实际知识写入。最新 Manifest 只存在于 `.runtime`，必须在第一轮双轴高优先级清零、完整回归和本地基础设施提交后，才能经 server-owned submit、Policy、审批、隔离 worktree、validators 和 GitGuard 执行。
+- 原库物理只读证据：源 `.git` 树摘要 inventory 前后均为 `571894E7ACCA214F090FDE13A9CAA25E7EDE0CDC76F5B47C305DD77EEEB0138A`，dirty entries 均为 19。
+- 第一轮最终复核已达到 Standards P0/P1=0、Spec P0/P1=0；最终 dirty worktree 已通过 Node 189/189、vault 57/57、仓库验证 635 files 和相关 JS 语法检查，可创建本地基础设施提交。
+- 迁移审批固定为 content 一次审批、integration 两次审批；4 个同路径冲突全部 keep-syno，只生成后续 Proposal；敏感候选和缺失附件不能被自动放行。
+- 后续顺序不变：基础设施封板 → 实际迁入 → 数据/知识闭环初始化 → 全产品缺口修复 → 第二/三轮审查 → fresh clone/浏览器/真实运行/备份回滚 → 本地提交与最终报告；不 Push。
+
 ## 产品目标
 
 Syno 是 Windows 本地、单用户、主动式且可审计的知识闭环私人管家：

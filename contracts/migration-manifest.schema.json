@@ -11,9 +11,10 @@
     "createdAt": { "type": "string", "format": "date-time" },
     "source": {
       "type": "object",
-      "required": ["root", "gitHead", "gitDirty", "dirtyEntries"],
+      "required": ["root", "realRoot", "gitHead", "gitDirty", "dirtyEntries"],
       "properties": {
         "root": { "type": "string", "minLength": 1 },
+        "realRoot": { "type": "string", "minLength": 1 },
         "gitHead": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
         "gitDirty": { "type": "boolean" },
         "dirtyEntries": { "type": "integer", "minimum": 0 }
@@ -21,8 +22,46 @@
       "additionalProperties": false
     },
     "sourceFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-    "files": { "type": "array", "items": { "type": "object" } },
-    "summary": { "type": "object" },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sourcePath", "targetPath", "kind", "action", "bytes"],
+        "properties": {
+          "sourcePath": { "type": "string", "minLength": 1 },
+          "targetPath": { "type": "string", "pattern": "^vault/" },
+          "kind": { "enum": ["markdown", "attachment"] },
+          "action": { "enum": ["import", "conflict", "identical", "excluded"] },
+          "phase": { "enum": ["content", "integration"] },
+          "decision": { "enum": ["skip", "keep-syno"] },
+          "sourceSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "targetSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "stagedSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "bytes": { "type": "integer", "minimum": 0 },
+          "sourcePresent": { "type": "boolean" },
+          "reason": { "type": "string", "minLength": 1 },
+          "normalizations": { "type": "object" },
+          "sniffedMime": { "type": "string" },
+          "isolated": { "type": "boolean" },
+          "diffSummary": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["import", "conflict", "identical", "excluded", "content", "integration", "duplicateSourceGroups"],
+      "properties": {
+        "import": { "type": "integer", "minimum": 0 },
+        "conflict": { "type": "integer", "minimum": 0 },
+        "identical": { "type": "integer", "minimum": 0 },
+        "excluded": { "type": "integer", "minimum": 0 },
+        "content": { "type": "integer", "minimum": 0 },
+        "integration": { "type": "integer", "minimum": 0 },
+        "duplicateSourceGroups": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
     "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
   },
   "additionalProperties": false

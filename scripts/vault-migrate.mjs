@@ -35,12 +35,12 @@ async function main() {
     return;
   }
   if (command === "submit") {
-    if (!options.id || !new Set(["content", "integration"]).has(options.phase)) throw new Error("submit 必须提供 --id 和 --phase content|integration");
+    if (!options.id || Object.keys(options).some((key) => !new Set(["id", "repo"]).has(key))) throw new Error("submit 只接受 --id");
     const baseUrl = "http://127.0.0.1:4317";
     const response = await fetch(`${baseUrl}/api/syno/migrations/${encodeURIComponent(options.id)}/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: baseUrl },
-      body: JSON.stringify({ phase: options.phase }),
+      body: JSON.stringify({}),
       signal: AbortSignal.timeout(30_000),
     });
     const body = await response.json();
@@ -48,7 +48,7 @@ async function main() {
     process.stdout.write(`${JSON.stringify(body, null, 2)}\n`);
     return;
   }
-  throw new Error("用法：vault:migrate -- inventory --source <path> | preview --id <id> | submit --id <id> --phase content|integration");
+  throw new Error("用法：vault:migrate -- inventory --source <path> | preview --id <id> | submit --id <id>");
 }
 
 main().catch((error) => {

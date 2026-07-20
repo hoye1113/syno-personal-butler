@@ -188,8 +188,8 @@ function createSynoRuntime(options = {}) {
       if (operation === "claims.create") return claims.createClaim(payload, { opsRoot: path.join(root, "ops") });
       if (operation === "evidence.candidates.create") return claims.createEvidenceCandidate(payload, { opsRoot: path.join(root, "ops") });
       if (operation === "evidence.candidates.approve") return claims.approveCandidate(payload, { opsRoot: path.join(root, "ops") });
-      if (operation === "vault.migration.content") return migration.apply(payload.id, { phase: "content", workspace: root });
-      if (operation === "vault.migration.integration") return migration.apply(payload.id, { phase: "integration", workspace: root });
+      if (operation === "vault.migration.content") return migration.apply(payload.id, { phase: "content", expectedDigest: payload.digest, workspace: root });
+      if (operation === "vault.migration.integration") return migration.apply(payload.id, { phase: "integration", expectedDigest: payload.digest, workspace: root });
       const domain = await executeDomainOperation(operation, payload, { workspace: root });
       if (domain) return domain;
       if (operation === "reports.create") {
@@ -348,17 +348,14 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "POST" && migrationSubmit) {
     const id = decodeURIComponent(migrationSubmit[1]);
     const body = await readBody(req);
-    const keys = Object.keys(body || {});
-    if (keys.length !== 1 || keys[0] !== "phase") {
-      const error = new Error("迁移提交只接受 phase"); error.statusCode = 400; throw error;
+    if (Object.keys(body || {}).length) {
+      const error = new Error("迁移提交不接受参数；阶段和 digest 由服务端固定"); error.statusCode = 400; throw error;
     }
-    const phase = String(body.phase || "");
-    if (!new Set(["content", "integration"]).has(phase)) {
-      const error = new Error("迁移 phase 无效"); error.statusCode = 400; throw error;
-    }
-    await runtime.migration.preview(id);
+    const preview = await runtime.migration.preview(id);
+    const phase = await runtime.migration.nextPhase(id);
+    if (phase === "complete") return { id, status: "complete", digest: preview.digest };
     const operation = phase === "content" ? "vault.migration.content" : "vault.migration.integration";
-    return runtime.core.execute(buildOperationRequest(operation, { id, phase }), webContext);
+    return runtime.core.execute(buildOperationRequest(operation, { id, phase, digest: preview.digest }), { ...webContext, messageId: `migration:${id}:${phase}` });
   }
   if (method === "POST" && url.pathname === "/api/syno/jobs") {
     const request = await readBody(req);

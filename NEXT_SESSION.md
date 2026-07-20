@@ -1,5 +1,80 @@
 # 下一会话启动指令
 
+## 2026-07-20 重启交接：知识库迁移正在第一轮基础设施封板
+
+### 当前必须先知道的事实
+
+- 当前分支仍是 `codex/round3-remediation`，固定实施起点 `a78e713`；已提交迁移基础设施首版 `64dc6c8 feat: add audited vault migration pipeline`。不得 reset、checkout、修改原库或 Push。
+- Codex 全局 Goal 已重新建立并处于 `active`：完成原知识库只读单向迁移、知识闭环初始化、三轮审查和全产品封板。
+- 当前工作树有 **7 个未提交实现/测试文件**，均属于第一轮审查修复：
+  - `apps/syno/syno/knowledge-store.mjs`
+  - `apps/syno/syno/runtime.mjs`
+  - `apps/syno/syno/vault-migration-service.mjs`
+  - `contracts/migration-manifest.schema.json`
+  - `scripts/vault-migrate.mjs`
+  - `tests/knowledge-and-git.test.mjs`
+  - `tests/vault-migration.test.mjs`
+- 另外，本交接会修改 `NEXT_SESSION.md` 和 `docs/HANDOFF-EXECUTION-PLAN.md`。只能精确暂存这些路径，禁止 `git add -A`。
+- **尚未执行实际迁入**：没有 submit、没有迁移审批、没有 apply；当前 `vault/` 未被本轮 Manifest 写入。
+
+### 最新有效 Manifest
+
+- 只使用：`migration-20260720-df900fe7`
+- 本机路径：`.runtime/migrations/migration-20260720-df900fe7/manifest.json`
+- digest：`83ad621478e222e2f184defb08b2dc3d3fab655d7cebb1d0f3df6182fa22a5ee`
+- 源 HEAD：`883fbf5c457156805b9e9b53358175ce84940b59`
+- 源 dirty entries：19
+- 结果：import 454、conflict 4、identical 19、excluded 5；content 438、integration 16、duplicate source groups 9。
+- 5 个 excluded 是 4 篇敏感内容候选和 1 个缺失 PNG 引用，不能擅自放行：
+  - `01-Areas/AI Agent Development/Super Agent 实战课/05-Skills Plugins Channel/5-3 Channel 抽象——让 Agent 活在飞书群里.md`
+  - `01-Areas/AI Agent Development/Super Agent 实战课/07-部署/7-1 收官——配置系统、CLI 入口与部署上线.md`
+  - `02-Resources/AI and Agents/Loock AI 全栈应用开发/2-LangGraph.js 教程/2-6 节点设计.md`
+  - `02-Resources/AI and Agents/Loock AI 全栈应用开发/3-Next.js 基础/3-9 中间件与认证模式.md`
+  - `99-System/Attachments/1772372691239-7f8d2bf1-8f38-4023-ab9c-7eeed69251c3.png`（源中缺失）
+- 旧 Manifest `56d19bd7`、`09ec9d47`、`db22c3c7`、`aec821ac`、`a58bd56e`、`439ecbcb`、`7d5745ab` 全部仅作调试历史，禁止 submit/apply。
+
+### 已完成的安全与语义修复
+
+- 源扫描改为知识目录白名单；隐藏目录、控制目录、credentials/secrets 不扫描，`.env` 等无关路径连文件名都不进入 Manifest。
+- Git 探针使用 `--no-optional-locks`、`GIT_OPTIONAL_LOCKS=0` 并关闭 fsmonitor/untracked cache；真实原库 `.git` 前后 SHA-256 树摘要一致：`571894E7ACCA214F090FDE13A9CAA25E7EDE0CDC76F5B47C305DD77EEEB0138A`，dirty entries 前后均为 19。
+- Job payload 锁定 Manifest digest；submit 只接受 ID，phase 和 digest 由服务端选择；旧 Manifest 遇到新增/修改源文件、Git 快照漂移或目标漂移会 fail closed。
+- 源、staged、vault 目标与 `ops/artifacts/migrations` 审计路径逐段拒绝 symlink/junction；已有 junction 回归测试。
+- 附件只收录实际引用、MIME/扩展一致且在 10 MB 单文件/50 MB 总量内的文件；缺失或歧义引用显式进入 excluded。
+- fatal UTF-8 解码；非法编码不会生成替换字符副本。
+- frontmatter 保留全部原标签到 `legacy_tags`，记录重复字段原值；created 使用原字段、Git 首次出现日期、文件时间顺序。
+- 文件名冲突使用确定性 hash 后缀；路径型和短 wikilink 同步更新；拓扑区分 incoming/outgoing，excluded 笔记不参与连接。
+- conflict 固定 `keep-syno` 并带双方 hash/首差异行摘要；重放不会覆盖首次迁移审计。
+- 中文/Unicode 二元词索引写 `.runtime/knowledge-index-v1.json`，默认检索隐藏测试、审计和系统协议噪声，并返回命中原因、状态与质量信息。
+
+### 测试与审查状态
+
+- 最终工作树完整 Node 回归：189/189 通过。
+- 最终工作树 vault pytest：57/57 通过。
+- 最终工作树仓库验证：635 files 通过；相关 JS `node --check` 全部通过。
+- 迁移专项 15/15 通过；quoted-key `secret-bearing` 定向回归 1/1 通过。
+- 第一轮 Spec 复核已明确 P0/P1 = 0。
+- 第一轮 Standards 最终复核已明确 P0/P1 = 0；JSON/YAML quoted credential key 已修复并新增 `"bot_token"` 回归。重启后仍须重跑完整回归，确认最终工作树整体状态。
+- 项目没有 `typecheck` script；不要把 `ERR_PNPM_NO_SCRIPT` 误记为类型失败。现有 JS 以 `node --check`、Node tests、`pnpm verify` 验证。
+
+### 备份与未决用户数据
+
+- 迁移前完整 Git bundle：`C:\tmp\syno-pre-migration-a78e713.bundle`
+- SHA-256：`2D7A22B7571C3857CB170ED135E2112897C6D602ACCE0731821654DF540161B0`
+- 非凭据状态备份：`C:\tmp\syno-state-pre-migration-a78e713`，`credentialsIncluded=false`。
+- 现有 Claim Job `job-20260720-3168722f` 仍等待主人决定；两个相似 Anthropic MD Proposal 仍应形成合并/保留建议，禁止自动批准或丢弃。
+
+### 重启后的精确执行顺序
+
+1. 完整读取本文件、`AGENTS.md`、本文链接的权威计划和安全/架构文档；确认 Goal 为 active。
+2. `git status --short` 和 `git diff --check`；不得丢弃上述 9 个交接范围文件的修改。
+3. 运行 `node --test tests/vault-migration.test.mjs tests/knowledge-and-git.test.mjs`、`pnpm test`、`pnpm verify`、`python -m pytest vault/tests`、相关 `node --check`。
+4. 记录第一轮 Standards 与 Spec 已达到 P0/P1=0；若代码再变，重新 inventory，旧 Manifest 立即作废。
+5. 更新真实源 `.git` 树摘要和 19 条 dirty 状态证据；对最新 Manifest 做 preview 与数量/附件/排除项核对。
+6. 精确暂存迁移基础设施及交接文档，创建本地提交；不 Push。
+7. 让运行中的 Syno Host 加载新代码，再以 `pnpm vault:migrate -- submit --id migration-...` 创建 server-owned content Job。单审批完成并验收后，再由同一命令创建 integration 双审批 Job。不得绕过 Policy/GitGuard 直接 apply。
+8. 实际迁入后开始第二轮数据审查：数量/hash/正文保真/冲突/索引/源库只读；随后初始化待批准 Goal、零掌握度学习队列、输出机会和轮换维护 backlog。
+9. 继续第三轮全系统 Standards/Spec、fresh clone、浏览器、Provider、微信、飞书、Windows 自启动、备份回滚与最终 bundle；最后本地精确提交，不 Push。
+
 1. 完整读取 `AGENTS.md` 与 `docs/HANDOFF-EXECUTION-PLAN.md`，再读取架构、策略、安全和设计文档。
 2. 保持 `codex/round3-remediation`，不得 reset、checkout、修改原 Obsidian 知识库仓库或自动 Push。
 3. R3-0 到 Windows 日历恢复的历史提交保持不变；三轮审查与最终复审修复为 `02d45b3`、`99b2ea2`、`0cc2669`、`a4ec17d`。`C:\tmp\syno-fresh-02d45b3` 在 `0cc2669` 上冻结锁文件离线安装下载 0 个包，Node 172/172、vault 57/57、仓库校验 617 项；`a4ec17d` 完成主工作树最终回归，真实计划任务和桌面/移动浏览器验收通过。

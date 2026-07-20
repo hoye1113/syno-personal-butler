@@ -35,6 +35,31 @@ test("knowledge search combines tag, source, stability and date filters", async 
   assert.deepEqual(await knowledge.search("Agent", { stability: "principle" }), []);
 });
 
+test("knowledge index finds Chinese concepts and hides system noise by default", async (t) => {
+  const testRoot = path.join(path.resolve(import.meta.dirname, ".."), ".runtime", "tests");
+  await fs.mkdir(testRoot, { recursive: true });
+  const root = await fs.mkdtemp(path.join(testRoot, "syno-knowledge-index-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const vaultRoot = path.join(root, "vault");
+  const indexFile = path.join(root, "runtime", "knowledge-index-v1.json");
+  await writeFixture(path.join(vaultRoot, "01-Areas", "知识闭环.md"), `---\ntitle: 知识闭环私人管家\ntags: [ai_agent]\nlegacy_tags: [agent_runtime]\nsource: personal\nknowledge_state: captured\nlink_status: connected\n---\n# 知识闭环私人管家\n\n输入、整理、学习与输出形成闭环。`);
+  await writeFixture(path.join(vaultRoot, "99-System", "audit", "知识管家.md"), "# 知识管家\n\n系统审计噪声。");
+  const knowledge = new KnowledgeStore({ vaultRoot, indexFile });
+  const chinese = await knowledge.search("知识管家");
+  assert.deepEqual(chinese.map((item) => item.title), ["知识闭环私人管家"]);
+  assert.ok(chinese[0].matchReasons.includes("title"));
+  assert.equal(chinese[0].knowledgeState, "captured");
+  const legacy = await knowledge.search("agent_runtime");
+  assert.deepEqual(legacy.map((item) => item.title), ["知识闭环私人管家"]);
+  assert.ok(legacy[0].matchReasons.includes("legacy_tag"));
+  assert.equal((await fs.stat(indexFile)).isFile(), true);
+});
+
+async function writeFixture(file, text) {
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, text, "utf8");
+}
+
 test("GitGuard commits only declared paths", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-git-guard-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
