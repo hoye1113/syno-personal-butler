@@ -2,6 +2,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { WeixinIlinkAdapter } from "../apps/syno/syno/weixin-ilink.mjs";
+import { getRunningChannelStatus } from "./live-channel-probe-runtime.mjs";
 
 function valueOf(argv, name, fallback = "") {
   const index = argv.indexOf(name);
@@ -43,8 +44,20 @@ function summarizeWeixin(status, durationMs) {
   };
 }
 
-async function main(argv = process.argv.slice(2), { adapter = new WeixinIlinkAdapter(), wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)) } = {}) {
+async function main(argv = process.argv.slice(2), {
+  adapter = new WeixinIlinkAdapter(),
+  wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+  runningWorker = () => getRunningChannelStatus("weixin"),
+  write = (value) => console.log(JSON.stringify(value, null, 2)),
+} = {}) {
   const { durationMs } = parseOptions(argv);
+  const workerStatus = await runningWorker().catch(() => null);
+  if (workerStatus) {
+    const report = { ...summarizeWeixin(workerStatus, durationMs), source: "running_worker" };
+    write(report);
+    if (!report.ok) process.exitCode = 2;
+    return report;
+  }
   try {
     const started = await adapter.start();
     if (!started.available) {
@@ -53,8 +66,8 @@ async function main(argv = process.argv.slice(2), { adapter = new WeixinIlinkAda
       throw error;
     }
     await wait(durationMs);
-    const report = summarizeWeixin(adapter.status(), durationMs);
-    console.log(JSON.stringify(report, null, 2));
+    const report = { ...summarizeWeixin(adapter.status(), durationMs), source: "standalone_probe" };
+    write(report);
     if (!report.ok) process.exitCode = 2;
     return report;
   } finally {

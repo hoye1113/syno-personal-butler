@@ -2,6 +2,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { FeishuChannelAdapter, FeishuCredentialStore } from "../apps/syno/syno/feishu-channel.mjs";
+import { getRunningChannelStatus } from "./live-channel-probe-runtime.mjs";
 
 function parseOptions(argv) {
   for (const forbidden of ["--app-id", "--app-secret", "--token", "--cookie", "--secret"]) {
@@ -31,8 +32,23 @@ function summarizeFeishu(status, credentialStatus) {
   };
 }
 
-async function main(argv = process.argv.slice(2), { credentials = new FeishuCredentialStore(), adapter } = {}) {
+async function main(argv = process.argv.slice(2), {
+  credentials = new FeishuCredentialStore(),
+  adapter,
+  runningWorker = () => getRunningChannelStatus("feishu"),
+  write = (value) => console.log(JSON.stringify(value, null, 2)),
+} = {}) {
   parseOptions(argv);
+  const workerStatus = await runningWorker().catch(() => null);
+  if (workerStatus) {
+    const report = {
+      ...summarizeFeishu(workerStatus, { configured: workerStatus.available === true, ownerBound: workerStatus.ownerBound === true }),
+      source: "running_worker",
+    };
+    write(report);
+    if (!report.ok) process.exitCode = 2;
+    return report;
+  }
   const credentialStatus = await credentials.status();
   if (!credentialStatus.configured) {
     const error = new Error("请先在 Syno Web 完成飞书扫码注册和 Owner 绑定");
@@ -42,8 +58,8 @@ async function main(argv = process.argv.slice(2), { credentials = new FeishuCred
   const channel = adapter || new FeishuChannelAdapter({ credentials });
   try {
     const status = await channel.start();
-    const report = summarizeFeishu(status, credentialStatus);
-    console.log(JSON.stringify(report, null, 2));
+    const report = { ...summarizeFeishu(status, credentialStatus), source: "standalone_probe" };
+    write(report);
     if (!report.ok) process.exitCode = 2;
     return report;
   } finally {

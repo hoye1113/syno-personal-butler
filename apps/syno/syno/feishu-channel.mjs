@@ -125,13 +125,14 @@ class FeishuChannelAdapter {
   constructor({ credentials = new FeishuCredentialStore(), stateStore = new FeishuStateStore(), sdkLoader = officialSdk, channelFactory, onMessage = async () => ({ text: "已收到" }), retryDelayMs = 30_000 } = {}) {
     this.credentials = credentials; this.sdkLoader = sdkLoader; this.channelFactory = channelFactory; this.onMessage = onMessage;
     this.stateStore = stateStore; this.retryDelayMs = retryDelayMs;
-    this.channel = null; this.running = false; this.lastError = ""; this.queue = []; this.draining = false; this.drainPromise = null; this.seen = new Set(); this.inflight = new Set(); this.retryTimer = null;
+    this.channel = null; this.running = false; this.ownerBound = false; this.lastError = ""; this.queue = []; this.draining = false; this.drainPromise = null; this.seen = new Set(); this.inflight = new Set(); this.retryTimer = null;
     this.registration = null; this.registrationState = { status: "idle" };
   }
 
   async start() {
     if (this.running) return this.status();
     const credential = await this.credentials.load();
+    this.ownerBound = Boolean(credential?.ownerOpenId);
     if (!credential) return this.status();
     const sdk = this.channelFactory ? null : await this.sdkLoader();
     const factory = this.channelFactory || ((options) => sdk.createLarkChannel(options));
@@ -154,7 +155,7 @@ class FeishuChannelAdapter {
   }
 
   status() {
-    return { id: "feishu", running: this.running, available: Boolean(this.channel), registration: this.registrationState.status, lastError: this.lastError };
+    return { id: "feishu", running: this.running, available: Boolean(this.channel), ownerBound: this.ownerBound, registration: this.registrationState.status, lastError: this.lastError };
   }
 
   async send(message) {

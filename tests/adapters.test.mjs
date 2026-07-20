@@ -305,6 +305,7 @@ test("Feishu registration starts the long connection after Owner confirmation", 
   for (let index = 0; index < 20 && !adapter.running; index += 1) await new Promise((resolve) => setTimeout(resolve, 5));
   assert.equal(adapter.registrationStatus().status, "confirmed");
   assert.equal(adapter.status().running, true);
+  assert.equal(adapter.status().ownerBound, true);
   assert.equal(connects, 1);
   await adapter.stop();
 });
