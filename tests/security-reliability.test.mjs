@@ -7,7 +7,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { buildClaudeArgs, runProcess } from "../apps/syno/syno/executors.mjs";
-import { securityHeaders } from "../apps/syno/syno/http-security.mjs";
+import { assertJsonMutation, assertSameOriginMutation, securityHeaders } from "../apps/syno/syno/http-security.mjs";
 import { assertRegisteredOperation, buildOperationRequest } from "../apps/syno/syno/operation-registry.mjs";
 import { routeSynoApi } from "../apps/syno/syno/runtime.mjs";
 import { ConversationStore } from "../apps/syno/syno/conversation-store.mjs";
@@ -107,6 +107,42 @@ test("Scheduler keeps the Worker event loop referenced", async (t) => {
   await scheduler.start();
   assert.equal(scheduler.timer.hasRef(), true);
   scheduler.stop();
+});
+
+test("Windows service Web API exposes only fixed status, install and uninstall actions", async () => {
+  const calls = [];
+  const windowsService = {
+    async status() { calls.push(["status"]); return { supported: true, installed: false, running: false, startup: "at_logon", webUrl: "http://127.0.0.1:4317/", legacyTaskDetected: true, lastTaskResult: null }; },
+    async install() { calls.push(["install"]); return { installed: true, running: true }; },
+    async uninstall() { calls.push(["uninstall"]); return { installed: false, running: false }; },
+  };
+  const runtime = { developmentMode: false, windowsService };
+  const readBody = async () => ({ taskName: "attacker", command: "calc.exe" });
+  assert.equal((await routeSynoApi(runtime, { method: "GET" }, new URL("http://localhost/api/syno/windows-service"), readBody)).legacyTaskDetected, true);
+  await routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/windows-service/install"), readBody);
+  await routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/windows-service/uninstall"), readBody);
+  assert.deepEqual(calls, [["status"], ["install"], ["uninstall"]]);
+  await assert.rejects(routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/windows-service/restart"), readBody), /未知 Syno API/);
+});
+
+test("Syno health identifies the product, protocol and exact repository without exposing its path", async () => {
+  const health = await routeSynoApi({ developmentMode: false }, { method: "GET" }, new URL("http://localhost/api/syno/health"), async () => ({}));
+  assert.equal(health.ok, true);
+  assert.equal(health.product, "syno-personal-butler");
+  assert.equal(health.protocolVersion, 1);
+  assert.match(health.repoFingerprint, /^[a-f0-9]{16}$/);
+  assert.equal(Object.hasOwn(health, "repoRoot"), false);
+});
+
+test("state-changing Windows service requests require JSON", () => {
+  assert.doesNotThrow(() => assertJsonMutation({ method: "POST", headers: { "content-type": "application/json; charset=utf-8" } }));
+  assert.throws(() => assertJsonMutation({ method: "POST", headers: { "content-type": "text/plain" } }), /JSON/);
+});
+
+test("state-changing Windows service requests require an exact same-origin browser Origin", () => {
+  assert.doesNotThrow(() => assertSameOriginMutation({ method: "POST", headers: { host: "127.0.0.1:4317", origin: "http://127.0.0.1:4317" } }));
+  assert.throws(() => assertSameOriginMutation({ method: "POST", headers: { host: "127.0.0.1:4317" } }), /Origin/);
+  assert.throws(() => assertSameOriginMutation({ method: "POST", headers: { host: "127.0.0.1:4317", origin: "http://evil.invalid" } }), /同源/);
 });
 
 test("conversation retention removes confirmed raw voice before the conversation", async (t) => {

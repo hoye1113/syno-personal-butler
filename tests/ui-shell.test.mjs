@@ -20,12 +20,37 @@ test("Web shell exposes the five knowledge-loop areas and always-reachable appro
   assert.match(html, /class="ghost-btn mobile-settings-trigger"[^>]*data-syno-panel="settings">连接设置</);
 });
 
+test("Today and settings disclose the daily decision before technical configuration", async () => {
+  const html = await fs.readFile(path.join(root, "apps", "syno", "public", "index.html"), "utf8");
+  assert.match(html, /<h1>今天先做这件事<\/h1>/);
+  for (const id of ["synoTodayPrimary", "synoTodayPrimaryAction", "synoTodayNeedsYou", "synoTodayRecent", "synoTodayProgress", "synoHealthSummary", "synoOnboarding"]) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+  for (const id of ["synoSettingAi", "synoSettingWeixin", "synoSettingFeishu", "synoSettingAutostart", "synoSettingData"]) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+  assert.match(html, /<details[^>]*id="synoAdvancedSettings"/);
+  assert.match(html, /id="synoShowOnboarding"/);
+  assert.match(html, /id="synoQuickCaptureFileButton"/);
+  for (const id of ["synoKnowledgeFilters", "synoKnowledgeTags", "synoKnowledgeSource", "synoKnowledgeStability", "synoKnowledgeFrom", "synoKnowledgeTo"]) assert.match(html, new RegExp(`id="${id}"`));
+  assert.match(html, /id="synoDataSettings"[\s\S]*保留策略[\s\S]*诊断[\s\S]*id="synoPreferenceForm"/);
+  assert.match(html, /id="synoWorkspaceSettings"[^>]*hidden/);
+  assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
+  assert.match(html, /data-syno-panel="jobs">审批中心/);
+  assert.ok(html.indexOf('id="synoKnowledgeQuery"') < html.indexOf('class="syno-intake"'), "Knowledge search should be first");
+  assert.match(html, /<details[^>]*id="synoLearningDetails"[\s\S]*id="synoLearningForm"/);
+  assert.ok(html.indexOf('id="synoOutputOpportunities"') < html.indexOf('id="synoOutputForm"'), "Create opportunity should precede creation forms");
+});
+
 test("knowledge-loop Web actions use inline evidence and explicit lifecycle decisions", async () => {
   const script = await fs.readFile(path.join(root, "apps", "syno", "public", "syno.js"), "utf8");
   assert.match(script, /decision: \{ action \}/);
   assert.match(script, /rawOutput: document\.querySelector\("#synoLearningArtifact"\)/);
   assert.match(script, /loadOutputOpportunities/);
   assert.match(script, /savePreferences/);
+  assert.match(script, /needTargets = \{ approval: "jobs", review: "learn", output: "create" \}/);
+  assert.match(script, /windowsServiceMutation/);
+  assert.match(script, /aria-busy/);
   assert.doesNotMatch(script, /window\.prompt/);
 });
 

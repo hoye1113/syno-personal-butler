@@ -95,6 +95,28 @@ test("ingest failures are durable and additive proposals support one approved ba
   assert.equal(batch.changedPaths.filter((item) => item.startsWith("ops/artifacts/")).length, 6);
 });
 
+test("pending intake includes new receipts and orders the newest first", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-ingest-pending-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const stateRoot = path.join(root, "state");
+  await fs.mkdir(stateRoot, { recursive: true });
+  await fs.writeFile(path.join(stateRoot, "artifact-old.json"), JSON.stringify({
+    status: "received", created: "2026-07-19T08:00:00.000Z",
+    artifact: { id: "artifact-old", created: "2026-07-19T08:00:00.000Z" },
+  }), "utf8");
+  await fs.writeFile(path.join(stateRoot, "artifact-new.json"), JSON.stringify({
+    status: "proposed", created: "2026-07-20T08:00:00.000Z",
+    artifact: { id: "artifact-new", created: "2026-07-20T08:00:00.000Z" },
+    candidate: { artifactId: "artifact-new", title: "最新收录", created: "2026-07-20T08:01:00.000Z" },
+  }), "utf8");
+  const service = new IngestService({
+    knowledge: { async search() { return []; } },
+    stateRoot,
+  });
+
+  assert.deepEqual((await service.pending()).map((item) => item.id), ["artifact-new", "artifact-old"]);
+});
+
 test("only user-produced practice updates mastery and schedules repetition", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-learning-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
@@ -148,13 +170,19 @@ test("output opportunities and teach-back prompts make output a mastery mechanis
   const published = await service.progress(opportunity.id, { action: "publish", feedback: "读者仍不理解 Harness 与 Agent 的区别，需要补一个小白例子。" });
   assert.equal(published.opportunity.status, "published");
   assert.match(published.opportunity.feedback, /小白例子/);
+  const { opportunity: next } = await service.createOpportunity({ title: "继续讲清 Tool Loop", reason: "仍需主人输出", priority: 20 });
+  await service.progress(next.id, { action: "accept" });
+  assert.equal((await service.list())[0].id, next.id, "actionable output must rank ahead of terminal history");
 });
 
 test("SignalSourceRegistry exposes stale claims, pending intake, output opportunities and maintenance", async () => {
   const registry = new SignalSourceRegistry({
     claims: { async dueClaims() { return [{ id: "claim-1", statement: "模型能力已到复核时间", reviewAfter: "2026-07-17T07:00:00.000Z" }]; } },
     ingest: { async pending() { return [{ id: "artifact-1", title: "待处理资料" }]; } },
-    outputs: { async list() { return [{ id: "output-1", title: "待写文章", priority: 90, status: "suggested" }]; } },
+    outputs: { async list() { return [
+      { id: "output-1", title: "待写文章", priority: 90, status: "drafting" },
+      { id: "output-2", title: "已发布文章", priority: 100, status: "published" },
+    ]; } },
     maintenance: { async inspect() { return [{ id: "orphan-1", title: "孤立笔记" }]; } },
   });
   const events = await registry.collect({ now: new Date("2026-07-17T08:00:00.000Z") });
@@ -205,4 +233,31 @@ test("Today ranks goals before commitments and reviews with the fixed work mix",
   assert.equal(snapshot.priorities[0].kind, "goal");
   assert.deepEqual(snapshot.allocation, { digest: 12, ingest: 5, maintenance: 3 });
   assert.deepEqual(snapshot.counts, { goals: 1, commitments: 1, reviews: 1, signals: 0 });
+});
+
+test("Today exposes one next action, needs-owner items, recent intake and daily progress", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-today-decision-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const goals = new GoalService({ opsRoot: path.join(root, "ops"), clock: () => new Date("2026-07-20T08:00:00.000Z") });
+  await goals.create({ title: "完成今日输出", priority: 90, focusAreas: ["AI Agent"] });
+  const today = new TodayService({
+    goals,
+    learning: { async due() { return [{ id: "review-1", knowledgeRef: "vault/harness.md", mastery: 0.4, nextReviewAt: "2026-07-20T07:00:00.000Z" }]; } },
+    host: { async list() { return [
+      { id: "job-approval", intent: "ingest.apply", status: "awaiting_approval", risk: "low", updated: "2026-07-20T07:30:00.000Z", request: { summary: "批准收录建议" } },
+      { id: "job-done", intent: "chat", status: "completed", risk: "read", updated: "2026-07-20T07:00:00.000Z", request: { summary: "完成微信回复" } },
+      { id: "job-old", intent: "chat", status: "failed", risk: "read", updated: "2026-07-19T07:00:00.000Z", request: { summary: "昨日失败" } },
+    ]; } },
+    signalSources: new SignalSourceRegistry({
+      ingest: { async pending() { return [{ id: "artifact-1", status: "proposed", title: "Agent 指南" }]; } },
+      outputs: { async list() { return [{ id: "output-1", title: "Agent Harness", priority: 70, status: "drafting" }]; } },
+    }),
+    clock: () => new Date("2026-07-20T08:00:00.000Z"),
+  });
+
+  const snapshot = await today.snapshot({ capacity: 10 });
+  assert.equal(snapshot.primary.title, "完成今日输出");
+  assert.deepEqual(snapshot.needsYou.map((item) => item.kind), ["approval", "review", "output"]);
+  assert.deepEqual(snapshot.recentIntake, [{ id: "artifact-1", status: "proposed", title: "Agent 指南" }]);
+  assert.deepEqual(snapshot.progress, { completed: 1, waiting: 1, failed: 0 });
 });

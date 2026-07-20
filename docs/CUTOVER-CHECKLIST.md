@@ -51,3 +51,14 @@ Provider 自动采用门、故障注入与主人真实断网步骤见 `docs/PROV
 - [x] 未自动 Push。Push 或远端发布只能由主人另行明确要求。
 
 若 C、D 或 E 中任一必选项未完成，保持全局 Goal active，不把“本地功能可用”等同于“最终切换完成”。
+
+## F. Web 收敛与 Windows 常驻服务（2026-07-20）
+
+- [x] Today、Capture、Knowledge、Learn、Create 已按渐进披露原则收敛，并完成桌面/移动浏览器复验。
+- [x] `pnpm start` 默认启动完整 Host；`SYNO_WEB_ONLY=true` 保留为隔离诊断入口。
+- [x] Windows 管理命令、固定参数 Web API、JSON/同源保护和 Dry Run 自动测试已完成。
+- [x] 真实 `Syno` 登录任务已完成安装、显式打开、受控 PID 重启、卸载数据保留和重装恢复；最终任务为 Running，PID 从 57656 受控切换到 59040，PID 文件、Node 路径、仓库指纹与 4317 监听进程一致，未检测到 `Syno Worker`。
+- [x] 真实演练覆盖交互式 Host 接管，以及未知 4317 服务导致新任务安装失败时按原 XML 恢复旧任务；恢复前后 XML SHA-256 同为 `65af6957e340540353e79f5ecaf53f582604a9d6ad196b45bce2ef71ebf9a79b`。旧任务停止、PID 所有权校验和替换注册均已纳入同一回滚边界。
+- [x] 以 `1c4e782` 干净克隆叠加本轮精确路径完成隔离复验，并修复两条飞书测试误写真实 `%LOCALAPPDATA%\Syno` 的隔离遗漏。
+- [x] 无 `node_modules` 的隔离克隆使用冻结锁文件冷安装成功，下载 0；最新未提交差异复验为 Node 165/165、vault 57/57、主工作树仓库校验 590 项、fresh clone 仓库校验 588 项通过。
+- [ ] 创建本轮本地提交后，从该提交再次完成 fresh clone 复验。

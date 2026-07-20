@@ -10,6 +10,8 @@
   let weixinLoginGeneration = 0;
   let weixinLoginTimer = null;
   let weixinLoginInFlight = 0;
+  const setupState = { ai: false, channel: false, windows: false };
+  const healthIssues = new Map();
 
   const focusableSelector = [
     "a[href]",
@@ -83,7 +85,7 @@
     if (panel === "jobs") loadJobs();
     if (panel === "notifications") loadNotifications();
     if (panel === "learn") loadDueReviews();
-    if (panel === "settings") { loadProviderStatus(); loadPreferences(); }
+    if (panel === "settings") { loadProviderStatus(); loadPreferences(); loadWindowsService(); loadChannelStatus(); }
     if (panel === "create") loadOutputOpportunities();
     if (panel === "knowledge") {
       loadMemoryProposals();
@@ -132,7 +134,14 @@
     const query = document.querySelector("#synoKnowledgeQuery").value.trim();
     target.replaceChildren(node("p", "syno-empty", "正在检索…"));
     try {
-      const { results } = await api(`/api/syno/search?q=${encodeURIComponent(query)}&limit=40`);
+      const params = new URLSearchParams({ q: query, limit: "40" });
+      const filters = {
+        tags: document.querySelector("#synoKnowledgeTags")?.value.trim(), source: document.querySelector("#synoKnowledgeSource")?.value.trim(),
+        stability: document.querySelector("#synoKnowledgeStability")?.value, from: document.querySelector("#synoKnowledgeFrom")?.value,
+        to: document.querySelector("#synoKnowledgeTo")?.value,
+      };
+      for (const [key, value] of Object.entries(filters)) if (value) params.set(key, value);
+      const { results } = await api(`/api/syno/search?${params}`);
       target.replaceChildren();
       if (!results.length) target.append(node("p", "syno-empty", "没有匹配笔记。换一个概念试试。"));
       for (const result of results) {
@@ -147,6 +156,20 @@
     }
   }
 
+  async function buildFileIntakePayload(file, requestedKind) {
+    if (!file) throw new Error("请选择文件");
+    const kind = requestedKind || (file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "txt");
+    const maximum = kind === "pdf" ? 10 * 1024 * 1024 : 1024 * 1024;
+    if (file.size > maximum) throw new Error(kind === "pdf" ? "PDF 不能超过 10 MB" : "文本文件不能超过 1 MB");
+    const bytes = new Uint8Array(await file.arrayBuffer()); let binary = "";
+    for (let index = 0; index < bytes.length; index += 0x8000) binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+    return { kind, name: file.name, base64: btoa(binary) };
+  }
+
+  function sendIntake(payload) {
+    return api("/api/syno/intake", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  }
+
   async function submitIntake() {
     const kind = document.querySelector("#synoIntakeKind").value;
     const value = document.querySelector("#synoIntakeValue").value.trim();
@@ -156,17 +179,8 @@
     button.textContent = "正在提交…";
     try {
       let payload = { kind, value };
-      if (["pdf", "txt"].includes(kind)) {
-        const file = fileInput.files[0];
-        if (!file) throw new Error("请选择文件");
-        const maximum = kind === "pdf" ? 10 * 1024 * 1024 : 1024 * 1024;
-        if (file.size > maximum) throw new Error(kind === "pdf" ? "PDF 不能超过 10 MB" : "文本文件不能超过 1 MB");
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        let binary = "";
-        for (let index = 0; index < bytes.length; index += 0x8000) binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
-        payload = { kind, name: file.name, base64: btoa(binary) };
-      }
-      const result = await api("/api/syno/intake", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (["pdf", "txt"].includes(kind)) payload = await buildFileIntakePayload(fileInput.files[0], kind);
+      const result = await sendIntake(payload);
       document.querySelector("#synoIntakeHint").textContent = `已收到 ${result.artifact.id}。赛诺正在异步查重并形成收录方案。`;
       loadIntakeProposal(result.artifact.id);
     } catch (error) {
@@ -315,6 +329,28 @@
     } catch (error) { status.textContent = error.message; }
   }
 
+  async function submitQuickCapture() {
+    const valueInput = document.querySelector("#synoQuickCaptureValue");
+    const fileInput = document.querySelector("#synoQuickCaptureFile");
+    const button = document.querySelector("#synoQuickCaptureSubmit");
+    const hint = document.querySelector("#synoQuickCaptureHint");
+    button.disabled = true; button.textContent = "正在接收…";
+    try {
+      const file = fileInput.files[0];
+      let payload;
+      if (file) payload = await buildFileIntakePayload(file);
+      else {
+        const value = valueInput.value.trim();
+        if (!value) throw new Error("请粘贴内容或选择文件");
+        payload = { kind: /^https?:\/\//i.test(value) ? "url" : "text", value };
+      }
+      await sendIntake(payload);
+      hint.textContent = "已接收内容，正在后台安全提取、查重并生成收录方案。";
+      valueInput.value = ""; fileInput.value = ""; await loadToday();
+    } catch (error) { hint.textContent = error.message; }
+    finally { button.disabled = false; button.textContent = "收录"; }
+  }
+
   function scheduleWeixinLoginPoll(generation, delayMs = 750) {
     if (generation !== weixinLoginGeneration) return;
     clearTimeout(weixinLoginTimer);
@@ -404,8 +440,79 @@
       const { channels } = await api("/api/syno/channels");
       const enabled = Object.values(channels).filter((channel) => channel.running).map((channel) => channel.id);
       document.querySelector("#synoChannelStatus").textContent = `本地服务已连接 · ${enabled.join(" · ") || "Web"}`;
+      const weixin = Object.values(channels).find((channel) => channel.id === "weixin");
+      const feishu = Object.values(channels).find((channel) => channel.id === "feishu");
+      setSettingStatus("#synoSettingWeixin", weixin?.running ? "已连接" : "未连接", weixin?.running);
+      setSettingStatus("#synoSettingFeishu", feishu?.running ? "已连接" : "未连接", feishu?.running);
+      setupState.channel = Boolean(weixin?.running || feishu?.running);
+      setHealthIssue("channels", [weixin, feishu].some((channel) => channel?.ownerBound && !channel.running) ? "已绑定渠道连接中断" : "");
+      refreshOnboarding();
     } catch (error) {
       document.querySelector("#synoChannelStatus").textContent = error.message;
+      setHealthIssue("channels", "无法读取微信和飞书状态");
+    }
+  }
+
+  function setSettingStatus(selector, text, healthy) {
+    const status = document.querySelector(`${selector} em`);
+    if (!status) return;
+    status.textContent = text;
+    status.classList.toggle("is-ready", Boolean(healthy));
+  }
+
+  function setHealthIssue(key, message) {
+    if (message) healthIssues.set(key, message); else healthIssues.delete(key);
+    const details = document.querySelector("#synoHealthSummary");
+    if (!details) return;
+    const summary = details.querySelector("summary");
+    if (!healthIssues.size) {
+      details.open = false; details.classList.remove("is-degraded"); summary.textContent = "Syno 正常运行";
+      details.querySelector("p").textContent = "AI、微信、飞书和后台任务的异常会在这里直接提示。";
+    } else {
+      details.open = true; details.classList.add("is-degraded"); summary.textContent = "Syno 需要你检查";
+      details.querySelector("p").textContent = [...healthIssues.values()].join("；");
+    }
+  }
+
+  function refreshOnboarding() {
+    const onboarding = document.querySelector("#synoOnboarding");
+    if (onboarding) onboarding.hidden = setupState.ai && setupState.channel && setupState.windows;
+  }
+
+  async function loadWindowsService() {
+    try {
+      const status = await api("/api/syno/windows-service");
+      const label = !status.supported ? "此系统不支持" : status.installed ? (status.running ? "已开启" : "已安装，未运行") : "未开启";
+      setSettingStatus("#synoSettingAutostart", label, status.installed && status.running);
+      document.querySelector("#synoWindowsServiceHint").textContent = status.installed ? "Windows 登录后会在后台启动完整 Syno，不会自动打开浏览器。" : "开启后，Windows 登录时会在后台启动 Syno。";
+      setupState.windows = Boolean(status.installed);
+      setHealthIssue("windows", status.installed && !status.running ? "Windows 后台任务未运行" : "");
+      refreshOnboarding();
+    } catch (error) {
+      setSettingStatus("#synoSettingAutostart", "检测失败", false);
+      setHealthIssue("windows", "无法读取 Windows 后台服务状态");
+    }
+  }
+
+  let windowsServiceMutation = false;
+  async function changeWindowsService(action) {
+    if (windowsServiceMutation) return;
+    const verb = action === "install" ? "开启" : "关闭";
+    if (!window.confirm(`${verb}开机自动运行？此操作只修改当前用户的 Syno 计划任务，不会删除数据。`)) return;
+    windowsServiceMutation = true;
+    const buttons = [document.querySelector("#synoWindowsInstall"), document.querySelector("#synoWindowsUninstall")].filter(Boolean);
+    const region = document.querySelector("#synoAutostartSettings");
+    for (const button of buttons) button.disabled = true;
+    region?.setAttribute("aria-busy", "true");
+    const hint = document.querySelector("#synoWindowsServiceHint"); hint.textContent = `正在${verb}…`;
+    try {
+      await api(`/api/syno/windows-service/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      await loadWindowsService();
+    } catch (error) { hint.textContent = error.message; }
+    finally {
+      windowsServiceMutation = false;
+      for (const button of buttons) button.disabled = false;
+      region?.removeAttribute("aria-busy");
     }
   }
 
@@ -456,26 +563,40 @@
   }
 
   async function loadToday() {
-    const target = document.querySelector("#synoTodayPriorities");
-    if (!target) return;
+    const primary = document.querySelector("#synoTodayPrimary");
+    if (!primary) return;
     try {
       const snapshot = await api("/api/syno/today");
-      target.replaceChildren();
-      const priorities = snapshot.priorities.slice(0, 4);
-      if (!priorities.length) {
-        const empty = node("article", "flow-step");
-        empty.append(node("span", "", "今日清场"), node("strong", "", "还没有必须处理的事项"), node("p", "", "可以从一次复习、收录或输出开始。"));
-        target.append(empty);
-      }
-      priorities.forEach((item, index) => {
-        const card = node("article", "flow-step");
-        card.append(node("span", "", `${String(index + 1).padStart(2, "0")} · ${priorityKind(item.kind)}`), node("strong", "", item.title), node("p", "", item.dueAt ? `到期：${new Date(item.dueAt).toLocaleString("zh-CN")}` : "按当前目标与知识缺口排序"));
-        target.append(card);
-      });
+      const item = snapshot.primary;
+      const action = node("button", "accent-btn", item ? (item.kind === "review" ? "开始复习" : item.kind === "commitment" ? "去处理" : "开始") : "去收录一条内容");
+      action.id = "synoTodayPrimaryAction"; action.type = "button";
+      action.addEventListener("click", () => select(item?.kind === "review" ? "learn" : item?.kind === "commitment" ? "jobs" : item ? "create" : "knowledge"));
+      primary.replaceChildren(
+        node("span", "", item ? priorityKind(item.kind) : "今日清场"),
+        node("strong", "", item?.title || "从一条真正想理解的内容开始"),
+        node("p", "", item?.dueAt ? `到期：${new Date(item.dueAt).toLocaleString("zh-CN")}` : item ? "根据你的目标、承诺和知识缺口排在第一位。" : "收录后，赛诺会异步查重并给出整理建议。"),
+        action,
+      );
+      const needs = document.querySelector("#synoTodayNeedsYou"); needs.replaceChildren();
+      const needLabels = { approval: "待确认", review: "到期复习", output: "需要你的输出" };
+      for (const entry of snapshot.needsYou || []) needs.append(node("button", "today-row", `${needLabels[entry.kind] || "待处理"} · ${entry.title}`));
+      if (!needs.children.length) needs.append(node("p", "syno-empty", "没有需要你确认的事项。"));
+      const needTargets = { approval: "jobs", review: "learn", output: "create" };
+      needs.querySelectorAll("button").forEach((button, index) => button.addEventListener("click", () => select(needTargets[snapshot.needsYou[index].kind] || "today")));
+      const recent = document.querySelector("#synoTodayRecent"); recent.replaceChildren();
+      for (const entry of snapshot.recentIntake || []) recent.append(node("p", "today-row", `${entry.title} · ${entry.status === "proposed" ? "待确认收录方案" : entry.status}`));
+      if (!recent.children.length) recent.append(node("p", "syno-empty", "今天还没有新收录。"));
+      const progress = snapshot.progress || { completed: 0, waiting: 0, failed: 0 };
+      document.querySelector("#synoTodayProgress").replaceChildren(
+        node("span", "is-complete", `已完成 ${progress.completed}`),
+        node("span", "is-waiting", `等待中 ${progress.waiting}`),
+        node("span", progress.failed ? "is-failed" : "", `异常 ${progress.failed}`),
+      );
+      setHealthIssue("tasks", progress.failed ? `今天有 ${progress.failed} 个任务异常` : "");
       document.querySelector("#weekScheduledCount").textContent = snapshot.counts.commitments;
       document.querySelector("#inboxCandidateCount").textContent = snapshot.counts.reviews;
     } catch (error) {
-      target.replaceChildren(node("p", "syno-error", `Today 暂不可用：${error.message}`));
+      primary.replaceChildren(node("span", "", "需要检查"), node("strong", "", "Today 暂时不可用"), node("p", "syno-error", error.message));
     }
   }
 
@@ -485,6 +606,7 @@
     target.replaceChildren(node("p", "syno-empty", "正在读取到期复习…"));
     try {
       const { reviews } = await api("/api/syno/learning/due");
+      document.querySelector("#synoLearnCount").textContent = `今天复习 ${reviews.length} 项`;
       target.replaceChildren();
       if (!reviews.length) target.append(node("p", "syno-empty", "当前没有到期复习。可以主动选择一个主题做 Teach-back。"));
       for (const review of reviews) {
@@ -552,8 +674,11 @@
       const { opportunities } = await api("/api/syno/outputs/opportunities");
       target.replaceChildren();
       if (!opportunities.length) target.append(node("p", "syno-empty", "还没有创作机会。先从一个想讲清的主题开始。"));
-      for (const opportunity of opportunities) {
-        const card = node("article", "syno-job");
+      const more = node("details", "setting-detail");
+      more.append(node("summary", "", `更多创作机会（${Math.max(0, opportunities.length - 1)}）`));
+      const moreList = node("div", "syno-list"); more.append(moreList);
+      for (const [index, opportunity] of opportunities.entries()) {
+        const card = node("article", index === 0 ? "syno-job is-featured" : "syno-job");
         card.append(node("strong", "", opportunity.title), node("p", "", `${opportunity.status} · ${opportunity.reason}`));
         if (opportunity.outline?.length) { const list = node("ol"); opportunity.outline.forEach((item) => list.append(node("li", "", item))); card.append(list); }
         const outputField = node("textarea", "syno-source-editor"); outputField.rows = 6; outputField.placeholder = "粘贴你的原始草稿或实践复盘（至少 20 字）"; outputField.setAttribute("aria-label", `${opportunity.title} 的原始输出`);
@@ -578,8 +703,9 @@
         if (["accepted", "drafting"].includes(opportunity.status)) add("draft", "提交我的草稿", true);
         if (["drafting", "practiced"].includes(opportunity.status)) add("publish", "记录发布与反馈");
         if (!["published", "dismissed"].includes(opportunity.status)) add("dismiss", "暂不创作");
-        card.append(actions); target.append(card);
+        card.append(actions); (index === 0 ? target : moreList).append(card);
       }
+      if (moreList.children.length) target.append(more);
     } catch (error) { target.replaceChildren(node("p", "syno-error", error.message)); }
   }
 
@@ -622,7 +748,9 @@
       document.querySelector("#synoProviderModel").value = status.modelId || "";
       document.querySelector("#synoProviderContext").value = status.contextLength;
       hint.textContent = status.configured ? `已配置 ${status.modelId}；Token 已加密保存。` : "尚未配置；本地搜索、任务与提醒仍可使用。";
-    } catch (error) { hint.textContent = error.message; }
+      setSettingStatus("#synoSettingAi", status.configured ? "已连接" : "未连接", status.configured);
+      setupState.ai = Boolean(status.configured); setHealthIssue("provider", status.configured ? "" : "AI 服务尚未连接"); refreshOnboarding();
+    } catch (error) { hint.textContent = error.message; setSettingStatus("#synoSettingAi", "检测失败", false); setHealthIssue("provider", "无法读取 AI 服务状态"); }
   }
 
   async function saveProvider(event) {
@@ -630,6 +758,7 @@
     try {
       const status = await api("/api/syno/provider", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ baseUrl: document.querySelector("#synoProviderBaseUrl").value.trim(), token: document.querySelector("#synoProviderToken").value, modelId: document.querySelector("#synoProviderModel").value.trim(), contextLength: Number(document.querySelector("#synoProviderContext").value) }) });
       document.querySelector("#synoProviderToken").value = ""; hint.textContent = `已安全保存 ${status.modelId}。`;
+      await loadProviderStatus();
     } catch (error) { hint.textContent = error.message; }
   }
 
@@ -705,6 +834,13 @@
 
   window.Syno = Object.freeze({ show, close, select });
 
+  const workspaceSettings = document.querySelector("#synoWorkspaceSettings");
+  const workspaceSettingsMount = document.querySelector("#synoWorkspaceSettingsMount");
+  if (workspaceSettings && workspaceSettingsMount) {
+    workspaceSettingsMount.append(workspaceSettings);
+    workspaceSettings.hidden = false;
+  }
+
   for (const trigger of document.querySelectorAll("[data-syno-panel]")) trigger.addEventListener("click", () => show(trigger.dataset.synoPanel, trigger));
   for (const tab of tabs) tab.addEventListener("click", () => select(tab.dataset.synoTab));
   document.querySelector("#synoDrawerClose")?.addEventListener("click", close);
@@ -715,6 +851,10 @@
   });
   document.querySelector("#synoKnowledgeSearch")?.addEventListener("click", loadKnowledge);
   document.querySelector("#synoKnowledgeQuery")?.addEventListener("keydown", (event) => { if (event.key === "Enter") loadKnowledge(); });
+  document.querySelector("#synoKnowledgeFiltersReset")?.addEventListener("click", () => {
+    for (const id of ["synoKnowledgeTags", "synoKnowledgeSource", "synoKnowledgeStability", "synoKnowledgeFrom", "synoKnowledgeTo"]) document.querySelector(`#${id}`).value = "";
+    loadKnowledge();
+  });
   document.querySelector("#synoJobsRefresh")?.addEventListener("click", loadJobs);
   document.querySelector("#synoIntakeKind")?.addEventListener("change", (event) => {
     const fileMode = ["pdf", "txt"].includes(event.target.value);
@@ -722,6 +862,16 @@
     document.querySelector("#synoIntakeValue").hidden = fileMode;
   });
   document.querySelector("#synoIntakeSubmit")?.addEventListener("click", submitIntake);
+  document.querySelector("#synoQuickCaptureSubmit")?.addEventListener("click", submitQuickCapture);
+  document.querySelector("#synoQuickCaptureFileButton")?.addEventListener("click", () => document.querySelector("#synoQuickCaptureFile").click());
+  document.querySelector("#synoQuickCaptureFile")?.addEventListener("change", (event) => {
+    document.querySelector("#synoQuickCaptureFileButton").textContent = event.target.files[0]?.name || "选择文件";
+  });
+  document.querySelector("#synoLearnStart")?.addEventListener("click", () => {
+    const queue = document.querySelector("#synoReviewQueue"); queue.open = true;
+    const first = document.querySelector("#synoDueReviews button");
+    if (first) first.focus(); else { document.querySelector("#synoLearningDetails").open = true; document.querySelector("#synoLearningRef").focus(); }
+  });
   document.querySelector("#synoChatForm")?.addEventListener("submit", submitChat);
   document.querySelector("#synoWeixinLogin")?.addEventListener("click", beginWeixinLogin);
   document.querySelector("#synoWeixinHome")?.addEventListener("click", setWeixinHome);
@@ -733,10 +883,24 @@
   document.querySelector("#synoFeishuRegister")?.addEventListener("click", () => feishuAction("register/start"));
   document.querySelector("#synoFeishuConnect")?.addEventListener("click", () => feishuAction("connect"));
   document.querySelector("#synoFeishuDisconnect")?.addEventListener("click", () => feishuAction("disconnect"));
+  document.querySelector("#synoWindowsInstall")?.addEventListener("click", () => changeWindowsService("install"));
+  document.querySelector("#synoWindowsUninstall")?.addEventListener("click", () => changeWindowsService("uninstall"));
+  document.querySelector("#synoShowOnboarding")?.addEventListener("click", () => {
+    document.querySelector("#synoOnboarding").hidden = false; close();
+    document.querySelector("#synoOnboarding").scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+  for (const trigger of document.querySelectorAll("[data-setting-target]")) trigger.addEventListener("click", () => {
+    const detail = document.querySelector(`#${trigger.dataset.settingTarget}`);
+    if (!detail) return;
+    detail.open = true;
+    detail.querySelector("summary")?.focus();
+  });
   for (const trigger of document.querySelectorAll("[data-scroll-target]")) trigger.addEventListener("click", () => {
     document.querySelector(`#${trigger.dataset.scrollTarget}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
     document.querySelectorAll("[data-scroll-target]").forEach((item) => item.classList.toggle("is-active", item === trigger));
   });
   loadToday();
   loadChannelStatus();
+  loadProviderStatus();
+  loadWindowsService();
 })();

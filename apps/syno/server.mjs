@@ -12,7 +12,7 @@ import { createSynoRuntime, routeSynoApi } from "./syno/runtime.mjs";
 import { WorkbenchOperations } from "./syno/workbench-operations.mjs";
 import { buildOperationRequest } from "./syno/operation-registry.mjs";
 import { GitGuard } from "./syno/git-guard.mjs";
-import { securityHeaders } from "./syno/http-security.mjs";
+import { assertJsonMutation, assertSameOriginMutation, securityHeaders } from "./syno/http-security.mjs";
 import { PATHS, resolveInside } from "./syno/paths.mjs";
 import { validateContractRecord } from "./syno/schema-registry.mjs";
 import {
@@ -112,15 +112,19 @@ const synoRuntime = createSynoRuntime({
   operationHandler: (operation, payload, context) => workbenchOperations.execute(operation, payload, context),
   onCommitted: executeLegacySideEffects,
 });
-const synoReady = synoRuntime.initialize();
+const synoReady = synoRuntime.initialize({ worker: process.env.SYNO_WEB_ONLY !== "true" });
 
-createServer(async (req, res) => {
+const httpServer = createServer(async (req, res) => {
   try {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     if (url.pathname.startsWith("/api/")) assertLocalRequest(req);
 
     if (url.pathname.startsWith("/api/syno/")) {
       await synoReady;
+      if (url.pathname.startsWith("/api/syno/windows-service")) {
+        assertJsonMutation(req);
+        assertSameOriginMutation(req);
+      }
       return respondJson(res, await routeSynoApi(synoRuntime, req, url, readJsonBody));
     }
 
@@ -237,6 +241,13 @@ createServer(async (req, res) => {
 }).listen(PORT, "127.0.0.1", () => {
   console.log(`Syno 赛诺运行于 http://127.0.0.1:${PORT}`);
 });
+
+async function shutdown() {
+  httpServer.close();
+  await synoRuntime.close();
+}
+process.once("SIGINT", shutdown);
+process.once("SIGTERM", shutdown);
 
 async function queueLegacyMutation(operation, payload) {
   await synoReady;

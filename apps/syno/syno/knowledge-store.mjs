@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { PATHS, relativeToRepo, resolveInside } from "./paths.mjs";
+import { frontmatterData } from "./validator.mjs";
 
 function plainText(markdown) {
   return String(markdown)
@@ -50,10 +51,18 @@ class KnowledgeStore {
     for (const file of files) {
       const markdown = await fs.readFile(file, "utf8");
       const text = plainText(markdown);
+      const frontmatter = frontmatterData(markdown);
+      const source = frontmatter.values.source_url || frontmatter.values.source || "";
+      const stability = frontmatter.values.stability || frontmatter.values.stability_class || "";
+      const date = frontmatter.values.updated || frontmatter.values.created || frontmatter.values.date || "";
       notes.push({
         path: relativeToRepo(file),
         title: titleOf(markdown, file),
         excerpt: text.slice(0, 280),
+        tags: frontmatter.tags,
+        source,
+        stability,
+        date,
         searchText: `${titleOf(markdown, file)} ${text}`.toLocaleLowerCase("zh-CN"),
       });
     }
@@ -63,14 +72,19 @@ class KnowledgeStore {
 
   invalidate() { this.cache = null; }
 
-  async search(query, { limit = 30 } = {}) {
+  async search(query, { limit = 30, tags = [], source = "", stability = "", from = "", to = "" } = {}) {
     if (!this.cache) await this.rebuild();
     const terms = String(query || "").toLocaleLowerCase("zh-CN").split(/\s+/).filter(Boolean);
     const ranked = this.cache.map((note) => {
       const title = note.title.toLocaleLowerCase("zh-CN");
       const score = terms.reduce((sum, term) => sum + (title.includes(term) ? 5 : 0) + (note.searchText.includes(term) ? 1 : 0), 0);
       return { note, score };
-    }).filter(({ score }) => !terms.length || score > 0);
+    }).filter(({ note, score }) => (!terms.length || score > 0)
+      && (!tags.length || tags.every((tag) => note.tags.some((value) => value.toLocaleLowerCase("zh-CN") === tag.toLocaleLowerCase("zh-CN"))))
+      && (!source || note.source.toLocaleLowerCase("zh-CN").includes(source.toLocaleLowerCase("zh-CN")))
+      && (!stability || note.stability === stability)
+      && (!from || (note.date && note.date >= from))
+      && (!to || (note.date && note.date <= `${to}T23:59:59`)));
     ranked.sort((a, b) => b.score - a.score || a.note.title.localeCompare(b.note.title, "zh-CN"));
     return ranked.slice(0, Math.min(100, Number(limit) || 30)).map(({ note, score }) => ({ ...note, score, searchText: undefined }));
   }

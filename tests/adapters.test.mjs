@@ -289,10 +289,13 @@ test("Feishu long connection accepts only owner DMs and deduplicates messages", 
   await adapter.stop();
 });
 
-test("Feishu channel gives the SDK a silent logger so request errors cannot print App Secret", async () => {
+test("Feishu channel gives the SDK a silent logger so request errors cannot print App Secret", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-feishu-logger-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
   let options;
   const adapter = new FeishuChannelAdapter({
     credentials: { async load() { return { appId: "cli_test", appSecret: "must-not-log", ownerOpenId: "owner" }; } },
+    stateStore: new FeishuStateStore({ file: path.join(root, "state.json") }),
     channelFactory: (value) => {
       options = value;
       return { on() {}, async connect() {}, async disconnect() {} };
@@ -397,7 +400,9 @@ test("Feishu registration URL renders to an in-memory PNG data URL", async () =>
   assert.throws(() => validateRegistrationUrl("https://example.com/page/launcher?user_code=stolen"), /不在官方启动页范围/);
 });
 
-test("Feishu registration starts the long connection after Owner confirmation", async () => {
+test("Feishu registration starts the long connection after Owner confirmation", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-feishu-registration-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
   let saved = null;
   let connects = 0;
   const adapter = new FeishuChannelAdapter({
@@ -405,6 +410,7 @@ test("Feishu registration starts the long connection after Owner confirmation", 
       async save(value) { saved = value; },
       async load() { return saved; },
     },
+    stateStore: new FeishuStateStore({ file: path.join(root, "state.json") }),
     sdkLoader: async () => ({
       registerApp(options) {
         options.onQRCodeReady({ url: "https://open.feishu.cn/page/launcher?user_code=ABCD-EFGH", expireIn: 600 });

@@ -88,9 +88,12 @@ class IngestService {
     for (const entry of entries) {
       if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
       const state = JSON.parse(await fs.readFile(path.join(this.stateRoot, entry.name), "utf8"));
-      if (["received", "proposed", "failed"].includes(state.status)) pending.push({ id: state.candidate?.artifactId || entry.name.replace(/\.json$/, ""), title: state.candidate?.title, status: state.status, proposal: state.proposal });
+      if (["received", "proposed", "failed"].includes(state.status)) pending.push({
+        id: state.candidate?.artifactId || entry.name.replace(/\.json$/, ""), title: state.candidate?.title,
+        status: state.status, proposal: state.proposal, created: state.candidate?.created || state.created || state.artifact?.created,
+      });
     }
-    return pending.slice(0, limit);
+    return pending.sort((a, b) => String(b.created || "").localeCompare(String(a.created || ""))).slice(0, limit);
   }
 
   async apply(id, { workspace = PATHS.repoRoot, decision } = {}) {

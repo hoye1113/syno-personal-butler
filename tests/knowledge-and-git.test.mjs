@@ -22,6 +22,19 @@ test("knowledge search and full reader work without Obsidian", async () => {
   assert.ok(note.markdown.length > 0);
 });
 
+test("knowledge search combines tag, source, stability and date filters", async (t) => {
+  const testRoot = path.join(path.resolve(import.meta.dirname, ".."), ".runtime", "tests");
+  await fs.mkdir(testRoot, { recursive: true });
+  const vaultRoot = await fs.mkdtemp(path.join(testRoot, "syno-knowledge-filter-"));
+  t.after(() => fs.rm(vaultRoot, { recursive: true, force: true }));
+  await fs.writeFile(path.join(vaultRoot, "agent.md"), `---\ntitle: Agent Harness\ntags: [AI, Agent]\nsource: GitHub\nstability: practice\nupdated: 2026-07-20\n---\n# Agent Harness\n\n反馈闭环。`, "utf8");
+  await fs.writeFile(path.join(vaultRoot, "philosophy.md"), `---\ntitle: 长期主义\ntags: [人生]\nsource: 书籍\nstability: principle\nupdated: 2025-01-01\n---\n# 长期主义`, "utf8");
+  const knowledge = new KnowledgeStore({ vaultRoot });
+  const results = await knowledge.search("Agent", { tags: ["AI", "Agent"], source: "git", stability: "practice", from: "2026-01-01", to: "2026-12-31" });
+  assert.deepEqual(results.map((item) => item.title), ["Agent Harness"]);
+  assert.deepEqual(await knowledge.search("Agent", { stability: "principle" }), []);
+});
+
 test("GitGuard commits only declared paths", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-git-guard-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));

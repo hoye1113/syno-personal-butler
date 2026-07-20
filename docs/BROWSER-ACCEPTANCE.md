@@ -67,3 +67,22 @@
 - 移动：390×844，`scrollWidth=390`、`bodyScrollWidth=390`；Today、Capture、Knowledge、Learn、Create 与“连接设置”均可达。
 - 控制台：桌面和移动流程合计 0 error、0 warning。
 - 减少动画：两处 `prefers-reduced-motion: reduce` 规则仍存在，`tests/ui-shell.test.mjs` 持续验证静态化行为。
+
+## 2026-07-20 Web 收敛复验
+
+- 固定点：`1c4e782`；验收对象为本轮尚未提交的 Web 收敛与 Windows 服务差异。
+- 隔离方式：`SYNO_WEB_ONLY=true`、端口 `4318`、状态根位于仓库忽略的 `.runtime/ui-final`；未读取真实凭据，也未竞争微信/飞书连接。
+- 桌面：1280×720，`scrollWidth=1280`；首屏只突出一个行动、待处理/最近收录/今日进展，旧目录配置和周历进入二级折叠入口。
+- 设置：首层只显示 AI、微信、飞书、开机自动运行、数据与备份五行；Provider URL、Model ID、上下文长度和 Token 均在高级设置内，Token 未回显。
+- 移动：390×844，`scrollWidth=390`；首屏只保留审批与连接设置，五入口底部导航完整可达。
+- 可访问性：快速文件收录使用原生按钮；设置 dialog 初始焦点进入关闭按钮，Escape 与焦点恢复由既有回归持续覆盖。
+- 控制台：全新 Playwright 会话的桌面设置与移动流程均为 0 error、0 warning。
+- 知识筛选：真实点击 Knowledge 的“筛选”后，标签、来源、稳定性、开始日期、结束日期与清除入口按需出现；默认搜索界面保持简洁。
+- 设置分层：真实点击“数据与备份”前不显示保留策略；进入后仍需点击“高级设置”才出现保留策略、诊断与工作区入口，目录字段继续由内层折叠控制。
+- 运行状态：真实本机服务返回 `product=syno-personal-butler`、协议版本与仓库指纹；设置页只呈现“已开启/未开启”，不暴露任务或进程细节。
+
+### 本轮截图
+
+- [桌面 Today 决策中心](../output/playwright/syno-desktop-converged-2026-07-20.png)
+- [桌面五行设置](../output/playwright/syno-settings-converged-2026-07-20.png)
+- [移动 Today 决策中心](../output/playwright/syno-mobile-converged-2026-07-20.png)

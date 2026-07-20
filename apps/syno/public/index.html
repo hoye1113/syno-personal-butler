@@ -5,12 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Syno 赛诺 · 私人管家</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='48' font-size='48'%3E%F0%9F%93%85%3C/text%3E%3C/svg%3E" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -42,51 +36,32 @@
               <button id="themeToggleBtn" class="theme-toggle" type="button">◑ 深色</button>
             </div>
           </div>
-          <h1>今天，把什么真正变成你的？</h1>
-          <div class="hero-copy-row">
-            <p class="hero-copy">赛诺先守住承诺与到期复习，再帮你吸收新知识、形成能讲给小白听的观点。</p>
-            <button id="heroConfigBtn" class="ghost-btn hero-config-btn" type="button">高级设置 →</button>
+          <h1>今天先做这件事</h1>
+          <article id="synoTodayPrimary" class="today-primary" aria-live="polite">
+            <span>正在判断下一步</span>
+            <strong>读取目标、承诺和到期复习…</strong>
+            <p>赛诺只把当前最重要的一件事放在这里。</p>
+            <button id="synoTodayPrimaryAction" class="accent-btn" type="button" disabled>请稍候</button>
+          </article>
+          <section id="synoOnboarding" class="onboarding-strip" aria-labelledby="synoOnboardingTitle">
+            <div><span>首次使用</span><strong id="synoOnboardingTitle">完成三步，赛诺就能在后台工作</strong></div>
+            <ol><li>连接 AI</li><li>绑定微信或飞书</li><li>开启开机自动运行</li></ol>
+            <button class="ghost-btn" type="button" data-syno-panel="settings">开始设置</button>
+          </section>
+          <div class="today-groups">
+            <section><h2>待你处理</h2><div id="synoTodayNeedsYou" class="today-list"><p>正在读取…</p></div></section>
+            <section><h2>最近收录</h2><div id="synoTodayRecent" class="today-list"><p>正在读取…</p></div></section>
+            <section><h2>今天进展</h2><div id="synoTodayProgress" class="today-progress"><span>正在统计…</span></div></section>
           </div>
-          <div id="synoTodayPriorities" class="hero-flow" aria-label="今日优先事项">
-            <div class="flow-step">
-              <span>01 · 目标</span>
-              <strong>正在读取今日重点</strong>
-              <p>目标、承诺和到期复习会按固定规则排序。</p>
-            </div>
-            <div class="flow-step">
-              <span>02 · 消化</span>
-              <strong>60% 已有知识</strong>
-              <p>优先复习、实践和输出，不让收藏代替掌握。</p>
-            </div>
-            <div class="flow-step">
-              <span>03 · 输入</span>
-              <strong>25% 新内容</strong>
-              <p>新素材先形成收录方案，批准后才进入知识事实源。</p>
-            </div>
-            <div class="flow-step">
-              <span>04 · 维护</span>
-              <strong>15% 知识库维护</strong>
-              <p>处理冲突、过期证据和关联缺口，保留来源与判断过程。</p>
-            </div>
-          </div>
-          <div class="hero-meta">
-            <div class="meta-card">
-              <span>日历状态</span>
-              <strong id="larkStatus">检测中</strong>
-              <button id="larkRepairBtn" class="meta-action" type="button" hidden>配置飞书</button>
-            </div>
-            <div class="meta-card">
-              <span>本周排期</span>
-              <strong id="weekScheduledCount">0</strong>
-            </div>
-            <div class="meta-card">
-              <span>待排期</span>
-              <strong id="backlogCount">0</strong>
-            </div>
-            <div class="meta-card">
-              <span>收件箱候选</span>
-              <strong id="inboxCandidateCount">0</strong>
-            </div>
+          <details id="synoHealthSummary" class="health-summary">
+            <summary>Syno 正常运行</summary>
+            <p>AI、微信、飞书和后台任务的异常会在这里直接提示。</p>
+          </details>
+          <div class="legacy-today-metrics" hidden>
+            <button id="heroConfigBtn" type="button">高级设置</button>
+            <strong id="larkStatus">检测中</strong><button id="larkRepairBtn" type="button" hidden>配置飞书</button>
+            <strong id="weekScheduledCount">0</strong><strong id="backlogCount">0</strong><strong id="inboxCandidateCount">0</strong>
+            <div id="synoTodayPriorities"></div>
           </div>
         </div>
         <div class="hero-side" aria-label="赛诺，纸片法老知识守护者">
@@ -100,6 +75,8 @@
         </div>
       </section>
 
+      <details id="synoWorkspaceSettings" class="secondary-workspace" hidden>
+        <summary>工作区与目录高级设置</summary>
       <section class="config-section">
         <details id="plannerSettingsDetails" class="planner-settings-details">
             <summary class="settings-summary">
@@ -239,8 +216,21 @@
             </form>
         </details>
       </section>
+      </details>
 
-      <section id="capture" class="toolbar">
+      <section id="capture" class="quick-capture" aria-labelledby="quickCaptureTitle">
+        <div><p class="panel-tag">CAPTURE · 快速收录</p><h2 id="quickCaptureTitle">收到什么，就交给 Syno</h2><p>先立即确认接收，安全提取、查重和收录建议会在后台继续。</p></div>
+        <div class="quick-capture-control">
+          <textarea id="synoQuickCaptureValue" rows="3" placeholder="粘贴链接、文字或 Markdown…"></textarea>
+          <button id="synoQuickCaptureFileButton" class="ghost-btn" type="button">选择文件</button><input id="synoQuickCaptureFile" type="file" accept="application/pdf,.pdf,text/plain,.txt,.md,text/markdown" hidden />
+          <button id="synoQuickCaptureSubmit" class="accent-btn" type="button">收录</button>
+        </div>
+        <p id="synoQuickCaptureHint" class="form-hint" aria-live="polite">支持 URL、Markdown、TXT 和 PDF。</p>
+      </section>
+
+      <details class="secondary-workspace">
+        <summary>打开创作周历工作区</summary>
+      <section id="captureWorkspace" class="toolbar">
         <div class="toolbar-left">
           <input id="searchInput" type="search" placeholder="搜选题 / 标签 / 目标形式" />
           <select id="stageFilter">
@@ -342,6 +332,7 @@
           <div id="calendarGrid" class="calendar-grid"></div>
         </section>
       </section>
+      </details>
     </main>
 
     <div id="appToast" class="app-toast" hidden></div>
@@ -543,36 +534,21 @@
         <button type="button" data-syno-tab="chat">对话</button>
       </nav>
       <section class="syno-pane" data-syno-pane="knowledge">
-        <details class="syno-intake">
-          <summary>收录新资料</summary>
-          <div class="syno-intake-fields">
-            <label for="synoIntakeKind">资料类型</label>
-            <select id="synoIntakeKind">
-              <option value="url">URL / 单篇 B站 opus 或 cv</option>
-              <option value="text">粘贴文本</option>
-              <option value="markdown">Markdown</option>
-              <option value="txt">TXT / Markdown 文件（1 MB 内）</option>
-              <option value="pdf">PDF（10 MB 内）</option>
-            </select>
-            <textarea id="synoIntakeValue" rows="4" placeholder="粘贴 URL、文本或 Markdown"></textarea>
-            <input id="synoIntakeFile" type="file" accept="application/pdf,.pdf,text/plain,.txt,.md,text/markdown" hidden />
-            <div class="syno-intake-actions">
-              <small id="synoIntakeHint">收录会先进入审批中心，不会直接改知识库。</small>
-              <button id="synoIntakeSubmit" class="accent-btn" type="button">提交收录候选</button>
-            </div>
-            <div id="synoIntakeProposal" class="syno-list" aria-live="polite"></div>
-          </div>
-        </details>
-        <details class="syno-intake syno-memory-box">
-          <summary>长期记忆候选</summary>
-          <p>候选不会自动进入知识库；“提交晋升”仍会先进入审批，并展示最终 Markdown 差异。</p>
-          <div id="synoMemoryProposals" class="syno-list" aria-live="polite"></div>
-        </details>
         <label class="syno-search-label" for="synoKnowledgeQuery">搜索知识库</label>
         <div class="syno-search-row">
           <input id="synoKnowledgeQuery" type="search" placeholder="输入主题、概念或笔记标题" />
           <button id="synoKnowledgeSearch" class="accent-btn" type="button">搜索</button>
         </div>
+        <details id="synoKnowledgeFilters" class="setting-detail knowledge-filters">
+          <summary>筛选</summary>
+          <div class="syno-stack-form">
+            <label>标签<input id="synoKnowledgeTags" placeholder="多个标签用逗号分隔" /></label>
+            <label>来源<input id="synoKnowledgeSource" placeholder="例如 GitHub、微信或域名" /></label>
+            <label>稳定性<select id="synoKnowledgeStability"><option value="">全部</option><option value="principle">第一性原理</option><option value="model">模型</option><option value="practice">实践</option><option value="fact">事实</option><option value="volatile">时效信息</option><option value="experience">个人经验</option></select></label>
+            <div class="syno-search-row"><label>开始日期<input id="synoKnowledgeFrom" type="date" /></label><label>结束日期<input id="synoKnowledgeTo" type="date" /></label></div>
+            <button id="synoKnowledgeFiltersReset" class="ghost-btn" type="button">清除筛选</button>
+          </div>
+        </details>
         <div class="syno-split">
           <div id="synoKnowledgeResults" class="syno-list" aria-live="polite"></div>
           <article id="synoReader" class="syno-reader">
@@ -580,6 +556,18 @@
             <p>全文会在这里显示，无需打开其他软件。</p>
           </article>
         </div>
+        <details class="syno-intake">
+          <summary>收录与知识维护</summary>
+          <div class="syno-intake-fields">
+            <label for="synoIntakeKind">资料类型</label>
+            <select id="synoIntakeKind"><option value="url">URL / 单篇 B站 opus 或 cv</option><option value="text">粘贴文本</option><option value="markdown">Markdown</option><option value="txt">TXT / Markdown 文件（1 MB 内）</option><option value="pdf">PDF（10 MB 内）</option></select>
+            <textarea id="synoIntakeValue" rows="4" placeholder="粘贴 URL、文本或 Markdown"></textarea>
+            <input id="synoIntakeFile" type="file" accept="application/pdf,.pdf,text/plain,.txt,.md,text/markdown" hidden />
+            <div class="syno-intake-actions"><small id="synoIntakeHint">收录会先进入审批中心，不会直接改知识库。</small><button id="synoIntakeSubmit" class="accent-btn" type="button">提交收录候选</button></div>
+            <div id="synoIntakeProposal" class="syno-list" aria-live="polite"></div>
+          </div>
+        </details>
+        <details class="syno-intake syno-memory-box"><summary>长期记忆候选</summary><p>候选不会自动进入知识库；“提交晋升”仍会先进入审批，并展示最终 Markdown 差异。</p><div id="synoMemoryProposals" class="syno-list" aria-live="polite"></div></details>
       </section>
       <section class="syno-pane" data-syno-pane="jobs" hidden>
         <div class="syno-pane-toolbar">
@@ -594,7 +582,9 @@
           <h3>讲得清，才算开始掌握</h3>
           <p>AI 草稿不会提高掌握度。请用自己的话口述、打字、答题或实践。</p>
         </div>
-        <div id="synoDueReviews" class="syno-list" aria-live="polite"></div>
+        <div class="learn-primary"><strong id="synoLearnCount">今天复习 0 项</strong><button id="synoLearnStart" class="accent-btn" type="button">开始复习</button></div>
+        <details id="synoReviewQueue" class="setting-detail"><summary>查看复习队列</summary><div id="synoDueReviews" class="syno-list" aria-live="polite"></div></details>
+        <details id="synoLearningDetails" class="setting-detail"><summary>记录学习证据</summary>
         <form id="synoLearningForm" class="syno-stack-form">
           <label>知识引用<input id="synoLearningRef" required placeholder="例如：vault/AI/Agent-Harness.md" /></label>
           <label>输出方式<select id="synoLearningMode"><option value="teach-back">教给小白</option><option value="typed">打字解释</option><option value="voice">口述转录</option><option value="practice">实际应用</option><option value="quiz">答题</option></select></label>
@@ -607,6 +597,7 @@
           <button class="accent-btn" type="submit">提交学习证据</button>
           <p id="synoLearningHint" class="form-hint" aria-live="polite"></p>
         </form>
+        </details>
       </section>
       <section class="syno-pane" data-syno-pane="create" hidden>
         <div class="syno-pane-intro">
@@ -614,6 +605,8 @@
           <h3>从知识缺口长出观点</h3>
           <p>优先 AI、Agent、AI Coding 与 Harness 深度文章；提纲和视频简报作为次级形式。</p>
         </div>
+        <div id="synoOutputOpportunities" class="syno-list" aria-live="polite"></div>
+        <details id="synoCreateTools" class="setting-detail"><summary>新建选题与 Teach-back</summary>
         <form id="synoTeachBackForm" class="syno-stack-form">
           <label>想讲清的主题<input id="synoTeachBackTitle" required placeholder="例如：为什么 Agent Harness 比模型更决定上限" /></label>
           <button class="ghost-btn" type="submit">生成 Teach-back 题目</button>
@@ -626,7 +619,7 @@
           <button class="accent-btn" type="submit">建立输出机会</button>
           <p id="synoOutputHint" class="form-hint" aria-live="polite"></p>
         </form>
-        <div id="synoOutputOpportunities" class="syno-list" aria-live="polite"></div>
+        </details>
       </section>
       <section class="syno-pane" data-syno-pane="notifications" hidden>
         <section class="syno-channel-setup" aria-labelledby="synoWeixinTitle">
@@ -665,26 +658,43 @@
         </form>
       </section>
       <section class="syno-pane" data-syno-pane="settings" hidden>
-        <div class="syno-pane-intro"><p class="panel-tag">SETTINGS · 本机配置</p><h3>Agent 与外部连接</h3><p>Token 只经 Windows DPAPI 加密保存，不在页面回显。</p></div>
-        <form id="synoProviderForm" class="syno-stack-form">
-          <label class="visually-hidden">Provider 账户<input type="text" name="username" value="syno-local-provider" autocomplete="username" tabindex="-1" /></label>
-          <label>OpenAI 兼容 Base URL<input id="synoProviderBaseUrl" type="url" required /></label>
-          <label>Token<input id="synoProviderToken" type="password" autocomplete="new-password" required placeholder="保存后不会回显" /></label>
-          <label>固定 Model ID<input id="synoProviderModel" required /></label>
-          <label>上下文长度<input id="synoProviderContext" type="number" min="4096" value="128000" required /></label>
-          <button class="accent-btn" type="submit">安全保存 Provider</button>
+        <div class="syno-pane-intro"><p class="panel-tag">SETTINGS · 本机配置</p><h3>连接与运行</h3><p>先看五个状态；需要时再进入配置。凭据不会在页面回显。</p><button id="synoShowOnboarding" class="ghost-btn" type="button">重新查看首次使用引导</button></div>
+        <div class="settings-status-list" aria-label="设置概览">
+          <button id="synoSettingAi" type="button" data-setting-target="synoAiSettings"><span><strong>AI 服务</strong><small>理解、整理和创作</small></span><em>检测中</em></button>
+          <button id="synoSettingWeixin" type="button" data-syno-panel="notifications"><span><strong>微信</strong><small>快速收录与提醒</small></span><em>检测中</em></button>
+          <button id="synoSettingFeishu" type="button" data-setting-target="synoFeishuSettings"><span><strong>飞书</strong><small>日程与结构化通知</small></span><em>检测中</em></button>
+          <button id="synoSettingAutostart" type="button" data-setting-target="synoAutostartSettings"><span><strong>开机自动运行</strong><small>登录 Windows 后后台启动</small></span><em>检测中</em></button>
+          <button id="synoSettingData" type="button" data-setting-target="synoDataSettings"><span><strong>数据与备份</strong><small>本地事实源与恢复</small></span><em>本机保存</em></button>
+        </div>
+        <details id="synoAiSettings" class="setting-detail">
+          <summary>AI 服务常用设置</summary>
           <p id="synoProviderHint" class="form-hint" aria-live="polite"></p>
-        </form>
-        <form id="synoPreferenceForm" class="syno-stack-form">
-          <h3>主动节奏与复习</h3>
+          <details id="synoAdvancedSettings" class="setting-detail is-advanced">
+            <summary>高级设置</summary>
+            <form id="synoProviderForm" class="syno-stack-form">
+              <label class="visually-hidden">Provider 账户<input type="text" name="username" value="syno-local-provider" autocomplete="username" tabindex="-1" /></label>
+              <label>OpenAI 兼容 Base URL<input id="synoProviderBaseUrl" type="url" required /></label>
+              <label>Token<input id="synoProviderToken" type="password" autocomplete="new-password" required placeholder="保存后不会回显" /></label>
+              <label>固定 Model ID<input id="synoProviderModel" required /></label>
+              <label>上下文长度<input id="synoProviderContext" type="number" min="4096" value="128000" required /></label>
+              <button class="accent-btn" type="submit">安全保存 AI 服务</button>
+            </form>
+          </details>
+        </details>
+        <details id="synoFeishuSettings" class="setting-detail"><summary>飞书连接</summary><section class="syno-channel-setup"><p>扫码注册并绑定本人账号。</p><p id="synoFeishuStatus">尚未注册。</p><div class="syno-job-actions"><button id="synoFeishuRegister" class="ghost-btn" type="button">开始注册</button><button id="synoFeishuConnect" class="accent-btn" type="button">连接</button><button id="synoFeishuDisconnect" class="ghost-btn" type="button">断开</button></div><div id="synoFeishuQr"></div></section></details>
+        <details id="synoAutostartSettings" class="setting-detail"><summary>开机自动运行</summary><p id="synoWindowsServiceHint">检测 Windows 后台服务…</p><div class="syno-job-actions"><button id="synoWindowsInstall" class="accent-btn" type="button">开启</button><button id="synoWindowsUninstall" class="ghost-btn" type="button">关闭</button></div></details>
+        <details id="synoDataSettings" class="setting-detail"><summary>数据与备份</summary><p>知识保存在 vault，任务和审批保存在 ops；卸载开机任务不会删除它们。</p>
+        <details class="setting-detail is-advanced"><summary>高级设置</summary>
+          <p><strong>保留策略</strong>：对话 30 天；确认转录后的原始语音 7 天；失败载荷 30 天；未完成任务保留到终态。</p>
+          <p><strong>诊断</strong>：服务仅监听 127.0.0.1:4317，凭据使用 Windows DPAPI 且不会回显。</p>
+          <div id="synoWorkspaceSettingsMount"></div>
+        <details class="setting-detail"><summary>主动节奏</summary><form id="synoPreferenceForm" class="syno-stack-form">
           <label>通知节奏<select id="synoCadence"><option value="minimal">克制（每天最多 1 次）</option><option value="balanced">平衡（每天最多 2 次）</option><option value="active">主动（事件优先，每天最多 3 次）</option></select></label>
           <label>每日复习数量<input id="synoReviewCount" type="number" min="1" max="20" required /></label>
           <div class="syno-search-row"><label>安静开始<input id="synoQuietStart" type="time" required /></label><label>安静结束<input id="synoQuietEnd" type="time" required /></label></div>
           <label class="switch-line"><input id="synoReducedDensity" type="checkbox" /><span>紧凑显示</span></label>
-          <button class="ghost-btn" type="submit">保存主动偏好</button>
-          <p id="synoPreferenceHint" class="form-hint" aria-live="polite"></p>
-        </form>
-        <section class="syno-channel-setup"><p class="panel-tag">飞书个人通道</p><h3>扫码注册并绑定 Owner</h3><p id="synoFeishuStatus">尚未注册。</p><div class="syno-job-actions"><button id="synoFeishuRegister" class="ghost-btn" type="button">开始注册</button><button id="synoFeishuConnect" class="accent-btn" type="button">连接</button><button id="synoFeishuDisconnect" class="ghost-btn" type="button">断开</button></div><div id="synoFeishuQr"></div></section>
+          <button class="ghost-btn" type="submit">保存主动偏好</button><p id="synoPreferenceHint" class="form-hint" aria-live="polite"></p>
+        </form></details></details></details>
       </section>
       <footer id="synoChannelStatus" class="syno-channel-status">正在读取本地状态…</footer>
     </aside>

@@ -142,6 +142,7 @@ async function startFixtureServer(t, fixture, extraEnv = {}, { executable = proc
       ...process.env,
       ...extraEnv,
       NODE_ENV: "test",
+      SYNO_WEB_ONLY: "true",
       SYNO_REPO_ROOT: fixture.tempRoot,
       HOME: fixture.tempRoot,
       SYNO_LOCAL_DATA: path.join(fixture.tempRoot, "local-data"),

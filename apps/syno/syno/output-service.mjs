@@ -44,7 +44,9 @@ class OutputService {
       const value = parseRecord(await fs.readFile(path.join(root, entry.name), "utf8"));
       if (!status || value.status === status) records.push(value);
     }
-    return records.sort((a, b) => b.priority - a.priority || b.created.localeCompare(a.created)).slice(0, limit);
+    const actionable = new Set(["suggested", "accepted", "drafting", "practiced"]);
+    return records.sort((a, b) => Number(actionable.has(b.status)) - Number(actionable.has(a.status))
+      || b.priority - a.priority || String(b.created || "").localeCompare(String(a.created || ""))).slice(0, limit);
   }
 
   async progress(id, input = {}, { opsRoot = this.opsRoot } = {}) {
