@@ -13,6 +13,7 @@ const ignored = new Set([
   "__pycache__",
   "node_modules",
 ]);
+const ignoredRelativeDirectories = new Set(["ops/artifacts/quarantine"]);
 const textExtensions = new Set([".md", ".mjs", ".js", ".json", ".ps1", ".py", ".toml", ".yml", ".yaml", ".html", ".css"]);
 const errors = [];
 
@@ -21,6 +22,9 @@ async function walk(directory) {
   for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
     if (ignored.has(entry.name)) continue;
     const candidate = path.join(directory, entry.name);
+    const relativeCandidate = path.relative(ROOT, candidate).replace(/\\/g, "/");
+    if (entry.isDirectory() && ignoredRelativeDirectories.has(relativeCandidate)) continue;
+    if (!entry.isDirectory() && /^apps\/syno\/public\/assets\/syno\/[^/]+-key\.png$/.test(relativeCandidate)) continue;
     if (entry.isDirectory()) files.push(...await walk(candidate));
     else files.push(candidate);
   }
