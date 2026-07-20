@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import { buildClaudeArgs, runProcess } from "../apps/syno/syno/executors.mjs";
 import { assertJsonMutation, assertSameOriginMutation, securityHeaders } from "../apps/syno/syno/http-security.mjs";
 import { assertRegisteredOperation, buildOperationRequest } from "../apps/syno/syno/operation-registry.mjs";
+import { OutputService } from "../apps/syno/syno/output-service.mjs";
 import { routeSynoApi } from "../apps/syno/syno/runtime.mjs";
 import { ConversationStore } from "../apps/syno/syno/conversation-store.mjs";
 import { Scheduler } from "../apps/syno/syno/scheduler.mjs";
@@ -107,6 +108,31 @@ test("Scheduler keeps the Worker event loop referenced", async (t) => {
   await scheduler.start();
   assert.equal(scheduler.timer.hasRef(), true);
   scheduler.stop();
+});
+
+test("output progress API cannot publish without domain-validated feedback", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-output-api-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const outputs = new OutputService({ opsRoot: path.join(root, "ops") });
+  const { opportunity } = await outputs.createOpportunity({ title: "讲清 Tool Loop", reason: "验证理解" });
+  await outputs.progress(opportunity.id, { action: "accept" });
+  await outputs.progress(opportunity.id, { action: "draft", userOutput: "这是主人亲自写出的观点、证据、边界和例子。" });
+  const runtime = {
+    developmentMode: false,
+    core: {
+      async execute(request) {
+        assert.equal(request.operation, "outputs.opportunity.progress");
+        return outputs.progress(request.payload.id, request.payload);
+      },
+    },
+  };
+  const url = new URL(`http://localhost/api/syno/outputs/opportunities/${opportunity.id}/progress`);
+  await assert.rejects(
+    routeSynoApi(runtime, { method: "POST" }, url, async () => ({ action: "publish", feedback: "" })),
+    /发布反馈/,
+  );
+  const records = await outputs.list();
+  assert.equal(records[0].status, "drafting");
 });
 
 test("Windows service Web API exposes only fixed status, install and uninstall actions", async () => {

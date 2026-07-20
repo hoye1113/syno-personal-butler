@@ -10,7 +10,7 @@ Syno enables exactly one `CognitiveRuntime` and one configured model ID. The act
 | overwrite/move/delete/new MOC/new tag | double | worktree | pinned diff and Web approval |
 | source-code change | denied | none | Syno may only create BugReport/ImprovementProposal |
 
-`ops/jobs` and `ops/events` are append-only control-plane audit facts written directly by JobStore before a worktree exists. This is not domain-write authority: requested `vault/` and non-audit `ops/` changes still use the declared worktree, validators and merge approval. `system_control` uses this audit-only boundary and receives no writable repository root.
+`ops/jobs` is a durable, mutable recovery snapshot; `ops/events` is the append-only immutable canonical audit sequence. JobStore writes both directly before a worktree exists, updating the Job snapshot for recovery while emitting an event for every transition. This is not domain-write authority: requested `vault/` and non-audit `ops/` changes still use the declared worktree, validators and merge approval. `system_control` uses this audit-only boundary and receives no writable repository root.
 
 Public requests cannot supply intent, Profile, risk, approval, executor or ToolRegistry data. The operation registry maps public modes to canonical operations. After execution, the actual Git diff may only increase risk.
 
