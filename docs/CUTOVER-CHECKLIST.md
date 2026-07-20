@@ -24,9 +24,9 @@
 
 - [x] 在主人明确授权下，从 OpenClaw last-good 档案将 token-cloud Token、固定 Model ID 和上下文长度直接迁入 Syno DPAPI。
 - [x] 执行 `pnpm probe:provider-real -- --confirm-live --trials 5`，五轮均通过原生工具循环且 Model ID 不漂移。
-- [ ] 验证 Provider 超时、离线后 Job 进入 `waiting_provider`，恢复后只重试原模型。
+- [x] 真实 `PROVIDER_HTTP_ERROR` 后同一微信 Job 进入 `waiting_provider`，重启恢复后仍由固定 `AIPC-deepseek-v4-flash` 完成。
 - [x] 微信凭据从主人授权的 OpenClaw 本机配置迁入 Syno DPAPI，Owner 绑定与真实连接健康通过。
-- [ ] 微信完成测试私聊、重复消息、处理失败不推进 cursor、恢复后单次交付。
+- [ ] 微信 Owner 私聊、连续回复和 Provider 失败恢复已通过；仍需真实重复 message ID 与附件往返。
 - [ ] 飞书完成扫码/授权、目标日历选择、重复与乱序事件、权限拒绝和恢复。
 
 真实渠道步骤与安全记录格式见 `docs/CHANNEL-ACCEPTANCE.md`。

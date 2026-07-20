@@ -57,6 +57,8 @@ Syno 是 Windows 本地、单用户、主动式且可审计的知识闭环私人
 - 2026-07-18 封板审计后的闭环加固新增 ConversationRouter、逐会话排他执行、真实用户原文 Artifact、Claim/Evidence 原子聚合、显式 IngestDecision 与三层生命周期、OutputOpportunity 进度、SignalSourceRegistry 和实际生效的主动偏好；同时修复飞书未送达却去重及微信轮询重复 DPAPI 的问题。批准前收录载荷不再提前污染 `ops/`。
 - 闭环封板加固提交 `620b8d6` 已在主工作树与 `C:\tmp\syno-fresh-620b8d6` 复验：Node 127/127、vault 57/57、仓库校验通过；内部工程门槛已收口，剩余仅为真实 Provider、微信、飞书和最终切换的主人验收门。
 - Windows Provider 凭据修复提交 `cbfa882` 显式加载 DPAPI 所需的 `System.Security` 程序集，并只允许 AIPC 请求 ID 到无前缀响应 ID 的确定性规范化。主人授权的 OpenClaw last-good Token 已迁入 Syno DPAPI；真实 Provider 五轮工具调用 5/5、微信 Owner 绑定与连接健康均通过。该提交已在 `C:\tmp\syno-fresh-cbfa882` 复验 Node 129/129、vault 57/57 和仓库校验。
+- 微信二维码、自动扫码状态轮询、长轮询超时与连续回复已由 `3c50299`、`e6d9746` 修复；只读任务不再被开发者既有改动误拦截，同时 `141d0be` 以 Git 内容指纹拒绝执行期篡改。真实 Owner 后续消息已连续完成。
+- 真实微信 Job `job-20260719-461dea5d` 曾因 `PROVIDER_HTTP_ERROR` 持久化为 `waiting_provider`，重启后仍由固定 `AIPC-deepseek-v4-flash` 完成；`a390462` 确保未来成功重试清除旧错误状态。该提交已在 `C:\tmp\syno-fresh-a390462` 复验 Node 135/135、vault 57/57 和仓库校验。
 5. **知识技能**：低成本收录、渐进整理、Teach-back、间隔复习、证据型创作、时效查证。
 6. **外部渠道**：Web 完整控制；微信快速入口；飞书日程和结构化通知；同一 Agent/Policy/Store。
 7. **Web 与品牌**：Today、Capture、Knowledge、Learn、Create；纸片法老知识守护者；WCAG AA。
