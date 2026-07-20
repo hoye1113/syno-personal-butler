@@ -4,6 +4,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 
+import { isMocPath } from "./knowledge-path-policy.mjs";
 import { parseRecord, serializeRecord } from "./markdown-record.mjs";
 import { validateContractRecord } from "./schema-registry.mjs";
 
@@ -443,8 +444,7 @@ class VaultMigrationService {
       const normalized = normalizeNote({ text: textByPath.get(file.relative), sourcePath: file.relative, sourceSha256, migrationId: id,
         createdFallback: seen || sourceStat.mtime.toISOString(), createdSource: seen ? "git-first-seen" : "file-mtime", renameMap, connected: connectedSources.has(file.relative) });
       const staged = Buffer.from(normalized.text, "utf8"); const renamed = renameMap.get(file.relative) !== file.relative;
-      const targetFilename = path.posix.basename(renameMap.get(file.relative), ".md");
-      const phase = file.relative === ROOT_MOC || /^MOC\s*-/i.test(targetFilename) || renamed || normalized.linkChanged ? "integration" : "content";
+      const phase = file.relative === ROOT_MOC || isMocPath(targetPath) || renamed || normalized.linkChanged ? "integration" : "content";
       const stagedFile = path.join(stagedRoot, ...targetPath.split("/")); await fs.mkdir(path.dirname(stagedFile), { recursive: true }); await fs.writeFile(stagedFile, staged);
       files.push({ sourcePath: file.relative, targetPath, kind: "markdown", action: "import", phase, sourceSha256, stagedSha256: sha256(staged), bytes: sourceBuffer.length, normalizations: normalized.normalizations });
     }

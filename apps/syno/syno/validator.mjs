@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 
+import { isMocPath } from "./knowledge-path-policy.mjs";
 import { PATHS } from "./paths.mjs";
 import { validateContractRecord } from "./schema-registry.mjs";
 
@@ -139,7 +140,7 @@ async function validateVaultContract(repoRoot, changedPaths, decision) {
       if (contract.requireSemanticLinkOrOrphan && !/\[\[[^\]]+\]\]/.test(current.body) && !/^(?:status|link_status):\s*orphan\s*$/m.test(text) && !migrationTopology) {
         errors.push(`${relative}: 新笔记必须包含语义 wikilink 或声明 status: orphan`);
       }
-      if (/^MOC\s*-/i.test(filename) && !new Set(["new_moc", "migrate_integrate"]).has(decision.intent)) errors.push(`${relative}: 新 MOC 未通过双审批意图`);
+      if (isMocPath(relative) && !new Set(["new_moc", "migrate_integrate"]).has(decision.intent)) errors.push(`${relative}: 新 MOC 未通过双审批意图`);
     }
     const oldTags = new Set(previous?.tags || []);
     const addedTags = current.tags.filter((tag) => !oldTags.has(tag));

@@ -348,7 +348,10 @@ test("Feishu persists successful dedupe and recovers a failed owner DM after res
     onMessage: async (message) => { recovered.push(message.id); return { text: "recovered" }; },
   });
   await second.start();
-  for (let index = 0; index < 30 && !recovered.length; index += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+  for (let index = 0; index < 30; index += 1) {
+    if ((await new FeishuStateStore({ file: stateFile }).snapshot()).pending.length === 0) break;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
   channels[1].handlers.get("message")({ messageId: "done", chatId: "c1", chatType: "p2p", senderId: "owner", content: "duplicate" });
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.deepEqual(recovered, ["retry"]);

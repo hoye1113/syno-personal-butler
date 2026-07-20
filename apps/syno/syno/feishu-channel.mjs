@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import QRCode from "qrcode";
@@ -7,12 +8,13 @@ import { runDpapi } from "./provider-credential-store.mjs";
 
 async function atomicWrite(file, value) {
   await fs.mkdir(path.dirname(file), { recursive: true });
-  const temporary = `${file}.${process.pid}.tmp`;
+  const temporary = `${file}.${process.pid}.${randomUUID()}.tmp`;
   await fs.writeFile(temporary, value, { encoding: "utf8", mode: 0o600 });
   await fs.rename(temporary, file);
 }
 
 const FAILED_PAYLOAD_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
+const STATE_OPERATION_TAILS = new Map();
 const SILENT_SDK_LOGGER = Object.freeze({
   error() {},
   warn() {},
@@ -42,7 +44,6 @@ class FeishuStateStore {
   constructor({ file = path.join(PATHS.stateRoot, "feishu-channel.json"), clock = () => new Date() } = {}) {
     this.file = file;
     this.clock = clock;
-    this.tail = Promise.resolve();
   }
   async snapshot() {
     return this.#serialized(async () => {
@@ -77,8 +78,12 @@ class FeishuStateStore {
     });
   }
   #serialized(operation) {
-    const result = this.tail.then(operation, operation);
-    this.tail = result.catch(() => {});
+    const key = path.resolve(this.file).toLocaleLowerCase("en-US");
+    const previous = STATE_OPERATION_TAILS.get(key) || Promise.resolve();
+    const result = previous.then(operation, operation);
+    const tail = result.catch(() => {});
+    STATE_OPERATION_TAILS.set(key, tail);
+    void tail.then(() => { if (STATE_OPERATION_TAILS.get(key) === tail) STATE_OPERATION_TAILS.delete(key); });
     return result;
   }
   async #read() {

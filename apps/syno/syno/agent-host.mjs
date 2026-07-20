@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { isMocPath } from "./knowledge-path-policy.mjs";
 import { evaluate } from "./policy.mjs";
 import { PATHS } from "./paths.mjs";
 import { ProcessFileLock } from "./process-lock.mjs";
@@ -16,7 +17,7 @@ function diffRequiresApproval(decision, changes = []) {
   const sensitiveRoots = ["apps/", "contracts/", "config/", "scripts/", "tests/"];
   return changes.some((change) => change.kind !== "added"
     || sensitiveRoots.some((root) => change.path.startsWith(root))
-    || /^vault\/.*\/MOC\s*-|^vault\/MOC\s*-/i.test(change.path));
+    || isMocPath(change.path));
 }
 
 class AgentHost {
