@@ -118,6 +118,8 @@ test("Windows task restart and uninstall own the exact Node child through a PID 
   assert.match(manager, /Export-ScheduledTask[\s\S]*Restore-SynoTask/);
   assert.match(manager, /Restore-SynoTask[\s\S]*Wait-SynoTaskReady/, "a running task restored after failure must pass health readiness again");
   assert.doesNotMatch(manager, /try \{ Stop-SynoHost \} catch \{ \}/, "replacement cleanup failures must not be swallowed");
+  assert.match(manager, /function Stop-SynoWrappers[\s\S]*Get-CimInstance Win32_Process[\s\S]*Test-SynoWrapperProcess/);
+  assert.match(manager, /"Uninstall"[\s\S]*KeepHostRunning[\s\S]*Stop-SynoWrappers/, "Web uninstall must retire task wrappers without killing the Host");
   const installStart = manager.indexOf('"Install"');
   const rollbackTry = manager.indexOf("    try {", installStart);
   const stopExisting = manager.indexOf("Stop-ScheduledTask -TaskName $taskName", installStart);
@@ -151,6 +153,13 @@ test("Windows service common policy rejects unknown health and stale PID ownersh
   const command = `. '${common}'; $repo='C:\\Syno'; $node='C:\\Node\\node.exe'; $server='C:\\Syno\\apps\\syno\\server.mjs'; $fp=Get-SynoRepoFingerprint $repo; $good=[pscustomobject]@{ok=$true;product='syno-personal-butler';protocolVersion=1;repoFingerprint=$fp}; $unknown=[pscustomobject]@{ok=$true}; $started=[datetime]'2026-07-20T00:00:00Z'; $process=[pscustomobject]@{Path=$node;StartTime=$started}; $details=[pscustomobject]@{CommandLine='node C:\\Syno\\apps\\syno\\server.mjs'}; $owned=[pscustomobject]@{version=1;nodePath=$node;serverPath=$server;repoRoot=$repo;startedAt=$started.ToUniversalTime().ToString('o')}; $stale=[pscustomobject]@{version=1;nodePath=$node;serverPath=$server;repoRoot=$repo;startedAt='2026-07-19T00:00:00.0000000Z'}; [ordered]@{goodHealth=(Test-SynoHealthResponse $good $fp);unknownHealth=(Test-SynoHealthResponse $unknown $fp);owned=(Test-SynoOwnershipRecord $owned $process $details $node $server $repo);stale=(Test-SynoOwnershipRecord $stale $process $details $node $server $repo)} | ConvertTo-Json -Compress`;
   const { stdout } = await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], { windowsHide: true });
   assert.deepEqual(JSON.parse(stdout.trim()), { goodHealth: true, unknownHealth: false, owned: true, stale: false });
+});
+
+test("Windows service common policy recognizes only this repository's launcher wrapper", { skip: process.platform !== "win32" }, async () => {
+  const common = path.join(root, "scripts", "windows-service-common.ps1").replaceAll("'", "''");
+  const command = `. '${common}'; $good=[pscustomobject]@{Name='powershell.exe';CommandLine='powershell.exe -File "C:\\Syno\\scripts\\start-syno.ps1" -RepoRoot "C:\\Syno"'}; $wrong=[pscustomobject]@{Name='powershell.exe';CommandLine='powershell.exe -File "C:\\Other\\scripts\\start-syno.ps1" -RepoRoot "C:\\Other"'}; [ordered]@{good=(Test-SynoWrapperProcess $good 'C:\\Syno\\scripts\\start-syno.ps1' 'C:\\Syno');wrong=(Test-SynoWrapperProcess $wrong 'C:\\Syno\\scripts\\start-syno.ps1' 'C:\\Syno')} | ConvertTo-Json -Compress`;
+  const { stdout } = await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], { windowsHide: true });
+  assert.deepEqual(JSON.parse(stdout.trim()), { good: true, wrong: false });
 });
 
 test("Windows install fails before touching Task Scheduler when Node is missing", { skip: process.platform !== "win32" }, async () => {

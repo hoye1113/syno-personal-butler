@@ -93,4 +93,4 @@
 - Today 的“去处理”和“待你处理”会真实打开相应抽屉，不再只切换隐藏 pane。
 - 设置总览的微信状态与“微信连接”详情一致；点击微信行只展开常用连接设置，不跳转通知中心。
 - 390×844 下 `scrollWidth=375 <= innerWidth=390`，五入口与连接设置可见；桌面和移动合计 0 error/0 warning。
-- Web 卸载返回完整 JSON 后当前 Host 仍健康；同源 JSON API 重装后 `installed=true`、`running=true`，全程留下 canonical Job/事件。
+- Web 卸载返回完整 JSON 后当前 Host 仍健康；旧 launcher 包装进程从 2 个收敛为 0，同源 JSON API 重装后 `installed=true`、`running=true` 且仅 1 个包装进程，全程留下 canonical Job/事件。

@@ -22,3 +22,11 @@ function Test-SynoOwnershipRecord($Ownership, $Process, $Details, [string]$Resol
     $Ownership.repoRoot -eq $ResolvedRoot -and $recordedStartedAt -eq $actualStartedAt -and
     $Details.CommandLine.IndexOf($ServerPath, [StringComparison]::OrdinalIgnoreCase) -ge 0
 }
+
+function Test-SynoWrapperProcess($Details, [string]$StartScript, [string]$RepoRoot) {
+  if (-not $Details -or [string]::IsNullOrWhiteSpace([string]$Details.CommandLine)) { return $false }
+  if ([string]$Details.Name -notmatch "(?i)^powershell(?:_ise)?\.exe$") { return $false }
+  $commandLine = [string]$Details.CommandLine
+  return $commandLine.IndexOf([IO.Path]::GetFullPath($StartScript), [StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+    $commandLine.IndexOf([IO.Path]::GetFullPath($RepoRoot), [StringComparison]::OrdinalIgnoreCase) -ge 0
+}

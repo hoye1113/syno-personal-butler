@@ -135,6 +135,15 @@ function Stop-SynoHost {
   Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
 }
 
+function Stop-SynoWrappers {
+  $wrappers = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+    Test-SynoWrapperProcess $_ $startScript $resolvedRoot
+  }
+  foreach ($wrapper in $wrappers) {
+    Stop-Process -Id $wrapper.ProcessId -Force -ErrorAction Stop
+  }
+}
+
 function Restore-SynoTask([string]$Xml, [bool]$WasRunning) {
   if (-not $Xml) { return }
   Register-ScheduledTask -TaskName $taskName -Xml $Xml -Force | Out-Null
@@ -188,6 +197,7 @@ switch ($Action) {
     $task = New-ScheduledTask -Action $taskAction -Trigger $trigger -Settings $settings -Principal $principal -Description "Syno personal knowledge butler"
     $replacementAttempted = $false
     try {
+      if ($KeepHostRunning) { Stop-SynoWrappers }
       if ($existing) {
         Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
         if (-not $KeepHostRunning) { Stop-SynoHost }
@@ -244,6 +254,7 @@ switch ($Action) {
       }
       Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
     }
+    if ($KeepHostRunning) { Stop-SynoWrappers }
     Write-Result (Get-SynoStatus)
   }
 }
