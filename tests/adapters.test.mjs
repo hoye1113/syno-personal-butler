@@ -6,7 +6,7 @@ import path from "node:path";
 
 import { FakeCalendarAdapter, MarkdownCalendarAdapter } from "../apps/syno/syno/calendar-adapters.mjs";
 import { ChannelHub, FakeChannelAdapter } from "../apps/syno/syno/channels.mjs";
-import { FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore } from "../apps/syno/syno/feishu-channel.mjs";
+import { FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, renderRegistrationQr, validateRegistrationUrl } from "../apps/syno/syno/feishu-channel.mjs";
 import { parseWeixinApproval } from "../apps/syno/syno/runtime.mjs";
 import { Scheduler, occurrenceFor } from "../apps/syno/syno/scheduler.mjs";
 import { LocalCredentialStore, LocalProcessLock, normalizeInbound, readLimitedBody, renderLoginQr, sniffMime, validateIlinkBaseUrl, validateLoginQrUrl, WeixinIlinkAdapter, WeixinIlinkClient } from "../apps/syno/syno/weixin-ilink.mjs";
@@ -270,6 +270,43 @@ test("Feishu credentials keep App Secret outside metadata", async (t) => {
   assert.equal(status.ownerBound, true);
   assert.doesNotMatch(await fs.readFile(store.metadataFile, "utf8"), /app-secret/);
   assert.equal((await store.load()).appSecret, "app-secret");
+});
+
+test("Feishu registration URL renders to an in-memory PNG data URL", async () => {
+  const url = "https://open.feishu.cn/page/launcher?user_code=ABCD-EFGH&from=sdk";
+  assert.equal(validateRegistrationUrl(url), url);
+  assert.match(await renderRegistrationQr(url), /^data:image\/png;base64,/);
+  assert.throws(() => validateRegistrationUrl("https://example.com/page/launcher?user_code=stolen"), /不在官方启动页范围/);
+});
+
+test("Feishu registration starts the long connection after Owner confirmation", async () => {
+  let saved = null;
+  let connects = 0;
+  const adapter = new FeishuChannelAdapter({
+    credentials: {
+      async save(value) { saved = value; },
+      async load() { return saved; },
+    },
+    sdkLoader: async () => ({
+      registerApp(options) {
+        options.onQRCodeReady({ url: "https://open.feishu.cn/page/launcher?user_code=ABCD-EFGH", expireIn: 600 });
+        return new Promise((resolve) => setTimeout(() => resolve({ client_id: "cli_registered", client_secret: "secret", user_info: { open_id: "owner" } }), 25));
+      },
+    }),
+    channelFactory: () => ({
+      on() {},
+      async connect() { connects += 1; },
+      async disconnect() {},
+    }),
+  });
+
+  const waiting = await adapter.beginRegistration();
+  assert.equal(waiting.status, "waiting_scan");
+  for (let index = 0; index < 20 && !adapter.running; index += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(adapter.registrationStatus().status, "confirmed");
+  assert.equal(adapter.status().running, true);
+  assert.equal(connects, 1);
+  await adapter.stop();
 });
 
 test("Weixin restores cursor context and never promotes the first unknown sender", async () => {

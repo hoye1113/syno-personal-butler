@@ -1317,7 +1317,7 @@ function renderLarkSetupPanel() {
     ? ""
     : cliVersion
       ? ` · lark-cli ${cliVersion}`
-      : " · 未检测到 lark-cli 版本，建议更新到最新版（npm i -g @larksuite/lark-cli）";
+      : " · 未检测到 lark-cli 版本，请安装官方 CLI（npx @larksuite/cli@1.0.72 install）";
   elements.larkSetupStatus.textContent = `${view.message}${versionNote}`;
   elements.larkSetupBadge.textContent = view.badge;
   elements.larkSetupBadge.className = `status-badge ${view.tone}`;

@@ -40,6 +40,21 @@ test("Weixin login auto-polls without a manual scan-confirm button", async () =>
   assert.match(script, /扫码状态连接暂时中断，正在自动重试/);
 });
 
+test("Feishu registration renders a local QR image with an official-link fallback", async () => {
+  const [script, legacyScript] = await Promise.all([
+    fs.readFile(path.join(root, "apps", "syno", "public", "syno.js"), "utf8"),
+    fs.readFile(path.join(root, "apps", "syno", "public", "app.js"), "utf8"),
+  ]);
+  assert.match(script, /result\.qrDataUrl/);
+  assert.match(script, /飞书扫码注册二维码/);
+  assert.match(script, /打开飞书扫码注册/);
+  assert.match(script, /scheduleFeishuRegistrationPoll\(generation, 0\)/);
+  assert.match(script, /注册完成，正在建立飞书长连接/);
+  assert.match(script, /注册状态连接暂时中断，正在自动重试/);
+  assert.match(legacyScript, /npx @larksuite\/cli@1\.0\.72 install/);
+  assert.doesNotMatch(legacyScript, /@larksuite\/lark-cli/);
+});
+
 test("paper-cut guardian is layered and reduced-motion safe", async () => {
   const publicRoot = path.join(root, "apps", "syno", "public");
   const [html, css] = await Promise.all([

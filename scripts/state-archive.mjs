@@ -3,7 +3,9 @@ import path from "node:path";
 import { PATHS } from "../apps/syno/syno/paths.mjs";
 import { backupState, restoreState, verifyArchive } from "../apps/syno/syno/state-archive.mjs";
 
-const [command, rawPath] = process.argv.slice(2);
+const args = process.argv.slice(2);
+if (args[0] === "--") args.shift();
+const [command, rawPath] = args;
 if (!command || !rawPath || !["backup", "verify", "restore"].includes(command)) {
   console.error("用法：node scripts/state-archive.mjs <backup|verify|restore> <绝对归档目录>");
   process.exit(2);

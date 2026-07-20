@@ -2099,6 +2099,15 @@ async function resolveCommand(command) {
     try {
       await fs.access(candidate);
       if (/\.(?:mjs|cjs|js)$/i.test(candidate)) return { executable: process.execPath, prefixArgs: [candidate] };
+      if (process.platform === "win32" && /lark-cli(?:\.ps1|\.cmd|\.bat)?$/i.test(candidate)) {
+        const npmEntry = path.join(path.dirname(candidate), "node_modules", "@larksuite", "cli", "scripts", "run.js");
+        try {
+          await fs.access(npmEntry);
+          return { executable: process.execPath, prefixArgs: [npmEntry] };
+        } catch {
+          // Continue with the configured executable when it is not an npm wrapper.
+        }
+      }
       return { executable: candidate, prefixArgs: [] };
     } catch {
       // Try the next known install location before falling back to PATH.

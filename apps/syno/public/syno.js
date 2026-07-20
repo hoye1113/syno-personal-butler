@@ -633,13 +633,73 @@
     } catch (error) { hint.textContent = error.message; }
   }
 
+  let feishuRegistrationGeneration = 0;
+  let feishuRegistrationTimer = null;
+
+  function stopFeishuRegistrationPoll() {
+    feishuRegistrationGeneration += 1;
+    if (feishuRegistrationTimer) clearTimeout(feishuRegistrationTimer);
+    feishuRegistrationTimer = null;
+  }
+
+  function scheduleFeishuRegistrationPoll(generation, delay = 1_500) {
+    if (generation !== feishuRegistrationGeneration) return;
+    if (feishuRegistrationTimer) clearTimeout(feishuRegistrationTimer);
+    feishuRegistrationTimer = setTimeout(() => pollFeishuRegistration(generation), delay);
+  }
+
+  async function pollFeishuRegistration(generation) {
+    if (generation !== feishuRegistrationGeneration) return;
+    const status = document.querySelector("#synoFeishuStatus");
+    try {
+      const result = await api("/api/syno/feishu/register/status");
+      if (generation !== feishuRegistrationGeneration) return;
+      if (result.status === "confirmed") {
+        stopFeishuRegistrationPoll();
+        document.querySelector("#synoFeishuQr").replaceChildren();
+        status.textContent = "注册完成，正在建立飞书长连接…";
+        await feishuAction("connect");
+        return;
+      }
+      if (["failed", "expired", "canceled"].includes(result.status)) {
+        stopFeishuRegistrationPoll();
+        status.textContent = `注册未完成：${result.error || result.status}`;
+        return;
+      }
+      status.textContent = result.status === "waiting_scan" ? "请扫描二维码并在飞书中确认。" : "飞书已扫码，正在等待授权确认…";
+      scheduleFeishuRegistrationPoll(generation);
+    } catch {
+      status.textContent = "注册状态连接暂时中断，正在自动重试…";
+      scheduleFeishuRegistrationPoll(generation, 2_500);
+    }
+  }
+
   async function feishuAction(action) {
     const status = document.querySelector("#synoFeishuStatus"); status.textContent = "正在处理…";
     try {
       const result = await api(`/api/syno/feishu/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       status.textContent = result.status === "waiting_scan" ? "请扫描二维码并在飞书中确认。" : `当前状态：${result.status || (result.running ? "已连接" : "未连接")}`;
       const qr = document.querySelector("#synoFeishuQr");
-      if (result.url) { const link = node("a", "accent-btn", "打开飞书扫码注册"); link.href = result.url; link.target = "_blank"; link.rel = "noreferrer"; qr.replaceChildren(link); }
+      if (result.url) {
+        const children = [];
+        if (result.qrDataUrl) {
+          const image = node("img", "syno-weixin-qr");
+          image.src = result.qrDataUrl;
+          image.alt = "飞书扫码注册二维码";
+          image.width = 320;
+          image.height = 320;
+          children.push(image);
+        }
+        const link = node("a", "accent-btn", "打开飞书扫码注册");
+        link.href = result.url; link.target = "_blank"; link.rel = "noreferrer";
+        children.push(link);
+        qr.replaceChildren(...children);
+      }
+      if (action === "register/start" && result.status === "waiting_scan") {
+        stopFeishuRegistrationPoll();
+        const generation = feishuRegistrationGeneration;
+        scheduleFeishuRegistrationPoll(generation, 0);
+      }
     } catch (error) { status.textContent = error.message; }
   }
 

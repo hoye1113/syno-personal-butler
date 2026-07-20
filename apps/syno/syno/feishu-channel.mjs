@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import QRCode from "qrcode";
 
 import { PATHS } from "./paths.mjs";
 import { runDpapi } from "./provider-credential-store.mjs";
@@ -12,6 +13,23 @@ async function atomicWrite(file, value) {
 }
 
 const FAILED_PAYLOAD_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
+
+function validateRegistrationUrl(value) {
+  const url = new URL(value || "");
+  if (url.protocol !== "https:" || url.hostname !== "open.feishu.cn" || url.pathname !== "/page/launcher") {
+    throw new Error("飞书注册二维码 URL 不在官方启动页范围");
+  }
+  return url.toString();
+}
+
+async function renderRegistrationQr(value) {
+  return QRCode.toDataURL(validateRegistrationUrl(value), {
+    type: "image/png",
+    errorCorrectionLevel: "M",
+    margin: 2,
+    width: 320,
+  });
+}
 
 class FeishuStateStore {
   constructor({ file = path.join(PATHS.stateRoot, "feishu-channel.json"), clock = () => new Date() } = {}) {
@@ -159,11 +177,22 @@ class FeishuChannelAdapter {
       source: "syno-personal-butler",
       appPreset: { name: "Syno 赛诺", desc: "主动式知识闭环私人管家" },
       addons: { preset: false, scopes: { tenant: ["im:message:send_as_bot", "im:message:readonly"] }, events: { items: { tenant: ["im.message.receive_v1"] } } },
-      onQRCodeReady: (info) => { this.registrationState = { status: "waiting_scan", url: info.url, expireIn: info.expireIn }; readyResolve(this.registrationState); },
+      onQRCodeReady: (info) => {
+        renderRegistrationQr(info.url).then((qrDataUrl) => {
+          if (this.registrationState.status === "starting") {
+            this.registrationState = { status: "waiting_scan", url: validateRegistrationUrl(info.url), qrDataUrl, expireIn: info.expireIn };
+          }
+          readyResolve(this.registrationState);
+        }).catch((error) => {
+          this.registrationState = { status: "failed", error: error.code || error.message };
+          readyResolve(this.registrationState);
+        });
+      },
       onStatusChange: (info) => { this.registrationState = { ...this.registrationState, status: info.status }; },
     }).then(async (result) => {
       await this.credentials.save({ appId: result.client_id, appSecret: result.client_secret, ownerOpenId: result.user_info?.open_id || "" });
       this.registrationState = { status: "confirmed", appId: result.client_id, ownerBound: Boolean(result.user_info?.open_id) };
+      await this.start();
       return this.registrationState;
     }).catch((error) => {
       this.registrationState = { status: "failed", error: error.code || error.message };
@@ -240,4 +269,4 @@ class FeishuChannelAdapter {
   }
 }
 
-export { FAILED_PAYLOAD_RETENTION_MS, FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, officialSdk };
+export { FAILED_PAYLOAD_RETENTION_MS, FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, officialSdk, renderRegistrationQr, validateRegistrationUrl };

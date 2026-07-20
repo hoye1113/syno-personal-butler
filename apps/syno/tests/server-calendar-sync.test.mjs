@@ -53,6 +53,30 @@ test("calendar Adapter sends selected calendar and configured timezone", { timeo
   assert.deepEqual(data.end_time, { timestamp: "1783706400", timezone: "America/Vancouver" });
 });
 
+test("Windows npm lark-cli wrappers resolve to their Node entry", { timeout: 45_000, skip: process.platform !== "win32" }, async (t) => {
+  const fixture = await createFixture("npm-wrapper", { calendarProvider: "lark" });
+  const wrapper = path.join(fixture.tempRoot, "lark-cli.ps1");
+  const npmEntry = path.join(fixture.tempRoot, "node_modules", "@larksuite", "cli", "scripts", "run.js");
+  await fs.mkdir(path.dirname(npmEntry), { recursive: true });
+  await fs.copyFile(fixture.fakeLarkCliPath, npmEntry);
+  await fs.writeFile(wrapper, "throw 'this wrapper must not be spawned directly'\n", "utf8");
+  await runGit(fixture.tempRoot, ["add", "--", "lark-cli.ps1", "node_modules/@larksuite/cli/scripts/run.js"]);
+  await runGit(fixture.tempRoot, ["commit", "-m", "add npm lark cli wrapper fixture"]);
+  fixture.fakeLarkCliPath = wrapper;
+  const server = await startFixtureServer(t, fixture, {
+    LARK_CLI_CAPTURE_PATH: path.join(fixture.tempRoot, "local-data", "event.json"),
+    LARK_CLI_CAPTURE_PARAMS_PATH: path.join(fixture.tempRoot, "local-data", "params.json"),
+  });
+  const response = await queueAndApprove(server.port, "/api/topics/schedule", {
+    path: "ops/content/topic.md",
+    scheduledDate: "2026-07-10",
+    scheduledStart: "10:00",
+    scheduledEnd: "11:00",
+    calendarProvider: "lark",
+  });
+  assert.equal(response.body.job.result.sideEffects.external.results[0].syncStatus, "已同步");
+});
+
 async function createFixture(name, overrides = {}) {
   const tempRoot = await fs.mkdtemp(path.join(tmpdir(), `syno-calendar-${name}-`));
   const vaultRoot = tempRoot;

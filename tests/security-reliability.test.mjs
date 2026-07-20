@@ -162,4 +162,8 @@ test("state archive CLI completes an isolated backup, verify and restore cycle",
   assert.deepEqual(restored, { restored: 2, version: 1 });
   assert.equal(await fs.readFile(path.join(state, "jobs", "waiting.json"), "utf8"), "{\"status\":\"waiting_provider\"}");
   await assert.rejects(execFileAsync(process.execPath, [command, "restore", archive], { env, windowsHide: true }), /Command failed/);
+
+  const forwardedArchive = path.join(root, "forwarded-archive");
+  const forwarded = JSON.parse((await execFileAsync(process.execPath, [command, "--", "backup", forwardedArchive], { env, windowsHide: true })).stdout);
+  assert.equal(forwarded.credentialsIncluded, false);
 });
