@@ -107,6 +107,16 @@ test("GitGuard commits hundreds of long declared paths without exceeding the Win
   assert.deepEqual(await guard.changedPaths(), ["unrelated.md"]);
 });
 
+test("GitGuard surfaces git add failures as a clean error without crashing the worker", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-git-add-fail-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const guard = new GitGuard({ repoRoot: root, worktreeRoot: path.join(root, ".worktrees") });
+  // 非 git 目录：git add 在仓库发现阶段即以 128 退出，根本不读 stdin；超过管道缓冲的 pathspec 经 stdin
+  // 写入会触发 EPIPE。真实失败已由 execFile 回调捕获，此处验证对外是干净 reject，而非未捕获 'error' 崩溃 worker。
+  const oversized = Array.from({ length: 600 }, (_, index) => `note-${String(index).padStart(4, "0")}-${"x".repeat(120)}.md`);
+  await assert.rejects(guard.commitPaths(oversized, "non-repo failure", root), (error) => /git add 失败/.test(error.message));
+});
+
 test("Git porcelain rename parsing keeps both destination and source", () => {
   assert.deepEqual(parsePorcelainZ("R  new.md\0old.md\0"), ["new.md", "old.md"]);
 });

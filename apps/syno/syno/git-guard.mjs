@@ -29,6 +29,8 @@ async function gitWithInput(args, input, { cwd = PATHS.repoRoot, allowExitCodes 
       }
       resolve({ stdout: stdout || "", stderr: stderr || "", code });
     });
+    // git 提前退出或被中止时，stdin 的 EPIPE 只是下游症状，真实失败已由上方回调捕获；吞掉以免未捕获 'error' 崩溃 worker。
+    if (child.stdin) child.stdin.on("error", () => {});
     child.stdin.end(input);
   });
 }
