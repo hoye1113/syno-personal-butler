@@ -19,6 +19,20 @@ async function git(args, { cwd = PATHS.repoRoot, allowExitCodes = [] } = {}) {
   }
 }
 
+async function gitWithInput(args, input, { cwd = PATHS.repoRoot, allowExitCodes = [] } = {}) {
+  return new Promise((resolve, reject) => {
+    const child = execFile("git", args, { cwd, windowsHide: true, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+      const code = error?.code ?? 0;
+      if (error && !allowExitCodes.includes(code)) {
+        reject(new Error(`git ${args[0]} 失败：${String(stderr || error.message).trim()}`));
+        return;
+      }
+      resolve({ stdout: stdout || "", stderr: stderr || "", code });
+    });
+    child.stdin.end(input);
+  });
+}
+
 function parsePorcelainZ(raw) {
   const entries = String(raw).split("\0").filter(Boolean);
   const paths = [];
@@ -124,7 +138,8 @@ class GitGuard {
   async #commitPaths(paths, message, cwd) {
     const normalized = [...new Set(paths.map((item) => item.replace(/\\/g, "/")))];
     if (!normalized.length) return { committed: false, reason: "no_changes" };
-    await git(["add", "--", ...normalized], { cwd });
+    const pathspec = Buffer.from(`${normalized.map((item) => `:(literal)${item}`).join("\0")}\0`, "utf8");
+    await gitWithInput(["add", "--pathspec-from-file=-", "--pathspec-file-nul"], pathspec, { cwd });
     const staged = await git(["diff", "--cached", "--name-only"], { cwd });
     const stagedPaths = staged.stdout.trim().split(/\r?\n/).filter(Boolean);
     const unexpected = stagedPaths.filter((item) => !normalized.includes(item.replace(/\\/g, "/")));

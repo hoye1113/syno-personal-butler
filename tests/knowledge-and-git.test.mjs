@@ -85,6 +85,28 @@ test("GitGuard commits only declared paths", async (t) => {
   assert.equal(tracked, "declared.md");
 });
 
+test("GitGuard commits hundreds of long declared paths without exceeding the Windows command line", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-git-many-paths-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await exec("git", ["init", "-b", "main"], { cwd: root });
+  await exec("git", ["config", "user.name", "Syno Test"], { cwd: root });
+  await exec("git", ["config", "user.email", "syno-test@localhost"], { cwd: root });
+  await fs.writeFile(path.join(root, "base.md"), "base\n");
+  await exec("git", ["add", "--", "base.md"], { cwd: root });
+  await exec("git", ["commit", "-m", "base"], { cwd: root });
+
+  const declared = Array.from({ length: 426 }, (_, index) => `note-${String(index).padStart(3, "0")}-${"long-path-".repeat(11)}.md`);
+  await Promise.all(declared.map((relative) => fs.writeFile(path.join(root, relative), `${relative}\n`)));
+  await fs.writeFile(path.join(root, "unrelated.md"), "must remain untracked\n");
+
+  const guard = new GitGuard({ repoRoot: root, worktreeRoot: path.join(root, ".worktrees") });
+  const result = await guard.commitPaths(declared, "test: many exact paths");
+
+  assert.equal(result.committed, true);
+  assert.equal(result.paths.length, declared.length);
+  assert.deepEqual(await guard.changedPaths(), ["unrelated.md"]);
+});
+
 test("Git porcelain rename parsing keeps both destination and source", () => {
   assert.deepEqual(parsePorcelainZ("R  new.md\0old.md\0"), ["new.md", "old.md"]);
 });
