@@ -8,7 +8,7 @@ import path from "node:path";
 import { FakeCalendarAdapter, MarkdownCalendarAdapter } from "../apps/syno/syno/calendar-adapters.mjs";
 import { ChannelHub, FakeChannelAdapter } from "../apps/syno/syno/channels.mjs";
 import { FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, renderRegistrationQr, SILENT_SDK_LOGGER, validateRegistrationUrl } from "../apps/syno/syno/feishu-channel.mjs";
-import { parseWeixinApproval } from "../apps/syno/syno/runtime.mjs";
+import { createWeixinMessageHandler, parseWeixinApproval } from "../apps/syno/syno/runtime.mjs";
 import { Scheduler, occurrenceFor } from "../apps/syno/syno/scheduler.mjs";
 import { LocalCredentialStore, LocalProcessLock, normalizeInbound, parseAttachmentKey, readLimitedBody, renderLoginQr, resolveAttachmentUrl, sniffMime, validateIlinkBaseUrl, validateLoginQrUrl, WeixinIlinkAdapter, WeixinIlinkClient } from "../apps/syno/syno/weixin-ilink.mjs";
 
@@ -543,6 +543,56 @@ test("Weixin decrypts real iLink AES-128-ECB image and file payloads before quar
   assert.equal(resolveAttachmentUrl({ encrypt_query_param: "signed value" }).toString(), "https://novac2c.cdn.weixin.qq.com/c2c/download?encrypted_query_param=signed+value");
   assert.throws(() => resolveAttachmentUrl({ full_url: "https://example.com/file" }), /allowlist/);
   await assert.rejects(async () => parseAttachmentKey({ file_item: { media: { aes_key: Buffer.from("short").toString("base64") } } }), /AES Key/);
+});
+
+test("Weixin quarantined Markdown returns an Artifact receipt without creating a curate Job", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-weixin-ingest-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const file = path.join(root, "guide.md");
+  await fs.writeFile(file, "# Agent guide\n\nUntrusted attachment body.\n", "utf8");
+  const fileSize = (await fs.stat(file)).size;
+  const received = [];
+  const proposed = [];
+  const handler = createWeixinMessageHandler({
+    core: { async execute() { throw new Error("attachment must not enter the generic Agent path"); } },
+    conversationRouter: { async resolve() { throw new Error("attachment must not resolve a chat conversation"); } },
+    ingest: {
+      async receive(payload, context) {
+        received.push({ payload, context });
+        return { artifact: { id: "artifact-attachment-one" }, proposalPending: true };
+      },
+      async propose(id) { proposed.push(id); return { proposal: { id: "proposal-one" } }; },
+    },
+    quarantineRoot: root,
+  });
+  const response = await handler({
+    id: "message-file",
+    senderId: "owner",
+    text: "",
+    artifacts: [{ path: file, size: fileSize, mime: "text/plain", isolated: true, autoRead: false }],
+  });
+  assert.match(response.text, /Artifact ID：artifact-attachment-one/);
+  assert.equal(received.length, 1);
+  assert.equal(received[0].payload.kind, "txt");
+  assert.equal(received[0].payload.name, "guide.md");
+  assert.equal(received[0].payload.title, "guide.md");
+  assert.equal(Buffer.from(received[0].payload.base64, "base64").toString("utf8"), "# Agent guide\n\nUntrusted attachment body.\n");
+  assert.deepEqual(received[0].context, { channel: "weixin", ownerId: "owner" });
+  for (let index = 0; index < 10 && !proposed.length; index += 1) await new Promise((resolve) => setTimeout(resolve, 1));
+  assert.deepEqual(proposed, ["artifact-attachment-one"]);
+
+  const outsideRoot = await fs.mkdtemp(path.join(tmpdir(), "syno-weixin-outside-"));
+  t.after(() => fs.rm(outsideRoot, { recursive: true, force: true }));
+  const outsideFile = path.join(outsideRoot, "outside.md");
+  await fs.writeFile(outsideFile, "# Outside\n", "utf8");
+  const rejected = await handler({
+    id: "message-outside",
+    senderId: "owner",
+    text: "",
+    artifacts: [{ path: outsideFile, size: (await fs.stat(outsideFile)).size, mime: "text/plain", isolated: true, autoRead: false }],
+  });
+  assert.match(rejected.text, /路径超出允许范围/);
+  assert.equal(received.length, 1);
 });
 
 test("Weixin does not advance cursor or dedupe marker before processing succeeds", async () => {

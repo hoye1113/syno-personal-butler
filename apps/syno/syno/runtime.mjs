@@ -34,11 +34,7 @@ import { ToolLoopExecutor } from "./tool-loop-executor.mjs";
 import { ToolRegistry } from "./tool-registry.mjs";
 import { TodayService } from "./today-service.mjs";
 import { WeixinIlinkAdapter } from "./weixin-ilink.mjs";
-
-function parseWeixinApproval(text) {
-  const match = /^批准\s+(job-\d{8}-[a-f0-9]{8})\s+([a-f0-9]{6})$/iu.exec(String(text || "").trim());
-  return match ? { jobId: match[1], code: match[2].toUpperCase() } : null;
-}
+import { createWeixinMessageHandler, parseWeixinApproval } from "./weixin-message-handler.mjs";
 
 const PUBLIC_COMMAND_INTENTS = Object.freeze({
   search: "search",
@@ -222,45 +218,11 @@ function createSynoRuntime(options = {}) {
       return effects;
     },
   });
-  const weixin = options.weixin || new WeixinIlinkAdapter({
-    onMessage: async (message) => {
-      try {
-        const approval = parseWeixinApproval(message.text);
-        if (approval) {
-          const result = await core.approve(approval.jobId, {
-            channel: "weixin",
-            senderId: message.senderId,
-            code: approval.code,
-          });
-          return {
-            text: result.requiresApproval
-              ? `任务 ${result.job.id} 仍等待审批`
-              : `任务 ${result.job.id} 已批准并进入 ${result.job.status}`,
-          };
-        }
-        const trimmed = String(message.text || "").trim();
-        if (/^https?:\/\/\S+$/i.test(trimmed)) {
-          const receipt = await ingest.receive({ kind: "url", value: trimmed }, { channel: "weixin", ownerId: message.senderId });
-          ingest.propose(receipt.artifact.id).catch(() => {});
-          return { text: `已接收，Artifact ID：${receipt.artifact.id}。正在后台查重并生成收录方案。` };
-        }
-        const request = {
-          text: trimmed || `收到 ${message.artifacts?.length || 0} 个隔离附件候选，请在 Web 中查看后决定是否收录。`,
-          artifacts: message.artifacts || [],
-        };
-        const conversationId = await conversationRouter.resolve({ ownerKey: "local-user" });
-        const result = await core.execute(request, {
-          channel: "weixin",
-          senderId: message.senderId,
-          messageId: message.id,
-          conversationId,
-        });
-        return { text: result.error?.message || (result.requiresApproval ? `任务 ${result.job.id} 等待审批，审批码 ${result.job.approvalCode}` : result.job?.result?.text || `任务 ${result.job?.id || ""} 已处理`) };
-      } catch (error) {
-        return { text: `未能处理：${error.message}` };
-      }
-    },
-  });
+  const channelCore = {
+    execute: (...args) => core.execute(...args),
+    approve: (...args) => core.approve(...args),
+  };
+  const weixin = options.weixin || new WeixinIlinkAdapter({ onMessage: createWeixinMessageHandler({ core: channelCore, ingest, conversationRouter }) });
   const feishu = options.feishu || new FeishuChannelAdapter({
     onMessage: async (message) => {
       const trimmed = String(message.text || "").trim();
@@ -437,4 +399,4 @@ async function routeSynoApi(runtime, req, url, readBody) {
   throw error;
 }
 
-export { PUBLIC_COMMAND_INTENTS, createSynoRuntime, parseWeixinApproval, routeSynoApi };
+export { PUBLIC_COMMAND_INTENTS, createSynoRuntime, createWeixinMessageHandler, parseWeixinApproval, routeSynoApi };
