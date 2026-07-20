@@ -2,7 +2,7 @@
 
 更新日期：2026-07-20
 
-当前结论：**内部知识闭环加固已通过本地自动与浏览器验收，尚未完成最终外部切换。** 剩余发布门槛依赖主人本机凭据、账号或设备，不能用 Fake 测试替代。
+当前结论：**内部知识闭环、真实 Provider、飞书消息与日历均已通过；尚未完成最终外部切换。** 剩余门槛是微信附件实机、最新提交的 fresh-clone/浏览器复验和最终仓库备份封板，不能用 Fake 测试替代。
 
 | 要求 | 状态 | 权威证据 |
 | --- | --- | --- |
@@ -15,12 +15,14 @@
 | 主动信号和有效偏好 | 通过自动验收 | SignalSourceRegistry、时效 Claim/收录/创作/维护信号；cadence、quiet hours、review count、display order 与 density 生效 |
 | Policy、审批、GitGuard 和源码禁改 | 通过自动验收 | policy、knowledge-and-git、cognitive-runtime、reports tests |
 | Web 桌面/移动/键盘/减少动画 | 通过 | `docs/BROWSER-ACCEPTANCE.md`；新增桌面/移动 Create 与主动偏好真实交互，0 error/0 warning |
-| 状态备份、校验、空目录恢复 | 通过自动验收 | `state-archive.mjs`、库级测试和隔离 CLI 端到端测试 |
-| fresh clone 可重复安装与验证 | 通过 | `a390462` 在 `C:\tmp\syno-fresh-a390462` 按锁文件安装；Node 135/135、vault 57/57、仓库校验通过 |
+| 状态备份、校验、空目录恢复 | 通过 | `state-archive.mjs` 自动测试；真实非凭据状态归档 24 项、`credentialsIncluded=false`，在空隔离目录恢复成功并拒绝二次覆盖 |
+| fresh clone 可重复安装与验证 | 通过 | `eef3ca5` 在 `C:\tmp\syno-fresh-eef3ca5` 按锁文件安装；Node 141/141、vault 57/57、仓库校验通过 |
 | token-cloud 真实 Provider | 通过 | OpenClaw last-good Token 已迁入 DPAPI；固定 `AIPC-deepseek-v4-flash` 五轮真实工具调用 5/5；真实 `PROVIDER_HTTP_ERROR` 后同一微信 Job 持久等待并由同一模型恢复完成 |
-| 微信真实 Owner 与设备链路 | 部分通过 | Owner 绑定、自动扫码状态轮询、真实连续消息与 Provider 故障恢复通过；缺真实重复 message ID 和附件往返 |
-| 飞书真实账号与日历链路 | 待主人验收 | DPAPI、durable pending/dedupe/restart recovery、Fake/契约和安全探针已通过；缺真实授权与往返 |
-| 最终备份、启动、回滚和切换 | 待外部门槛后执行 | `docs/CUTOVER-CHECKLIST.md` D/E |
+| 微信真实 Owner 与设备链路 | 部分通过 | Owner 绑定、自动扫码、连续消息、Provider 故障恢复与 17 个 durable seen ID 跨重启通过；缺附件实机往返 |
+| 飞书真实账号与消息链路 | 通过 | 主人扫码绑定 Owner；4 条真实私聊全部完成、同一会话、真实 seen ID 重放拒绝、Worker 重启自动恢复 |
+| 飞书真实日历链路 | 通过 | lark-cli 1.0.72 user 身份；「Hoye」主日历读取、真实创建、同 event ID 双更新、清理、拒绝错误后恢复和重启恢复通过 |
+| 运行中渠道健康探针 | 通过 | 微信/飞书均从本机健康 Worker 返回 `ok/configured/ownerBound/connected=true`；不再竞争微信锁或建立第二条飞书连接 |
+| 最终备份、启动、回滚和切换 | 部分通过 | 状态 backup/verify/空目录 restore、仓库 407 项显式备份、Worker/渠道重启恢复通过；待微信附件和最终文档提交 |
 | 分支、原知识库和远端边界 | 持续满足 | 当前分支未重置、原知识库未修改、没有自动 Push |
 
 ## 当前自动验证命令
@@ -33,8 +35,7 @@ pnpm verify
 
 ## 外部验收顺序
 
-1. 从微信完成真实重复 message ID 与附件往返。
-2. 完成飞书真实账号与日历验收。
-3. 执行切换清单 D/E，更新本矩阵并重新跑完整验证。
+1. 从微信完成无隐私附件实机往返。
+2. 执行切换清单 E 的最终主工作树复验和封板提交。
 
 只有本矩阵所有必选项都有直接证据时，才能把全局 Goal 标记为 complete。

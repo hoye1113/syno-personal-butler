@@ -46,3 +46,13 @@
 - 飞书扫码、日历授权、重复/乱序事件与恢复。
 
 这些项目继续保留在全局 Goal，不以本记录替代真实外部验收。
+
+## 2026-07-20 增量复验
+
+- UI Git 基线：`8492d0f`；随后 `eef3ca5` 仅调整后台健康 probe 与飞书 Owner 状态字段，不改变布局或交互
+- 服务地址：`http://127.0.0.1:4317`
+- 桌面：1280×720，`scrollWidth=1265 <= innerWidth=1280`，飞书日历显示已连接到「Hoye」，Provider password 输入值为空，0 error/0 warning。
+- 移动：390×844，`scrollWidth=375 <= innerWidth=390`，“连接设置”可达并打开设置 dialog，0 error/0 warning。
+- 键盘：Escape 关闭设置 dialog，并将焦点恢复到“连接设置”触发按钮。
+- 减少动画：最新 CSS 仍包含 `prefers-reduced-motion` 规则；动态静态化行为由既有真实仿真与 `tests/ui-shell.test.mjs` 持续覆盖。
+- 安全：本轮使用真实本地配置，仅核对 password 字段为空和脱敏状态文本；没有截图、读取或记录 Token、App Secret、设备码。

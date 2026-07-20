@@ -28,6 +28,8 @@ pnpm probe:weixin -- --confirm-live --duration-ms 2000
 pnpm probe:feishu -- --confirm-live
 ```
 
+若 Syno Worker 已在运行，两个 probe 读取本机 `127.0.0.1` 的脱敏渠道状态并返回 `source: running_worker`，不会抢占微信单实例 poller 或建立第二条飞书长连接；Worker 未运行时才使用独立短探针。
+
 3. 主人发送唯一私聊文本，确认只执行并回复一次；成功去重和失败待处理状态必须跨 Worker 重启保持。
 4. 验证陌生人和群聊不进入 Agent、重复 message ID 不重复处理。
 5. 授权目标日历，验证创建、重复事件、乱序回执、权限拒绝、断网降级和恢复；飞书不得成为知识事实源。
@@ -43,8 +45,13 @@ pnpm probe:feishu -- --confirm-live
 | 微信自动扫码状态轮询 | 2026-07-19 | passed | Web 自动轮询扫码状态，不再依赖“我已扫码确认”；二维码由受信登录 URL 在本地渲染为内存 PNG |
 | 微信 Owner 连续往返 | 2026-07-20 | passed | 两个后续 Owner 消息分别形成完成态 Job；轮询、固定会话、Agent 执行与回复链路持续可用 |
 | 微信 Provider 故障恢复 | 2026-07-20 | passed | 同一微信 Job 曾因真实 `PROVIDER_HTTP_ERROR` 进入 `waiting_provider`，重启恢复后由固定模型完成，无 fallback |
-| 微信重复投递/附件实机 | 待验收 | pending | 自动去重、失败不推进 cursor 与附件隔离测试已通过；仍需真实重复 message ID 和附件往返 |
-| 飞书连接健康 | 待验收 | pending | 不记录 App ID/App Secret |
-| 飞书 Owner/日历/恢复 | 待验收 | pending | 仅记录日历别名和脱敏事件摘要 |
+| 微信 durable 去重 | 2026-07-20 | passed | 17 个真实 seen ID 跨 Worker 重启保留；恢复后没有重复 Job；自动测试覆盖同 message ID 重放、失败不推进 cursor |
+| 微信附件实机 | 待验收 | pending | 附件流式限额、MIME 嗅探和隔离测试已通过；仍需主人发送一份无隐私附件完成实机往返 |
+| 飞书连接健康 | 2026-07-20 | passed | 主人扫码创建应用并绑定 Owner；二维码本地渲染，注册确认后自动长连接，重启自动恢复；未记录 App ID/App Secret |
+| 飞书 Owner 连续往返 | 2026-07-20 | passed | 4 个真实 Owner 私聊 Job 全部完成、0 failed/0 waiting、同一 Conversation；4 个 durable seen ID 跨重启保留 |
+| 飞书真实 ID 重放 | 2026-07-20 | passed | 对一个真实已完成 message ID 做本地恢复重放，`replayAccepted=false`，pending 维持 0，未再次执行 Agent |
+| 飞书日历授权与 CRUD | 2026-07-20 | passed | lark-cli 1.0.72 user 身份、Token valid、主日历「Hoye」；真实创建后对同 event ID 更新两次并清理成功，无参会人通知 |
+| 飞书权限拒绝与恢复 | 2026-07-20 | passed | 不存在日历的只读请求按预期拒绝、无 Token 泄漏；随后 user 身份主日历读取成功，Worker 重启后仍可用 |
+| 运行中 Worker 健康探针 | 2026-07-20 | passed | 微信与飞书均 `ok/configured/ownerBound/connected=true`、`errorCode=null`、`source=running_worker`；不输出凭据 |
 
 全部通过后，把结果摘要同步到 `docs/FINAL-ACCEPTANCE.md` 和 `docs/CUTOVER-CHECKLIST.md`。

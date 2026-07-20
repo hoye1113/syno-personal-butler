@@ -51,6 +51,19 @@ pnpm state:archive -- restore D:\Backups\syno-state-20260717
 4. 运行针对性测试后再跑完整测试。
 5. 生成 `BugReport` 或 `ImprovementProposal`；不要让 Agent 修改源码绕过故障。
 
+渠道健康 probe 可以在 Worker 运行时直接执行。它优先读取 `http://127.0.0.1:<PORT>/api/syno/channels` 的脱敏状态，返回 `source: running_worker`；仅在本机服务不可达时才启动独立 Adapter。这样不会与微信进程锁竞争，也不会为飞书重复建立长连接。
+
+### Windows 飞书日历 CLI
+
+当前验收锁定官方 `@larksuite/cli` 1.0.72：
+
+```powershell
+npx @larksuite/cli@1.0.72 install
+lark-cli version
+```
+
+不要安装不存在的 `@larksuite/lark-cli` 包。若服务进程早于 CLI 安装启动，重启 Syno 让它重新读取 `PATH`；也可把 `LARK_CLI_PATH` 指向 `lark-cli.ps1` 或 `lark-cli.cmd`。Syno 在 Windows 上会将 npm 包装器解析到官方 Node 入口，避免直接 spawn `.ps1` 的 `EFTYPE` 错误。用户日历仍需 `lark-cli auth login --domain calendar` 授权，消息 App 扫码不能替代日历 user 授权。
+
 ## 发布和切换
 
 - 发布前逐项执行 `docs/CUTOVER-CHECKLIST.md`，结果写入 `docs/FINAL-ACCEPTANCE.md`。
