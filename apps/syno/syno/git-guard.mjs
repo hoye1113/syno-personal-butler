@@ -11,7 +11,9 @@ const execFileAsync = promisify(execFile);
 
 async function git(args, { cwd = PATHS.repoRoot, allowExitCodes = [] } = {}) {
   try {
-    const result = await execFileAsync("git", args, { cwd, windowsHide: true, maxBuffer: 10 * 1024 * 1024 });
+    // 全局禁用 core.quotepath：否则非 ASCII 暂存路径会被八进制转义并加引号输出，
+    // 与声明的 raw UTF-8 路径比对时全部误判为"未声明路径"（#commitPaths 的精确暂存校验）。
+    const result = await execFileAsync("git", ["-c", "core.quotepath=false", ...args], { cwd, windowsHide: true, maxBuffer: 10 * 1024 * 1024 });
     return { stdout: result.stdout, stderr: result.stderr, code: 0 };
   } catch (error) {
     if (allowExitCodes.includes(error.code)) return { stdout: error.stdout || "", stderr: error.stderr || "", code: error.code };

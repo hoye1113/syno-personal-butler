@@ -117,6 +117,30 @@ test("GitGuard surfaces git add failures as a clean error without crashing the w
   await assert.rejects(guard.commitPaths(oversized, "non-repo failure", root), (error) => /git add 失败/.test(error.message));
 });
 
+test("GitGuard commits non-ASCII declared paths without quotepath false-positives", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-git-nonascii-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await exec("git", ["init", "-b", "main"], { cwd: root });
+  await exec("git", ["config", "user.name", "Syno Test"], { cwd: root });
+  await exec("git", ["config", "user.email", "syno-test@localhost"], { cwd: root });
+  await fs.writeFile(path.join(root, "base.md"), "base\n");
+  await exec("git", ["add", "--", "base.md"], { cwd: root });
+  await exec("git", ["commit", "-m", "base"], { cwd: root });
+  // 真实迁移内容为中文路径；core.quotepath=true 时 git diff --cached --name-only 会八进制转义，
+  // 与 raw 声明路径比对会误判"未声明路径"。此处验证精确暂存对非 ASCII 路径成立。
+  const declared = ["vault/01-认知/0-1 前言.md", "vault/01-认知/1-1 搞定 Agent.md", "vault/02-资源/知识图谱.md"];
+  for (const relative of declared) {
+    await fs.mkdir(path.join(root, path.dirname(relative)), { recursive: true });
+    await fs.writeFile(path.join(root, relative), `${relative}\n`);
+  }
+  await fs.writeFile(path.join(root, "unrelated.md"), "must remain untracked\n");
+  const guard = new GitGuard({ repoRoot: root, worktreeRoot: path.join(root, ".worktrees") });
+  const result = await guard.commitPaths(declared, "test: non-ascii paths");
+  assert.equal(result.committed, true);
+  assert.deepEqual(result.paths.sort(), [...declared].sort());
+  assert.deepEqual(await guard.changedPaths(), ["unrelated.md"]);
+});
+
 test("Git porcelain rename parsing keeps both destination and source", () => {
   assert.deepEqual(parsePorcelainZ("R  new.md\0old.md\0"), ["new.md", "old.md"]);
 });
