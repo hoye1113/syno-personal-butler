@@ -13,6 +13,13 @@ async function atomicWrite(file, value) {
 }
 
 const FAILED_PAYLOAD_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
+const SILENT_SDK_LOGGER = Object.freeze({
+  error() {},
+  warn() {},
+  info() {},
+  debug() {},
+  trace() {},
+});
 
 function validateRegistrationUrl(value) {
   const url = new URL(value || "");
@@ -136,7 +143,15 @@ class FeishuChannelAdapter {
     if (!credential) return this.status();
     const sdk = this.channelFactory ? null : await this.sdkLoader();
     const factory = this.channelFactory || ((options) => sdk.createLarkChannel(options));
-    this.channel = factory({ appId: credential.appId, appSecret: credential.appSecret, transport: "websocket", policy: { dmMode: "open", requireMention: true, groupAllowlist: [] }, includeRawInMessage: false });
+    this.channel = factory({
+      appId: credential.appId,
+      appSecret: credential.appSecret,
+      transport: "websocket",
+      policy: { dmMode: "open", requireMention: true, groupAllowlist: [] },
+      includeRawInMessage: false,
+      logger: SILENT_SDK_LOGGER,
+      loggerLevel: 0,
+    });
     this.channel.on("message", (message) => this.#enqueue(message, credential).catch((error) => { this.lastError = error.message; }));
     this.channel.on?.("error", (error) => { this.lastError = error.message; });
     await this.channel.connect();
@@ -270,4 +285,4 @@ class FeishuChannelAdapter {
   }
 }
 
-export { FAILED_PAYLOAD_RETENTION_MS, FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, officialSdk, renderRegistrationQr, validateRegistrationUrl };
+export { FAILED_PAYLOAD_RETENTION_MS, FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, officialSdk, renderRegistrationQr, SILENT_SDK_LOGGER, validateRegistrationUrl };

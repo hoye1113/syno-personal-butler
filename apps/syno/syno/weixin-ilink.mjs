@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createDecipheriv, randomBytes, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import QRCode from "qrcode";
@@ -7,6 +7,7 @@ import { PATHS, resolveInside } from "./paths.mjs";
 import { runDpapi } from "./provider-credential-store.mjs";
 
 const DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com/";
+const DEFAULT_CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c/";
 const CDN_ALLOWLIST = new Set(["novac2c.cdn.weixin.qq.com"]);
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const ATTACHMENT_TIMEOUT_MS = 20_000;
@@ -226,6 +227,47 @@ function sniffMime(bytes) {
   return "";
 }
 
+function parseAttachmentKey(item) {
+  const imageHex = item.image_item?.aeskey;
+  if (imageHex !== undefined && imageHex !== "") {
+    if (!/^[0-9a-fA-F]{32}$/.test(imageHex)) throw new Error("附件 AES Key 不是 16 字节十六进制值");
+    return Buffer.from(imageHex, "hex");
+  }
+  const encoded = item.image_item?.media?.aes_key || item.file_item?.media?.aes_key;
+  if (!encoded) return null;
+  const decoded = Buffer.from(encoded, "base64");
+  if (decoded.length === 16) return decoded;
+  if (decoded.length === 32 && /^[0-9a-fA-F]{32}$/.test(decoded.toString("ascii"))) {
+    return Buffer.from(decoded.toString("ascii"), "hex");
+  }
+  throw new Error("附件 AES Key 必须解码为 16 字节或 32 位十六进制文本");
+}
+
+function resolveAttachmentUrl(media) {
+  let url;
+  if (media?.full_url) {
+    url = new URL(media.full_url);
+  } else if (media?.encrypt_query_param) {
+    url = new URL("download", DEFAULT_CDN_BASE_URL);
+    url.searchParams.set("encrypted_query_param", media.encrypt_query_param);
+  } else {
+    throw new Error("附件没有可安全验证的 CDN 地址，未下载");
+  }
+  if (url.protocol !== "https:" || !CDN_ALLOWLIST.has(url.hostname)) throw new Error("附件来源不在腾讯 CDN allowlist");
+  return url;
+}
+
+function decryptAttachment(bytes, key) {
+  if (!key) return bytes;
+  if (bytes.length === 0 || bytes.length % 16 !== 0) throw new Error("附件密文长度不符合 AES-128-ECB 协议");
+  try {
+    const decipher = createDecipheriv("aes-128-ecb", key, null);
+    return Buffer.concat([decipher.update(bytes), decipher.final()]);
+  } catch {
+    throw new Error("附件 AES-128-ECB 解密失败");
+  }
+}
+
 async function readLimitedBody(response, maxBytes = MAX_ATTACHMENT_BYTES) {
   const reader = response.body?.getReader?.();
   if (!reader) throw new Error("附件响应不可流式验证");
@@ -439,34 +481,35 @@ class WeixinIlinkAdapter {
 
   async #quarantine(item) {
     const media = item.image_item?.media || item.file_item?.media;
-    if (!media?.full_url) throw new Error("附件没有可安全验证的完整 CDN 地址，未下载");
-    const url = new URL(media.full_url);
-    if (url.protocol !== "https:" || !CDN_ALLOWLIST.has(url.hostname)) throw new Error("附件来源不在腾讯 CDN allowlist");
+    const url = resolveAttachmentUrl(media);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), ATTACHMENT_TIMEOUT_MS);
+    const key = parseAttachmentKey(item);
     let contentType;
     let bytes;
     try {
       const response = await this.fetchImpl(url, { redirect: "error", signal: controller.signal });
       if (!response.ok) throw new Error(`附件下载 HTTP ${response.status}`);
+      const maxWireBytes = MAX_ATTACHMENT_BYTES + (key ? 16 : 0);
       const length = Number(response.headers.get("content-length") || 0);
-      if (length > MAX_ATTACHMENT_BYTES) throw new Error("附件超过 10 MB");
+      if (length > maxWireBytes) throw new Error("附件超过 10 MB");
       contentType = (response.headers.get("content-type") || "application/octet-stream").split(";")[0].toLowerCase();
       if (!/^(image\/(png|jpeg|gif|webp)|application\/pdf|text\/plain|text\/markdown|application\/octet-stream)$/.test(contentType)) throw new Error(`附件 MIME 不受支持：${contentType}`);
-      bytes = await readLimitedBody(response);
+      bytes = decryptAttachment(await readLimitedBody(response, maxWireBytes), key);
+      if (bytes.length > MAX_ATTACHMENT_BYTES) throw new Error("附件超过 10 MB");
     } finally {
       clearTimeout(timer);
     }
     const sniffed = sniffMime(bytes);
     if (!sniffed) throw new Error("附件内容无法识别为受支持格式");
-    if (contentType === "application/octet-stream") {
+    if (key || contentType === "application/octet-stream") {
       if (!sniffed) throw new Error("二进制附件缺少可验证格式");
     } else if (contentType.startsWith("image/") || contentType === "application/pdf") {
       if (contentType !== sniffed) throw new Error(`附件声明 MIME 与内容不符：${contentType} / ${sniffed}`);
     } else if (contentType.startsWith("text/") && sniffed !== "text/plain") {
       throw new Error("文本附件内容验证失败");
     }
-    const verifiedMime = contentType === "application/octet-stream" || contentType.startsWith("text/") ? sniffed : contentType;
+    const verifiedMime = key || contentType === "application/octet-stream" || contentType.startsWith("text/") ? sniffed : contentType;
     await fs.mkdir(this.quarantineRoot, { recursive: true });
     const supplied = path.basename(item.file_item?.file_name || "attachment.bin").replace(/[^\p{L}\p{N}._-]/gu, "_");
     const file = resolveInside(this.quarantineRoot, `${randomUUID().slice(0, 10)}-${supplied}`);
@@ -478,6 +521,7 @@ class WeixinIlinkAdapter {
 export {
   CDN_ALLOWLIST,
   DEFAULT_BASE_URL,
+  DEFAULT_CDN_BASE_URL,
   LocalCredentialStore,
   LocalProcessLock,
   MAX_ATTACHMENT_BYTES,
@@ -485,7 +529,9 @@ export {
   WeixinIlinkClient,
   fetchJson,
   normalizeInbound,
+  parseAttachmentKey,
   readLimitedBody,
+  resolveAttachmentUrl,
   renderLoginQr,
   sniffMime,
   validateIlinkBaseUrl,

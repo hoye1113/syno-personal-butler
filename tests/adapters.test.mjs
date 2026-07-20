@@ -1,15 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createCipheriv, randomBytes } from "node:crypto";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { FakeCalendarAdapter, MarkdownCalendarAdapter } from "../apps/syno/syno/calendar-adapters.mjs";
 import { ChannelHub, FakeChannelAdapter } from "../apps/syno/syno/channels.mjs";
-import { FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, renderRegistrationQr, validateRegistrationUrl } from "../apps/syno/syno/feishu-channel.mjs";
+import { FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, renderRegistrationQr, SILENT_SDK_LOGGER, validateRegistrationUrl } from "../apps/syno/syno/feishu-channel.mjs";
 import { parseWeixinApproval } from "../apps/syno/syno/runtime.mjs";
 import { Scheduler, occurrenceFor } from "../apps/syno/syno/scheduler.mjs";
-import { LocalCredentialStore, LocalProcessLock, normalizeInbound, readLimitedBody, renderLoginQr, sniffMime, validateIlinkBaseUrl, validateLoginQrUrl, WeixinIlinkAdapter, WeixinIlinkClient } from "../apps/syno/syno/weixin-ilink.mjs";
+import { LocalCredentialStore, LocalProcessLock, normalizeInbound, parseAttachmentKey, readLimitedBody, renderLoginQr, resolveAttachmentUrl, sniffMime, validateIlinkBaseUrl, validateLoginQrUrl, WeixinIlinkAdapter, WeixinIlinkClient } from "../apps/syno/syno/weixin-ilink.mjs";
 
 test("Channel and Calendar fake Adapters satisfy their contracts", async () => {
   const channel = new FakeChannelAdapter();
@@ -189,6 +190,27 @@ test("Feishu long connection accepts only owner DMs and deduplicates messages", 
   assert.equal(received.length, 1);
   assert.equal(received[0].text, "hello");
   assert.equal(sent.length, 1);
+  await adapter.stop();
+});
+
+test("Feishu channel gives the SDK a silent logger so request errors cannot print App Secret", async () => {
+  let options;
+  const adapter = new FeishuChannelAdapter({
+    credentials: { async load() { return { appId: "cli_test", appSecret: "must-not-log", ownerOpenId: "owner" }; } },
+    channelFactory: (value) => {
+      options = value;
+      return { on() {}, async connect() {}, async disconnect() {} };
+    },
+  });
+  await adapter.start();
+  assert.equal(options.logger, SILENT_SDK_LOGGER);
+  assert.equal(options.loggerLevel, 0);
+  const captured = [];
+  const original = console.error;
+  console.error = (...args) => captured.push(args);
+  try { options.logger.error({ config: { data: '{"app_secret":"must-not-log"}' } }); }
+  finally { console.error = original; }
+  assert.deepEqual(captured, []);
   await adapter.stop();
 });
 
@@ -381,6 +403,50 @@ test("Weixin attachments are streamed, sniffed and quarantined without auto-read
   assert.equal(inbound.artifacts[0].autoRead, false);
   assert.equal(sniffMime(png), "image/png");
   await assert.rejects(readLimitedBody(new Response(Buffer.alloc(5)), 4), /超过 10 MB/);
+});
+
+test("Weixin decrypts real iLink AES-128-ECB image and file payloads before quarantine", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-weixin-encrypted-media-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const key = randomBytes(16);
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from("encrypted-safe")]);
+  const encrypt = (plain) => {
+    const cipher = createCipheriv("aes-128-ecb", key, null);
+    return Buffer.concat([cipher.update(plain), cipher.final()]);
+  };
+  const delivered = [];
+  let inbound;
+  const credentials = { async save() {}, async load() { return null; }, async clear() {} };
+  const client = { async sendText(message) { delivered.push(message); return { ret: 0 }; } };
+  const responses = [encrypt(png), encrypt(Buffer.from("# Real encrypted file\n"))];
+  const adapter = new WeixinIlinkAdapter({
+    client,
+    credentialStore: credentials,
+    quarantineRoot: root,
+    fetchImpl: async () => new Response(responses.shift(), { status: 200, headers: { "content-type": "application/octet-stream" } }),
+    onMessage: async (message) => { inbound = message; return { text: "ok" }; },
+  });
+  adapter.credential = { token: "test", ownerId: "owner", contexts: {}, seenIds: [] };
+
+  await adapter.handleInbound({
+    message_id: "encrypted-image", message_type: 1, from_user_id: "owner", context_token: "ctx-1",
+    item_list: [{ type: 2, image_item: { aeskey: key.toString("hex"), media: { full_url: "https://novac2c.cdn.weixin.qq.com/image" } } }],
+  });
+  assert.equal(inbound.artifacts[0].mime, "image/png");
+  assert.deepEqual(await fs.readFile(inbound.artifacts[0].path), png);
+
+  await adapter.handleInbound({
+    message_id: "encrypted-file", message_type: 1, from_user_id: "owner", context_token: "ctx-2",
+    item_list: [{ type: 4, file_item: { file_name: "notes.md", media: { aes_key: Buffer.from(key.toString("hex"), "ascii").toString("base64"), full_url: "https://novac2c.cdn.weixin.qq.com/file" } } }],
+  });
+  assert.equal(inbound.artifacts[0].mime, "text/plain");
+  assert.match(path.basename(inbound.artifacts[0].path), /-notes\.md$/);
+  assert.equal((await fs.readFile(inbound.artifacts[0].path, "utf8")), "# Real encrypted file\n");
+  assert.equal(delivered.length, 2);
+  assert.deepEqual(parseAttachmentKey({ image_item: { aeskey: key.toString("hex") } }), key);
+  assert.equal(resolveAttachmentUrl({ encrypt_query_param: "signed value" }).toString(), "https://novac2c.cdn.weixin.qq.com/c2c/download?encrypted_query_param=signed+value");
+  assert.throws(() => resolveAttachmentUrl({ full_url: "https://example.com/file" }), /allowlist/);
+  await assert.rejects(async () => parseAttachmentKey({ file_item: { media: { aes_key: Buffer.from("short").toString("base64") } } }), /AES Key/);
 });
 
 test("Weixin does not advance cursor or dedupe marker before processing succeeds", async () => {
