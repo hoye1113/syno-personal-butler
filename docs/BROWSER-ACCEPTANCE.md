@@ -57,3 +57,13 @@
 - 减少动画：最新 CSS 仍包含 `prefers-reduced-motion` 规则；动态静态化行为由既有真实仿真与 `tests/ui-shell.test.mjs` 持续覆盖。
 - 安全：本轮使用真实本地配置，仅核对 password 字段为空和脱敏状态文本；没有截图、读取或记录 Token、App Secret、设备码。
 - 重启恢复：不注入 `LARK_CLI_PATH` 手工重启服务后，页面恢复显示 `Hoye · Hoye`，API 为 `connected/valid`、lark-cli 1.0.72；微信与飞书消息 Worker 同时保持 Owner 已绑定运行态。
+
+## 2026-07-20 封板复验
+
+- 代码基线：`bc5937b`（包含微信真实运行记录；渠道修复提交 `e02f62b`、`2dde18d` 均为其祖先）。
+- 桌面：1280×720，`scrollWidth=1280`、`bodyScrollWidth=1280`，无横向溢出；Today、审批、设置与五个知识闭环入口可达。
+- 安全：真实配置下 Token 输入框值为空，仅显示“Token 已加密保存”；未读取、截图或记录 Token。
+- 键盘：设置抽屉初始焦点进入关闭按钮；Escape 关闭后焦点恢复到“设置”触发按钮。
+- 移动：390×844，`scrollWidth=390`、`bodyScrollWidth=390`；Today、Capture、Knowledge、Learn、Create 与“连接设置”均可达。
+- 控制台：桌面和移动流程合计 0 error、0 warning。
+- 减少动画：两处 `prefers-reduced-motion: reduce` 规则仍存在，`tests/ui-shell.test.mjs` 持续验证静态化行为。

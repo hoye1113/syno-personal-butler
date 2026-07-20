@@ -3,7 +3,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ignored = new Set([".git", ".runtime", ".worktrees", ".pnpm-store", ".pytest_cache", "node_modules"]);
+const ignored = new Set([
+  ".git",
+  ".runtime",
+  ".worktrees",
+  ".pnpm-store",
+  ".playwright-cli",
+  ".pytest_cache",
+  "__pycache__",
+  "node_modules",
+]);
 const textExtensions = new Set([".md", ".mjs", ".js", ".json", ".ps1", ".py", ".toml", ".yml", ".yaml", ".html", ".css"]);
 const errors = [];
 

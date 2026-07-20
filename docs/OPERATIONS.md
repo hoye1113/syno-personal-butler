@@ -27,6 +27,8 @@ pnpm state:archive -- restore D:\Backups\syno-state-20260717
 
 完整测试包含一次使用隔离 `SYNO_LOCAL_DATA` 的 CLI 端到端演练：创建等待 Provider 的 Job 与对话状态，依次执行 backup、verify、restore，并验证二次恢复因目标非空而失败。该测试不会访问真实 `%LOCALAPPDATA%\Syno`。
 
+2026-07-20 封板演练在确认 0 个 `running` Job 后短暂停止 Worker，将真实非凭据状态备份到 `C:\tmp\syno-state-final-bc5937b`：52 项，`credentialsIncluded=false`，manifest SHA-256 为 `DE0AD96C68170CA10498721C53F625A8405205DA912E095C2EFD026F70DAD969`。归档在全新隔离根恢复成功，第二次恢复按预期拒绝；随后 Worker 重启，微信与飞书探针均从 `running_worker` 返回连接健康。
+
 ## 恢复与回滚
 
 - 源码回滚只由 Codex 在独立开发流程执行；Syno 本身无源码修改能力。

@@ -43,15 +43,17 @@ pnpm probe:feishu -- --confirm-live
 | --- | --- | --- | --- |
 | 微信连接健康 | 2026-07-18 | passed | 从主人授权的 OpenClaw 本机配置迁入 DPAPI；Owner 已绑定，2 秒真实轮询健康且无错误 |
 | 微信自动扫码状态轮询 | 2026-07-19 | passed | Web 自动轮询扫码状态，不再依赖“我已扫码确认”；二维码由受信登录 URL 在本地渲染为内存 PNG |
-| 微信 Owner 连续往返 | 2026-07-20 | passed | 两个后续 Owner 消息分别形成完成态 Job；轮询、固定会话、Agent 执行与回复链路持续可用 |
+| 微信 Owner 连续往返 | 2026-07-20 | passed | 4 条连续 Owner 消息形成 4 个唯一 request key 和 4 个完成态 Job，均收到回复；回复使用每次唯一 iLink `client_id`，固定会话、轮询和 Agent 链路持续可用 |
 | 微信 Provider 故障恢复 | 2026-07-20 | passed | 同一微信 Job 曾因真实 `PROVIDER_HTTP_ERROR` 进入 `waiting_provider`，重启恢复后由固定模型完成，无 fallback |
 | 微信 durable 去重 | 2026-07-20 | passed | 17 个真实 seen ID 跨 Worker 重启保留；恢复后没有重复 Job；自动测试覆盖同 message ID 重放、失败不推进 cursor |
-| 微信附件实机 | 待验收 | pending | 已按真实 iLink 协议覆盖 AES-128-ECB 图片/文件、固定腾讯 CDN fallback、流式限额、MIME 嗅探和隔离；仍需主人发送一份无隐私附件完成实机往返 |
+| 微信附件实机 | 2026-07-20 | repaired, final confirmation pending | 主人真实发送的 MD 已完成 iLink 解密、MIME/大小检查与 quarantine；错误生成的 `curate_note` Job 已拒绝。相同真实载荷经修复后的 Intake 路径形成 Artifact `artifact-20260720-ef20760f` 与 Proposal `ingest-fd29b810`，未写入 vault。仍需主人再次从微信发送任一无隐私 MD，确认直接收到新 Artifact ID 且不再出现审批码 |
 | 飞书连接健康 | 2026-07-20 | passed | 主人扫码创建应用并绑定 Owner；二维码本地渲染，注册确认后自动长连接，重启自动恢复；SDK 使用无输出 Logger，不记录 App ID/App Secret 或错误请求体 |
 | 飞书 Owner 连续往返 | 2026-07-20 | passed | 4 个真实 Owner 私聊 Job 全部完成、0 failed/0 waiting、同一 Conversation；4 个 durable seen ID 跨重启保留 |
 | 飞书真实 ID 重放 | 2026-07-20 | passed | 对一个真实已完成 message ID 做本地恢复重放，`replayAccepted=false`，pending 维持 0，未再次执行 Agent |
 | 飞书日历授权与 CRUD | 2026-07-20 | passed | lark-cli 1.0.72 user 身份、Token valid、主日历「Hoye」；真实创建后对同 event ID 更新两次并清理成功，无参会人通知 |
 | 飞书权限拒绝与恢复 | 2026-07-20 | passed | 不存在日历的只读请求按预期拒绝、无 Token 泄漏；随后 user 身份主日历读取成功，Worker 重启后仍可用 |
 | 运行中 Worker 健康探针 | 2026-07-20 | passed | 微信与飞书均 `ok/configured/ownerBound/connected=true`、`errorCode=null`、`source=running_worker`；不输出凭据 |
+
+微信连续回复修复位于 `e02f62b`，附件两阶段路由修复位于 `2dde18d`。iLink `-14` 过期状态进入冷却并保留凭据，凭据轮换串行停止旧 Worker 后再启动新 Worker，避免“只能回复一条”和重复 poller。
 
 全部通过后，把结果摘要同步到 `docs/FINAL-ACCEPTANCE.md` 和 `docs/CUTOVER-CHECKLIST.md`。
