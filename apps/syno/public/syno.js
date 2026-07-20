@@ -445,6 +445,12 @@
       const feishu = Object.values(channels).find((channel) => channel.id === "feishu");
       setSettingStatus("#synoSettingWeixin", weixin?.running ? "已连接" : "未连接", weixin?.running);
       setSettingStatus("#synoSettingFeishu", feishu?.running ? "已连接" : "未连接", feishu?.running);
+      const weixinDetail = document.querySelector("#synoWeixinStatus");
+      if (weixinDetail) weixinDetail.textContent = weixin?.running
+        ? "已连接本人微信；支持快速收录、查询、复习与提醒。"
+        : weixin?.ownerBound ? "已绑定本人微信，连接暂时中断。" : "未连接。只允许扫码者本人，不启用群聊。";
+      const feishuDetail = document.querySelector("#synoFeishuStatus");
+      if (feishuDetail && feishu?.running) feishuDetail.textContent = "已连接本人飞书；用于日程与结构化通知。";
       setupState.channel = Boolean(weixin?.running || feishu?.running);
       setHealthIssue("channels", [weixin, feishu].some((channel) => channel?.ownerBound && !channel.running) ? "已绑定渠道连接中断" : "");
       refreshOnboarding();
