@@ -226,6 +226,15 @@ class GitGuard {
     if (!managed || managed.startsWith("../") || path.isAbsolute(managed)) return false;
     return value === managed || value.startsWith(`${managed}/`);
   }
+
+  async changeSnapshot(cwd = this.repoRoot) {
+    const changes = await this.changes(cwd);
+    return Promise.all(changes.map(async (change) => {
+      const result = await git(["hash-object", "--no-filters", "--", change.path], { cwd, allowExitCodes: [128] });
+      const blob = result.code === 0 ? result.stdout.trim() : "missing";
+      return { ...change, fingerprint: diffHash(`${change.status}\0${change.path}\0${change.sourcePath || ""}\0${blob}`) };
+    }));
+  }
 }
 
 export { GitGuard, diffHash, git, parsePorcelainDetails, parsePorcelainZ };

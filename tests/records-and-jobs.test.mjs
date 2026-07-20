@@ -177,6 +177,27 @@ test("read-only channel jobs preserve unrelated developer changes", async (t) =>
   assert.equal(commits.flat().includes("apps/syno/public/syno.js"), false);
 });
 
+test("read-only jobs reject mutations hidden behind an already-dirty path", async (t) => {
+  const opsRoot = path.join(PATHS.runtimeRoot, "tests", `dirty-read-mutation-${Date.now()}`);
+  t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
+  const store = new JobStore({ opsRoot });
+  let snapshots = 0;
+  const git = {
+    async changedPaths() { return ["apps/syno/public/syno.js"]; },
+    async changeSnapshot() {
+      snapshots += 1;
+      return [{ status: " M", path: "apps/syno/public/syno.js", kind: "existing", fingerprint: snapshots === 1 ? "before" : "after" }];
+    },
+    async commitPaths() { return { committed: false }; },
+  };
+  const host = new AgentHost({ store, executor: new FakeExecutor(), gitGuard: git });
+
+  const result = await host.receive({ intent: "chat", text: "must stay read-only" });
+
+  assert.equal(result.job.status, "failed");
+  assert.match(result.job.error.message, /只读 Profile 产生了文件变更/);
+});
+
 test("retryable Provider failures stay durable without switching executors", async (t) => {
   const opsRoot = path.join(PATHS.runtimeRoot, "tests", `provider-wait-${Date.now()}`);
   t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));

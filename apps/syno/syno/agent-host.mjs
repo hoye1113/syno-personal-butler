@@ -113,7 +113,10 @@ class AgentHost {
     let workspace = PATHS.repoRoot;
     try {
       if (!alreadyRunning) await this.store.transition(job, "running");
-      const dirtyBefore = await this.gitGuard.changedPaths(PATHS.repoRoot);
+      const baselineChanges = typeof this.gitGuard.changeSnapshot === "function"
+        ? await this.gitGuard.changeSnapshot(PATHS.repoRoot)
+        : (await this.gitGuard.changedPaths(PATHS.repoRoot)).map((item) => ({ path: item }));
+      const dirtyBefore = [...new Set(baselineChanges.flatMap((item) => [item.path, item.sourcePath].filter(Boolean)))];
       const unrelated = dirtyBefore.filter((item) => !isSystemPath(item));
       // A read-only run has no filesystem mutation tools, so unrelated edits in
       // the developer's main worktree are a baseline to preserve, not a reason
@@ -200,11 +203,18 @@ class AgentHost {
         return { job };
       }
 
-      const changes = typeof this.gitGuard.changes === "function"
-        ? await this.gitGuard.changes(workspace)
+      const changes = typeof this.gitGuard.changeSnapshot === "function"
+        ? await this.gitGuard.changeSnapshot(workspace)
+        : typeof this.gitGuard.changes === "function"
+          ? await this.gitGuard.changes(workspace)
         : (await this.gitGuard.changedPaths(workspace)).map((item) => ({ status: "M", path: item, kind: "existing" }));
-      const baselinePaths = new Set(dirtyBefore.filter((item) => !isSystemPath(item)));
-      const executorChanges = changes.filter((item) => !isSystemPath(item.path) && !baselinePaths.has(item.path));
+      const baselineByPath = new Map(baselineChanges.filter((item) => !isSystemPath(item.path)).map((item) => [item.path, item]));
+      const executorChanges = changes.filter((item) => {
+        if (isSystemPath(item.path)) return false;
+        const baseline = baselineByPath.get(item.path);
+        if (!baseline) return true;
+        return item.fingerprint !== undefined && baseline.fingerprint !== item.fingerprint;
+      });
       const executorPaths = [...new Set(executorChanges.flatMap((item) => [item.path, item.sourcePath].filter(Boolean)))];
       const validation = await this.validator({ repoRoot: workspace, changedPaths: executorPaths, decision: job.decision });
       job.changedPaths = validation.changedPaths;
