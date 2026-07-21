@@ -22,7 +22,6 @@ synced: 2026-06-09
 ## 课程章节
 
 - [[MOC - LangGraph.js 快速开始|1-LangGraph.js 快速开始]] — LangGraph.js 核心概念与快速上手（8 篇）
-- [[MOC - LangGraph.js 教程|2-LangGraph.js 教程]] — LangGraph.js 系统教程与实战模式（32 篇）
 - [[MOC - Next.js 基础|3-Next.js 基础]] — 全栈应用所需的 Next.js 基础知识（11 篇）
 - [[MOC - Chat Bot 实战|4-Chat Bot 实战]] — 基于 LangGraph.js 的 Chat Bot 完整项目实战（17 篇）
 - [[MOC - 前端 Agent 面试题|5-前端 Agent 面试题]] — 前端 Agent 与 LangGraph.js 面试题锦集（11 篇）
@@ -33,7 +32,6 @@ synced: 2026-06-09
 | 主题 | 章节 MOC |
 |------|---------|
 | LangGraph.js 快速开始 | [[MOC - LangGraph.js 快速开始]] |
-| LangGraph.js 教程 | [[MOC - LangGraph.js 教程]] |
 | Next.js 基础 | [[MOC - Next.js 基础]] |
 | Chat Bot 实战 | [[MOC - Chat Bot 实战]] |
 | 前端 Agent 面试题 | [[MOC - 前端 Agent 面试题]] |
