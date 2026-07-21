@@ -63,3 +63,25 @@ test("settings permissions are disjoint", async () => {
     confirmationRequired: ["notifications.quietHours"],
   }), /不能重叠/);
 });
+
+test("knowledge-profile contract validates dimensions and rejects unknown fields", async () => {
+  const valid = {
+    id: "profile-20260721-abcd1234",
+    generatedAt: "2026-07-21T00:00:00.000Z",
+    vaultFingerprint: "abc123",
+    summary: { notes: 1, searchable: 1, mocCount: 0, tags: 1 },
+    topics: [{ name: "AI", noteRefs: 1, tagRefs: ["AI"], stabilityMix: { practice: 1 }, coverage: 1 }],
+    sources: [{ ref: "GitHub", count: 1, reliability: "traceable" }],
+    stabilityBreakdown: { principle: 0, model: 0, practice: 1, fact: 0, volatile: 0, personal: 0, unknown: 0 },
+    reliabilityBreakdown: { traceable: 1, needsSource: 0 },
+    orphanNoteRefs: [],
+    deadLinkRefs: [],
+    outdatedNoteRefs: [],
+    evidenceGaps: [],
+    learningCoverage: { withState: 0, withoutState: 1, avgMastery: 0 },
+    nextMaintenanceWindow: "2026-07-28T00:00:00.000Z",
+  };
+  await validateContractRecord("knowledge-profile", valid);
+  await assert.rejects(validateContractRecord("knowledge-profile", { ...valid, summary: { notes: 1 } }), /searchable/);
+  await assert.rejects(validateContractRecord("knowledge-profile", { ...valid, noise: 1 }), /未知字段/);
+});

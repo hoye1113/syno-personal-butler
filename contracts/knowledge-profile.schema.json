@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/knowledge-profile.schema.json",
+  "title": "KnowledgeProfile",
+  "description": "迁移后知识画像：对 vault 与 ops 事实源做只读派生，覆盖主题/来源/稳定性/时效性/可靠性/孤岛/死链/证据缺口/潜在过时九个维度的可审计快照。画像本身是派生产物，不得把推断表述为已验证事实。",
+  "type": "object",
+  "required": [
+    "id",
+    "generatedAt",
+    "vaultFingerprint",
+    "summary",
+    "topics",
+    "sources",
+    "stabilityBreakdown",
+    "reliabilityBreakdown",
+    "orphanNoteRefs",
+    "deadLinkRefs",
+    "outdatedNoteRefs",
+    "evidenceGaps",
+    "learningCoverage",
+    "nextMaintenanceWindow"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "vaultFingerprint": { "type": "string", "minLength": 1 },
+    "summary": {
+      "type": "object",
+      "required": ["notes", "searchable", "mocCount", "tags"],
+      "properties": {
+        "notes": { "type": "integer", "minimum": 0 },
+        "searchable": { "type": "integer", "minimum": 0 },
+        "mocCount": { "type": "integer", "minimum": 0 },
+        "tags": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "topics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "noteRefs", "tagRefs", "stabilityMix", "coverage"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "noteRefs": { "type": "integer", "minimum": 0 },
+          "tagRefs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "stabilityMix": { "type": "object" },
+          "coverage": { "type": "number", "minimum": 0, "maximum": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ref", "count", "reliability"],
+        "properties": {
+          "ref": { "type": "string", "minLength": 1 },
+          "count": { "type": "integer", "minimum": 0 },
+          "reliability": { "enum": ["traceable", "needs_source"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "stabilityBreakdown": {
+      "type": "object",
+      "required": ["principle", "model", "practice", "fact", "volatile", "personal", "unknown"],
+      "properties": {
+        "principle": { "type": "integer", "minimum": 0 },
+        "model": { "type": "integer", "minimum": 0 },
+        "practice": { "type": "integer", "minimum": 0 },
+        "fact": { "type": "integer", "minimum": 0 },
+        "volatile": { "type": "integer", "minimum": 0 },
+        "personal": { "type": "integer", "minimum": 0 },
+        "unknown": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "reliabilityBreakdown": {
+      "type": "object",
+      "required": ["traceable", "needsSource"],
+      "properties": {
+        "traceable": { "type": "integer", "minimum": 0 },
+        "needsSource": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "orphanNoteRefs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "deadLinkRefs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "target"],
+        "properties": {
+          "from": { "type": "string", "minLength": 1 },
+          "target": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "outdatedNoteRefs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "evidenceGaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claimId", "statement"],
+        "properties": {
+          "claimId": { "type": "string", "minLength": 1 },
+          "statement": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "learningCoverage": {
+      "type": "object",
+      "required": ["withState", "withoutState", "avgMastery"],
+      "properties": {
+        "withState": { "type": "integer", "minimum": 0 },
+        "withoutState": { "type": "integer", "minimum": 0 },
+        "avgMastery": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "nextMaintenanceWindow": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

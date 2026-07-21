@@ -114,6 +114,17 @@ class LearningService {
     }
     return states.sort((a, b) => a.nextReviewAt.localeCompare(b.nextReviewAt)).slice(0, limit);
   }
+  async listStates({ opsRoot = this.opsRoot } = {}) {
+    const root = path.join(opsRoot, "reviews", "learning", "states");
+    let entries = [];
+    try { entries = await fs.readdir(root, { withFileTypes: true }); } catch (error) { if (error.code === "ENOENT") return []; throw error; }
+    const states = [];
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+      states.push(parseRecord(await fs.readFile(path.join(root, entry.name), "utf8")));
+    }
+    return states;
+  }
 }
 
 export { ASSISTANCE, LearningService, REVIEW_INTERVALS, RUBRIC_KEYS, STAGES, calibrationFor, demonstratedStage, reviewIntervalDays, rubricScore, stateId };

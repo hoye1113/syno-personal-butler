@@ -102,6 +102,12 @@ class KnowledgeStore {
     if (!relative.startsWith("vault/") || !relative.endsWith(".md")) throw new Error("只允许读取 vault 内 Markdown");
     const markdown = await fs.readFile(candidate, "utf8"); return { path: relative, title: titleOf(markdown, candidate), markdown };
   }
+  async list({ searchable } = {}) {
+    await this.#ensureCurrent();
+    const notes = (this.cache || []).filter((note) => searchable === undefined || note.searchable === searchable);
+    // Strip the heavy search-token index; callers (profile, future learning queue) want metadata only.
+    return notes.map(({ index, ...rest }) => rest);
+  }
 }
 
 export { KnowledgeStore, plainText, titleOf, walkMarkdown };

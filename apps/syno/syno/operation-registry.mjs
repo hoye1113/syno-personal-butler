@@ -11,6 +11,7 @@ const OPERATION_INTENTS = Object.freeze({
   "claims.create": "create_claim",
   "evidence.candidates.create": "create_evidence_candidate",
   "evidence.candidates.approve": "approve_evidence_candidate",
+  "knowledge.profile.generate": "create_knowledge_profile",
   "notes.edit": "overwrite_note",
   "content.brief.create": "create_content_brief",
   "memory.promote": "curate_note",

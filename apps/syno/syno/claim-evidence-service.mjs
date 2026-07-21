@@ -84,6 +84,18 @@ class ClaimEvidenceService {
     }
     return claims.sort((a, b) => a.reviewAfter.localeCompare(b.reviewAfter)).slice(0, limit);
   }
+  async listClaims({ opsRoot = this.opsRoot, status } = {}) {
+    const root = path.join(opsRoot, "evidence", "claims");
+    let entries = [];
+    try { entries = await fs.readdir(root, { withFileTypes: true }); } catch (error) { if (error.code === "ENOENT") return []; throw error; }
+    const claims = [];
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+      const claim = parseRecord(await fs.readFile(path.join(root, entry.name), "utf8"));
+      if (!status || claim.status === status) claims.push(claim);
+    }
+    return claims;
+  }
 }
 
 export { ClaimEvidenceService };
