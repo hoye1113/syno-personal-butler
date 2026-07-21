@@ -20,6 +20,19 @@ function extractWikilinks(markdown) {
   return links;
 }
 
+// Strip a leading YAML frontmatter block (--- ... ---). The dead-link scan only
+// inspects body wikilinks: frontmatter wikilinks (e.g. `author: [[Name]]`) are
+// metadata-aggregation tags, not content links, so they must not count as dead.
+function stripFrontmatter(markdown) {
+  const text = String(markdown || "");
+  const lines = text.split(/\r?\n/);
+  if (lines[0].trim() !== "---") return text;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i].trim() === "---") return lines.slice(i + 1).join("\n");
+  }
+  return text;
+}
+
 function stableBasename(target) {
   return path.basename(String(target).replace(/\\/g, "/"), ".md").trim();
 }
@@ -193,7 +206,7 @@ class KnowledgeProfileService {
     const dead = [];
     const seen = new Set();
     for (const note of notes) {
-      for (const target of extractWikilinks(note.markdown)) {
+      for (const target of extractWikilinks(stripFrontmatter(note.markdown))) {
         const base = stableBasename(target);
         if (!base || existing.has(base)) continue;
         const key = `${note.path}\0${base}`;

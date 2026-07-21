@@ -63,6 +63,16 @@ test("dead wikilinks are reported as deadLinkRefs", async (t) => {
   assert.ok(profile.deadLinkRefs.some((link) => link.target === "missing-target" && link.from.endsWith("agent.md")));
 });
 
+test("wikilinks inside frontmatter are not treated as dead links", async (t) => {
+  const { profileService } = await setup(t, {
+    "agent.md": "---\ntitle: Agent\nauthor:\n  - \"[[Sitor AI]]\"\nsource: \"[[Hermes]]\"\nstability: practice\nupdated: 2026-07-01\n---\n# Agent\n\n正文里没有死链。",
+  });
+  const { profile } = await profileService.generate();
+  assert.ok(!profile.deadLinkRefs.some((link) => link.target === "Sitor AI"));
+  assert.ok(!profile.deadLinkRefs.some((link) => link.target === "Hermes"));
+  assert.equal(profile.deadLinkRefs.length, 0);
+});
+
 test("long-unchanged searchable notes are flagged as potentially outdated", async (t) => {
   const { profileService } = await setup(t, {
     "old.md": "---\ntitle: Old\nstability: fact\nupdated: 2025-01-01\n---\n# Old\n\n过时候选。",
