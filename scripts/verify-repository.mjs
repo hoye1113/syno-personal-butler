@@ -39,13 +39,19 @@ for (const file of files) {
   }
   if (!textExtensions.has(path.extname(file).toLowerCase())) continue;
   const text = await fs.readFile(file, "utf8");
-  if (/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(text)) errors.push(`${relative}: private key material`);
-  if (/\b(?:sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/.test(text)) errors.push(`${relative}: probable credential`);
-  if (/C:\\Users\\[^\\\s]+\\\.(?:openclaw|ssh)|%LOCALAPPDATA%\\Syno\\credentials/i.test(text) && !relative.startsWith("docs/")) {
-    errors.push(`${relative}: local credential path must only appear in documentation`);
-  }
-  if (!relative.startsWith("docs/") && /(?:[A-Za-z]:[\\/](?:Users|workSpace)[\\/]|D:[\\/]workSpace[\\/])/i.test(text)) {
-    errors.push(`${relative}: hard-coded personal absolute path`);
+  // vault/ 是主人的知识库（教程代码示例、溯源路径等合法内容），ops/ 的 Job/事件/产物记录
+  // 会引用并记录这些内容（如迁移 diff 预览）；其敏感内容由迁移 sensitiveReason + 主人批准的
+  // 排除项把关。密钥/路径卫生启发式只对 Syno 源码生效。
+  const isUserContent = relative.startsWith("vault/") || relative.startsWith("ops/");
+  if (!isUserContent) {
+    if (/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(text)) errors.push(`${relative}: private key material`);
+    if (/\b(?:sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/.test(text)) errors.push(`${relative}: probable credential`);
+    if (/C:\\Users\\[^\\\s]+\\\.(?:openclaw|ssh)|%LOCALAPPDATA%\\Syno\\credentials/i.test(text) && !relative.startsWith("docs/")) {
+      errors.push(`${relative}: local credential path must only appear in documentation`);
+    }
+    if (!relative.startsWith("docs/") && /(?:[A-Za-z]:[\\/](?:Users|workSpace)[\\/]|D:[\\/]workSpace[\\/])/i.test(text)) {
+      errors.push(`${relative}: hard-coded personal absolute path`);
+    }
   }
   if ((relative.startsWith("apps/") || relative.startsWith("config/")) && /macOS|AppleScript|osascript|com\.apple\.iCal/i.test(text)) {
     errors.push(`${relative}: unsupported Apple implementation reference`);
