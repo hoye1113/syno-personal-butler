@@ -9,7 +9,7 @@ phase: execution
 risk: low
 channel: web
 created: 2026-07-21T08:07:30.329Z
-updated: 2026-07-21T08:07:31.946Z
+updated: 2026-07-21T08:07:32.368Z
 ---
 
 # Job job-20260721-eb7deddc
@@ -30,7 +30,7 @@ updated: 2026-07-21T08:07:31.946Z
   "senderId": "local-user",
   "conversationId": "conversation-835badd2-da30-46c4-acb1-0e9d3345576d",
   "created": "2026-07-21T08:07:30.329Z",
-  "updated": "2026-07-21T08:07:31.946Z",
+  "updated": "2026-07-21T08:07:32.368Z",
   "request": {
     "summary": "Syno operation: knowledge.profile.generate",
     "payloadDigest": "3a4035af5e68db543d28858c03bc6caec971c911011c3c887cf7839aaafdf106",
@@ -75,7 +75,8 @@ updated: 2026-07-21T08:07:31.946Z
     "branch": "syno/job/job-20260721-eb7deddc",
     "directory": "D:\\workSpace\\syno-personal-butler\\.worktrees\\syno-job-job-20260721-eb7deddc",
     "base": "92972e4e53635e861bd3b108177be2c8e157de5b"
-  }
+  },
+  "runId": "operation-job-20260721-eb7deddc"
 }
 ```
 <!-- syno:json:end -->
