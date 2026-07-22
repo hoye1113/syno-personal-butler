@@ -63,7 +63,10 @@ class ChannelHub {
       if (this.adapters.has(state.homeChannel)) this.homeChannel = state.homeChannel;
     } catch (error) { if (error.code !== "ENOENT") throw error; }
     const results = {};
-    for (const [id, adapter] of this.adapters) results[id] = await adapter.start();
+    await Promise.allSettled([...this.adapters].map(async ([id, adapter]) => {
+      try { results[id] = await adapter.start(); }
+      catch (error) { results[id] = { delivered: false, error: String(error?.message || error) }; }
+    }));
     return results;
   }
   async stop() {

@@ -301,9 +301,11 @@ function createSynoRuntime(options = {}) {
         fs.mkdir(PATHS.stateRoot, { recursive: true }),
       ]);
       await host.recover();
-      await channels.start();
+      // 渠道启动不阻塞 Web API：微信/飞书离线或握手超时降级运行，
+      // channelRecoveryTimer（worker 模式）会周期重试，不应让 synoReady 永远 pending。
+      channels.start().catch((error) => console.error("[syno] channels.start 降级运行，渠道将后台重试:", String(error?.message || error)));
       if (worker) {
-        await proactive.start();
+        proactive.start().catch((error) => console.error("[syno] proactive.start 降级:", String(error?.message || error)));
         channelRecoveryTimer = setInterval(() => Promise.allSettled([weixin.start(), feishu.start()]), 60_000);
       }
       return core.snapshot();

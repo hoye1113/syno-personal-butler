@@ -30,6 +30,22 @@ test("Channel and Calendar fake Adapters satisfy their contracts", async () => {
   assert.equal((await calendar.remove(created.id)).removed, true);
 });
 
+test("ChannelHub.start tolerates a failing adapter and keeps others running", async () => {
+  const ok = new FakeChannelAdapter();
+  const failing = {
+    start: async () => { throw new Error("ws handshake timeout"); },
+    stop: async () => ({}),
+    status: () => ({ running: false, available: false }),
+    send: async () => ({ delivered: false }),
+  };
+  const hub = new ChannelHub({ ok, failing });
+  const results = await hub.start();
+  assert.equal(results.ok.running, true, "healthy adapter should still start");
+  assert.equal(results.failing.error, "ws handshake timeout", "failing adapter error should be captured, not thrown");
+  assert.equal(hub.status().ok.running, true, "healthy adapter remains available");
+  await hub.stop();
+});
+
 test("Markdown Calendar persists a rebuildable event", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-calendar-adapter-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
