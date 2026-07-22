@@ -58,16 +58,25 @@ class KnowledgeProfileService {
     this.maintenanceWindowDays = maintenanceWindowDays;
   }
 
-  async generate({ opsRoot = this.opsRoot } = {}) {
+  // ── v2 三接口：inspect / persist / latest ──────────────────────────
+
+  /**
+   * 只读计算当前画像，不写任何文件。
+   * 返回 { profile } — v2 契约含 scope、excludedSystemNotes。
+   */
+  async inspect({ opsRoot = this.opsRoot } = {}) {
     const now = this.clock();
     // knowledge.list() runs #ensureCurrent, so fingerprint is fresh afterwards.
     const notes = await this.knowledge.list();
     const vaultFingerprint = this.knowledge.fingerprint || "";
     const withMarkdown = await this.#withMarkdown(notes);
+    const searchable = notes.filter((note) => note.searchable);
+    const excludedSystemNotes = notes.length - searchable.length;
 
     const orphanNoteRefs = await this.#orphans();
     const profile = {
       id: `profile-${now.toISOString().slice(0, 10).replaceAll("-", "")}-${randomUUID().slice(0, 8)}`,
+      scope: "personal-knowledge",
       generatedAt: now.toISOString(),
       vaultFingerprint,
       summary: this.#summary(withMarkdown),
@@ -80,17 +89,36 @@ class KnowledgeProfileService {
       outdatedNoteRefs: this.#outdated(withMarkdown, now),
       evidenceGaps: await this.#evidenceGaps({ opsRoot }),
       learningCoverage: await this.#learningCoverage({ opsRoot }, withMarkdown),
+      excludedSystemNotes,
       nextMaintenanceWindow: new Date(now.getTime() + this.maintenanceWindowDays * 86_400_000).toISOString(),
     };
+    return { profile };
+  }
+
+  /**
+   * 计算画像并持久化到 ops/knowledge/profiles/。
+   * 返回 { profile, changedPaths }。
+   */
+  async persist({ opsRoot = this.opsRoot } = {}) {
+    const { profile } = await this.inspect({ opsRoot });
     const file = path.join(opsRoot, "knowledge", "profiles", `${profile.id}.md`);
     await writeRecord(file, profile, {
       schema: "knowledge-profile",
       title: `知识画像 ${profile.id}`,
-      summaryKeys: ["id", "generatedAt", "vaultFingerprint", "nextMaintenanceWindow"],
+      summaryKeys: ["id", "generatedAt", "vaultFingerprint", "scope", "nextMaintenanceWindow"],
     });
     return { profile, changedPaths: [path.relative(path.dirname(opsRoot), file).replace(/\\/g, "/")] };
   }
 
+  /**
+   * 向后兼容：generate() 等价于 persist()。
+   */
+  async generate(options) { return this.persist(options); }
+
+  /**
+   * 读取最近一次持久化画像，并判断是否与当前 vault 一致。
+   * 返回 { profile, fresh, currentVaultFingerprint } 或 null。
+   */
   async latest({ opsRoot = this.opsRoot } = {}) {
     const root = path.join(opsRoot, "knowledge", "profiles");
     let entries = [];
@@ -101,7 +129,12 @@ class KnowledgeProfileService {
       profiles.push(parseRecord(await fs.readFile(path.join(root, entry.name), "utf8")));
     }
     if (!profiles.length) return null;
-    return profiles.sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))[0];
+    const latest = profiles.sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))[0];
+    // 确保 knowledge index 是最新的，以获取当前 fingerprint
+    await this.knowledge.list();
+    const currentVaultFingerprint = this.knowledge.fingerprint || "";
+    const fresh = latest.vaultFingerprint === currentVaultFingerprint;
+    return { profile: latest, fresh, currentVaultFingerprint };
   }
 
   // notes from knowledge.list() lack raw markdown; read it back for wikilink extraction

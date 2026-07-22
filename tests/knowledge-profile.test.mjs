@@ -120,5 +120,65 @@ test("latest returns the most recently generated profile", async (t) => {
   });
   const first = await profileService.generate();
   const latest = await profileService.latest();
-  assert.equal(latest.id, first.profile.id);
+  assert.equal(latest.profile.id, first.profile.id);
+});
+
+test("v2 profile includes scope and excludedSystemNotes", async (t) => {
+  const { profileService } = await setup(t, {
+    "agent.md": "---\ntitle: Agent\ntags: [AI]\nstability: practice\nupdated: 2026-07-01\n---\n# Agent",
+  });
+  const { profile } = await profileService.inspect();
+  assert.equal(profile.scope, "personal-knowledge");
+  assert.ok(typeof profile.excludedSystemNotes === "number");
+  assert.ok(profile.excludedSystemNotes >= 0);
+});
+
+test("inspect does not write any files", async (t) => {
+  const { profileService, opsRoot } = await setup(t, {
+    "note.md": "---\ntitle: Note\nstability: practice\nupdated: 2026-07-01\n---\n# Note",
+  });
+  const profilesDir = path.join(opsRoot, "knowledge", "profiles");
+  await assert.rejects(() => fs.readdir(profilesDir), { code: "ENOENT" });
+  const { profile } = await profileService.inspect();
+  assert.ok(profile.id);
+  // Still no files written
+  await assert.rejects(() => fs.readdir(profilesDir), { code: "ENOENT" });
+});
+
+test("persist writes profile to ops/", async (t) => {
+  const { profileService, opsRoot } = await setup(t, {
+    "note.md": "---\ntitle: Note\nstability: practice\nupdated: 2026-07-01\n---\n# Note",
+  });
+  const { profile, changedPaths } = await profileService.persist();
+  assert.ok(changedPaths[0].includes("knowledge/profiles/"));
+  const file = path.join(opsRoot, "knowledge", "profiles", `${profile.id}.md`);
+  const content = await fs.readFile(file, "utf8");
+  assert.ok(content.includes("personal-knowledge"));
+});
+
+test("latest returns freshness based on vaultFingerprint", async (t) => {
+  const { profileService, knowledge } = await setup(t, {
+    "note.md": "---\ntitle: Note\nstability: practice\nupdated: 2026-07-01\n---\n# Note",
+  });
+  // Before any persist, latest is null
+  assert.equal(await profileService.latest(), null);
+  // Persist a profile
+  await profileService.persist();
+  const result = await profileService.latest();
+  assert.ok(result.profile);
+  assert.equal(result.fresh, true);
+  assert.ok(result.currentVaultFingerprint.length > 0);
+});
+
+test("latest reports stale when vault changes after persist", async (t) => {
+  const { profileService, knowledge, vaultRoot } = await setup(t, {
+    "note.md": "---\ntitle: Note\nstability: practice\nupdated: 2026-07-01\n---\n# Note",
+  });
+  await profileService.persist();
+  // Add a new note to change the vault fingerprint
+  await fs.writeFile(path.join(vaultRoot, "new.md"), "---\ntitle: New\nstability: fact\n---\n# New\n", "utf8");
+  knowledge.invalidate();
+  const result = await profileService.latest();
+  assert.equal(result.fresh, false);
+  assert.notEqual(result.currentVaultFingerprint, result.profile.vaultFingerprint);
 });

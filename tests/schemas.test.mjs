@@ -67,6 +67,7 @@ test("settings permissions are disjoint", async () => {
 test("knowledge-profile contract validates dimensions and rejects unknown fields", async () => {
   const valid = {
     id: "profile-20260721-abcd1234",
+    scope: "personal-knowledge",
     generatedAt: "2026-07-21T00:00:00.000Z",
     vaultFingerprint: "abc123",
     summary: { notes: 1, searchable: 1, mocCount: 0, tags: 1 },
@@ -79,6 +80,7 @@ test("knowledge-profile contract validates dimensions and rejects unknown fields
     outdatedNoteRefs: [],
     evidenceGaps: [],
     learningCoverage: { withState: 0, withoutState: 1, avgMastery: 0 },
+    excludedSystemNotes: 0,
     nextMaintenanceWindow: "2026-07-28T00:00:00.000Z",
   };
   await validateContractRecord("knowledge-profile", valid);

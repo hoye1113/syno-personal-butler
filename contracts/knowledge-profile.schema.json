@@ -2,10 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://syno.local/contracts/knowledge-profile.schema.json",
   "title": "KnowledgeProfile",
-  "description": "迁移后知识画像：对 vault 与 ops 事实源做只读派生，覆盖主题/来源/稳定性/时效性/可靠性/孤岛/死链/证据缺口/潜在过时九个维度的可审计快照。画像本身是派生产物，不得把推断表述为已验证事实。",
+  "description": "v2 知识画像：对 vault 与 ops 事实源做只读派生，覆盖主题/来源/稳定性/时效性/可靠性/孤岛/死链/证据缺口/潜在过时九个维度的可审计快照。scope 标记仅统计个人知识；excludedSystemNotes 标记被排除的系统笔记数。画像本身是派生产物，不得把推断表述为已验证事实。",
   "type": "object",
   "required": [
     "id",
+    "scope",
     "generatedAt",
     "vaultFingerprint",
     "summary",
@@ -18,10 +19,12 @@
     "outdatedNoteRefs",
     "evidenceGaps",
     "learningCoverage",
+    "excludedSystemNotes",
     "nextMaintenanceWindow"
   ],
   "properties": {
     "id": { "type": "string", "minLength": 1 },
+    "scope": { "type": "string", "enum": ["personal-knowledge"] },
     "generatedAt": { "type": "string", "format": "date-time" },
     "vaultFingerprint": { "type": "string", "minLength": 1 },
     "summary": {
@@ -122,6 +125,7 @@
       },
       "additionalProperties": false
     },
+    "excludedSystemNotes": { "type": "integer", "minimum": 0 },
     "nextMaintenanceWindow": { "type": "string", "format": "date-time" }
   },
   "additionalProperties": false
