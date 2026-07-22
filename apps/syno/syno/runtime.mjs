@@ -23,6 +23,7 @@ import { NotificationStore } from "./notification-store.mjs";
 import { OperationExecutor } from "./operation-executor.mjs";
 import { buildOperationRequest } from "./operation-registry.mjs";
 import { PATHS } from "./paths.mjs";
+import { PlannerService } from "./planner-service.mjs";
 import { OutputService } from "./output-service.mjs";
 import { ProviderClient } from "./provider-client.mjs";
 import { ProviderCredentialStore } from "./provider-credential-store.mjs";
@@ -77,6 +78,7 @@ function createSynoRuntime(options = {}) {
   const claims = options.claims || new ClaimEvidenceService();
   const knowledgeMaintenance = options.knowledgeMaintenance || new KnowledgeMaintenanceSource();
   const profile = options.profile || new KnowledgeProfileService({ knowledge, maintenance: knowledgeMaintenance, claims, learning });
+  const planner = options.planner || new PlannerService({ knowledge, goals, learning, claims, ingest, maintenance: knowledgeMaintenance, profile, outputs });
   const migration = options.migration || new VaultMigrationService({ repoRoot: PATHS.repoRoot, runtimeRoot: path.join(PATHS.runtimeRoot, "migrations") });
   const signalSources = options.signalSources || new SignalSourceRegistry({ claims, ingest, outputs, maintenance: knowledgeMaintenance });
   let host;
@@ -190,7 +192,7 @@ function createSynoRuntime(options = {}) {
       if (operation === "claims.create") return claims.createClaim(payload, { opsRoot: path.join(root, "ops") });
       if (operation === "evidence.candidates.create") return claims.createEvidenceCandidate(payload, { opsRoot: path.join(root, "ops") });
       if (operation === "evidence.candidates.approve") return claims.approveCandidate(payload, { opsRoot: path.join(root, "ops") });
-      if (operation === "knowledge.profile.generate") return profile.generate({ opsRoot: path.join(root, "ops") });
+      if (operation === "knowledge.profile.generate") return profile.persist({ opsRoot: path.join(root, "ops") });
       if (operation === "vault.migration.content") return migration.apply(payload.id, { phase: "content", expectedDigest: payload.digest, workspace: root });
       if (operation === "vault.migration.integration") return migration.apply(payload.id, { phase: "integration", expectedDigest: payload.digest, workspace: root });
       const domain = await executeDomainOperation(operation, payload, { workspace: root });
@@ -256,7 +258,7 @@ function createSynoRuntime(options = {}) {
   });
   const channels = options.channels || new ChannelHub({ web, windows, weixin, feishu });
   reports = new ReportService({ host, knowledge, notifications, channels, gitGuard });
-  const today = options.today || new TodayService({ goals, learning, host, settingsRegistry, signalSources });
+  const today = options.today || new TodayService({ goals, learning, host, settingsRegistry, signalSources, planner });
   core = new SynoCore({ host, knowledge, notifications, channels, reports, today });
   const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, settingsRegistry, signalSources });
   let channelRecoveryTimer = null;
@@ -272,6 +274,7 @@ function createSynoRuntime(options = {}) {
     goals,
     claims,
     profile,
+    planner,
     migration,
     today,
     notifications,
@@ -389,6 +392,7 @@ async function routeSynoApi(runtime, req, url, readBody) {
     runtime.ingest.propose(receipt.artifact.id).catch(() => {});
     return receipt;
   }
+  if (method === "GET" && url.pathname === "/api/syno/intake/pending") return { items: await runtime.ingest.pending() };
   const intakeStatus = /^\/api\/syno\/intake\/([^/]+)$/.exec(url.pathname);
   if (method === "GET" && intakeStatus) return runtime.ingest.status(decodeURIComponent(intakeStatus[1]));
   const intakeApply = /^\/api\/syno\/intake\/([^/]+)\/apply$/.exec(url.pathname);
@@ -416,7 +420,12 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "POST" && url.pathname === "/api/syno/goals") return runtime.core.execute(buildOperationRequest("goals.create", await readBody(req)), webContext);
   if (method === "POST" && url.pathname === "/api/syno/claims") return runtime.core.execute(buildOperationRequest("claims.create", await readBody(req)), webContext);
   if (method === "POST" && url.pathname === "/api/syno/knowledge/profile") return runtime.core.execute(buildOperationRequest("knowledge.profile.generate", await readBody(req)), webContext);
-  if (method === "GET" && url.pathname === "/api/syno/knowledge/profile/latest") return { profile: await runtime.profile.latest() };
+  if (method === "GET" && url.pathname === "/api/syno/knowledge/profile/latest") {
+    const result = await runtime.profile.latest();
+    if (!result) return { profile: null, fresh: false, currentVaultFingerprint: "" };
+    return { profile: result.profile, fresh: result.fresh, currentVaultFingerprint: result.currentVaultFingerprint, excludedSystemNotes: result.profile.excludedSystemNotes ?? 0 };
+  }
+  if (method === "GET" && url.pathname === "/api/syno/learning/plan/today") return runtime.planner.planDay({ opsRoot: path.join(PATHS.repoRoot, "ops") });
   if (method === "POST" && url.pathname === "/api/syno/evidence/candidates") return runtime.core.execute(buildOperationRequest("evidence.candidates.create", await readBody(req)), webContext);
   const evidenceApproval = /^\/api\/syno\/evidence\/candidates\/([^/]+)\/approve$/.exec(url.pathname);
   if (method === "POST" && evidenceApproval) return runtime.core.execute(buildOperationRequest("evidence.candidates.approve", { candidateId: decodeURIComponent(evidenceApproval[1]) }), webContext);

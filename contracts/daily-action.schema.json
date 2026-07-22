@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/daily-action.schema.json",
+  "title": "DailyAction",
+  "description": "每日可执行动作：包含 kind、area、intent，前端可直接跳转到对应对象。",
+  "type": "object",
+  "required": ["id", "kind", "title", "reason", "priority", "area", "intent", "status"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "kind": { "enum": ["review", "digest", "ingest", "maintenance", "output", "goal"] },
+    "title": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "minLength": 1 },
+    "priority": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "area": { "enum": ["learn", "capture", "knowledge", "create", "today", "approvals"] },
+    "intent": { "type": "string", "minLength": 1 },
+    "ref": { "type": "string" },
+    "status": { "enum": ["pending", "in_progress", "completed", "skipped"] },
+    "dueAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}
