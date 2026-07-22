@@ -225,8 +225,9 @@ test("Signal and Priority engines are deterministic and notification-bounded", (
   assert.deepEqual(priority.allocate(20), { digest: 12, ingest: 5, maintenance: 3 });
   const signal = new SignalEngine({ schedule: { morningHour: 8, eveningHour: 20, weeklyDay: 0, maxDailyNotifications: 3 } });
   const now = new Date("2026-07-19T21:00:00+08:00");
-  assert.equal(signal.collect({ now, notificationsToday: 2, highValueEvents: [{ id: "e1" }] }).length, 1);
-  assert.deepEqual(signal.collect({ now, notificationsToday: 3 }), []);
+  assert.equal(signal.collect({ now, notificationsToday: 2, highValueEvents: [{ id: "e1" }] }).length, 2); // daily slice 1 + weekly 独立 1
+  // 日常配额满时仍返回 weekly（周度复盘独立于日常配额）
+  assert.deepEqual(signal.collect({ now, notificationsToday: 3 }), [{ kind: "weekly", key: "weekly:2026-07-19" }]);
   assert.match(localDateKey(now), /^2026-07-/);
 });
 
@@ -277,6 +278,22 @@ test("ProactiveOrchestrator weekly signal calls maintenance.weeklySummary and ta
   assert.match(weeklySend.message.body, /01-Areas/);
   assert.deepEqual(weeklySend.targets, ["web", "windows", "weixin", "feishu"]);
   assert.ok(weeklySend.message.text.includes(weeklySend.message.title), "message should carry self-contained text for weixin/feishu");
+});
+
+test("weekly signal is independent of the daily notification budget", () => {
+  const signal = new SignalEngine({ schedule: { morningHour: 8, eveningHour: 20, weeklyDay: 0, maxDailyNotifications: 2 } });
+  const sunday = new Date("2026-07-19T09:00:00+08:00"); // 周日早晨
+  const morning = signal.collect({ now: sunday, notificationsToday: 0, maxDailyNotifications: 2 });
+  assert.ok(morning.some((s) => s.kind === "weekly"), "weekly fires on Sunday morning");
+  assert.ok(morning.some((s) => s.kind === "morning"), "morning also fires");
+  // 晚上日常配额已用 1（morning）；weekly 不占配额，evening 仍可触发（修复 weekly 挤掉 evening 的 bug）
+  const evening = signal.collect({
+    now: new Date("2026-07-19T21:00:00+08:00"),
+    lastRuns: { morning: "2026-07-19", weekly: "2026-07-19" },
+    notificationsToday: 1,
+    maxDailyNotifications: 2,
+  });
+  assert.ok(evening.some((s) => s.kind === "evening"), "evening still fires because weekly did not consume daily budget");
 });
 
 test("localMessage daily fallback uses allocation.ingest (not capture) and carries text", () => {

@@ -124,10 +124,12 @@ class ProactiveOrchestrator {
       await this.channels.send(message, ["web", "windows", "weixin", "feishu"]);
       state.lastRuns[signal.kind] = date;
       state.lastRuns[signal.key] = date;
-      state.notificationsToday += 1;
+      // weekly 是周度复盘，不占日常通知配额（与 SignalEngine.collect 的独立配额对齐）
+      const consumesBudget = signal.kind !== "weekly";
+      if (consumesBudget) state.notificationsToday += 1;
       state.pending[result.job?.id || signal.key] = { signalKey: signal.key, fallbackDelivered: !completedText, status: result.job?.status || "local" };
       delivered.push({ signal: signal.kind, jobId: result.job?.id, providerStatus: result.job?.status, localFallback: !completedText });
-      if (state.notificationsToday >= cadenceBudget) break;
+      if (consumesBudget && state.notificationsToday >= cadenceBudget) break;
     }
     if (this.conversations && state.lastPruned !== date) {
       await this.conversations.prune();
