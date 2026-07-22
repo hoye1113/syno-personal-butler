@@ -417,6 +417,31 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .syno-error { color: var(--danger); }
 .syno-empty { color: var(--muted); }
 
+/* 审批顾问建议卡片：管家先读懂，再给「这是什么 / 管家建议 / 理由」 */
+.syno-job.is-awaiting_approval { border-color: color-mix(in oklch, var(--old-gold) 42%, var(--line)); }
+.syno-advice { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.syno-advice-row { display: flex; flex-direction: column; gap: 3px; }
+.syno-advice-row .panel-tag { margin: 0; }
+.syno-advice-text { margin: 0; line-height: 1.55; color: var(--text); }
+.syno-advice-caveat {
+  margin: 0; padding: 8px 11px; border-radius: 10px;
+  background: color-mix(in oklch, var(--terracotta) 14%, transparent);
+  color: color-mix(in oklch, var(--terracotta) 78%, var(--text));
+  font-size: 0.85rem; line-height: 1.5;
+}
+.syno-advice-badge {
+  align-self: flex-start; padding: 2px 9px; border-radius: 999px;
+  background: color-mix(in oklch, var(--muted) 16%, transparent); color: var(--muted);
+  font-size: 0.72rem; letter-spacing: 0.04em;
+}
+.syno-advice-detail { margin-top: 2px; }
+.syno-advice-detail > summary { color: var(--indigo); font-weight: 700; cursor: pointer; }
+.syno-advice-detail .syno-markdown { margin-top: 8px; font-size: 0.82rem; color: var(--muted); }
+.syno-advice-loading { display: flex; align-items: center; gap: 9px; color: var(--muted); }
+.syno-advice-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--old-gold); animation: syno-advice-pulse 1.4s ease-in-out infinite; }
+@keyframes syno-advice-pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .syno-advice-dot { animation: none; opacity: 0.7; } }
+
 .syno-conversation {
   display: grid;
   gap: 10px;

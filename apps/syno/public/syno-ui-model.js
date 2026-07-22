@@ -17,5 +17,40 @@
     return (opportunity?.allowedActions || []).map((action) => ({ action, ...OUTPUT_ACTIONS[action] })).filter((item) => item.label);
   }
 
-  root.SynoUiModel = Object.freeze({ todayTarget, outputActions });
+  const INTENT_LABELS = Object.freeze({
+    curate_note: "收录", create_content_idea: "内容创意", create_content_brief: "内容大纲",
+    create_action: "行动", create_memory_proposal: "记忆候选", goals_create: "目标",
+    complex_analysis: "分析", search: "搜索", chat: "对话",
+  });
+
+  function intentLabel(intent) {
+    return INTENT_LABELS[intent] || intent || "任务";
+  }
+
+  // 待审批任务的动作按钮：标签随拟执行的结果而变（收录/丢弃/批准合并），
+  // 而非千篇一律的「批准/拒绝」。建议结果尚未就绪时返回空数组（等待管家读取后再填）。
+  function adviceButtons(job) {
+    const advice = job?.advice;
+    const action = advice?.detail?.action;
+    if (job?.phase === "merge") return [{ action: "approve", label: "批准合并", kind: "accent" }, { action: "reject", label: "拒绝", kind: "ghost" }];
+    if (action === "create") return [{ action: "approve", label: "收录", kind: "accent" }, { action: "reject", label: "拒绝收录", kind: "ghost" }];
+    if (action === "reject") return [{ action: "approve", label: "丢弃", kind: "accent" }, { action: "reject", label: "保留", kind: "ghost" }];
+    if (action === "append-source" || action === "link-only" || action === "keep-separate") return [{ action: "approve", label: "批准合并", kind: "accent" }, { action: "reject", label: "拒绝", kind: "ghost" }];
+    if (advice) return [{ action: "approve", label: "批准", kind: "accent" }, { action: "reject", label: "拒绝", kind: "ghost" }];
+    return [];
+  }
+
+  // 纯映射器：把 job + 缓存的 advice 映射成卡片视图模型（供测试与渲染共用）。
+  function adviceViewModel(job) {
+    const advice = job?.advice || null;
+    return {
+      intentLabel: intentLabel(job?.intent),
+      advice,
+      buttons: adviceButtons(job),
+      loading: !advice,
+      degraded: advice?.via === "fallback" || advice?.via === "minimal",
+    };
+  }
+
+  root.SynoUiModel = Object.freeze({ todayTarget, outputActions, intentLabel, adviceButtons, adviceViewModel });
 })(globalThis);

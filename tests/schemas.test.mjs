@@ -50,6 +50,19 @@ test("knowledge-loop contracts reject AI-authored mastery and stale volatile cla
   await validateContractRecord("claim", { ...volatile, reviewAfter: "2026-07-24T08:00:00.000Z" });
 });
 
+test("job contract accepts an optional approval-advice cache field", async () => {
+  const base = {
+    id: "job-20260722-test", intent: "curate_note", status: "awaiting_approval",
+    profile: "syno-curate", approval: "single", risk: "low", phase: "execution",
+    approvalsReceived: 0, approvalCode: "178617",
+    created: "2026-07-22T05:35:33.341Z", updated: "2026-07-22T05:35:33.341Z",
+    request: { summary: "Syno operation: ingest.apply", payloadDigest: "x", fields: ["intent"] },
+    decision: { intent: "curate_note", profile: "syno-curate", approval: "single", risk: "low", allowed: true, reason: "请求会修改长期事实源，需要一次审批" },
+  };
+  await validateContractRecord("job", base);
+  await validateContractRecord("job", { ...base, advice: { whatIsIt: "《X》", recommendation: "approve", reason: "Y", via: "butler", generatedAt: "2026-07-22T06:00:00.000Z" } });
+});
+
 test("settings permissions are disjoint", async () => {
   const registry = {
     version: 1,

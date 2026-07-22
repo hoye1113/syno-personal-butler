@@ -257,25 +257,25 @@
       if (!jobs.length) target.append(node("p", "syno-empty", "还没有任务。可以从“问赛诺”开始。"));
       for (const job of jobs) {
         const item = node("article", `syno-job is-${job.status}`);
+        item.dataset.jobId = job.id;
         const meta = node("div", "syno-job-meta");
-        meta.append(node("strong", "", job.intent), node("span", "syno-status", statusLabel(job)));
-        const request = node("p", "", job.request?.summary || "结构化任务");
-        item.append(meta, request);
+        meta.append(node("strong", "", uiModel.intentLabel(job.intent)), node("span", "syno-status", statusLabel(job)));
+        item.append(meta);
         if (job.error?.message) item.append(node("p", "syno-error", job.error.message));
+        if (job.status !== "awaiting_approval") item.append(node("p", "", job.request?.summary || "结构化任务"));
         if (job.result?.preview) {
           const details = node("details", "syno-diff");
           details.append(node("summary", "", "查看待合并 Markdown diff"), node("pre", "syno-markdown", job.result.preview));
           item.append(details);
         }
         if (job.status === "awaiting_approval") {
+          const slot = node("div", "syno-advice");
+          renderAdviceSlot(slot, job.advice);
+          item.append(slot);
           const actions = node("div", "syno-job-actions");
-          const approve = node("button", "accent-btn", job.phase === "merge" ? "批准合并" : "批准");
-          const reject = node("button", "ghost-btn", "拒绝");
-          approve.type = reject.type = "button";
-          approve.addEventListener("click", () => decide(job.id, "approve"));
-          reject.addEventListener("click", () => decide(job.id, "reject"));
-          actions.append(approve, reject);
+          buildAdviceActions(actions, job);
           item.append(actions);
+          if (!job.advice) loadAdvice(job, slot, actions);
         }
         target.append(item);
       }
@@ -295,6 +295,58 @@
       alert(error.message);
     }
     await loadJobs();
+  }
+
+  // 渲染审批顾问建议：三段（这是什么 / 管家建议 / 理由）+ 可选「注意」+ 离线徽标 + 原始信息折叠。
+  function renderAdviceSlot(slot, advice) {
+    slot.replaceChildren();
+    if (!advice) {
+      const loading = node("div", "syno-advice-loading");
+      loading.append(node("span", "syno-advice-dot"), node("span", "", "管家正在阅读…"));
+      slot.append(loading);
+      return;
+    }
+    for (const [eyebrow, text] of [["这是什么", advice.whatIsIt], ["管家建议", advice.recommendationLabel], ["理由", advice.reason]]) {
+      const row = node("div", "syno-advice-row");
+      row.append(node("span", "panel-tag", eyebrow), node("p", "syno-advice-text", text));
+      slot.append(row);
+    }
+    if (advice.caveat) slot.append(node("p", "syno-advice-caveat", `注意：${advice.caveat}`));
+    if (advice.via === "fallback" || advice.via === "minimal") slot.append(node("span", "syno-advice-badge", "离线摘要"));
+    const detail = advice.detail;
+    if (detail && (detail.source || detail.proposedPath || detail.dedupeMatches?.length || detail.bodyPreview)) {
+      const lines = [];
+      if (detail.source) lines.push(`来源：${detail.source}`);
+      if (detail.proposedPath) lines.push(`拟入路径：${detail.proposedPath}`);
+      if (detail.risk) lines.push(`查重风险：${detail.risk}`);
+      if (detail.dedupeMatches?.length) lines.push(`命中已有：${detail.dedupeMatches.join("、")}`);
+      if (detail.bodyPreview) lines.push(`正文片段：${detail.bodyPreview}`);
+      const expand = node("details", "setting-detail syno-advice-detail");
+      expand.append(node("summary", "", "原始收录信息"), node("pre", "syno-markdown", lines.join("\n")));
+      slot.append(expand);
+    }
+  }
+
+  function buildAdviceActions(container, job) {
+    container.replaceChildren();
+    for (const btn of uiModel.adviceButtons(job)) {
+      const el = node("button", btn.kind === "ghost" ? "ghost-btn" : "accent-btn", btn.label);
+      el.type = "button";
+      el.addEventListener("click", () => decide(job.id, btn.action));
+      container.append(el);
+    }
+  }
+
+  // 懒加载：首次打开审批卡片时取管家建议并就地刷新（不动整张列表）。
+  async function loadAdvice(job, slot, actions) {
+    try {
+      const { advice } = await api(`/api/syno/jobs/${encodeURIComponent(job.id)}/advice`);
+      job.advice = advice;
+    } catch (error) {
+      job.advice = { whatIsIt: "读取建议失败，可参考下方原始信息手动确认。", recommendationLabel: "请主人审阅后确认", reason: error.message, caveat: "", via: "minimal" };
+    }
+    renderAdviceSlot(slot, job.advice);
+    buildAdviceActions(actions, job);
   }
 
   async function loadNotifications() {

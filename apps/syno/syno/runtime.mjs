@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { AgentHost } from "./agent-host.mjs";
+import { ApprovalAdvisor, minimalAdvice } from "./approval-advisor.mjs";
 import { ChannelHub, WebChannelAdapter, WindowsNotificationAdapter } from "./channels.mjs";
 import { ClaimEvidenceService } from "./claim-evidence-service.mjs";
 import { NativeCognitiveRuntime } from "./cognitive-runtime.mjs";
@@ -261,11 +262,14 @@ function createSynoRuntime(options = {}) {
   const today = options.today || new TodayService({ goals, learning, host, settingsRegistry, signalSources, planner });
   core = new SynoCore({ host, knowledge, notifications, channels, reports, today });
   const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, settingsRegistry, signalSources, maintenance: knowledgeMaintenance });
+  const approvalAdvisor = options.approvalAdvisor || new ApprovalAdvisor({ provider, ingest });
   let channelRecoveryTimer = null;
 
   return {
     core,
     host,
+    jobStore,
+    approvalAdvisor,
     knowledge,
     intake: sourceIntake,
     ingest,
@@ -445,6 +449,20 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "POST" && url.pathname === "/api/syno/channels/home") {
     const body = await readBody(req);
     return { channels: await runtime.channels.setHome(String(body.channel || "")) };
+  }
+  const adviceMatch = /^\/api\/syno\/jobs\/([^/]+)\/advice$/.exec(url.pathname);
+  if (method === "GET" && adviceMatch) {
+    const id = decodeURIComponent(adviceMatch[1]);
+    const job = await runtime.jobStore.get(id);
+    if (!job) { const error = new Error(`任务不存在：${id}`); error.statusCode = 404; throw error; }
+    if (job.advice) return { advice: job.advice };
+    try {
+      const advice = await runtime.approvalAdvisor.generate(job, { loadRequest: (j) => runtime.jobStore.loadRequest(j) });
+      await runtime.jobStore.save({ ...job, advice });
+      return { advice };
+    } catch (error) {
+      return { advice: minimalAdvice(job), degraded: true, error: error?.code || "ADVICE_UNAVAILABLE" };
+    }
   }
   const match = /^\/api\/syno\/jobs\/([^/]+)\/(approve|reject|cancel)$/.exec(url.pathname);
   if (method === "POST" && match) {

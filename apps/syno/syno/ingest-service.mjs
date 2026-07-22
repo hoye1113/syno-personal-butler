@@ -81,6 +81,34 @@ class IngestService {
     } catch (error) { if (error.code === "ENOENT") return null; throw error; }
   }
 
+  // 只读读取一个 Artifact 的完整可读字段（标题/正文/来源/拟入路径/查重命中）。
+  // 与 apply() 共用同一份本地状态，但不做任何写入；供审批顾问读取后给出建议。
+  async readArtifact(id) {
+    let state;
+    try {
+      state = JSON.parse(await fs.readFile(path.join(this.stateRoot, `${id}.json`), "utf8"));
+    } catch (error) {
+      if (error.code === "ENOENT") throw Object.assign(new Error(`收录 Artifact 不存在：${id}`), { code: "ARTIFACT_MISSING" });
+      throw error;
+    }
+    const prepared = state.prepared || {};
+    const candidate = state.candidate || {};
+    const proposal = state.proposal || {};
+    const payload = state.payload || {};
+    return {
+      id,
+      title: candidate.title,
+      body: String(prepared.content || prepared.text || ""),
+      source: prepared.sourceUrl || (payload.kind === "url" ? String(payload.value || "") : ""),
+      digest: candidate.summary,
+      proposedPath: proposal.suggestedPath,
+      existingRef: proposal.existingNoteRef,
+      risk: proposal.risk,
+      dedupeMatches: Array.isArray(candidate.dedupeMatches) ? candidate.dedupeMatches : [],
+      status: state.status,
+    };
+  }
+
   async pending({ limit = 50 } = {}) {
     let entries = [];
     try { entries = await fs.readdir(this.stateRoot, { withFileTypes: true }); } catch (error) { if (error.code === "ENOENT") return []; throw error; }
