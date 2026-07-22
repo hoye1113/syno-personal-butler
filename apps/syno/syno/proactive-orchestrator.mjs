@@ -21,15 +21,7 @@ function isQuietTime(now, quietHours = DEFAULT_QUIET_HOURS) {
 function localMessage(signal, snapshot, weeklySummary) {
   const names = { morning: "晨间计划", evening: "晚间复盘", weekly: "每周深度复盘", event: "高价值事件" };
   const title = `Syno · ${names[signal.kind] || "主动提醒"}`;
-  let body;
-  if (signal.kind === "weekly" && weeklySummary) {
-    const topicLines = weeklySummary.topics.slice(0, 3).map((topic) => `· ${topic.topic}（${topic.count} 篇孤岛）`).join("\n");
-    body = `本周知识库有 ${weeklySummary.totalOrphans} 篇孤岛笔记待整理：\n${topicLines || "暂无孤岛"}\n建议挑一个主题补链或合并。`;
-  } else {
-    const priorities = snapshot.priorities.slice(0, 3).map((item, index) => `${index + 1}. ${item.title}`).join("\n");
-    const allocation = snapshot.allocation || {};
-    body = priorities || `今天没有硬性到期事项。建议完成一次真实输出。\n消化 ${allocation.digest ?? 0} / 收录 ${allocation.ingest ?? 0} / 维护 ${allocation.maintenance ?? 0}`;
-  }
+  const body = bodyFor(signal.kind, snapshot, weeklySummary);
   return {
     title,
     body,
@@ -38,6 +30,50 @@ function localMessage(signal, snapshot, weeklySummary) {
     source: "proactive",
     data: { idempotencyKey: `proactive:${signal.key}`, signal: signal.kind },
   };
+}
+
+// 按信号种类分化文案：晨间突出计划预算、晚间突出进度与到期复习、周复盘突出孤岛主题
+function bodyFor(kind, snapshot, weeklySummary) {
+  if (kind === "weekly" && weeklySummary) {
+    const topicLines = weeklySummary.topics.slice(0, 3).map((topic) => `· ${topic.topic}（${topic.count} 篇孤岛）`).join("\n");
+    return `本周知识库有 ${weeklySummary.totalOrphans} 篇孤岛笔记待整理：\n${topicLines || "暂无孤岛"}\n建议挑一个主题补链或合并。`;
+  }
+  if (kind === "morning") return morningBody(snapshot);
+  if (kind === "evening") return eveningBody(snapshot);
+  return prioritiesBody(snapshot);
+}
+
+// 晨间：突出今日学习计划预算（消化/收录/维护）与首要行动；缺计划时回退到优先行动
+function morningBody(snapshot) {
+  const allocation = snapshot?.plan?.allocation;
+  const primary = snapshot?.primary;
+  const lines = [];
+  if (allocation) {
+    lines.push(`今日计划：消化 ${allocation.digest ?? 0} / 收录 ${allocation.ingest ?? 0} / 维护 ${allocation.maintenance ?? 0}`);
+  }
+  if (primary?.title) lines.push(`首要：${primary.title}`);
+  return lines.length ? lines.join("\n") : prioritiesBody(snapshot);
+}
+
+// 晚间：突出今日完成进度与到期复习；缺进度时回退到优先行动
+function eveningBody(snapshot) {
+  const progress = snapshot?.progress;
+  const due = (snapshot?.dueReviews || []).slice(0, 2);
+  const lines = [];
+  if (progress) {
+    const failed = progress.failed ? `（${progress.failed} 项失败）` : "";
+    lines.push(`今日已完成 ${progress.completed ?? 0} 项，待确认 ${progress.waiting ?? 0} 项${failed}`);
+  }
+  if (due.length) lines.push(`到期复习：${due.map((item) => item.title).join("、")}`);
+  return lines.length ? lines.join("\n") : prioritiesBody(snapshot);
+}
+
+// 兜底：列出今日优先行动；无行动时显示消化预算（snapshot.allocation 来自 PriorityEngine）
+function prioritiesBody(snapshot) {
+  const priorities = (snapshot?.priorities || []).slice(0, 3).map((item, index) => `${index + 1}. ${item.title}`).join("\n");
+  if (priorities) return priorities;
+  const allocation = snapshot?.allocation || {};
+  return `今天没有硬性到期事项。建议完成一次真实输出。\n消化 ${allocation.digest ?? 0} / 收录 ${allocation.ingest ?? 0} / 维护 ${allocation.maintenance ?? 0}`;
 }
 
 class ProactiveOrchestrator {

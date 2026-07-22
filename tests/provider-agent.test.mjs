@@ -287,6 +287,35 @@ test("localMessage daily fallback uses allocation.ingest (not capture) and carri
   assert.ok(msg.text.includes(msg.title) && msg.text.includes(msg.body));
 });
 
+test("localMessage morning surfaces plan allocation and primary action", () => {
+  const signal = { kind: "morning", key: "morning:2026-07-20" };
+  const snapshot = {
+    plan: { allocation: { digest: 7, ingest: 2, maintenance: 1 } },
+    primary: { title: "复习：Tool Loop" },
+    priorities: [{ title: "复习：Tool Loop" }],
+  };
+  const msg = localMessage(signal, snapshot);
+  assert.match(msg.body, /消化 7/);
+  assert.match(msg.body, /收录 2/);
+  assert.match(msg.body, /首要：复习：Tool Loop/);
+  assert.ok(msg.text.includes(msg.body));
+});
+
+test("localMessage evening surfaces progress and top due reviews", () => {
+  const signal = { kind: "evening", key: "evening:2026-07-20" };
+  const snapshot = {
+    progress: { completed: 3, waiting: 2, failed: 1 },
+    dueReviews: [{ title: "复习：Context Engineering" }, { title: "复习：Signal Engine" }, { title: "复习：第三条应被截断" }],
+    priorities: [],
+  };
+  const msg = localMessage(signal, snapshot);
+  assert.match(msg.body, /已完成 3/);
+  assert.match(msg.body, /待确认 2/);
+  assert.match(msg.body, /Context Engineering/);
+  assert.match(msg.body, /Signal Engine/);
+  assert.doesNotMatch(msg.body, /第三条应被截断/);
+});
+
 test("SettingsRegistry persists only valid Agent-adjustable preferences", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-settings-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
