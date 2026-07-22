@@ -18,10 +18,19 @@ const ACTION_MAP = Object.freeze({
   review: { area: "learn", intent: "start-review" },
   digest: { area: "learn", intent: "start-review" },
   ingest: { area: "capture", intent: "review-ingest" },
+  claim: { area: "knowledge", intent: "review-claim" },
   "output-opportunity": { area: "create", intent: "continue-output" },
   "knowledge-maintenance": { area: "knowledge", intent: "review-maintenance" },
   exploration: { area: "knowledge", intent: "review-maintenance" },
   news: { area: "knowledge", intent: "review-maintenance" },
+});
+
+// 信号 kind → ACTION_MAP key（约束 3.3 固定映射）
+const SIGNAL_KIND_TO_ACTION = Object.freeze({
+  "claim-review": "claim",
+  "ingest-pending": "ingest",
+  "output-opportunity": "output-opportunity",
+  "knowledge-maintenance": "knowledge-maintenance",
 });
 
 function jobTitle(job) {
@@ -84,7 +93,7 @@ class TodayService {
         dueAt: review.nextReviewAt,
       })),
       ...signals.map((signal) => {
-        const kind = signal.kind === "knowledge-maintenance" ? "exploration" : "news";
+        const kind = SIGNAL_KIND_TO_ACTION[signal.kind] || "news";
         return typedAction(kind, signal.id, signal.title, signal.ref, { priority: signal.priority });
       }),
     ];

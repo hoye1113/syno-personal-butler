@@ -144,3 +144,33 @@ test("snapshot recentIntake items have typed actions", async (t) => {
     assert.ok(item.intent, `recentIntake item ${item.id} should have intent`);
   }
 });
+
+test("snapshot maps each signal kind to its canonical area and intent", async () => {
+  const signalSources = {
+    async collect() {
+      return [
+        { id: "s-claim", kind: "claim-review", title: "复核观点", ref: { id: "claim-1" }, priority: 40 },
+        { id: "s-ingest", kind: "ingest-pending", title: "收录", ref: { id: "a-1" }, priority: 40 },
+        { id: "s-output", kind: "output-opportunity", title: "输出", ref: { id: "o-1" }, priority: 40 },
+        { id: "s-maint", kind: "knowledge-maintenance", title: "维护", ref: { id: "m-1" }, priority: 40 },
+      ];
+    },
+  };
+  const today = new TodayService({
+    goals: { async list() { return []; } },
+    learning: { async due() { return []; } },
+    host: { async list() { return []; } },
+    signalSources,
+    clock: () => FIXED_NOW,
+  });
+  const snapshot = await today.snapshot({ capacity: 10 });
+  const byKind = new Map(snapshot.priorities.map((item) => [item.kind, item]));
+  assert.equal(byKind.get("claim").area, "knowledge");
+  assert.equal(byKind.get("claim").intent, "review-claim");
+  assert.equal(byKind.get("ingest").area, "capture");
+  assert.equal(byKind.get("ingest").intent, "review-ingest");
+  assert.equal(byKind.get("output-opportunity").area, "create");
+  assert.equal(byKind.get("output-opportunity").intent, "continue-output");
+  assert.equal(byKind.get("knowledge-maintenance").area, "knowledge");
+  assert.equal(byKind.get("knowledge-maintenance").intent, "review-maintenance");
+});
