@@ -108,3 +108,29 @@ test("recordRecommendation persists to runtime", async (t) => {
   assert.ok(data.length === 1);
   assert.equal(data[0].path, "vault/test.md");
 });
+
+test("recordRecommendation deduplicates by path instead of appending", async (t) => {
+  const { maintenance, runtimeRoot } = await setup(t, {});
+  maintenance.recordRecommendation("vault/test.md");
+  maintenance.recordRecommendation("vault/other.md");
+  maintenance.recordRecommendation("vault/test.md"); // 同 path 重复
+  const historyFile = path.join(runtimeRoot, "maintenance-history.json");
+  const data = JSON.parse(await fs.readFile(historyFile, "utf8"));
+  assert.equal(data.length, 2, "duplicate path should overwrite, not append");
+  assert.equal(data.filter((entry) => entry.path === "vault/test.md").length, 1);
+});
+
+test("weeklySummary reuses the orphan cache warmed by inspect", async (t) => {
+  const { maintenance } = await setup(t, {
+    "00-Inbox/a.md": "# A\n\n孤立 A。",
+    "01-Areas/b.md": "# B\n\n孤立 B。",
+    "01-Areas/c.md": "# C\n\n孤立 C。",
+  });
+  assert.equal(maintenance._cache, null);
+  await maintenance.inspect();
+  const warmedCache = maintenance._cache;
+  assert.ok(Array.isArray(warmedCache) && warmedCache.length > 0, "inspect warms the orphan cache");
+  const summary = await maintenance.weeklySummary();
+  assert.equal(maintenance._cache, warmedCache, "weeklySummary must reuse the same cache instance, not recompute");
+  assert.equal(summary.totalOrphans, warmedCache.length, "summary total matches cached orphans");
+});

@@ -39,14 +39,27 @@ class KnowledgeMaintenanceSource {
    */
   async inspect({ limit = 10 } = {}) {
     const now = this.clock();
+    const orphans = await this.#orphansForCurrentVault();
+    // 缓存里的 orphan.title 是笔记原标题；inspect 对外给出人类可读前缀
+    const labelled = orphans.map((orphan) => ({ ...orphan, title: `关联孤立笔记：${orphan.title}` }));
+    return this._filterByCooldown(labelled, now).slice(0, limit);
+  }
+
+  // 取当前 vault 的全部孤岛。fingerprint 命中时复用缓存、跳过全量读盘；inspect 与 weeklySummary 共享。
+  async #orphansForCurrentVault() {
     const files = await walkMarkdown(this.vaultRoot);
     const fingerprint = fingerprintVault(files.map((f) => path.relative(this.vaultRoot, f)));
-
-    // 使用 fingerprint 作为缓存键
     if (this._cache && this._cachedFingerprint === fingerprint) {
-      return this._filterByCooldown(this._cache, now).slice(0, limit);
+      return this._cache;
     }
+    const orphans = await this.#collectOrphans(files);
+    this._cache = orphans;
+    this._cachedFingerprint = fingerprint;
+    return orphans;
+  }
 
+  // 全量读盘并计算孤岛（排除 README/MOC）。orphan.title 保留笔记原标题，由调用方决定是否加前缀。
+  async #collectOrphans(files) {
     const notes = [];
     for (const file of files) {
       const markdown = await fs.readFile(file, "utf8");
@@ -54,51 +67,31 @@ class KnowledgeMaintenanceSource {
       if (/(?:^|\/)README\.md$|(?:^|\/)MOC\s*-/i.test(relative)) continue;
       notes.push({ file, relative, markdown, title: titleOf(markdown, file), basename: path.basename(file, ".md") });
     }
-
     const corpus = notes.map((note) => note.markdown).join("\n");
-    const allOrphans = notes
+    return notes
       .filter((note) => !/\[\[[^\]]+\]\]/.test(note.markdown) && !corpus.includes(`[[${note.basename}]]`))
       .map((note) => ({
         id: `orphan:${note.relative}`,
         kind: "orphan",
-        title: `关联孤立笔记：${note.title}`,
+        title: note.title,
         path: `vault/${note.relative}`,
         reason: "没有出站 WikiLink，也没有被其他笔记直接引用",
         topic: this.#extractTopic(note.relative),
       }));
-
-    this._cache = allOrphans;
-    this._cachedFingerprint = fingerprint;
-    return this._filterByCooldown(allOrphans, now).slice(0, limit);
   }
 
   /**
-   * 生成周度摘要（大批候选，不返回日常 inspect）。
-   * 返回 { summary, items }，默认只读。
+   * 生成周度摘要（大批候选，不返回日常 inspect）。复用 inspect 预热的孤岛缓存，
+   * 避免对同一 vault 重复全量读盘。默认只读。
    */
   async weeklySummary() {
-    const files = await walkMarkdown(this.vaultRoot);
-    const notes = [];
-    for (const file of files) {
-      const markdown = await fs.readFile(file, "utf8");
-      const relative = path.relative(this.vaultRoot, file).replace(/\\/g, "/");
-      if (/(?:^|\/)README\.md$|(?:^|\/)MOC\s*-/i.test(relative)) continue;
-      notes.push({ file, relative, markdown, title: titleOf(markdown, file), basename: path.basename(file, ".md") });
-    }
-
-    const corpus = notes.map((note) => note.markdown).join("\n");
-    const orphans = notes
-      .filter((note) => !/\[\[[^\]]+\]\]/.test(note.markdown) && !corpus.includes(`[[${note.basename}]]`))
-      .map((note) => ({ path: `vault/${note.relative}`, title: note.title, topic: this.#extractTopic(note.relative) }));
-
-    // 按主题分组
+    const orphans = await this.#orphansForCurrentVault();
     const byTopic = new Map();
     for (const orphan of orphans) {
       const topic = orphan.topic || "未分类";
       if (!byTopic.has(topic)) byTopic.set(topic, []);
-      byTopic.get(topic).push(orphan);
+      byTopic.get(topic).push({ path: orphan.path, title: orphan.title, topic: orphan.topic });
     }
-
     return {
       generatedAt: this.clock().toISOString(),
       totalOrphans: orphans.length,
@@ -169,7 +162,13 @@ class KnowledgeMaintenanceSource {
    */
   recordRecommendation(path) {
     const history = this.#loadHistory();
-    history.push({ path, recommendedAt: this.clock().getTime() });
+    const existing = history.find((entry) => entry.path === path);
+    if (existing) {
+      // 同 path 覆盖推荐时间，避免历史无限膨胀（冷却语义不变：_filterByCooldown 仍按 path 去重）
+      existing.recommendedAt = this.clock().getTime();
+    } else {
+      history.push({ path, recommendedAt: this.clock().getTime() });
+    }
     this.#saveHistory(history);
   }
 
