@@ -15,11 +15,11 @@
 - 仓库：当前 checkout 根目录
 - 分支：`codex/round3-remediation`
 - 固定起点：`b79d2e5 chore(vault): remove LangGraph.js tutorial series (32 files)`
-- 当前工作树不是 clean：本文档和多个源码文件已修改，新文件已创建。
-- 当前文档任务不暂存、不提交、不 Push；新会话必须重新运行 `git status --short --branch`，不得把本文状态当作永久事实。
+- 当前工作树 clean：P0–P4 实现 + 三轮审查修复已按精确路径分提交（基线 `b79d2e5` 之上）。新会话必须重新运行 `git status --short --branch` 与 `git log --oneline -8`，不得把本文状态当作永久事实。
+- 本轮未 Push（遵循约束）。
 - Syno `vault/`：512 个受 Git 跟踪的 Markdown。
 - 原库：555 个受 Git 跟踪的 Markdown，HEAD `883fbf5c457156805b9e9b53358175ce84940b59`，已有 19 项用户修改；永久只读。
-- 当前验证：Node 228/231（3 个 calendar-sync 因工作树未提交失败）、vault pytest 57/57、Repository verify 1131 files。
+- 当前验证：Node 233/233（calendar-sync 已恢复 + 2 个审查防回归测试）、vault pytest 57/57、Repository verify 1131 files。
 - 4317 Host 健康；Provider 已配置；微信和飞书均显示 running、available、ownerBound。
 - Windows 登录任务：installed=true、startup=at_logon、running=false、lastTaskResult=4294967295，尚未通过常驻验收。
 - 未 Push。
@@ -44,9 +44,25 @@
 
 ## 尚未完成
 
-1. P5：三轮审查、主人裁决、Windows 常驻验收、fresh clone、浏览器、真实渠道和备份恢复。
+1. P5：主人裁决、Windows 常驻验收、浏览器、真实渠道和备份恢复。（三轮审查已完成，见下；fresh clone 见阶段三）
 2. 全局 Goal 需通过 `goals.create` Job + 审批创建。
-3. 3 个 calendar-sync 测试因工作树未提交失败（GitGuard 拒绝执行），提交后应恢复。
+3. fresh clone 本地回归验证（阶段三，待执行）。
+
+## 三轮审查（阶段二，已完成）
+
+- 第 1 轮（Profile/Planner/契约，deep/architecture）：[Required] inspect 把全部 notes(含 searchable=false 系统笔记)传入 topics/sources/stability/reliability/deadLinks，违反约束 2 → 已修(inspect 改用 searchableWithMarkdown；deadLinks from 用 searchable、existing 用全部避免误报；summary mocCount/tags 用 searchable；notes 字段保留总数作对比) + 防回归测试。提交 ba98cc4。
+- 第 2 轮（Today/Capture/维护，deep/general）：[Required] items(priorities) 把 claim-review/ingest-pending/output-opportunity 信号统一映射为 news，违反约束 3.3，且 ACTION_MAP 缺 claim → 已修(SIGNAL_KIND_TO_ACTION 映射 signal.kind 到 ACTION_MAP key；ACTION_MAP 补 claim→knowledge/review-claim) + 防回归测试。提交 ecc4846。
+- 第 3 轮（Standards/安全/运行/交付，deep/security）：0 Required。pnpm verify 1131 files、.runtime 入 gitignore、文档未虚假宣称 build/typecheck、Provider 无 fallback 未改、路径遍历/注入/错误降级均通过。
+
+### [Optional] backlog（未阻塞，后续可处理）
+
+- planner allocation 仅 digest/ingest/maintenance 三键，review 被计入 digest，output/goal 不计入任何键，语义待明确。
+- planner loadExistingPlan 返回首个匹配，同日多文件时建议返回 fingerprint 匹配或最新。
+- planner 构造注入 profile 但 planDay 未使用（死依赖）。
+- DailyAction 在 daily-knowledge-plan 内联与独立 daily-action.schema 重复，建议 $ref。
+- profile #withMarkdown 依赖全局 PATHS.repoRoot，建议注入 repoRoot 与 opsRoot 对齐。
+- maintenance weeklySummary 重复全量遍历，建议复用 inspect 的 notes。
+- maintenance recordRecommendation 无去重，planner 重算时 history 可能膨胀（Set 去重功能 OK）。
 
 ## 当前待主人裁决
 
