@@ -19,7 +19,7 @@
 - 本轮未 Push（遵循约束）。
 - Syno `vault/`：512 个受 Git 跟踪的 Markdown。
 - 原库：555 个受 Git 跟踪的 Markdown，HEAD `883fbf5c457156805b9e9b53358175ce84940b59`，已有 19 项用户修改；永久只读。
-- 当前验证：Node 233/233（calendar-sync 已恢复 + 2 个审查防回归测试）、vault pytest 57/57、Repository verify 1131 files。
+- 当前验证：Node 234/234（含渠道容错 + P4 proactive 测试）、vault pytest 57/57、Repository verify 1141 files（Goal Job 产物 +10、dead config 删 -3 后）。
 - 4317 Host 健康；Provider 已配置；微信和飞书均显示 running、available、ownerBound。
 - Windows 登录任务：installed=true、startup=at_logon、running=false、lastTaskResult=4294967295，尚未通过常驻验收。
 - 未 Push。
@@ -40,12 +40,12 @@
 - P1：DailyKnowledgePlan + DailyAction 契约，KnowledgeLoopPlanner.planDay() 实现，GET /api/syno/learning/plan/today 端点。
 - P2：TodayService 集成 planner，所有 item 含 typed action (area/intent)，Goal=0 引导提示，suggestedLearning/dueReviews 分离。
 - P3：KnowledgeMaintenanceSource 增强——vault fingerprint 缓存键、7 天冷却、主题轮换、每日最多 1 个维护、周摘要。
-- P4：planner 集成 OutputOpportunity，检查已有活跃输出或基于 Goal 自动生成。
+- P4：planner 集成 OutputOpportunity；ProactiveOrchestrator 主动渠道核心补全（weekly→weeklySummary、渠道定向含微信/飞书、allocation bug 修复），详见「本次会话补全」。
 
 ## 尚未完成
 
 1. P5：主人裁决、Windows 常驻验收、浏览器、真实渠道和备份恢复。（三轮审查已完成，见下；fresh clone 见阶段三）
-2. 全局 Goal 需通过 `goals.create` Job + 审批创建。
+2. ~~全局 Goal 需通过 goals.create Job + 审批创建~~ 已创建：`goal-643fb7fc`（focusAreas 校准为 vault 实际 snake_case tag：ai_coding/coding_agent/harness/context/loop_engineering/ai_philosophy/ai_career/ai_evaluation；title 曾因 curl 中文编码乱码已直接修文件）。planner 已引用并选中 AI Agent Development 笔记（plan/today 验证通过）。
 3. ~~fresh clone 本地回归验证~~ 已完成（阶段三）：本地路径 clone 到 `D:\tmp\syno-clone-test`（HEAD `d90b503` 与原仓库一致，未 push），`pnpm install --frozen-lockfile` 81 包 833ms，`pnpm verify` 1131 files，Node test 233/233，`pytest vault/tests` 57 passed，`node --check` planner/today/profile 通过。证据证明提交后 HEAD 可干净复现。
 
 ## 三轮审查（阶段二，已完成）
@@ -63,6 +63,25 @@
 - profile #withMarkdown 依赖全局 PATHS.repoRoot，建议注入 repoRoot 与 opsRoot 对齐。
 - maintenance weeklySummary 重复全量遍历，建议复用 inspect 的 notes。
 - maintenance recordRecommendation 无去重，planner 重算时 history 可能膨胀（Set 去重功能 OK）。
+- ProactiveOrchestrator morning/evening 内容未分化（都用 priorities.slice(0,3)，未突出 plan.allocation / dueReviews / progress）。
+- cadence 默认 balanced=2，周日 morning+evening+weekly 三任务会撞限额（考虑固定日程走独立配额）。
+- SignalEngine 时间阈值（≥8/≥21）vs 精确 8:30/22:00；weekly 无小时门槛。
+
+## 本次会话补全（渠道容错 + P4 主动渠道 + dead config 清理 + Goal）
+
+- **渠道容错**（`c4f0027`）：`initialize` 的 `channels.start()` 改后台运行 + `ChannelHub.start` 用 `Promise.allSettled`，渠道（微信/飞书）WebSocket 握手超时不再阻塞 `synoReady`/Web API——`/api/syno/*` 在渠道离线时仍可用，`channelRecoveryTimer` 周期重试。
+- **P4 主动渠道核心补全**（`4445c05`）：weekly signal 调 `maintenance.weeklySummary()`（之前 0 引用）；`channels.send` 定向含微信/飞书；`localMessage` 加 `text` 字段（微信/飞书丢弃 title）；修 `allocation.capture→ingest` bug。
+- **dead config / 死模块清理**（`8a3c3d3` + `dc7b000`）：删 `config/channels.json`、`config/executors.json`、`config/schedule.json`（全 0 引用）+ `scheduler.mjs`（legacy 死模块）+ ARCHITECTURE legacy 声明 + Scheduler 测试。
+- **全局 Goal 创建**：`goal-643fb7fc`（见上）。
+
+## 架构发现（避免下次重复探索）
+
+- **定时调度由 `ProactiveOrchestrator` + `SignalEngine` 承担**（`runtime.mjs` L263 实例化、L308 worker 模式 `start`），**不是 `Scheduler` 类**（已删）。`runtime.scheduler` 字段是 `proactive` 的别名，与 Scheduler 类无关。晨间/晚间/周复盘主动通知已在 web/windows 触发；本次补全让 weekly 调 weeklySummary + 渠道含微信/飞书。
+- **`config/` 目录只有 `vault-contract.json` 是活的**（`validator.mjs:103` 读）。`channels.json`/`executors.json`/`schedule.json` 都曾是无引用死配置（已删）。PATHS 无 configRoot，config 不被遍历加载。
+- **渠道发送**：`ChannelHub.send` 默认 `targets=[web, windows, homeChannel]`（不含微信/飞书）；微信/飞书 adapter 用 `text||body`（丢弃 title），故主动消息须带 `text` 字段自包含。
+- **allocation 字段**：`PriorityEngine.allocate` 返回 `{digest, ingest, maintenance}`（无 capture）。
+- **KnowledgeStore 默认 indexFile 在 `.runtime/knowledge-index-v1.json`**（非 `vault/.index.json`）；测试/脚本若误用 `vault/.index.json` 会污染工作树触发 GitGuard。
+- **渠道间歇超时**：微信/飞书 WebSocket 握手对网络/服务波动敏感，偶发 15s 超时；非持久故障，Host 已容错（渠道降级、API 不阻塞）。
 
 ## 当前待主人裁决
 
