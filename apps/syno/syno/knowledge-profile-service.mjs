@@ -73,6 +73,7 @@ class KnowledgeProfileService {
     const searchable = notes.filter((note) => note.searchable);
     const excludedSystemNotes = notes.length - searchable.length;
 
+    const searchableWithMarkdown = withMarkdown.filter((note) => note.searchable);
     const orphanNoteRefs = await this.#orphans();
     const profile = {
       id: `profile-${now.toISOString().slice(0, 10).replaceAll("-", "")}-${randomUUID().slice(0, 8)}`,
@@ -80,13 +81,13 @@ class KnowledgeProfileService {
       generatedAt: now.toISOString(),
       vaultFingerprint,
       summary: this.#summary(withMarkdown),
-      topics: this.#topics(withMarkdown),
-      sources: this.#sources(withMarkdown),
-      stabilityBreakdown: this.#stabilityBreakdown(withMarkdown),
-      reliabilityBreakdown: this.#reliabilityBreakdown(withMarkdown),
+      topics: this.#topics(searchableWithMarkdown),
+      sources: this.#sources(searchableWithMarkdown),
+      stabilityBreakdown: this.#stabilityBreakdown(searchableWithMarkdown),
+      reliabilityBreakdown: this.#reliabilityBreakdown(searchableWithMarkdown),
       orphanNoteRefs,
-      deadLinkRefs: this.#deadLinks(withMarkdown),
-      outdatedNoteRefs: this.#outdated(withMarkdown, now),
+      deadLinkRefs: this.#deadLinks(searchableWithMarkdown, withMarkdown),
+      outdatedNoteRefs: this.#outdated(searchableWithMarkdown, now),
       evidenceGaps: await this.#evidenceGaps({ opsRoot }),
       learningCoverage: await this.#learningCoverage({ opsRoot }, withMarkdown),
       excludedSystemNotes,
@@ -157,11 +158,11 @@ class KnowledgeProfileService {
   }
 
   #summary(notes) {
-    const searchable = notes.filter((note) => note.searchable).length;
-    const mocCount = notes.filter((note) => /(?:^|\/)MOC\s*-/i.test(note.path)).length;
+    const searchableNotes = notes.filter((note) => note.searchable);
+    const mocCount = searchableNotes.filter((note) => /(?:^|\/)MOC\s*-/i.test(note.path)).length;
     const tagSet = new Set();
-    for (const note of notes) for (const tag of [...(note.tags || []), ...(note.legacyTags || [])]) if (tag) tagSet.add(tag);
-    return { notes: notes.length, searchable, mocCount, tags: tagSet.size };
+    for (const note of searchableNotes) for (const tag of [...(note.tags || []), ...(note.legacyTags || [])]) if (tag) tagSet.add(tag);
+    return { notes: notes.length, searchable: searchableNotes.length, mocCount, tags: tagSet.size };
   }
 
   #topics(notes) {
@@ -234,11 +235,11 @@ class KnowledgeProfileService {
     return [...new Set(findings.map((finding) => finding.path))].sort();
   }
 
-  #deadLinks(notes) {
-    const existing = new Set(notes.map((note) => stableBasename(note.path)));
+  #deadLinks(searchableNotes, allNotes) {
+    const existing = new Set(allNotes.map((note) => stableBasename(note.path)));
     const dead = [];
     const seen = new Set();
-    for (const note of notes) {
+    for (const note of searchableNotes) {
       for (const target of extractWikilinks(stripFrontmatter(note.markdown))) {
         const base = stableBasename(target);
         if (!base || existing.has(base)) continue;

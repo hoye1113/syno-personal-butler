@@ -182,3 +182,22 @@ test("latest reports stale when vault changes after persist", async (t) => {
   assert.equal(result.fresh, false);
   assert.notEqual(result.currentVaultFingerprint, result.profile.vaultFingerprint);
 });
+
+test("system notes do not pollute topics, sources or stability breakdown", async (t) => {
+  const { profileService } = await setup(t, {
+    "01-Areas/personal.md": "---\ntitle: Personal\ntags: [AI]\nsource: GitHub\nstability: practice\nupdated: 2026-07-01\n---\n# Personal",
+    "99-System/protocol.md": "---\ntitle: Protocol\ntags: [System, Meta]\nsource: Internal\nstability: principle\nupdated: 2026-07-01\n---\n# Protocol",
+  });
+  const { profile } = await profileService.inspect();
+  assert.equal(profile.excludedSystemNotes, 1, "system note should be excluded");
+  assert.equal(profile.summary.searchable, 1);
+  const topicNames = profile.topics.map((topic) => topic.name);
+  assert.ok(topicNames.includes("AI"), `topics should include AI, got ${JSON.stringify(topicNames)}`);
+  assert.ok(!topicNames.includes("System"), "system tag must not pollute topics");
+  assert.ok(!topicNames.includes("Meta"), "system tag must not pollute topics");
+  const sourceRefs = profile.sources.map((source) => source.ref);
+  assert.ok(sourceRefs.includes("GitHub"));
+  assert.ok(!sourceRefs.includes("Internal"), "system source must not pollute sources");
+  assert.equal(profile.stabilityBreakdown.principle, 0, "system stability must not pollute breakdown");
+  assert.equal(profile.stabilityBreakdown.practice, 1);
+});
