@@ -159,12 +159,12 @@
 
   async function buildFileIntakePayload(file, requestedKind) {
     if (!file) throw new Error("请选择文件");
-    const kind = requestedKind || (file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "txt");
-    const maximum = kind === "pdf" ? 10 * 1024 * 1024 : 1024 * 1024;
-    if (file.size > maximum) throw new Error(kind === "pdf" ? "PDF 不能超过 10 MB" : "文本文件不能超过 1 MB");
+    const kind = requestedKind || uiModel.fileKindFromName(file.name);
+    const maximum = ["pdf", "docx"].includes(kind) ? 10 * 1024 * 1024 : 1024 * 1024;
+    if (file.size > maximum) throw new Error(["pdf", "docx"].includes(kind) ? "文件不能超过 10 MB" : "文本文件不能超过 1 MB");
     const bytes = new Uint8Array(await file.arrayBuffer()); let binary = "";
     for (let index = 0; index < bytes.length; index += 0x8000) binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
-    return { kind, name: file.name, base64: btoa(binary) };
+    return { kind, name: file.name, base64: btoa(binary), title: file.name };
   }
 
   function sendIntake(payload) {
@@ -180,7 +180,10 @@
     button.textContent = "正在提交…";
     try {
       let payload = { kind, value };
-      if (["pdf", "txt"].includes(kind)) payload = await buildFileIntakePayload(fileInput.files[0], kind);
+      if (["pdf", "docx", "txt", "html"].includes(kind)) {
+        if (!fileInput.files[0]) throw new Error("请先选择文件");
+        payload = await buildFileIntakePayload(fileInput.files[0], kind);
+      }
       const result = await sendIntake(payload);
       document.querySelector("#synoIntakeHint").textContent = `已收到 ${result.artifact.id}。赛诺正在异步查重并形成收录方案。`;
       loadIntakeProposal(result.artifact.id);
@@ -248,9 +251,9 @@
     return values[job.status] || job.status;
   }
 
-  async function loadJobs() {
+  async function loadJobs({ silent = false } = {}) {
     const target = document.querySelector("#synoJobs");
-    target.replaceChildren(node("p", "syno-empty", "正在读取任务…"));
+    if (!silent) target.replaceChildren(node("p", "syno-empty", "正在读取任务…"));
     try {
       const { jobs } = await api("/api/syno/jobs");
       target.replaceChildren();
@@ -280,11 +283,18 @@
         target.append(item);
       }
     } catch (error) {
-      target.replaceChildren(node("p", "syno-error", error.message));
+      if (!silent) target.replaceChildren(node("p", "syno-error", error.message));
     }
   }
 
   async function decide(id, action) {
+    const card = document.querySelector(`[data-job-id="${CSS.escape(id)}"]`);
+    if (card) {
+      card.classList.add("is-resolving");
+      for (const btn of card.querySelectorAll("button")) { btn.disabled = true; btn.style.pointerEvents = "none"; }
+      const slot = card.querySelector(".syno-advice");
+      if (slot) slot.replaceChildren(node("span", "syno-advice-badge", "执行中…"));
+    }
     try {
       await api(`/api/syno/jobs/${encodeURIComponent(id)}/${action}`, {
         method: "POST",
@@ -292,9 +302,19 @@
         body: JSON.stringify(action === "reject" ? { reason: "用户在 Web UI 拒绝" } : {}),
       });
     } catch (error) {
+      if (card) {
+        card.classList.remove("is-resolving");
+        for (const btn of card.querySelectorAll("button")) { btn.disabled = false; btn.style.pointerEvents = ""; }
+        const slot = card.querySelector(".syno-advice");
+        const actions = card.querySelector(".syno-job-actions");
+        const stashedJob = actions?.__synoJob;
+        if (slot && stashedJob) { renderAdviceSlot(slot, stashedJob.advice); buildAdviceActions(actions, stashedJob); }
+        else if (slot) slot.replaceChildren();
+      }
       alert(error.message);
+      return;
     }
-    await loadJobs();
+    await loadJobs({ silent: true });
   }
 
   // 渲染审批顾问建议：三段（这是什么 / 管家建议 / 理由）+ 可选「注意」+ 离线徽标 + 原始信息折叠。
@@ -328,6 +348,7 @@
   }
 
   function buildAdviceActions(container, job) {
+    container.__synoJob = job;
     container.replaceChildren();
     for (const btn of uiModel.adviceButtons(job)) {
       const el = node("button", btn.kind === "ghost" ? "ghost-btn" : "accent-btn", btn.label);
@@ -915,7 +936,7 @@
   });
   document.querySelector("#synoJobsRefresh")?.addEventListener("click", loadJobs);
   document.querySelector("#synoIntakeKind")?.addEventListener("change", (event) => {
-    const fileMode = ["pdf", "txt"].includes(event.target.value);
+    const fileMode = ["pdf", "txt", "docx", "html"].includes(event.target.value);
     document.querySelector("#synoIntakeFile").hidden = !fileMode;
     document.querySelector("#synoIntakeValue").hidden = fileMode;
   });

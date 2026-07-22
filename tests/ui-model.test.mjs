@@ -36,3 +36,18 @@ test("UI model maps approval advice to outcome-aware buttons", () => {
   assert.equal(pending.loading, true);
   assert.equal(pending.buttons.length, 0);
 });
+
+test("fileKindFromName maps extensions to intake kinds", () => {
+  const model = globalThis.SynoUiModel;
+  assert.equal(model.fileKindFromName("report.pdf"), "pdf");
+  assert.equal(model.fileKindFromName("REPORT.PDF"), "pdf");
+  assert.equal(model.fileKindFromName("notes.md"), "markdown");
+  assert.equal(model.fileKindFromName("notes.markdown"), "markdown");
+  assert.equal(model.fileKindFromName("readme.txt"), "txt");
+  assert.equal(model.fileKindFromName("doc.docx"), "docx");
+  assert.equal(model.fileKindFromName("page.html"), "html");
+  assert.equal(model.fileKindFromName("page.htm"), "html");
+  assert.throws(() => model.fileKindFromName("book.epub"), /暂不支持/);
+  assert.throws(() => model.fileKindFromName(""), /暂不支持/);
+  assert.throws(() => model.fileKindFromName("noext"), /暂不支持/);
+});

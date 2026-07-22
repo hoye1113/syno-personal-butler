@@ -36,7 +36,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = __dirname;
 const PUBLIC_DIR = path.join(PROJECT_ROOT, "public");
 process.env.TOPIC_PLANNER_CONFIG ||= path.join(PATHS.stateRoot, "topic-planner.config.json");
-const PORT = Number(process.env.PORT || 4317);
+const PORT = Number(process.env.PORT || 8888);
 const TIMEZONE = normalizeTimeZone(
   process.env.TOPIC_PLANNER_TIME_ZONE || Intl.DateTimeFormat().resolvedOptions().timeZone,
 );

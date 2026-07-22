@@ -100,3 +100,14 @@ test("knowledge-profile contract validates dimensions and rejects unknown fields
   await assert.rejects(validateContractRecord("knowledge-profile", { ...valid, summary: { notes: 1 } }), /searchable/);
   await assert.rejects(validateContractRecord("knowledge-profile", { ...valid, noise: 1 }), /未知字段/);
 });
+
+test("artifact contract accepts docx and html kinds", async () => {
+  const base = {
+    id: "artifact-20260722-abcd1234", path: "local-state://ingest/artifact-20260722-abcd1234",
+    created: "2026-07-22T12:00:00.000Z", isolated: true, status: "accepted",
+  };
+  await validateContractRecord("artifact", { ...base, kind: "docx" });
+  await validateContractRecord("artifact", { ...base, kind: "html" });
+  await validateContractRecord("artifact", { ...base, kind: "pdf" });
+  await assert.rejects(validateContractRecord("artifact", { ...base, kind: "epub" }), (err) => /枚举/.test(err.message));
+});

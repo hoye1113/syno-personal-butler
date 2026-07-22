@@ -50,3 +50,21 @@ test("PDF intake validates magic bytes and size before quarantine", async (t) =>
   assert.equal(request.artifact.pages, 1);
   assert.equal((await fs.stat(path.join(root, "uploads", request.attachment))).size, 13);
 });
+
+test("markdown paste and file upload both work", async () => {
+  const service = new IntakeService();
+  const pasted = await service.prepare({ kind: "markdown", value: "# Hello\n\nWorld" });
+  assert.equal(pasted.sourceType, "markdown");
+  assert.equal(pasted.content, "# Hello\n\nWorld");
+  assert.equal(pasted.artifact, undefined);
+  const fileRequest = await service.prepare({ kind: "markdown", name: "note.md", base64: Buffer.from("# File\n\nContent").toString("base64") });
+  assert.equal(fileRequest.sourceType, "markdown");
+  assert.equal(fileRequest.content, "# File\n\nContent");
+});
+
+test("markdown and unknown kind reject empty or unsupported input", async () => {
+  const service = new IntakeService();
+  await assert.rejects(service.prepare({ kind: "markdown", value: "" }), /收录内容不能为空/);
+  await assert.rejects(service.prepare({ kind: "markdown", value: "   " }), /收录内容不能为空/);
+  await assert.rejects(service.prepare({ kind: "epub" }), /不支持的收录类型/);
+});

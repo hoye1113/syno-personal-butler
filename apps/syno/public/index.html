@@ -222,10 +222,10 @@
         <div><p class="panel-tag">CAPTURE · 快速收录</p><h2 id="quickCaptureTitle">收到什么，就交给 Syno</h2><p>先立即确认接收，安全提取、查重和收录建议会在后台继续。</p></div>
         <div class="quick-capture-control">
           <textarea id="synoQuickCaptureValue" rows="3" placeholder="粘贴链接、文字或 Markdown…"></textarea>
-          <button id="synoQuickCaptureFileButton" class="ghost-btn" type="button">选择文件</button><input id="synoQuickCaptureFile" type="file" accept="application/pdf,.pdf,text/plain,.txt,.md,text/markdown" hidden />
+          <button id="synoQuickCaptureFileButton" class="ghost-btn" type="button">选择文件</button><input id="synoQuickCaptureFile" type="file" accept="application/pdf,.pdf,text/plain,.txt,.md,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,text/html,.html,.htm" hidden />
           <button id="synoQuickCaptureSubmit" class="accent-btn" type="button">收录</button>
         </div>
-        <p id="synoQuickCaptureHint" class="form-hint" aria-live="polite">支持 URL、Markdown、TXT 和 PDF。</p>
+        <p id="synoQuickCaptureHint" class="form-hint" aria-live="polite">支持 URL、Markdown、TXT、PDF、DOCX 和 HTML。</p>
       </section>
 
       <details class="secondary-workspace">
@@ -560,9 +560,9 @@
           <summary>收录与知识维护</summary>
           <div class="syno-intake-fields">
             <label for="synoIntakeKind">资料类型</label>
-            <select id="synoIntakeKind"><option value="url">URL / 单篇 B站 opus 或 cv</option><option value="text">粘贴文本</option><option value="markdown">Markdown</option><option value="txt">TXT / Markdown 文件（1 MB 内）</option><option value="pdf">PDF（10 MB 内）</option></select>
+            <select id="synoIntakeKind"><option value="url">URL / 单篇 B站 opus 或 cv</option><option value="text">粘贴文本</option><option value="markdown">Markdown</option><option value="txt">TXT / Markdown 文件（1 MB 内）</option><option value="pdf">PDF（10 MB 内）</option><option value="docx">DOCX（10 MB 内）</option><option value="html">HTML（1 MB 内）</option></select>
             <textarea id="synoIntakeValue" rows="4" placeholder="粘贴 URL、文本或 Markdown"></textarea>
-            <input id="synoIntakeFile" type="file" accept="application/pdf,.pdf,text/plain,.txt,.md,text/markdown" hidden />
+            <input id="synoIntakeFile" type="file" accept="application/pdf,.pdf,text/plain,.txt,.md,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,text/html,.html,.htm" hidden />
             <div class="syno-intake-actions"><small id="synoIntakeHint">收录会先进入审批中心，不会直接改知识库。</small><button id="synoIntakeSubmit" class="accent-btn" type="button">提交收录候选</button></div>
             <div id="synoIntakeProposal" class="syno-list" aria-live="polite"></div>
           </div>

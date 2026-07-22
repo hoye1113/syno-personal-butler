@@ -419,6 +419,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* 审批顾问建议卡片：管家先读懂，再给「这是什么 / 管家建议 / 理由」 */
 .syno-job.is-awaiting_approval { border-color: color-mix(in oklch, var(--old-gold) 42%, var(--line)); }
+.syno-job.is-resolving { opacity: 0.6; pointer-events: none; border-style: dashed; transition: opacity .18s ease; }
+.syno-job.is-resolving .syno-job-actions { display: none; }
 .syno-advice { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
 .syno-advice-row { display: flex; flex-direction: column; gap: 3px; }
 .syno-advice-row .panel-tag { margin: 0; }

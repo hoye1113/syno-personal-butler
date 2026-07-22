@@ -40,6 +40,14 @@
     return [];
   }
 
+  // 文件扩展名 → kind 映射（大小写不敏感）。
+  function fileKindFromName(name) {
+    const ext = String(name || "").toLowerCase().split(".").pop();
+    const map = { pdf: "pdf", md: "markdown", markdown: "markdown", txt: "txt", docx: "docx", html: "html", htm: "html" };
+    if (!map[ext]) throw new Error(`暂不支持该格式：仅支持 PDF、Markdown、TXT、DOCX、HTML`);
+    return map[ext];
+  }
+
   // 纯映射器：把 job + 缓存的 advice 映射成卡片视图模型（供测试与渲染共用）。
   function adviceViewModel(job) {
     const advice = job?.advice || null;
@@ -52,5 +60,5 @@
     };
   }
 
-  root.SynoUiModel = Object.freeze({ todayTarget, outputActions, intentLabel, adviceButtons, adviceViewModel });
+  root.SynoUiModel = Object.freeze({ todayTarget, outputActions, intentLabel, adviceButtons, adviceViewModel, fileKindFromName });
 })(globalThis);
