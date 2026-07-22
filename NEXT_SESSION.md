@@ -19,7 +19,7 @@
 - 本轮未 Push（遵循约束）。
 - Syno `vault/`：512 个受 Git 跟踪的 Markdown。
 - 原库：555 个受 Git 跟踪的 Markdown，HEAD `883fbf5c457156805b9e9b53358175ce84940b59`，已有 19 项用户修改；永久只读。
-- 当前验证：Node 234/234（含渠道容错 + P4 proactive 测试）、vault pytest 57/57、Repository verify 1141 files（Goal Job 产物 +10、dead config 删 -3 后）。
+- 当前验证：Node 239/239（含渠道容错 + P4 proactive + backlog 推进 5 例）、vault pytest 57/57、Repository verify 1139 files。
 - 4317 Host 健康；Provider 已配置；微信和飞书均显示 running、available、ownerBound。
 - Windows 登录任务：installed=true、startup=at_logon、running=false、lastTaskResult=4294967295，尚未通过常驻验收。
 - 未 Push。
@@ -56,14 +56,10 @@
 
 ### [Optional] backlog（未阻塞，后续可处理）
 
-- planner allocation 仅 digest/ingest/maintenance 三键，review 被计入 digest，output/goal 不计入任何键，语义待明确。
-- planner loadExistingPlan 返回首个匹配，同日多文件时建议返回 fingerprint 匹配或最新。
-- planner 构造注入 profile 但 planDay 未使用（死依赖）。
-- DailyAction 在 daily-knowledge-plan 内联与独立 daily-action.schema 重复，建议 $ref。
-- profile #withMarkdown 依赖全局 PATHS.repoRoot，建议注入 repoRoot 与 opsRoot 对齐。
-- maintenance weeklySummary 重复全量遍历，建议复用 inspect 的 notes。
-- maintenance recordRecommendation 无去重，planner 重算时 history 可能膨胀（Set 去重功能 OK）。
-- ProactiveOrchestrator morning/evening 内容未分化（都用 priorities.slice(0,3)，未突出 plan.allocation / dueReviews / progress）。
+> 2026-07-22 已完成 6 项：planner allocation 语义文档化、loadExistingPlan 取最新、planner profile 死依赖删除、weeklySummary 缓存复用、recordRecommendation 去重、morning/evening 内容分化。详见「本次会话补全（backlog 推进）」。
+
+- **DailyAction `$ref` 去重**（已评估，需独立工单）：`daily-knowledge-plan.schema.json` 的 items 与独立 `daily-action.schema.json` 字段重复。但 `schema-registry.mjs` 的 `validateValue`（L15-46）是手写递归校验器，**不解析 `$ref`**——若 items 改 `$ref`，会被当成无 type/properties 的空 schema 跳过校验，导致 items **静默失校验**。正确做法需先给 registry 加 `$ref` 解析 + loadContract 依赖预加载，作为独立工单。
+- profile `#withMarkdown` 依赖全局 PATHS.repoRoot，建议注入 repoRoot 与 opsRoot 对齐。
 - cadence 默认 balanced=2，周日 morning+evening+weekly 三任务会撞限额（考虑固定日程走独立配额）。
 - SignalEngine 时间阈值（≥8/≥21）vs 精确 8:30/22:00；weekly 无小时门槛。
 
@@ -73,6 +69,13 @@
 - **P4 主动渠道核心补全**（`4445c05`）：weekly signal 调 `maintenance.weeklySummary()`（之前 0 引用）；`channels.send` 定向含微信/飞书；`localMessage` 加 `text` 字段（微信/飞书丢弃 title）；修 `allocation.capture→ingest` bug。
 - **dead config / 死模块清理**（`8a3c3d3` + `dc7b000`）：删 `config/channels.json`、`config/executors.json`、`config/schedule.json`（全 0 引用）+ `scheduler.mjs`（legacy 死模块）+ ARCHITECTURE legacy 声明 + Scheduler 测试。
 - **全局 Goal 创建**：`goal-643fb7fc`（见上）。
+
+## 本次会话补全（backlog 推进，3 批）
+
+- **morning/evening 主动通知分化**（`b44a6cf`）：`localMessage` 按 signal.kind 分化——晨间突出 plan.allocation（消化/收录/维护预算）+ primary；晚间突出 progress（已完成/待确认）+ 前 2 到期复习；event/weekly 保持。缺字段回退优先行动。新增测试 2 例。
+- **维护源缓存复用 + 去重**（`b589f27`）：抽取 `#orphansForCurrentVault`，inspect 与 weeklySummary 共享 fingerprint 缓存，跳过重复全量读盘；`recordRecommendation` 按 path 去重（覆盖非追加）防 history 膨胀。新增测试 2 例。
+- **planner 正确性 + 清理**（`9a388b6`）：`loadExistingPlan` 按 generatedAt 降序取最新（避免 readdir 顺序返回旧计划）；删 planner profile 死依赖（+ runtime 实例化 + test setup 同步）；allocation 三键语义文档化（注释 + 契约 description）。新增测试 1 例。
+- 全量 239/239，verify 1139 files，未 push。
 
 ## 架构发现（避免下次重复探索）
 
