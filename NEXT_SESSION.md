@@ -19,7 +19,7 @@
 - 本轮未 Push（遵循约束）。
 - Syno `vault/`：512 个受 Git 跟踪的 Markdown。
 - 原库：555 个受 Git 跟踪的 Markdown，HEAD `883fbf5c457156805b9e9b53358175ce84940b59`，已有 19 项用户修改；永久只读。
-- 当前验证：Node 239/239（含渠道容错 + P4 proactive + backlog 推进 5 例）、vault pytest 57/57、Repository verify 1139 files。
+- 当前验证：Node 240/240（含渠道容错 + P4 proactive + backlog 推进 6 例）、vault pytest 57/57、Repository verify 1139 files。
 - 4317 Host 健康；Provider 已配置；微信和飞书均显示 running、available、ownerBound。
 - Windows 登录任务：installed=true、startup=at_logon、running=false、lastTaskResult=4294967295，尚未通过常驻验收。
 - 未 Push。
@@ -56,12 +56,10 @@
 
 ### [Optional] backlog（未阻塞，后续可处理）
 
-> 2026-07-22 已完成 6 项：planner allocation 语义文档化、loadExistingPlan 取最新、planner profile 死依赖删除、weeklySummary 缓存复用、recordRecommendation 去重、morning/evening 内容分化。详见「本次会话补全（backlog 推进）」。
+> 2026-07-22 已完成 8 项：planner allocation 语义文档化、loadExistingPlan 取最新、planner profile 死依赖删除、weeklySummary 缓存复用、recordRecommendation 去重、morning/evening 内容分化、profile repoRoot 注入、cadence weekly 独立配额。详见「本次会话补全」两轮。
 
 - **DailyAction `$ref` 去重**（已评估，需独立工单）：`daily-knowledge-plan.schema.json` 的 items 与独立 `daily-action.schema.json` 字段重复。但 `schema-registry.mjs` 的 `validateValue`（L15-46）是手写递归校验器，**不解析 `$ref`**——若 items 改 `$ref`，会被当成无 type/properties 的空 schema 跳过校验，导致 items **静默失校验**。正确做法需先给 registry 加 `$ref` 解析 + loadContract 依赖预加载，作为独立工单。
-- profile `#withMarkdown` 依赖全局 PATHS.repoRoot，建议注入 repoRoot 与 opsRoot 对齐。
-- cadence 默认 balanced=2，周日 morning+evening+weekly 三任务会撞限额（考虑固定日程走独立配额）。
-- SignalEngine 时间阈值（≥8/≥21）vs 精确 8:30/22:00；weekly 无小时门槛。
+- ~~SignalEngine 时间精度~~（已评估，**非 bug**）：≥hour 阈值（morning≥8、evening≥21）配合 lastRuns 去重每天只触发一次，是合理设计；weekly 无小时门槛但受 quietHours（22:30-07:30）约束实际只在白天触发。保持现状，不改动。
 
 ## 本次会话补全（渠道容错 + P4 主动渠道 + dead config 清理 + Goal）
 
@@ -76,6 +74,13 @@
 - **维护源缓存复用 + 去重**（`b589f27`）：抽取 `#orphansForCurrentVault`，inspect 与 weeklySummary 共享 fingerprint 缓存，跳过重复全量读盘；`recordRecommendation` 按 path 去重（覆盖非追加）防 history 膨胀。新增测试 2 例。
 - **planner 正确性 + 清理**（`9a388b6`）：`loadExistingPlan` 按 generatedAt 降序取最新（避免 readdir 顺序返回旧计划）；删 planner profile 死依赖（+ runtime 实例化 + test setup 同步）；allocation 三键语义文档化（注释 + 契约 description）。新增测试 1 例。
 - 全量 239/239，verify 1139 files，未 push。
+
+## 本次会话补全（backlog 第二轮：profile 注入 + weekly 配额修复）
+
+- **profile repoRoot 注入**（`340542c`）：`#withMarkdown` 改用注入的 `this.repoRoot`（与 opsRoot 对称）。注意 note.path 基准仍是全局 relativeToRepo，故 repoRoot 默认必须 = PATHS.repoRoot；此改动为对称性 + 未来 KnowledgeStore 注入铺路，行为零变更。
+- **cadence weekly 独立配额**（`bee2f34`，**真 bug 修复**）：周日 balanced=2 时 weekly 占日常配额挤掉 evening。`SignalEngine.collect` 把 weekly 排出日常 slice、独立返回；`ProactiveOrchestrator.tick` 里 weekly 不计 notificationsToday、不触发配额 break。新增回归测试。
+- **时间精度保持现状**（评估后非 bug）：≥hour 阈值 + lastRuns 去重每天触发一次，合理设计；weekly 受 quietHours 约束只在白天触发。不改动。
+- 全量 240/240，verify 1139 files，未 push。
 
 ## 架构发现（避免下次重复探索）
 
