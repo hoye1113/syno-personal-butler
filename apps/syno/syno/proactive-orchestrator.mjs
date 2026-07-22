@@ -18,13 +18,22 @@ function isQuietTime(now, quietHours = DEFAULT_QUIET_HOURS) {
   return start > end ? current >= start || current < end : current >= start && current < end;
 }
 
-function localMessage(signal, snapshot) {
+function localMessage(signal, snapshot, weeklySummary) {
   const names = { morning: "晨间计划", evening: "晚间复盘", weekly: "每周深度复盘", event: "高价值事件" };
-  const priorities = snapshot.priorities.slice(0, 3).map((item, index) => `${index + 1}. ${item.title}`).join("\n");
-  const allocation = snapshot.allocation;
+  const title = `Syno · ${names[signal.kind] || "主动提醒"}`;
+  let body;
+  if (signal.kind === "weekly" && weeklySummary) {
+    const topicLines = weeklySummary.topics.slice(0, 3).map((topic) => `· ${topic.topic}（${topic.count} 篇孤岛）`).join("\n");
+    body = `本周知识库有 ${weeklySummary.totalOrphans} 篇孤岛笔记待整理：\n${topicLines || "暂无孤岛"}\n建议挑一个主题补链或合并。`;
+  } else {
+    const priorities = snapshot.priorities.slice(0, 3).map((item, index) => `${index + 1}. ${item.title}`).join("\n");
+    const allocation = snapshot.allocation || {};
+    body = priorities || `今天没有硬性到期事项。建议完成一次真实输出。\n消化 ${allocation.digest ?? 0} / 收录 ${allocation.ingest ?? 0} / 维护 ${allocation.maintenance ?? 0}`;
+  }
   return {
-    title: `Syno · ${names[signal.kind] || "主动提醒"}`,
-    body: priorities || `今天没有硬性到期事项。建议完成一次真实输出。\n消化 ${allocation.digest} / 收录 ${allocation.capture} / 维护 ${allocation.maintenance}`,
+    title,
+    body,
+    text: `${title}\n${body}`,
     level: signal.kind === "event" ? "warning" : "info",
     source: "proactive",
     data: { idempotencyKey: `proactive:${signal.key}`, signal: signal.kind },
@@ -32,10 +41,10 @@ function localMessage(signal, snapshot) {
 }
 
 class ProactiveOrchestrator {
-  constructor({ host, today, channels, conversations, settingsRegistry, signalSources, signalEngine = new SignalEngine(), stateFile = path.join(PATHS.stateRoot, "proactive.json"), clock = () => new Date(), quietHours = DEFAULT_QUIET_HOURS } = {}) {
+  constructor({ host, today, channels, conversations, settingsRegistry, signalSources, maintenance, signalEngine = new SignalEngine(), stateFile = path.join(PATHS.stateRoot, "proactive.json"), clock = () => new Date(), quietHours = DEFAULT_QUIET_HOURS } = {}) {
     if (!host || !today || !channels) throw new Error("ProactiveOrchestrator 缺少 host、today 或 channels");
     this.host = host; this.today = today; this.channels = channels; this.conversations = conversations;
-    this.settingsRegistry = settingsRegistry; this.signalSources = signalSources; this.signalEngine = signalEngine; this.stateFile = stateFile; this.clock = clock; this.quietHours = quietHours; this.timer = null;
+    this.settingsRegistry = settingsRegistry; this.signalSources = signalSources; this.maintenance = maintenance; this.signalEngine = signalEngine; this.stateFile = stateFile; this.clock = clock; this.quietHours = quietHours; this.timer = null;
   }
 
   async load() {
@@ -63,7 +72,8 @@ class ProactiveOrchestrator {
     const delivered = [];
     for (const signal of signals) {
       const snapshot = await this.today.snapshot();
-      const fallback = localMessage(signal, snapshot);
+      const weeklySummary = signal.kind === "weekly" && this.maintenance ? await this.maintenance.weeklySummary() : undefined;
+      const fallback = localMessage(signal, snapshot, weeklySummary);
       const prompt = `这是由确定性 SignalEngine 触发的${fallback.title}。请基于 today.read 工具，用不超过 180 字给出主人今天的优先行动；不要扩大权限，不要创建写任务。`;
       let result;
       try {
@@ -74,8 +84,8 @@ class ProactiveOrchestrator {
         result = { job: { id: signal.key, status: "local-fallback" }, error: { code: error.code || "AGENT_UNAVAILABLE" } };
       }
       const completedText = result.job?.status === "completed" ? result.job.result?.text : "";
-      const message = completedText ? { ...fallback, body: completedText } : fallback;
-      await this.channels.send(message);
+      const message = completedText ? { ...fallback, body: completedText, text: `${fallback.title}\n${completedText}` } : fallback;
+      await this.channels.send(message, ["web", "windows", "weixin", "feishu"]);
       state.lastRuns[signal.kind] = date;
       state.lastRuns[signal.key] = date;
       state.notificationsToday += 1;

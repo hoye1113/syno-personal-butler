@@ -7,7 +7,7 @@ import path from "node:path";
 import { ConversationStore } from "../apps/syno/syno/conversation-store.mjs";
 import { executeDomainOperation } from "../apps/syno/syno/domain-operations.mjs";
 import { PriorityEngine } from "../apps/syno/syno/priority-engine.mjs";
-import { ProactiveOrchestrator, isQuietTime } from "../apps/syno/syno/proactive-orchestrator.mjs";
+import { ProactiveOrchestrator, isQuietTime, localMessage } from "../apps/syno/syno/proactive-orchestrator.mjs";
 import { ProviderClient, ProviderError, estimateTokens, matchesFixedModel } from "../apps/syno/syno/provider-client.mjs";
 import { ProviderCredentialStore, runDpapi } from "../apps/syno/syno/provider-credential-store.mjs";
 import { SettingsRegistry } from "../apps/syno/syno/settings-registry.mjs";
@@ -253,6 +253,38 @@ test("ProactiveOrchestrator drives the single Agent but keeps local fallback and
   assert.match(messages[0].body, /复习 Tool Loop/);
   assert.deepEqual(await proactive.tick({ now: new Date("2026-07-20T20:30:00+08:00") }), []);
   assert.equal(isQuietTime(new Date("2026-07-20T23:30:00+08:00"), { start: "23:00", end: "07:00" }), true);
+});
+
+test("ProactiveOrchestrator weekly signal calls maintenance.weeklySummary and targets all channels", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-proactive-weekly-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const sends = [];
+  const host = { async receive() { return { job: { id: "job-w", status: "waiting_provider" } }; } };
+  const today = { async snapshot() { return { priorities: [], allocation: { digest: 1, ingest: 1, maintenance: 1 } }; } };
+  const channels = { async send(message, targets) { sends.push({ message, targets }); return { web: { delivered: true } }; } };
+  const conversations = { async prune() { return []; } };
+  const maintenance = { async weeklySummary() { return { generatedAt: "x", totalOrphans: 5, topics: [{ topic: "01-Areas", count: 3, items: [] }, { topic: "02-Resources", count: 2, items: [] }] }; } };
+  const proactive = new ProactiveOrchestrator({
+    host, today, channels, conversations, maintenance,
+    signalEngine: new SignalEngine({ schedule: { morningHour: 8, eveningHour: 20, weeklyDay: 0, maxDailyNotifications: 3 } }),
+    stateFile: path.join(root, "state.json"), quietHours: { start: "23:00", end: "07:00" },
+  });
+  // 2026-07-19 周日 09:00 (+08:00)：触发 morning + weekly
+  await proactive.tick({ now: new Date("2026-07-19T09:00:00+08:00") });
+  const weeklySend = sends.find((entry) => entry.message.data?.signal === "weekly");
+  assert.ok(weeklySend, "weekly signal should be sent");
+  assert.match(weeklySend.message.body, /5 篇孤岛/);
+  assert.match(weeklySend.message.body, /01-Areas/);
+  assert.deepEqual(weeklySend.targets, ["web", "windows", "weixin", "feishu"]);
+  assert.ok(weeklySend.message.text.includes(weeklySend.message.title), "message should carry self-contained text for weixin/feishu");
+});
+
+test("localMessage daily fallback uses allocation.ingest (not capture) and carries text", () => {
+  const signal = { kind: "morning", key: "morning:2026-07-19" };
+  const snapshot = { priorities: [], allocation: { digest: 6, ingest: 3, maintenance: 1 } };
+  const msg = localMessage(signal, snapshot);
+  assert.match(msg.body, /收录 3/);
+  assert.ok(msg.text.includes(msg.title) && msg.text.includes(msg.body));
 });
 
 test("SettingsRegistry persists only valid Agent-adjustable preferences", async (t) => {

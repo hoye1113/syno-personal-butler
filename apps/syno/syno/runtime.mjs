@@ -260,7 +260,7 @@ function createSynoRuntime(options = {}) {
   reports = new ReportService({ host, knowledge, notifications, channels, gitGuard });
   const today = options.today || new TodayService({ goals, learning, host, settingsRegistry, signalSources, planner });
   core = new SynoCore({ host, knowledge, notifications, channels, reports, today });
-  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, settingsRegistry, signalSources });
+  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, settingsRegistry, signalSources, maintenance: knowledgeMaintenance });
   let channelRecoveryTimer = null;
 
   return {
