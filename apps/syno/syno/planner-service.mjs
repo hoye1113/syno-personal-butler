@@ -39,6 +39,7 @@ class PlannerService {
     profile,
     outputs,
     opsRoot = PATHS.opsRoot,
+    runtimeRoot = PATHS.runtimeRoot,
     clock = () => new Date(),
     capacity = DEFAULT_CAPACITY,
   } = {}) {
@@ -51,6 +52,7 @@ class PlannerService {
     this.profile = profile;
     this.outputs = outputs;
     this.opsRoot = opsRoot;
+    this.runtimeRoot = runtimeRoot;
     this.clock = clock;
     this.capacity = capacity;
   }
@@ -65,7 +67,7 @@ class PlannerService {
     const vaultFingerprint = this.knowledge.fingerprint || "";
 
     // 检查是否已有今日计划且 vault 未变
-    const existing = await this.#loadExistingPlan(localDate, { opsRoot });
+    const existing = await this.#loadExistingPlan(localDate, { runtimeRoot: this.runtimeRoot });
     if (existing && existing.vaultFingerprint === vaultFingerprint) {
       return existing;
     }
@@ -225,12 +227,12 @@ class PlannerService {
     };
 
     // 持久化到 .runtime/
-    await this.#savePlan(plan, { opsRoot });
+    await this.#savePlan(plan, { runtimeRoot: this.runtimeRoot });
     return plan;
   }
 
-  async #loadExistingPlan(localDate, { opsRoot }) {
-    const root = path.join(opsRoot, "plans");
+  async #loadExistingPlan(localDate, { runtimeRoot }) {
+    const root = path.join(runtimeRoot, "plans");
     let entries = [];
     try { entries = await fs.readdir(root, { withFileTypes: true }); } catch (error) { if (error.code === "ENOENT") return null; throw error; }
     for (const entry of entries) {
@@ -242,8 +244,8 @@ class PlannerService {
     return null;
   }
 
-  async #savePlan(plan, { opsRoot }) {
-    const file = path.join(opsRoot, "plans", `${plan.id}.md`);
+  async #savePlan(plan, { runtimeRoot }) {
+    const file = path.join(runtimeRoot, "plans", `${plan.id}.md`);
     await writeRecord(file, plan, {
       schema: "daily-knowledge-plan",
       title: `每日计划 ${plan.localDate}`,

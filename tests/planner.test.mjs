@@ -25,6 +25,8 @@ async function setup(t, notes = {}, { goals: goalInputs = [], learningStates = [
   await fs.mkdir(vaultRoot, { recursive: true });
   const opsRoot = path.join(tempRoot, "ops");
   await fs.mkdir(opsRoot, { recursive: true });
+  const runtimeRoot = path.join(tempRoot, ".runtime");
+  await fs.mkdir(runtimeRoot, { recursive: true });
   t.after(() => fs.rm(tempRoot, { recursive: true, force: true }));
   for (const [name, content] of Object.entries(notes)) {
     await fs.mkdir(path.dirname(path.join(vaultRoot, name)), { recursive: true });
@@ -36,7 +38,7 @@ async function setup(t, notes = {}, { goals: goalInputs = [], learningStates = [
   const learning = new LearningService({ opsRoot, clock: () => FIXED_NOW });
   const goals = new GoalService({ opsRoot, clock: () => FIXED_NOW });
   const profile = new KnowledgeProfileService({ knowledge, maintenance, claims, learning, opsRoot, clock: () => FIXED_NOW });
-  const planner = new PlannerService({ knowledge, goals, learning, claims, ingest: null, maintenance, profile, opsRoot, clock: () => FIXED_NOW });
+  const planner = new PlannerService({ knowledge, goals, learning, claims, ingest: null, maintenance, profile, opsRoot, runtimeRoot, clock: () => FIXED_NOW });
 
   // 创建目标
   for (const goalInput of goalInputs) {
@@ -68,7 +70,7 @@ async function setup(t, notes = {}, { goals: goalInputs = [], learningStates = [
     });
   }
 
-  return { vaultRoot, opsRoot, knowledge, maintenance, claims, learning, goals, profile, planner };
+  return { vaultRoot, opsRoot, runtimeRoot, knowledge, maintenance, claims, learning, goals, profile, planner };
 }
 
 test("planDay returns a schema-conformant DailyKnowledgePlan", async (t) => {
@@ -178,12 +180,12 @@ test("empty vault produces a plan with no digest items", async (t) => {
   assert.equal(plan.allocation.digest, 0);
 });
 
-test("plan persists to ops/plans/", async (t) => {
-  const { planner, opsRoot } = await setup(t, {
+test("plan persists to .runtime/plans/", async (t) => {
+  const { planner, runtimeRoot } = await setup(t, {
     "note.md": "---\ntitle: Note\ntags: [AI]\nstability: practice\nupdated: 2026-07-01\n---\n# Note",
   });
   const plan = await planner.planDay();
-  const file = path.join(opsRoot, "plans", `${plan.id}.md`);
+  const file = path.join(runtimeRoot, "plans", `${plan.id}.md`);
   const content = await fs.readFile(file, "utf8");
   const roundtrip = parseRecord(content);
   assert.equal(roundtrip.id, plan.id);
