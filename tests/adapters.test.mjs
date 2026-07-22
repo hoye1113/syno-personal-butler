@@ -10,7 +10,6 @@ import { ChannelHub, FakeChannelAdapter } from "../apps/syno/syno/channels.mjs";
 import { FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, renderRegistrationQr, SILENT_SDK_LOGGER, validateRegistrationUrl } from "../apps/syno/syno/feishu-channel.mjs";
 import { ProcessFileLock } from "../apps/syno/syno/process-lock.mjs";
 import { createWeixinMessageHandler, parseWeixinApproval } from "../apps/syno/syno/runtime.mjs";
-import { Scheduler, occurrenceFor } from "../apps/syno/syno/scheduler.mjs";
 import { LocalCredentialStore, LocalProcessLock, normalizeInbound, parseAttachmentKey, readLimitedBody, renderLoginQr, resolveAttachmentUrl, sniffMime, validateIlinkBaseUrl, validateLoginQrUrl, WeixinIlinkAdapter, WeixinIlinkClient } from "../apps/syno/syno/weixin-ilink.mjs";
 
 async function removeTemp(root) {
@@ -52,18 +51,6 @@ test("Markdown Calendar persists a rebuildable event", async (t) => {
   const adapter = new MarkdownCalendarAdapter({ opsRoot: root });
   const event = await adapter.create({ id: "event-one", title: "选题排期", start: "2026-07-16T10:00:00+08:00", end: "2026-07-16T11:00:00+08:00" });
   assert.match(await fs.readFile(event.path, "utf8"), /选题排期/);
-});
-
-test("Scheduler catches up only the most recent occurrence", async (t) => {
-  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-scheduler-"));
-  t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const due = [];
-  const scheduler = new Scheduler({ stateFile: path.join(root, "state.json"), onDue: async (id) => due.push(id) });
-  const now = new Date(2026, 6, 19, 22, 30, 0);
-  assert.equal(occurrenceFor({ hour: 22, minute: 0 }, now).getDate(), 19);
-  assert.deepEqual(await scheduler.tick(now), ["morning", "evening", "weekly"]);
-  assert.deepEqual(await scheduler.tick(new Date(2026, 6, 19, 23, 0, 0)), []);
-  assert.deepEqual(due, ["morning", "evening", "weekly"]);
 });
 
 test("Weixin Adapter normalizes text/voice and keeps login behind a seam", async () => {

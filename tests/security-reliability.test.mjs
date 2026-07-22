@@ -12,7 +12,6 @@ import { assertRegisteredOperation, buildOperationRequest } from "../apps/syno/s
 import { OutputService } from "../apps/syno/syno/output-service.mjs";
 import { routeSynoApi } from "../apps/syno/syno/runtime.mjs";
 import { ConversationStore } from "../apps/syno/syno/conversation-store.mjs";
-import { Scheduler } from "../apps/syno/syno/scheduler.mjs";
 import { backupState, restoreState, verifyArchive } from "../apps/syno/syno/state-archive.mjs";
 import { validateContractRecord } from "../apps/syno/syno/schema-registry.mjs";
 import { isPrivateAddress } from "../apps/syno/syno/source-fetcher.mjs";
@@ -99,15 +98,6 @@ test("Windows cmd launch preserves spaced arguments", { skip: process.platform !
   await fs.writeFile(command, "@echo off\r\necho %~1\r\n", "utf8");
   const result = await runProcess(command, ["hello world"], { timeoutMs: 10_000 });
   assert.equal(result.stdout.trim(), "hello world");
-});
-
-test("Scheduler keeps the Worker event loop referenced", async (t) => {
-  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-worker-ref-"));
-  t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const scheduler = new Scheduler({ stateFile: path.join(root, "state.json"), onDue: async () => {} });
-  await scheduler.start();
-  assert.equal(scheduler.timer.hasRef(), true);
-  scheduler.stop();
 });
 
 test("output progress API cannot publish without domain-validated feedback", async (t) => {

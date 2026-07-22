@@ -75,4 +75,4 @@ Job files and immutable events are the recovery log. Per-job locks serialize sta
 
 Conversation defaults are 30 days for completed chat, 7 days for confirmed raw voice, 30 days for failed payloads, and until terminal state for unfinished work. Provider outage never changes provider or model: deterministic local features continue and LLM jobs remain durable for retry.
 
-The Worker product path is `SignalEngine → PriorityEngine → ProactiveOrchestrator → CognitiveRuntime`. The historical `Scheduler` remains only for legacy regression coverage and is not used to wake the product Agent.
+The Worker product path is `SignalEngine → PriorityEngine → ProactiveOrchestrator → CognitiveRuntime`.
