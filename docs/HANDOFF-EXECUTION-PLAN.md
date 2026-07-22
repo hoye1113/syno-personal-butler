@@ -1,18 +1,8 @@
-# Syno 主动式知识闭环管家：权威执行计划
+# Syno 主动式知识闭环管家：长期执行纲要
 
-更新日期：2026-07-18（Asia/Shanghai）
+更新日期：2026-07-21（Asia/Shanghai）
 
-本文是后续开发的权威执行入口。新会话先读根目录 `AGENTS.md`、`NEXT_SESSION.md`、本文以及 `docs/ARCHITECTURE.md`、`docs/POLICY.md`、`docs/SECURITY.md`。
-
-## 2026-07-20 原知识库迁移执行状态
-
-- 用户批准的“Syno 原知识库完整迁移与私人管家封板计划”已进入执行；当前 Goal 为 active。
-- 基础设施首版提交为 `64dc6c8`，其后的第一轮 Standards/Spec 修复仍在工作树，具体文件、测试、Manifest 和恢复顺序以 `NEXT_SESSION.md` 顶部重启交接为准。
-- 尚未执行任何实际知识写入。最新 Manifest 只存在于 `.runtime`，必须在第一轮双轴高优先级清零、完整回归和本地基础设施提交后，才能经 server-owned submit、Policy、审批、隔离 worktree、validators 和 GitGuard 执行。
-- 原库物理只读证据：源 `.git` 树摘要 inventory 前后均为 `571894E7ACCA214F090FDE13A9CAA25E7EDE0CDC76F5B47C305DD77EEEB0138A`，dirty entries 均为 19。
-- 第一轮最终复核已达到 Standards P0/P1=0、Spec P0/P1=0；最终 dirty worktree 已通过 Node 189/189、vault 57/57、仓库验证 635 files 和相关 JS 语法检查，可创建本地基础设施提交。
-- 迁移审批固定为 content 一次审批、integration 两次审批；4 个同路径冲突全部 keep-syno，只生成后续 Proposal；敏感候选和缺失附件不能被自动放行。
-- 后续顺序不变：基础设施封板 → 实际迁入 → 数据/知识闭环初始化 → 全产品缺口修复 → 第二/三轮审查 → fresh clone/浏览器/真实运行/备份回滚 → 本地提交与最终报告；不 Push。
+本文维护长期产品目标、架构边界和迁移历史摘要。下一阶段的唯一详细任务、公共接口、阶段顺序和验收门槛位于 `docs/TODO-EXECUTION-PLAN.md`；当前执行断点位于根目录 `NEXT_SESSION.md`。
 
 ## 产品目标
 
@@ -20,90 +10,76 @@ Syno 是 Windows 本地、单用户、主动式且可审计的知识闭环私人
 
 `输入收录 → 整理关联 → 理解学习 → 复习实践 → 创作输出 → 反馈更新`
 
-它降低整理成本，但不替主人假装掌握。只有主人亲自口述、打字、答题或实践形成的 `LearningEvidence` 才能提高掌握度。AI 草稿只能提供脚手架。
+Syno 负责降低整理成本、维护知识库、发现学习缺口、安排复习并推动输出，但不能替主人假装掌握。只有主人亲自口述、打字、答题或实践形成的 `LearningEvidence` 才能提高掌握度；AI 草稿只能提供脚手架、提纲、追问和反馈。
 
-## 不可变边界
+## 当前阶段
 
-- `vault/` 是唯一可写知识事实源，`ops/` 是行动和证据事实源；`.runtime/` 可删除重建。
+- 原知识库单向迁移已经完成，迁移管道、审批、GitGuard 和审计记录已落地。
+- 当前固定起点为 `b79d2e5`，Syno `vault/` 有 512 个受 Git 跟踪的 Markdown，原库有 555 个，差值 43。
+- 当前产品尚未封板：Goal、每日计划、真实学习状态、输出机会和维护轮换尚未初始化。
+- 最近持久化知识画像已经过期，Windows 登录任务已安装但没有运行；两者均列为下一阶段 P0。
+- 下一步必须从 `docs/TODO-EXECUTION-PLAN.md` 的 P0 开始，不得恢复旧的“预创建零掌握状态”设计。
+
+## 迁移历史摘要
+
+- 原库 inventory HEAD：`883fbf5c457156805b9e9b53358175ce84940b59`，inventory 前后保持 19 个 dirty entries；原库未被 Syno 写入。
+- content Job `job-20260720-01b25db9` 成功，合并提交 `1631c23`。
+- integration Job `job-20260721-f9be2d0b` 成功，合并提交 `824a317`。
+- 后续 `job-20260721-c0f18eba`、`job-20260721-eb7deddc` 已完成；`job-20260721-e4501b3d` 保留失败审计。
+- Windows ENAMETOOLONG 和非 ASCII pathspec 问题已通过 stdin NUL pathspec 与确定性 porcelain 解析修复，不得退回长命令行暂存。
+- 32 篇 LangGraph.js 教程由 `b79d2e5` 主动移除。
+- 4 个同路径冲突固定 keep-syno，只保留 Proposal；5 个敏感或缺失项固定排除，除非主人明确重新提交。
+- 两个相同 SHA-256 的 Anthropic 收录候选仍等待主人裁决，不得自动重复收录。
+
+## 不可变架构边界
+
+- `vault/` 是唯一可写知识事实源，`ops/` 是任务、行动、证据、产物和事件事实源，`.runtime/` 是可删除重建的缓存与建议状态。
 - 原始 `D:\workSpace\obsidian_repository` 永久只读，不做双向同步。
-- 产品运行时只有一个启用的 `CognitiveRuntime`。原生 `ToolLoopAgent` 是当前唯一活动实现；固定版本 Hermes 已因 Provider 表面越界而淘汰，不并行、不自动回退。OpenCode/OpenClaw 都不是产品运行时。
-- Provider 只使用一个固定 Model ID 和一个 OpenAI 兼容 Base URL，不自动换 Provider、模型或分层。
-- 模型不得唤醒自己、改变 Policy、扩大权限或绕过审批。
-- Syno 不修改自身源码，只能生成 `BugReport`、`ImprovementProposal`，以及修改 `SettingsRegistry` 白名单配置。
+- 产品只启用一个 `CognitiveRuntime`；原生 `ToolLoopAgent` 是当前唯一活动实现。
+- Hermes 固定版本未通过单端点 Provider 门槛，当前不采用、不并行、不接触真实 Token；OpenCode/OpenClaw 也不是产品运行时。
+- Provider 只使用一个固定 OpenAI-compatible Base URL、一个 Model ID 和原生非流式 tool calls；不可自动切换 Provider、模型或 fallback。
+- `SignalEngine → PriorityEngine → CognitiveRuntime → ToolRegistry → Policy/Approval/GitGuard` 的权限链不可绕过。
+- 模型不得自行唤醒、扩大能力、修改 Policy、审批、安全规则、源码或 ToolRegistry。
+- Syno 不能修改自身源码，只能修改 `SettingsRegistry` 白名单配置并生成 BugReport/ImprovementProposal。
 - 不重置整改分支，不使用 `git add -A`，不自动 Push。
 
-## 当前状态
+## 固定领域语义
 
-- 仓库：`D:\workSpace\syno-personal-butler`
-- 分支：`codex/round3-remediation`
-- R3-0 已在本地提交 `c34ba05 fix: restore isolated R3 baseline`，当时 Node 66/66、vault Python 57/57 全绿。
-- 主动知识闭环、单 Agent/Provider、渠道 Adapter、五区 Web 和纸片法老已完成首轮实现；本轮可靠性加固正在同一分支验收，以 `NEXT_SESSION.md` 的测试快照为准。
-- `.pnpm-store/` 是本机安装缓存，不暂存；删除仍须按仓库审批规则执行。
-
-## 固定实施顺序
-
-1. **R3-0 可信基线**：测试隔离、日历副作用契约、只读权限、完整回归。
-2. **产品和架构事实**：单 Agent、固定 Provider、Afu 改造边界、源码禁改、本地恢复策略。
-3. **知识闭环契约**：Goal、Artifact、Ingest、Claim/Evidence、Learning、Output、Memory、Settings。
-4. **运行时**：`SignalEngine → PriorityEngine → CognitiveRuntime → ToolRegistry`，Provider 离线持久等待。原生适配器是唯一活动实现；本轮固定版本 Hermes 已按硬门槛淘汰。
-
-## Hermes 候选执行状态（2026-07-18）
-
-- 已建立窄接口：`run / cancel / health / capabilities`，并将原生循环迁入该接口。
-- 已锁定上游 `0f102fa4dc04b7dfdab048169aaaa640d09d7523`（Hermes `0.18.2`，MIT），本地源码只读。
-- 无凭据 Fake Provider Spike 已通过：空 toolset 不暴露工具、白名单只含 Syno 代理工具、固定模型、无 fallback/memory/context/Gateway/CLI，并完成两轮非流式原生工具调用。
-- Hermes 该版本必须设置固定 SHA 下的私有 `_disable_streaming` 标志才能满足 Syno 非流式契约；升级必须重新审计。
-- 生产 JSONL sidecar 已通过最小环境、Token 脱敏、固定 SHA、恶意工具名、控制命令、取消、超时、崩溃重启、无效 JSON 和 Provider 429 门禁；取消采用终止单 Run 隔离进程并干净重启的语义。
-- 收紧 Fake Provider 后确认上游仍会探测 `/api/v1/models`、`/api/tags`、`/v1/props`、`/props`、`/version`、`/v1/models` 或 `/models`，违反只允许 `POST /chat/completions` 的 Provider 契约。
-- 当前决定：**该固定版本未通过硬门槛，不采用且不再接触真实 Token**。不以额外私有钩子、广域网络 monkey-patch、Hermes 专用过滤代理或安全 fork 绕过；原生 Runtime 是唯一活动实现。真实 Provider 验收仅验证原生固定模型。
-- 决策与原生单次 Run 固定配置加固已提交 `f015921`；主工作树及 fresh clone 均通过 Node 112/112、vault 57/57 和仓库校验。
-- 隔离 Web 验收已覆盖 1440×1000 与 390×844、键盘焦点循环与恢复、关闭抽屉的 `hidden/inert` 边界、减少动画、Token 不回显和控制台错误；同时补上移动端可实际点击的“连接设置”入口。证据见 `docs/BROWSER-ACCEPTANCE.md`。
-- Web 修复提交 `200fb1f` 已在主工作树与全新克隆复验：Node 113/113、vault 57/57、仓库校验通过。
-- 备份恢复、单向迁移、已知限制、最终切换清单和逐项验收矩阵分别由 `docs/OPERATIONS.md`、`docs/MIGRATION.md`、`docs/KNOWN-LIMITATIONS.md`、`docs/CUTOVER-CHECKLIST.md` 与 `docs/FINAL-ACCEPTANCE.md` 维护；未通过的真实外部门槛必须保持显式未完成。
-- 切换控制提交 `2a8d195` 已在主工作树与 `C:\tmp\syno-fresh-2a8d195` 复验：Node 114/114、vault 57/57、仓库校验通过；状态归档 CLI 完成隔离 backup/verify/restore 演练。
-- 渠道安全提交 `04005b2` 将微信 Bot/回复 context 改为 DPAPI、分离可备份运行状态、迁移旧明文格式，并为微信/飞书提供显式确认且不输出凭据的真实健康探针；主工作树与 `C:\tmp\syno-fresh-04005b2` 均通过 Node 118/118、vault 57/57 和仓库校验。
-- 飞书恢复提交 `1540b66` 将 Owner 私聊事件持久化为 30 天 pending，成功回复后才写 durable dedupe，失败可重试或跨 Worker 重启恢复；主工作树与 `C:\tmp\syno-fresh-1540b66` 均通过 Node 120/120、vault 57/57 和仓库校验。
-- Provider 采用门提交 `fdd0c04` 将本地上下文/超时/离线故障注入与五轮真实工具调用串联，要求故障后仍由同一固定 Model ID 全部成功；主工作树与 `C:\tmp\syno-fresh-fdd0c04` 均通过 Node 121/121、vault 57/57 和仓库校验。真实断网仍保留为主人验收。
-- 2026-07-18 封板审计后的闭环加固新增 ConversationRouter、逐会话排他执行、真实用户原文 Artifact、Claim/Evidence 原子聚合、显式 IngestDecision 与三层生命周期、OutputOpportunity 进度、SignalSourceRegistry 和实际生效的主动偏好；同时修复飞书未送达却去重及微信轮询重复 DPAPI 的问题。批准前收录载荷不再提前污染 `ops/`。
-- 闭环封板加固提交 `620b8d6` 已在主工作树与 `C:\tmp\syno-fresh-620b8d6` 复验：Node 127/127、vault 57/57、仓库校验通过；内部工程门槛已收口，剩余仅为真实 Provider、微信、飞书和最终切换的主人验收门。
-- Windows Provider 凭据修复提交 `cbfa882` 显式加载 DPAPI 所需的 `System.Security` 程序集，并只允许 AIPC 请求 ID 到无前缀响应 ID 的确定性规范化。主人授权的 OpenClaw last-good Token 已迁入 Syno DPAPI；真实 Provider 五轮工具调用 5/5、微信 Owner 绑定与连接健康均通过。该提交已在 `C:\tmp\syno-fresh-cbfa882` 复验 Node 129/129、vault 57/57 和仓库校验。
-- 微信二维码、自动扫码状态轮询、长轮询超时与连续回复已由 `3c50299`、`e6d9746` 修复；只读任务不再被开发者既有改动误拦截，同时 `141d0be` 以 Git 内容指纹拒绝执行期篡改。真实 Owner 后续消息已连续完成。
-- 真实微信 Job `job-20260719-461dea5d` 曾因 `PROVIDER_HTTP_ERROR` 持久化为 `waiting_provider`，重启后仍由固定 `AIPC-deepseek-v4-flash` 完成；`a390462` 确保未来成功重试清除旧错误状态。该提交已在 `C:\tmp\syno-fresh-a390462` 复验 Node 135/135、vault 57/57 和仓库校验。
-- 飞书扫码注册在 `8492d0f` 起使用本地内存 PNG、前端状态轮询和后端确认后自动长连接；Windows npm `.ps1/.cmd` 包装器解析到官方 Node 入口。主人真实飞书消息 4/4 完成，真实 seen ID 重放被 durable dedupe 拒绝；user 日历「Hoye」完成创建、同 event ID 双更新、清理、错误拒绝与重启恢复。
-- `8492d0f` 已在主工作树与 `C:\tmp\syno-fresh-8492d0f` 通过 Node 139/139、vault 57/57 和仓库校验；2026-07-20 增量浏览器复验通过桌面 1280×720、移动 390×844、Token 不回显、日历恢复、焦点恢复与 0 error/0 warning。
-- 运行中渠道 probe 在 `eef3ca5` 起优先复用本机 Worker 脱敏状态，不再争抢微信进程锁或打开第二条飞书长连接；飞书运行状态显式包含 `ownerBound`。主工作树和 `C:\tmp\syno-fresh-eef3ca5` 通过 Node 141/141、vault 57/57 和仓库校验，两个真实 probe 均 `ok=true`。
-- 渠道媒体与日志安全提交 `9837366` 对齐真实 iLink：图片/文件 CDN 密文使用 AES-128-ECB 解密，`full_url` 缺失时只回退固定腾讯 CDN，随后仍执行流式限额、MIME/魔数和隔离规则；飞书 SDK 错误日志改为无输出 Logger，避免请求配置泄露 App Secret。
-- Windows 重启恢复提交 `2e1dfd0` 在无 `LARK_CLI_PATH` 时自动发现与 `node.exe` 同目录及常见全局目录的官方 lark-cli 包装器。真实服务重启恢复 Hoye 日历与 lark-cli 1.0.72；主工作树和 `C:\tmp\syno-fresh-2e1dfd0` 通过 Node 144/144、vault 57/57 和仓库校验，最新桌面/移动浏览器复验通过。
-- 微信长期回复修复 `e02f62b` 为每次 iLink 回复生成唯一 `client_id`，对 `-14` 采用凭据保留冷却，并串行轮换旧/新 Worker；主人连续发送 4 条消息全部得到回复。附件 Intake 修复 `2dde18d` 把真实 MD/TXT/PDF 从通用 `curate_note` Job 改为 `Artifact → IngestProposal`，不再提前请求写入审批。
-- 当前代码基线 `0cc2669` 已在主工作树与 `C:\tmp\syno-fresh-02d45b3` 通过冻结锁文件离线安装（下载 0）、Node 172/172、vault 57/57 和仓库校验。真实 Web 卸载后 Host 健康且 launcher=0，重装后计划任务健康且 launcher=1；桌面/移动 Today 与微信设置均通过。主人此前从微信直发 MD 的 Artifact/Proposal 两阶段结果保持不变，未自动写 vault。
-5. **知识技能**：低成本收录、渐进整理、Teach-back、间隔复习、证据型创作、时效查证。
-6. **外部渠道**：Web 完整控制；微信快速入口；飞书日程和结构化通知；同一 Agent/Policy/Store。
-7. **Web 与品牌**：Today、Capture、Knowledge、Learn、Create；纸片法老知识守护者；WCAG AA。
-8. **封板**：完整测试、浏览器验收、fresh clone、备份恢复、真实外部探针；不 Push。
-
-## 固定领域状态
-
-- 知识：`captured → curated → understood → applied → expressed → retained → integrated`
-- 收录：`Artifact → 安全检查/提取/去重 → InboxCandidate → IngestProposal → 批准 → Note`
+- 知识状态：`captured → curated → understood → applied → expressed → retained → integrated`
+- 收录流程：`Artifact → 安全检查/提取/去重 → InboxCandidate → IngestProposal → 主人批准 → Note`
 - 主动优先级：明确目标/项目 → 已承诺事项 → 到期复习和知识缺口 → 新信息 → 自由探索
-- 每日资源配比：60% 消化已有知识、25% 新内容、15% 知识库维护
+- 推荐资源目标：60% 消化已有知识、25% 新内容收录、15% 知识库维护
 - 默认主动节奏：晨间计划、高价值事件、晚间复盘、每周深度复盘；每日主动通知最多 3 次
+- 每日推荐是可重建的计划，不等于掌握事实；LearningState 必须来源于真实主人证据。
 
-## Provider 和保留规则
+## Provider、渠道和保留规则
 
 - 默认 Base URL：`https://server.flowyaipc.cn/claw/v1`
 - 请求：`POST {baseUrl}/chat/completions`，非流式，原生 tool calls
-- Base URL、Token、Model ID、上下文长度由设置页录入；Token 由 Windows DPAPI 保存到 `%LOCALAPPDATA%\Syno\credentials`
-- Provider 不可用时，本地能力继续；LLM Job 进入 `waiting_provider`，人工/定时重试后恢复
-- 对话 30 天；确认转录后的原始语音 7 天；失败载荷 30 天；未完成任务保留到终态
-- `ConversationStore.prune` 分别执行语音与对话保留；状态归档默认只包含 `%LOCALAPPDATA%\Syno\state`，明确排除 credentials，并以 SHA-256 清单校验。
+- Token 使用 Windows DPAPI 保存，禁止回显、日志输出或提交。
+- Provider 不可用时本地搜索、计划、提醒和队列继续；LLM Job 进入 `waiting_provider`，恢复后仍使用同一固定 Model ID。
+- Web、微信、飞书共用同一个 Owner、Conversation、Policy、审批和事实源。
+- Web 负责今日决策、审批、深度学习、知识维护与创作；微信/飞书负责快速收录、查询、提醒和低风险动作。
+- 对话保留 30 天；确认转录后的原始语音 7 天；失败载荷 30 天；未完成任务保留到终态。
+
+## 审批与 Git 规则
+
+- 读取、搜索、画像预览和每日计划可以直接执行。
+- 写 `ops/` 或新增普通知识笔记需要一次审批。
+- 覆盖、删除、移动、新 MOC、新 tag、源码修改和高风险集成需要固定差异与两次审批。
+- 长期记忆只能先写 MemoryProposal。
+- 自动提交只能暂存 Job 声明的精确路径；禁止 `git add -A`。
+- 不 Push；原库不进入 worktree、测试目录或运行缓存。
+
+## 验收原则
+
+- 自动测试通过只是内部基线，不代表真实产品验收。
+- 当前仓库必须运行 Node tests、vault pytest、repository verify 和 Syno 配置验证。
+- 当前没有正式 build/typecheck 工具链；除非实际引入，否则不得在验收文档中声称已执行。
+- fresh clone、桌面/移动端浏览器、键盘、减少动画、Provider、微信、飞书、Windows 登录任务、备份和恢复必须分别有当前证据。
+- Fake Provider 或单元测试不得冒充真实 Token、真实设备、真实渠道或 Windows 登录验收。
+- 每轮报告必须区分已验证事实、候选、主人裁决项、已知限制和 backlog。
 
 ## 完成定义
 
-- `pnpm test`、类型检查、构建、配置和仓库验证全部通过；`python -m pytest vault/tests` 全部通过。
-- 测试不读取或写入真实 `%LOCALAPPDATA%\Syno` 凭据和数据。
-- 收录、学习证据、脱机重试、渠道去重/鉴权、审批和恢复均有契约测试。
-- Web 通过键盘、对比度、响应式、减少动画和核心浏览器流程验收。
-- fresh clone 可重复安装、构建、启动；备份、回滚、迁移与已知限制已记录。
-- 真实 Provider Token、微信扫码和飞书扫码属于主人输入/设备验收，不以 Fake 测试冒充。
-- 原始 Obsidian 仓库未改变，当前分支未被重置，远端未 Push。
+迁移已完成，但私人管家尚未封板。只有 `docs/TODO-EXECUTION-PLAN.md` 的 P0–P5 全部通过，且原库未改变、当前分支未重置、远端未 Push，才能将全局 Goal 标记 complete。
