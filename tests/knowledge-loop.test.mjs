@@ -278,7 +278,10 @@ test("Today exposes one next action, needs-owner items, recent intake and daily 
 
   const snapshot = await today.snapshot({ capacity: 10 });
   assert.equal(snapshot.primary.title, "完成今日输出");
-  assert.deepEqual(snapshot.needsYou.map((item) => item.kind), ["approval", "review", "output"]);
-  assert.deepEqual(snapshot.recentIntake, [{ id: "artifact-1", status: "proposed", title: "Agent 指南" }]);
+  assert.deepEqual(snapshot.needsYou.map((item) => item.kind), ["approval", "review", "output-opportunity"]);
+  assert.ok(snapshot.recentIntake.length === 1 && snapshot.recentIntake[0].id === "artifact-1");
+  assert.equal(snapshot.recentIntake[0].status, "proposed");
+  assert.equal(snapshot.recentIntake[0].area, "capture");
+  assert.equal(snapshot.recentIntake[0].intent, "review-ingest");
   assert.deepEqual(snapshot.progress, { completed: 1, waiting: 1, failed: 0 });
 });
