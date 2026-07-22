@@ -36,7 +36,6 @@ class PlannerService {
     claims,
     ingest,
     maintenance,
-    profile,
     outputs,
     opsRoot = PATHS.opsRoot,
     runtimeRoot = PATHS.runtimeRoot,
@@ -49,7 +48,6 @@ class PlannerService {
     this.claims = claims;
     this.ingest = ingest;
     this.maintenance = maintenance;
-    this.profile = profile;
     this.outputs = outputs;
     this.opsRoot = opsRoot;
     this.runtimeRoot = runtimeRoot;
@@ -218,6 +216,8 @@ class PlannerService {
       vaultFingerprint,
       goalRefs,
       capacity: this.capacity,
+      // allocation = 学习消化预算（对齐 60/25/15）：digest 含 review（到期复习属消化巩固），
+      // ingest 为收录候选，maintenance 为维护建议；output/goal 是创造性产出，不计入消化预算。
       allocation: {
         digest: items.filter((i) => i.kind === "digest" || i.kind === "review").length,
         ingest: items.filter((i) => i.kind === "ingest").length,
@@ -235,13 +235,17 @@ class PlannerService {
     const root = path.join(runtimeRoot, "plans");
     let entries = [];
     try { entries = await fs.readdir(root, { withFileTypes: true }); } catch (error) { if (error.code === "ENOENT") return null; throw error; }
+    const matched = [];
     for (const entry of entries) {
       if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
       if (!entry.name.includes(localDate)) continue;
       const plan = parseRecord(await fs.readFile(path.join(root, entry.name), "utf8"));
-      if (plan.localDate === localDate) return plan;
+      if (plan.localDate === localDate) matched.push(plan);
     }
-    return null;
+    if (matched.length === 0) return null;
+    // 同日多文件（vault 一天内多次变化）时返回最新生成的计划，避免 readdir 顺序不确定返回旧计划
+    matched.sort((a, b) => String(b.generatedAt || "").localeCompare(String(a.generatedAt || "")));
+    return matched[0];
   }
 
   async #savePlan(plan, { runtimeRoot }) {

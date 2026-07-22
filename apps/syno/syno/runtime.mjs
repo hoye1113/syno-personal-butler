@@ -78,7 +78,7 @@ function createSynoRuntime(options = {}) {
   const claims = options.claims || new ClaimEvidenceService();
   const knowledgeMaintenance = options.knowledgeMaintenance || new KnowledgeMaintenanceSource();
   const profile = options.profile || new KnowledgeProfileService({ knowledge, maintenance: knowledgeMaintenance, claims, learning });
-  const planner = options.planner || new PlannerService({ knowledge, goals, learning, claims, ingest, maintenance: knowledgeMaintenance, profile, outputs });
+  const planner = options.planner || new PlannerService({ knowledge, goals, learning, claims, ingest, maintenance: knowledgeMaintenance, outputs });
   const migration = options.migration || new VaultMigrationService({ repoRoot: PATHS.repoRoot, runtimeRoot: path.join(PATHS.runtimeRoot, "migrations") });
   const signalSources = options.signalSources || new SignalSourceRegistry({ claims, ingest, outputs, maintenance: knowledgeMaintenance });
   let host;

@@ -38,7 +38,7 @@ async function setup(t, notes = {}, { goals: goalInputs = [], learningStates = [
   const learning = new LearningService({ opsRoot, clock: () => FIXED_NOW });
   const goals = new GoalService({ opsRoot, clock: () => FIXED_NOW });
   const profile = new KnowledgeProfileService({ knowledge, maintenance, claims, learning, opsRoot, clock: () => FIXED_NOW });
-  const planner = new PlannerService({ knowledge, goals, learning, claims, ingest: null, maintenance, profile, opsRoot, runtimeRoot, clock: () => FIXED_NOW });
+  const planner = new PlannerService({ knowledge, goals, learning, claims, ingest: null, maintenance, opsRoot, runtimeRoot, clock: () => FIXED_NOW });
 
   // 创建目标
   for (const goalInput of goalInputs) {
@@ -190,4 +190,26 @@ test("plan persists to .runtime/plans/", async (t) => {
   const roundtrip = parseRecord(content);
   assert.equal(roundtrip.id, plan.id);
   assert.equal(roundtrip.localDate, plan.localDate);
+});
+
+test("loadExistingPlan returns the most recently generated plan for the day", async (t) => {
+  const { planner, runtimeRoot } = await setup(t, {
+    "note.md": "---\ntitle: Note\ntags: [AI]\nstability: practice\nupdated: 2026-07-01\n---\n# Note",
+  });
+  const plansRoot = path.join(runtimeRoot, "plans");
+  const real = await planner.planDay();
+  // 手动写一个更旧的同 fingerprint 同日计划，验证不依赖 readdir 顺序返回最新
+  await writeRecord(path.join(plansRoot, "plan-2026-07-21-stale.md"), {
+    id: "plan-2026-07-21-stale",
+    ownerId: "local-user",
+    localDate: "2026-07-21",
+    generatedAt: "2026-07-21T00:00:00.000Z",
+    vaultFingerprint: real.vaultFingerprint,
+    goalRefs: [],
+    capacity: 5,
+    allocation: { digest: 0, ingest: 0, maintenance: 0 },
+    items: [],
+  }, { schema: "daily-knowledge-plan", title: "每日计划 2026-07-21", summaryKeys: ["id", "localDate", "generatedAt", "vaultFingerprint"] });
+  const loaded = await planner.planDay();
+  assert.equal(loaded.id, real.id, "should return the newest plan (generatedAt 08:00 > 00:00), not the stale one");
 });
