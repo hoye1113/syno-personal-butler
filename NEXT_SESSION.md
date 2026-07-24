@@ -20,8 +20,8 @@
 - Syno `vault/`：512 个受 Git 跟踪的 Markdown。
 - 原库：555 个受 Git 跟踪的 Markdown，HEAD `883fbf5c457156805b9e9b53358175ce84940b59`，已有 19 项用户修改；永久只读。
 - 当前验证：Node 240/240（含渠道容错 + P4 proactive + backlog 推进 6 例）、vault pytest 57/57、Repository verify 1139 files。
-- 4317 Host 健康；Provider 已配置；微信和飞书均显示 running、available、ownerBound。
-- Windows 登录任务：installed=true、startup=at_logon、running=false、lastTaskResult=4294967295，尚未通过常驻验收。
+- Host 端口改为 8888（原 4317→6666→8888，6666 被 Chrome unsafe-port 拦截）；Provider 已配置；微信和飞书均显示 running、available、ownerBound。
+- Windows 登录任务 "Syno"：LogonTrigger、start-syno.ps1、崩溃重启 999 次/1 分钟、无电池限制；配置正确，尚未通过重启验收（搁置）。
 - 未 Push。
 
 ## 已完成
@@ -93,15 +93,27 @@
 
 ## 当前待主人裁决
 
-- 两个正文 SHA-256 相同的 Anthropic MD IngestProposal：保留其一或继续搁置，不自动重复收录。
-- 4 个同路径冲突继续 keep-syno：
+- ~~Anthropic 候选~~ 已删除（仅剩 1 个 `artifact-20260720-ef20760f`，非官方原文，同类已有一篇被拒绝；NEXT_SESSION 旧文声称"两个 SHA-256 相同"已证伪——dedupeKey 不同，另一个已 rejected）。
+- 4 个同路径冲突继续搁置（keep-syno，不阻塞功能）：
   1. `vault/01-Areas/AI Agent Development/04-Context Engineering/4-5 Just-In-Time Context.md`
   2. `vault/02-Resources/AI and Agents/Agent Design & Patterns/Spec Kit vs OpenSpec vs Superpowers - CCC.md`
   3. `vault/02-Resources/AI and Agents/Authors/CCC.md`
   4. `vault/02-Resources/AI and Agents/Authors/ConardLi.md`
 - 5 个固定排除项继续保持排除：两篇敏感凭据课程、两篇敏感凭据资源、一个源工作区缺失附件；精确路径保存在迁移 Manifest 和审计记录中。
-- 1 个无证据 Claim：补证、降级或继续保持 candidate。
+- 1 个无证据 Claim（`claim-4f0ba8ac`，JIT Context 策略原则）：保持 candidate，不降级——principle 级声明确定性高，等 KnowledgeMaintenanceSource 自动发现 evidence gap。
+- Windows 常驻验收：搁置，需重启电脑验证登录自启。任务名 "Syno"，配置已确认正确（LogonTrigger、start-syno.ps1、崩溃重启 999 次/1 分钟、无电池限制）。上次结果 0xC000013A（进程被终止，非任务故障）。
 
 ## 完成定义
 
 迁移完成不等于产品 Goal 完成。只有 TODO 的 P0–P5 全部完成，并取得当前 checkout 的三轮审查、fresh clone、Web、Provider、微信、飞书、Windows 和备份恢复证据后，才能将全局 Goal 标记 complete。
+
+## 上下文管理 M1（2026-07-23，本会话完成）
+
+- **背景**：Native runtime 对话曾在 `PROVIDER_CONTEXT_LIMIT` 永久失败。v1 已实现 OBSERVE→COMPRESS→STORE→ROTATE 分层压缩；本会话补完推荐方案 M1（HANDOFF + STORE 治理 + OBS 可观测）。长期演进计划见 `docs/CONTEXT-MANAGEMENT-ROADMAP.md`，`docs/CONTEXT-MANAGEMENT-PLAN.md` 顶部已加反向指针。
+- **HANDOFF（防自污染）**：rotate 后的 handoff 由 spoofed `user` 消息改为 `{role:"system", _syno:{kind:"handoff"}}`（`tool-loop-executor.mjs`）；`context-manager.extractValuable` 跳过 `_syno.kind==="handoff"`，防前情自污染。测试覆盖。
+- **STORE（存储治理）**：`conversation-store.mjs` 新增 `compactionLogMax`(200)/`summariesMax`(50) cap、`archiveExternalThreshold`(100) 外置（`<id>.archive.json` 追加语义 + 懒加载 `getArchive()`）、prune 按 30 天裁 archive、删除会话连外置文件一起清。
+- **OBS（可观测）**：`context-manager` 内存 `#stats`（压缩分动作/rotate/抽取计数 + before/after token）+ `stats()` 快照；`GET /api/syno/context/stats` 端点（仅聚合指标，不带 provider 凭证）；`settings-registry` 新增 `context.thresholds`（confirmationRequired 组，校验 light/moderate/heavy/overflow ∈ (0,1) 或 null）；`createSynoRuntime` 注入 `options.contextThresholds` 接缝（构造时同步，避开 sync 构造器的 await）。
+- **验证**：Node test 298/298（`apps/syno/tests/*.test.mjs tests/*.test.mjs`），verify 1227 files。未 push。
+- **⚠️ 部署缺口（重要，详见 memory）**：源码里 `compress()` 已接好，但**线上微信服务是旧打包构建**——压缩/rotate 路径实际不触发，仍会报「上下文超限」。M1 改动**需 rebuild/redeploy 才生效**；在此之前用**手动 rotate** 兜底。
+- **手动 rotate 微信（按需复用）**：`ConversationStore.create()` 新空会话 → `ConversationRouter.rotate({ownerKey:"local-user"}, newId)`（自动归档当前 active、旧 id 入 retiredIds）→ 路由逐消息解析，无需重启。路由文件 `%LOCALAPPDATA%\Syno\state\conversation-routing.json`。当前 active（本会话 rotate 过去）：`conversation-ec193dc2-f1bc-48be-9fe5-18903ef50fd6`。
+- **Deferred（已记录，非阻塞）**：bootstrap 读 `context.thresholds` 注入 createSynoRuntime（受 sync 构造器阻塞，需改 builder async 或 worker.mjs/server.mjs 调用点）；stats 落盘到 `context-stats.json`（anti-thrash 状态同为内存态，保持一致）。
