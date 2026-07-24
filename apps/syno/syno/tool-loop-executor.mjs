@@ -16,7 +16,7 @@ async function rotateConversation({ conversations, conversationRouter, ownerKey,
     fresh.handoffContext = handoff;
     // 注入为语义正确的前情载体（system + _syno.kind），而非伪 user：
     // 避免 (a) 模型把它当请求回应、(b) extractValuable 把前情当真实用户陈述再提取（自污染）。
-    fresh.messages.push({ role: "system", content: handoff, _syno: { kind: "handoff" } });
+    fresh.messages.push({ role: "system", content: handoff, _syno: { kind: "handoff", factualStatus: "unverified" } });
     await conversations.save(fresh);
   }
   return fresh.id;

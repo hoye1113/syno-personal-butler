@@ -93,6 +93,34 @@ class Deduplicator {
   }
 }
 
+// FIDELITY 护栏（M2a，§4.1）：检测 LLM 摘要是否引入源对话里不存在的强实体（≥4 位数字 / 年份）。
+// 命中即低置信——调用方据此不物化、保留原始 tail（宁可不压不可压错）。规则摘要（字面摘录）豁免。
+// 纯规则、零额外 LLM 成本、可测；ID 样 token 扩展留待 COST（5.2）数据后再定。
+class SummaryGuard {
+  #ENTITY_RUN = /\d[\d,.]*\d/g;
+
+  assess(sourceText, summaryText) {
+    const summaryEntities = this.#extract(summaryText);
+    if (!summaryEntities.size) return { reject: false }; // 摘要未引强实体，无法判定幻觉，放行
+    const sourceEntities = this.#extract(sourceText);
+    for (const entity of summaryEntities) {
+      if (!sourceEntities.has(entity)) return { reject: true, reason: `hallucinated-entity:${entity}` };
+    }
+    return { reject: false };
+  }
+
+  #extract(text) {
+    const set = new Set();
+    const matches = String(text || "").match(this.#ENTITY_RUN) || [];
+    for (const raw of matches) {
+      // 归一化：去千分位逗号 / 小数点，"1,000"/"1000.0"→"1000"，防形式差异误判；仅保留 ≥4 位
+      const normalized = raw.replace(/[,.]/g, "");
+      if (normalized.length >= 4) set.add(normalized);
+    }
+    return set;
+  }
+}
+
 // 跨对话前情提要：超大对话用规则提取（不调 LLM），受 token 上限保护。
 class HandoffGen {
   constructor({ tokenCap = 50000 } = {}) {
@@ -172,6 +200,8 @@ class ContextManager {
     extractionCalls: 0,
     extractionsProposed: 0,
     antiThrashCooldowns: 0,
+    summaryGuardRejections: 0,
+    summaryGuardErrors: 0,
     totalBeforeTokens: 0,
     totalAfterTokens: 0,
     lastUpdated: null,
@@ -194,12 +224,16 @@ class ContextManager {
 
     this.fallbackContextLength = Number(options.contextLength) || 1_000_000;
     this.tailMessages = options.tailMessages ?? 10;
+    // Layer3 摘要保留的「近窗」条数：刻意小于 tailMessages，使 Layer3 能裁掉中段并注入摘要
+    // （否则 cut=length-tailMessages 恒 ≤0，摘要只写 conversation.summaries、永不进活跃上下文）。
+    this.keepAfterSummary = options.keepAfterSummary ?? Math.max(2, Math.floor(this.tailMessages / 2));
     this.thresholds = { ...DEFAULT_THRESHOLDS, ...(options.thresholds || {}) };
     this.clock = clock;
 
     this.tokenTracker = new TokenTracker();
     this.toolTruncator = new ToolTruncator({ tokenLimit: options.singleToolLimit ?? 15000 });
     this.deduplicator = new Deduplicator();
+    this.summaryGuard = new SummaryGuard();
     this.archiver = new Archiver({ conversationStore });
     this.handoffGen = new HandoffGen({ tokenCap: options.handoffTokenCap ?? 50000 });
 
@@ -250,6 +284,8 @@ class ContextManager {
       if (message.role !== "user") continue;
       // 双保险：即便历史/异常路径把前情提要当 user 注入，也绝不作为真实用户陈述提取（防自污染）。
       if (message._syno?.kind === "handoff") continue;
+      // 同理：Layer3 物化的 [前情摘要] 是 LLM 产出（factualStatus:unverified），非真实用户陈述。
+      if (message._syno?.kind === "summary") continue;
       const text = String(message.content || "");
       if (text.length <= 10) continue;
       if (/(决定|结论|记住|待办|todo|确认|方案是)/i.test(text)) {
@@ -303,12 +339,31 @@ class ContextManager {
       working = this.#pruneHistory(working, archivable);
     }
 
-    // Layer3: LLM 摘要（物化为 system message，中段入 archive）
+    // Layer3: LLM 摘要。保留比 tail 更小的近窗（keepAfterSummary），把被裁掉的中段摘要后
+    // 物化为 system message 前置于近窗——这是「记忆压缩」进入下一轮活跃上下文的唯一通道。
+    // （M2a 修复：旧实现 summarize(working) + materialize 守卫 messages.length<=tailMessages，而 Layer2
+    //  已把 working 裁到 ≤tailMessages → cut 恒 0 → 摘要只写 conversation.summaries、永不注入、永不复用。
+    //  现改为：先切出中段 → 摘要该中段 → 注入 [summary,...近窗]，让摘要真正随消息流转。）
     if (this.#ratioOf(system, working, contextLength) >= this.thresholds.heavy) {
-      summary = await this.#summarize(working, { conversationId });
-      const materialized = this.#materializeSummary(working, summary);
-      archivable.push(...materialized.archived);
-      working = materialized.messages;
+      const split = this.#splitForSummary(working);
+      if (split.archived.length) {
+        const summarized = await this.#summarize(split.archived, { conversationId });
+        if (summarized.text) {
+          if (summarized.origin === "llm" && this.#summaryRejected(split.archived, summarized.text)) {
+            // FIDELITY 护栏：LLM 摘要引入了源里不存在的强实体 → 不物化、保留近窗、降级 layer2
+            summary = null;
+          } else {
+            summary = summarized.text;
+            const summaryMessage = {
+              role: "system",
+              content: `${SUMMARY_TAG}\n\n${summary}`,
+              _syno: { kind: "summary", factualStatus: "unverified", generatedAt: this.clock().toISOString() },
+            };
+            working = [summaryMessage, ...split.keep];
+            archivable.push(...split.archived);
+          }
+        }
+      }
     }
 
     const finalMessages = system ? [system, ...working] : working;
@@ -370,14 +425,14 @@ class ContextManager {
     return messages.slice(cut);
   }
 
-  #materializeSummary(messages, summaryText) {
-    if (messages.length <= this.tailMessages) return { messages, archived: [] };
-    let cut = messages.length - this.tailMessages;
+  // 切出 Layer3 要摘要的中段：保留最新 keepAfterSummary 条，其余按 tool 配对边界作为待摘要+归档段。
+  // 返回 { keep, archived }；archived 为空表示太短、无可摘要内容（Layer3 不注入，避免只增不减）。
+  #splitForSummary(messages) {
+    const keep = Math.min(this.keepAfterSummary, messages.length);
+    if (messages.length <= keep) return { keep: messages, archived: [] };
+    let cut = messages.length - keep;
     while (cut < messages.length && messages[cut] && messages[cut].role === "tool") cut += 1;
-    const archived = messages.slice(0, cut);
-    const tail = messages.slice(cut);
-    const summaryMessage = { role: "system", content: `${SUMMARY_TAG}\n\n${summaryText}` };
-    return { messages: [summaryMessage, ...tail], archived };
+    return { keep: messages.slice(cut), archived: messages.slice(0, cut) };
   }
 
   async #summarize(messages, { conversationId }) {
@@ -393,12 +448,29 @@ class ContextManager {
           { temperature: 0.2 },
         );
         const text = String(completion?.message?.content || "").trim();
-        if (text) return text;
+        if (text) return { text, origin: "llm" };
       } catch {
         // 降级到规则提取
       }
     }
-    return this.#ruleBasedSummary(messages);
+    return { text: this.#ruleBasedSummary(messages), origin: "rule" };
+  }
+
+  // FIDELITY 护栏：LLM 摘要若引入源(user+assistant)里不存在的强实体 → 拒绝（不物化）。
+  // guard 自身抛错 → 保守拒绝（记 summaryGuardErrors），保证不把不可信摘要物化进上下文。
+  #summaryRejected(working, summaryText) {
+    const sourceText = (working || [])
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => String(m.content || ""))
+      .join("\n");
+    try {
+      const result = this.summaryGuard.assess(sourceText, summaryText);
+      if (result?.reject) { this.#stats.summaryGuardRejections += 1; return true; }
+      return false;
+    } catch {
+      this.#stats.summaryGuardErrors += 1;
+      return true;
+    }
   }
 
   #buildSummaryPrompt(messages) {
@@ -509,4 +581,4 @@ class ContextManager {
   }
 }
 
-export { ContextManager, TokenTracker, ToolTruncator, Deduplicator, HandoffGen, Archiver };
+export { ContextManager, TokenTracker, ToolTruncator, Deduplicator, SummaryGuard, HandoffGen, Archiver };
