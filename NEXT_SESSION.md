@@ -8,7 +8,7 @@
 
 后续会话（2026-07-24）已完成 **M1 上下文管理**（HANDOFF/STORE/OBS）+ **host 端口 4317→8888 单一来源**修复：均本地提交（`ddd28b9` code+tests / `6071aec` docs / `eabbbe6` port）、上线、`pnpm test` **298/298**。（本文件下方「240/240」为 07-21 旧值，已过时；分支仍 `codex/round3-remediation`、未 Push。）
 
-**Windows 常驻验收已通过（2026-07-24）**——重启后登录自启确认（task 起 `10:53:43` → node 起 `10:53:58`，ownership `.runtime/syno-host.pid` mode=owned）；但登录时 wrapper（`start-syno.ps1`）以 `0xC000013A` 一次性中断、node 沦为孤儿（父进程已退），故 `health ok` 而 `windows:status running=false`。`pnpm windows:restart` 恢复后 task=`Running`、`lastTaskResult=267009`（= `0x41301` 运行中态）、wrapper 存活、60s 轮询稳定。自愈链确认工作。根因（登录会话初始化竞态）未完全定位，不阻塞。**当前无立即在途动作**；下一个里程碑是 M2（需新会话）。**完整待办见 `docs/OUTSTANDING-WORK.md`**——M2 记忆保真、审批/多格式收录计划、deferred 小项都在里头，且全部基于已核实事实。新会话优先读那份。
+**Windows 常驻验收已通过（2026-07-24）**——重启后登录自启确认（task 起 `10:53:43` → node 起 `10:53:58`，ownership `.runtime/syno-host.pid` mode=owned）；但登录时 wrapper（`start-syno.ps1`）以 `0xC000013A` 一次性中断、node 沦为孤儿（父进程已退），故 `health ok` 而 `windows:status running=false`。`pnpm windows:restart` 恢复后 task=`Running`、`lastTaskResult=267009`（= `0x41301` 运行中态）、wrapper 存活、60s 轮询稳定。自愈链确认工作。根因（登录会话初始化竞态）未完全定位，不阻塞。**当前无立即在途动作**；下一个里程碑是 M2（需新会话）。**完整待办见 `docs/OUTSTANDING-WORK.md`**——M2 记忆保真、审批即时反馈+多格式收录（**Phase 1 已实现 `2dc77b8`**、待端到端验收）、deferred 小项都在里头，且全部基于已核实事实。新会话优先读那份。
 
 ## 权威入口
 

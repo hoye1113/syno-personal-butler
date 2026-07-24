@@ -61,11 +61,13 @@ M1 上下文管理 + host 端口修复**均已实现、上线、验证、本地�
 - **为什么优先**：压缩 = 知识 butler 的「记忆边界」。「永不污染记忆」与「持续可改进」是 ROADMAP §1 的两大并列锚点——M1 解决了后者（可观测），M2 守前者（不污染）。
 - 需新会话：设计 + 多文件 + 测试，单个上下文窗口放不下。
 
-### 审批即时反馈 + 多格式收录（独立工作流，与上下文管理无关）
-- 计划文档**已落盘**：`docs/APPROVAL-AND-MULTIFORMAT-INTAKE-PLAN.md`（Phase 1 代码**未实现**）。
-- 原始 plan：`C:\Users\38788\.claude\plans\wild-nibbling-thunder.md`。
-- 解决真实痛点：① 审批点「收录/丢弃」看似无反应（前端零反馈）；② pdf/md/docx/html 收录报「缺少内容」或乱码。
-- 状态：**本次会话未触碰**；是否继续由用户定（与 M2 是两条独立线）。
+### 审批即时反馈 + 多格式收录（✅ Phase 1 已实现，2026-07-24 核实）
+- **Phase 1 已落库**：commit `2dc77b8`（2026-07-22）实现了方案一（审批即时反馈：`decide()` 点即置灰 + `is-resolving` + 「执行中…」、`loadJobs({silent})` 静默刷新不清屏）+ 方案二（docx/html/markdown 收录：`fileKindFromName` 精确映射、intake docx/html 分支、artifact enum 扩 docx/html、mammoth）。测试 298/298 绿。设计/变更说明见 `docs/APPROVAL-AND-MULTIFORMAT-INTAKE-PLAN.md`（该文档曾误标「未实现」，已纠正）。
+- **Phase 1 收尾待办（非阻塞）**：
+  - **端到端手动验收缺口**：测试覆盖不了 DOM 交互与 mammoth 真实解析，需手动点审批（看即时反馈 + 不清屏）、分别传 `.md/.docx/.html/.pdf/未知` 验 approve 写入且标题为真文件名。P5 验收门未列此项，等于没验过。
+  - **两个边界 bug**（对照代码核实 2026-07-24）：① `syno.js` 审批 POST 成功后的静默 `loadJobs` 若 GET 失败，卡片卡 `is-resolving` 灰态零反馈（decide catch 只兜 POST，不兜 GET）；② 前端 fileMode 仅 `[pdf,txt,docx,html]`、markdown 未入，选「Markdown」传 .md 走粘贴路径（后端已支持 markdown base64，前后端不对齐）。
+  - mammoth 真实 `convertToHtml` 路径无集成测试（docx 测试全注入 fake extractor）。
+- **Phase 2（方案三大文件精华提取）**：Phase 1 既已落地、可启动；见下方「更长期路线图」。
 
 ### 更长期路线图（M2 之后，登记用，避免下次「发现漏了」）
 
@@ -74,7 +76,7 @@ M1 上下文管理 + host 端口修复**均已实现、上线、验证、本地�
 - **上下文 M3**（`ROADMAP §7`）：DISTILL（提取结构化升级，LLM 分类 decision/fact/preference/todo/resource + 图谱链接 + 语义去重）+ COST（per-feature token 归因，接 OBS stats 端点）+ UNIFY（Native/Hermes 上下文收敛契约）。
 - **上下文 M4**（`ROADMAP §7`）：RECOVER（`GET /api/syno/conversations/:id/compaction-log` + `POST .../restore-compaction` 恢复工具，让 v1 §7.9 压缩可恢复从存储层到运维层）+ CONCUR（per-routeKey 序列化契约，retiredIds 降级为 defense-in-depth）。
 - **ROADMAP §8 五个开放设计问题**：在对应里程碑决策时定——OBS 阈值与 frozen runConfig 接缝、摘要护栏选型、DRIFT 改造必要性、UNIFY 收敛 vs 契约、archive 外置存量迁移。
-- **审批 Phase 2 — 大文件精华提取**（`APPROVAL…PLAN §方案三`）：`prepared.content > 3 万字`阈值、Skill 模板式摘要、`prepared.fullText`（原文供 RAG）+ `prepared.largeDocDigest`。**Phase 1 落地后启动**，需先固化 Large Document Digest Skill 模板。
+- **审批 Phase 2 — 大文件精华提取**（`APPROVAL…PLAN §方案三`）：`prepared.content > 3 万字`阈值、Skill 模板式摘要、`prepared.fullText`（原文供 RAG）+ `prepared.largeDocDigest`。**Phase 1 已落地（`2dc77b8`）、可启动**；需先固化 Large Document Digest Skill 模板。
 - **小颗粒 deferred**（跟随对应主线顺手处理）：`CONTEXT-MANAGEMENT-PLAN:655` F15（cognitive-runtime 对 rotate 展开会标 `completed+undefined`，应独立 run 状态）、扫描 PDF 的 OCR 支持、微信附件白名单未扩展 docx/html（`weixin-message-handler.mjs` 第二入口）、方案一前端即时反馈缺 DOM 自动测试、decide 进行中手动 refresh 会清屏（可选禁用 refresh 按钮）。
 
 ---
