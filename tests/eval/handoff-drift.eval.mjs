@@ -6,19 +6,29 @@
 // DRIFT 前提（finding #7：post-M1 偏遗忘而非复利）看起来可从 HandoffGen 读码预测，
 // 但实测才作数。本 eval 走真实 compress→overflow→handoff 链路。
 //
-// 机制（已读码核实 HandoffGen L131-144 + rotate L313-318）：
-//   generateHandoff 只读 role==="user"(全部) + 末 3 assistant；**不读 system / summary / 上轮 handoff**。
-//   rotateConversation 把 handoff 存为 system 消息 → 下一轮 generateHandoff 过滤掉它 → 锚点丢失。
-// 故预期：depth1=存活（锚点在 user 字面里），depth2+=丢失（只剩 system handoff + generic 轮次）。
+// 两段历史：
+//   改造前（commit 6f0e9f0）：rotate 不前传 summary → 实测 depth≥2 存活 0%（锚点丢失）。
+//   改造后（本版）：rotateConversation 用 accumulateDigest 把「上轮最新 summary || handoff」
+//     累积进 fresh.handoffContext，HandoffGen 把它折成 ## 前情（未经核实） preamble。
+//   本 eval 必须走「传 handoffContext 进 compress + 用 accumulateDigest 累积」这条真路径，
+//   否则只是复测已被修复的旧缺陷，结论无意义。
+//
+// 仿真 vs 真实 rotateConversation：本 eval 不直接调 rotateConversation（那需要 ConversationStore/Router
+// 和磁盘 IO）。而是在内存里复刻它的两步语义：
+//   (1) digest = old.summaries[-1]?.summary || handoff
+//   (2) handoffContext = accumulateDigest(old.handoffContext, digest)
+// 然后把 handoffContext 传进下一轮 compress({ handoffContext })，校验生成的 handoff 含锚点。
+// 这正是 tool-loop-agent.mjs + tool-loop-executor.mjs 的真实数据流。
 
 import test from "node:test";
 import assert from "node:assert/strict";
 import { ContextManager } from "../../apps/syno/syno/context-manager.mjs";
 import { ToolRegistry } from "../../apps/syno/syno/tool-registry.mjs";
+import { accumulateDigest } from "../../apps/syno/syno/tool-loop-executor.mjs";
 
 const ANCHOR = "决策锚-A7X9-2026"; // 确定性、独特、可逐字匹配
 const DEPTHS = [1, 2, 3, 5];
-const GATE = 0.80; // 决策门：depth≥2 存活率 ≥80% → 不改策略；否则改造候选
+const GATE = 0.80; // 决策门：depth≥2 存活率 ≥80% → 改造生效；否则改造未达预期
 
 function makeTool() {
   return {
@@ -54,10 +64,14 @@ function buildConversation(handoffFromPrev, anchorAtStart) {
   return msgs;
 }
 
-test("DRIFT: 锚点跨 rotate 存活曲线（depth 1/2/3/5）", async () => {
+test("DRIFT: 锚点跨 rotate 存活曲线（depth 1/2/3/5）——  summary 前传路径", async () => {
   const cm = newContextManager();
   const contextLength = 2000; // 小窗口，易达 overflow(0.95)；轮次体量足够，每轮必触发
   const survived = {};
+  // 模拟 rotateConversation 累积的稳定载体（跨段滚动窗口）
+  let handoffContext = "";
+  // 模拟 old.summaries[-1]?.summary（layer3 产物；rotate 用它退回 handoff）
+  let lastSummary = null;
   let prevHandoff = null;
 
   const assertRotate = (compressed, depth) => {
@@ -68,35 +82,43 @@ test("DRIFT: 锚点跨 rotate 存活曲线（depth 1/2/3/5）", async () => {
 
   // depth 1：原对话含锚点
   let conv = buildConversation(null, true);
-  let compressed = await cm.compress(conv, { runConfig: { contextLength } });
+  let compressed = await cm.compress(conv, { runConfig: { contextLength }, handoffContext });
   assertRotate(compressed, 1);
   survived[1] = compressed.handoff.includes(ANCHOR);
   prevHandoff = compressed.handoff;
+  // rotate 后：上轮 summary（无则退回 handoff）累积进 handoffContext，进下一轮 handoff 的「前情」段
+  lastSummary = prevHandoff; // 仿真：本轮无真 layer3 summary，退回 handoff（rotateConversation 的 || 兜底）
+  handoffContext = accumulateDigest(handoffContext, lastSummary);
 
   // depth 2/3/5：每轮新对话 = [system, 上轮 handoff(system), generic 轮次]，不重述锚点
+  // 关键：把累积的 handoffContext 传进 compress，让 HandoffGen 把锚点折进 preamble
   for (const d of [2, 3, 5]) {
     conv = buildConversation(prevHandoff, false);
-    compressed = await cm.compress(conv, { runConfig: { contextLength } });
+    compressed = await cm.compress(conv, { runConfig: { contextLength }, handoffContext });
     assertRotate(compressed, d);
     survived[d] = compressed.handoff.includes(ANCHOR);
     prevHandoff = compressed.handoff;
+    lastSummary = prevHandoff;
+    handoffContext = accumulateDigest(handoffContext, lastSummary);
   }
 
   const deepDepths = DEPTHS.filter((d) => d >= 2);
   const deepSurvival = deepDepths.filter((d) => survived[d]).length / deepDepths.length;
   const verdict = deepSurvival >= GATE
-    ? "不改策略（depth≥2 存活率 ≥80%）"
-    : "改造候选：把 summary/handoffContext 前传承接进下次 handoff（当前偏遗忘）";
+    ? "改造生效（summary 前传：depth≥2 存活率 ≥80%）"
+    : "改造未达预期：depth≥2 仍有丢失，检查 accumulateDigest/handoffContext 接线";
 
   const curve = DEPTHS.map((d) => `depth${d}=${survived[d] ? "存活" : "丢失"}`).join("  ");
-  console.log("\n===== M2b DRIFT 锚点存活曲线 =====");
+  console.log("\n===== M2b DRIFT 锚点存活曲线（summary 前传路径）=====");
   console.log(`锚点: ${ANCHOR}`);
   console.log(`曲线: ${curve}`);
   console.log(`depth≥2 存活率: ${(deepSurvival * 100).toFixed(0)}%  (门限 ${GATE * 100}%)`);
   console.log(`裁决: ${verdict}`);
   console.log("===================================\n");
 
-  // 硬断言只锁「eval 接线正确 + 可预测的 literal-assembly 性质」：锚点在 user 字面 → depth1 必存活。
-  // depth2+ 的具体值让 eval 输出说话（改造落地后应翻转为存活，届时更新此 sentinel）。
-  assert.equal(survived[1], true, "depth1 必存活：锚点在首条 user，HandoffGen 字面拼接全部 user");
+  // 硬断言：前传路径下，锚点应跨所有 depth 存活（preamble 字面折入，确定性拼接）。
+  // 改造前（6f0e9f0）此处 depth2+ 全丢失；此处翻转即证明修复落地。
+  for (const d of DEPTHS) {
+    assert.equal(survived[d], true, `depth${d} 锚点应存活（前传路径生效）`);
+  }
 });

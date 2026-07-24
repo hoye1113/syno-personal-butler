@@ -128,14 +128,15 @@ class HandoffGen {
     this.charCap = toChars(tokenCap);
   }
 
-  async generateHandoff(messages, { conversationId } = {}) {
+  async generateHandoff(messages, { conversationId, handoffContext } = {}) {
     const users = (messages || []).filter((m) => m.role === "user").map((m) => String(m.content || ""));
     const assistants = (messages || []).filter((m) => m.role === "assistant").slice(-3).map((m) => String(m.content || ""));
+    const preamble = this.#preamble(handoffContext);
 
-    let handoff = this.#assemble(users, assistants);
+    let handoff = this.#assemble(users, assistants, preamble);
     if (handoff.length > this.charCap) {
-      // 超上限：只保留最近少量 user + 末尾 1 条 assistant
-      handoff = this.#assemble(users.slice(-3), assistants.slice(-1));
+      // 超上限：只保留最近少量 user + 末尾 1 条 assistant（保留前情 preamble，防跨 rotate 遗忘）
+      handoff = this.#assemble(users.slice(-3), assistants.slice(-1), preamble);
     }
     if (handoff.length > this.charCap) {
       handoff = `${handoff.slice(0, this.charCap)}\n…[前情已截断]…`;
@@ -143,9 +144,17 @@ class HandoffGen {
     return handoff;
   }
 
-  #assemble(users, assistants) {
+  // 跨 rotate 的稳定摘要载体：把上轮 handoffContext（累积的各段 summary / handoff）
+  // 作「前情」前置（标未经核实），让早期决策跨 rotate 存活。占 charCap 的 ≤40%，留余量给近期内容。
+  #preamble(handoffContext) {
+    const body = String(handoffContext || "").slice(0, Math.floor(this.charCap * 0.4)).trim();
+    return body ? `## 前情（上一段对话延续，未经核实）\n${body}` : "";
+  }
+
+  #assemble(users, assistants, preamble = "") {
     return [
       HANDOFF_HEADER,
+      preamble,
       "## 用户近期意图",
       ...users,
       "## 最近进展",
@@ -296,7 +305,7 @@ class ContextManager {
   }
 
   // ---- 主压缩入口 ----
-  async compress(messages, { conversationId, runConfig } = {}) {
+  async compress(messages, { conversationId, runConfig, handoffContext } = {}) {
     const contextLength = Number(runConfig?.contextLength) || this.fallbackContextLength;
     const beforeTokens = this.estimateForMessages(messages);
     const ratio = contextLength > 0 ? beforeTokens / contextLength : 1;
@@ -311,7 +320,7 @@ class ContextManager {
 
     // Layer4: rotate（始终可达，不受 anti-thrash 约束）
     if (ratio >= this.thresholds.overflow) {
-      const handoff = await this.handoffGen.generateHandoff(rest, { conversationId });
+      const handoff = await this.handoffGen.generateHandoff(rest, { conversationId, handoffContext });
       this.#fireExtraction("rotate", rest, [], conversationId);
       const rotated = { messages, action: "rotate", stats: { beforeTokens, ratio }, handoff };
       this.#recordCompression(rotated);

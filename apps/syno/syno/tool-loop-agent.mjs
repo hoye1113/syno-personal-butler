@@ -83,7 +83,7 @@ class ToolLoopAgent {
         // Mid-turn 压缩：每 turn 顶部从 conversation.messages 重建，发送前压缩
         let messages = [{ role: "system", content: this.systemPrompt }, ...conversation.messages];
         if (this.contextManager) {
-          const compressed = await this.contextManager.compress(messages, { conversationId: conversation.id, runConfig });
+          const compressed = await this.contextManager.compress(messages, { conversationId: conversation.id, runConfig, handoffContext: conversation.handoffContext });
           if (compressed.action === "rotate") {
             return {
               rotate: true,
