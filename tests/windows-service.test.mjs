@@ -58,7 +58,7 @@ test("WindowsServiceManager pins the repository, Node and management script", as
     nodePath: "C:\\Node Runtime\\node.exe",
     async run(args) {
       calls.push(args);
-      return { stdout: JSON.stringify({ supported: true, installed: false, running: false, startup: "at_logon", webUrl: "http://127.0.0.1:4317/", legacyTaskDetected: false, lastTaskResult: null }) };
+      return { stdout: JSON.stringify({ supported: true, installed: false, running: false, startup: "at_logon", webUrl: "http://127.0.0.1:8888/", legacyTaskDetected: false, lastTaskResult: null }) };
     },
   });
   await manager.status();

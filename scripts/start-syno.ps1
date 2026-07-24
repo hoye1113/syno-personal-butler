@@ -8,6 +8,8 @@ $resolvedRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 $resolvedNode = (Resolve-Path -LiteralPath $NodePath).Path
 $commonScript = Join-Path $PSScriptRoot "windows-service-common.ps1"
 . $commonScript
+# Canonical web port: mirror apps/syno/syno/paths.mjs DEFAULT_WEB_PORT (PORT env overrides).
+$synoPort = if ($env:PORT) { [int]$env:PORT } else { 8888 }
 $server = Join-Path $resolvedRoot "apps\syno\server.mjs"
 if (-not (Test-Path -LiteralPath $server -PathType Leaf)) { throw "Syno Host entrypoint not found: $server" }
 $runtimeRoot = Join-Path $resolvedRoot ".runtime"
@@ -32,7 +34,7 @@ function Write-HostOwnership($Process, [string]$Mode) {
 }
 
 function Adopt-HealthyHost {
-  $listener = Get-NetTCPConnection -LocalAddress "127.0.0.1" -LocalPort 4317 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+  $listener = Get-NetTCPConnection -LocalAddress "127.0.0.1" -LocalPort $synoPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
   if (-not $listener) { throw "Syno health responded but no loopback listener was found" }
   $process = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
   $details = Get-CimInstance Win32_Process -Filter "ProcessId = $($listener.OwningProcess)" -ErrorAction SilentlyContinue
@@ -53,9 +55,9 @@ Remove-Item Env:SYNO_WEB_ONLY -ErrorAction SilentlyContinue
 while ($true) {
   $health = $null
   try {
-    $health = Invoke-RestMethod -Uri "http://127.0.0.1:4317/api/syno/health" -Method Get -TimeoutSec 2
+    $health = Invoke-RestMethod -Uri "http://127.0.0.1:$synoPort/api/syno/health" -Method Get -TimeoutSec 2
   } catch { break }
-  if (-not (Test-SynoHealthResponse $health $repoFingerprint)) { throw "Port 4317 is occupied by an unknown service" }
+  if (-not (Test-SynoHealthResponse $health $repoFingerprint)) { throw "Port $synoPort is occupied by an unknown service" }
   Adopt-HealthyHost
   Start-Sleep -Seconds 5
 }

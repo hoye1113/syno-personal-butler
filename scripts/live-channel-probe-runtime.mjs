@@ -1,6 +1,8 @@
+import { DEFAULT_WEB_PORT } from "../apps/syno/syno/paths.mjs";
+
 const SUPPORTED_CHANNELS = new Set(["weixin", "feishu"]);
 
-async function getRunningChannelStatus(channel, { fetchImpl = fetch, port = process.env.PORT || "4317" } = {}) {
+async function getRunningChannelStatus(channel, { fetchImpl = fetch, port = process.env.PORT || DEFAULT_WEB_PORT } = {}) {
   if (!SUPPORTED_CHANNELS.has(channel)) throw new Error("未知渠道状态探针");
   const numericPort = Number(port);
   if (!Number.isInteger(numericPort) || numericPort < 1 || numericPort > 65_535) return null;

@@ -11,8 +11,10 @@ $ErrorActionPreference = "Stop"
 if (-not $RepoRoot) { $RepoRoot = Split-Path -Parent $PSScriptRoot }
 $taskName = "Syno"
 $legacyTaskName = "Syno Worker"
-$webUrl = "http://127.0.0.1:4317/"
-$healthUrl = "http://127.0.0.1:4317/api/syno/health"
+# Canonical web port: mirror apps/syno/syno/paths.mjs DEFAULT_WEB_PORT (PORT env overrides).
+$synoPort = if ($env:PORT) { [int]$env:PORT } else { 8888 }
+$webUrl = "http://127.0.0.1:$synoPort/"
+$healthUrl = "http://127.0.0.1:$synoPort/api/syno/health"
 $resolvedRoot = [IO.Path]::GetFullPath($RepoRoot)
 if (-not $NodePath) { $NodePath = (Get-Command node -ErrorAction Stop).Source }
 $nodeExtension = [IO.Path]::GetExtension($NodePath)

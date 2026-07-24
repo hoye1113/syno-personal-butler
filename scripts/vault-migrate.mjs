@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { VaultMigrationService } from "../apps/syno/syno/vault-migration-service.mjs";
+import { DEFAULT_WEB_PORT } from "../apps/syno/syno/paths.mjs";
 
 const DEFAULT_REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -36,7 +37,7 @@ async function main() {
   }
   if (command === "submit") {
     if (!options.id || Object.keys(options).some((key) => !new Set(["id", "repo"]).has(key))) throw new Error("submit 只接受 --id");
-    const baseUrl = "http://127.0.0.1:4317";
+    const baseUrl = `http://127.0.0.1:${process.env.PORT || DEFAULT_WEB_PORT}`;
     const response = await fetch(`${baseUrl}/api/syno/migrations/${encodeURIComponent(options.id)}/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: baseUrl },

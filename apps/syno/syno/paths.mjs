@@ -30,6 +30,10 @@ function relativeToRepo(candidate) {
   return path.relative(REPO_ROOT, absolute).replace(/\\/g, "/") || ".";
 }
 
+// Canonical local web port. Host listens here (apps/syno/server.mjs); every probe/script mirrors it.
+// PORT env overrides. This is the single JS source of truth — PowerShell scripts mirror with `$env:PORT || 8888`.
+const DEFAULT_WEB_PORT = 8888;
+
 const PATHS = Object.freeze({
   repoRoot: REPO_ROOT,
   appRoot: APP_ROOT,
@@ -42,4 +46,4 @@ const PATHS = Object.freeze({
   stateRoot: path.join(localDataRoot(), "state"),
 });
 
-export { PATHS, relativeToRepo, resolveInside };
+export { DEFAULT_WEB_PORT, PATHS, relativeToRepo, resolveInside };

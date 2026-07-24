@@ -11,7 +11,7 @@ pnpm verify
 pnpm start
 ```
 
-浏览器打开 <http://127.0.0.1:4317>。Syno 不依赖 Obsidian，也不依赖 OpenClaw。
+浏览器打开 <http://127.0.0.1:8888>。Syno 不依赖 Obsidian，也不依赖 OpenClaw。
 
 首次启动默认使用仓库内的 `vault/`、`ops/content/` 与 `ops/artifacts/inbox/`。token-cloud Provider、飞书和微信均按需配置；未配置时不影响本地知识阅读、任务、提醒与审批。
 

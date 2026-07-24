@@ -129,7 +129,7 @@ test("output progress API cannot publish without domain-validated feedback", asy
 test("Windows service Web API exposes only fixed status, install and uninstall actions", async () => {
   const calls = [];
   const windowsService = {
-    async status() { calls.push(["status"]); return { supported: true, installed: false, running: false, startup: "at_logon", webUrl: "http://127.0.0.1:4317/", legacyTaskDetected: true, lastTaskResult: null }; },
+    async status() { calls.push(["status"]); return { supported: true, installed: false, running: false, startup: "at_logon", webUrl: "http://127.0.0.1:8888/", legacyTaskDetected: true, lastTaskResult: null }; },
     async mutate(action, context) { calls.push(["mutate", action, context.channel, context.senderId]); return { installed: action === "install", running: action === "install", jobId: "job-audit" }; },
   };
   const runtime = { developmentMode: false, windowsService };
@@ -176,9 +176,9 @@ test("state-changing Windows service requests require JSON", () => {
 });
 
 test("state-changing Windows service requests require an exact same-origin browser Origin", () => {
-  assert.doesNotThrow(() => assertSameOriginMutation({ method: "POST", headers: { host: "127.0.0.1:4317", origin: "http://127.0.0.1:4317" } }));
-  assert.throws(() => assertSameOriginMutation({ method: "POST", headers: { host: "127.0.0.1:4317" } }), /Origin/);
-  assert.throws(() => assertSameOriginMutation({ method: "POST", headers: { host: "127.0.0.1:4317", origin: "http://evil.invalid" } }), /同源/);
+  assert.doesNotThrow(() => assertSameOriginMutation({ method: "POST", headers: { host: "127.0.0.1:8888", origin: "http://127.0.0.1:8888" } }));
+  assert.throws(() => assertSameOriginMutation({ method: "POST", headers: { host: "127.0.0.1:8888" } }), /Origin/);
+  assert.throws(() => assertSameOriginMutation({ method: "POST", headers: { host: "127.0.0.1:8888", origin: "http://evil.invalid" } }), /同源/);
 });
 
 test("conversation retention removes confirmed raw voice before the conversation", async (t) => {

@@ -13,7 +13,7 @@ import { WorkbenchOperations } from "./syno/workbench-operations.mjs";
 import { buildOperationRequest } from "./syno/operation-registry.mjs";
 import { GitGuard } from "./syno/git-guard.mjs";
 import { assertJsonMutation, assertSameOriginMutation, securityHeaders } from "./syno/http-security.mjs";
-import { PATHS, resolveInside } from "./syno/paths.mjs";
+import { DEFAULT_WEB_PORT, PATHS, resolveInside } from "./syno/paths.mjs";
 import { validateContractRecord } from "./syno/schema-registry.mjs";
 import {
   getPlannerConfigPath,
@@ -36,7 +36,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = __dirname;
 const PUBLIC_DIR = path.join(PROJECT_ROOT, "public");
 process.env.TOPIC_PLANNER_CONFIG ||= path.join(PATHS.stateRoot, "topic-planner.config.json");
-const PORT = Number(process.env.PORT || 8888);
+const PORT = Number(process.env.PORT || DEFAULT_WEB_PORT);
 const TIMEZONE = normalizeTimeZone(
   process.env.TOPIC_PLANNER_TIME_ZONE || Intl.DateTimeFormat().resolvedOptions().timeZone,
 );

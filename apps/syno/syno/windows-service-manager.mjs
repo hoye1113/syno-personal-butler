@@ -3,6 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
+import { DEFAULT_WEB_PORT } from "./paths.mjs";
+
 const execFileAsync = promisify(execFile);
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
@@ -30,7 +32,7 @@ class WindowsServiceManager {
   }
 
   #unsupported() {
-    return { supported: false, installed: false, running: false, startup: "unsupported", webUrl: "http://127.0.0.1:4317/", legacyTaskDetected: false, lastTaskResult: null };
+    return { supported: false, installed: false, running: false, startup: "unsupported", webUrl: `http://127.0.0.1:${DEFAULT_WEB_PORT}/`, legacyTaskDetected: false, lastTaskResult: null };
   }
 
   async #invoke(action) {
