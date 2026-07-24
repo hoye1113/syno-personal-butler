@@ -5,7 +5,7 @@ import { PATHS } from "./paths.mjs";
 
 const GROUPS = Object.freeze({
   agentAdjustable: Object.freeze(["notifications.cadence", "notifications.quietHours", "learning.dailyReviewCount", "ui.displayOrder", "ui.preferences"]),
-  confirmationRequired: Object.freeze(["provider.modelId", "budget", "channels", "calendar", "ownerAllowlist", "retention", "actions.allowlist"]),
+  confirmationRequired: Object.freeze(["provider.modelId", "budget", "channels", "calendar", "ownerAllowlist", "retention", "actions.allowlist", "context.thresholds"]),
   immutable: Object.freeze(["provider.baseUrl", "provider.token", "policy", "allowedRoots", "toolRegistry", "approvals", "security", "source", "contracts"]),
 });
 
@@ -15,6 +15,7 @@ const DEFAULT_VALUES = Object.freeze({
   "learning.dailyReviewCount": 5,
   "ui.displayOrder": Object.freeze(["today", "capture", "knowledge", "learn", "create"]),
   "ui.preferences": Object.freeze({ reducedDensity: false }),
+  "context.thresholds": null,
 });
 
 function validateValue(key, value) {
@@ -29,6 +30,13 @@ function validateValue(key, value) {
     if (!Array.isArray(value) || value.length !== allowed.length || !allowed.every((item) => value.includes(item))) throw new Error("显示顺序必须包含五个主区且不能重复");
   }
   if (key === "ui.preferences" && (value === null || typeof value !== "object" || Array.isArray(value))) throw new Error("界面偏好必须为对象");
+  if (key === "context.thresholds" && value !== null) {
+    if (typeof value !== "object" || Array.isArray(value)) throw new Error("压缩阈值必须为对象或 null");
+    for (const [name, ratio] of Object.entries(value)) {
+      if (!["light", "moderate", "heavy", "overflow"].includes(name)) throw new Error(`未知压缩阈值：${name}`);
+      if (!Number.isFinite(ratio) || ratio <= 0 || ratio >= 1) throw new Error(`压缩阈值 ${name} 必须为 (0,1) 区间数值`);
+    }
+  }
   return value;
 }
 
@@ -56,7 +64,7 @@ class SettingsRegistry {
 
   async set(key, value, options = {}) {
     const group = this.assertChange(key, options);
-    if (group === "agentAdjustable") validateValue(key, value);
+    validateValue(key, value);
     const state = await this.load();
     state.values[key] = value;
     state.updatedAt = this.clock().toISOString();

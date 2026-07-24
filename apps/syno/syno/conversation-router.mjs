@@ -22,13 +22,38 @@ class ConversationRouter {
     return this.#serialized(async () => {
       const key = routeKey(ownerKey, threadKey);
       const state = await this.#load();
+      const retired = new Set(state.retiredIds || []);
       const existing = state.routes[key]?.conversationId;
-      if (existing && (!conversationId || conversationId === existing)) return existing;
-      const resolved = conversationId || existing || `conversation-${randomUUID()}`;
+      const existingAlive = existing && !retired.has(existing) ? existing : null;
+      if (existingAlive && (!conversationId || conversationId === existingAlive)) return existingAlive;
+      const resolved = conversationId || existingAlive || `conversation-${randomUUID()}`;
       if (!/^conversation-[a-zA-Z0-9-]+$/.test(resolved)) throw new Error("Conversation ID 无效");
       state.routes[key] = { conversationId: resolved, updatedAt: this.clock().toISOString() };
       await this.#save(state);
       return resolved;
+    });
+  }
+
+  async rotate({ ownerKey, threadKey = "default", newConversationId }) {
+    if (!newConversationId || !/^conversation-[a-zA-Z0-9-]+$/.test(newConversationId)) throw new Error("Conversation ID 无效");
+    return this.#serialized(async () => {
+      const key = routeKey(ownerKey, threadKey);
+      const state = await this.#load();
+      const oldId = state.routes[key]?.conversationId || null;
+      state.routes[key] = { conversationId: newConversationId, rotatedFrom: oldId, updatedAt: this.clock().toISOString() };
+      state.retiredIds = oldId ? [...new Set([...(state.retiredIds || []), oldId])] : (state.retiredIds || []);
+      await this.#save(state);
+      return { oldId, newConversationId };
+    });
+  }
+
+  async retire(conversationId) {
+    if (!conversationId) return [];
+    return this.#serialized(async () => {
+      const state = await this.#load();
+      state.retiredIds = [...new Set([...(state.retiredIds || []), conversationId])];
+      await this.#save(state);
+      return state.retiredIds;
     });
   }
 
@@ -41,9 +66,13 @@ class ConversationRouter {
   async #load() {
     try {
       const parsed = JSON.parse(await fs.readFile(this.stateFile, "utf8"));
-      return { version: 1, routes: parsed?.routes && typeof parsed.routes === "object" ? parsed.routes : {} };
+      return {
+        version: 1,
+        routes: parsed?.routes && typeof parsed.routes === "object" ? parsed.routes : {},
+        retiredIds: Array.isArray(parsed?.retiredIds) ? parsed.retiredIds : [],
+      };
     } catch (error) {
-      if (error.code === "ENOENT") return { version: 1, routes: {} };
+      if (error.code === "ENOENT") return { version: 1, routes: {}, retiredIds: [] };
       throw error;
     }
   }

@@ -12,6 +12,7 @@ import { assertRegisteredOperation, buildOperationRequest } from "../apps/syno/s
 import { OutputService } from "../apps/syno/syno/output-service.mjs";
 import { routeSynoApi } from "../apps/syno/syno/runtime.mjs";
 import { ConversationStore } from "../apps/syno/syno/conversation-store.mjs";
+import { validateValue } from "../apps/syno/syno/settings-registry.mjs";
 import { backupState, restoreState, verifyArchive } from "../apps/syno/syno/state-archive.mjs";
 import { validateContractRecord } from "../apps/syno/syno/schema-registry.mjs";
 import { isPrivateAddress } from "../apps/syno/syno/source-fetcher.mjs";
@@ -149,6 +150,26 @@ test("Syno health identifies the product, protocol and exact repository without 
   assert.equal(Object.hasOwn(health, "repoRoot"), false);
 });
 
+test("context stats endpoint returns aggregate telemetry without credentials (OBS 3.1)", async () => {
+  const stats = { byAction: { none: 3, rotate: 1 }, compressions: 4, rotates: 1 };
+  const runtime = { developmentMode: false, contextManager: { stats: () => stats } };
+  const result = await routeSynoApi(runtime, { method: "GET" }, new URL("http://localhost/api/syno/context/stats"), async () => ({}));
+  assert.equal(result.compressions, 4);
+  assert.equal(result.byAction.rotate, 1);
+  assert.equal(result.apiKey, undefined); // 仅聚合指标，绝不携带 provider 凭证
+  // 无 contextManager 时优雅降级
+  const degraded = await routeSynoApi({ developmentMode: false }, { method: "GET" }, new URL("http://localhost/api/syno/context/stats"), async () => ({}));
+  assert.equal(degraded.ok, false);
+});
+
+test("context.thresholds setting validates ratio shape (OBS 3.1)", () => {
+  assert.equal(validateValue("context.thresholds", null), null);
+  assert.deepEqual(validateValue("context.thresholds", { light: 0.5, heavy: 0.8 }), { light: 0.5, heavy: 0.8 });
+  assert.throws(() => validateValue("context.thresholds", { light: 1.5 }), /(0,1)/);
+  assert.throws(() => validateValue("context.thresholds", { unknown: 0.5 }), /未知压缩阈值/);
+  assert.throws(() => validateValue("context.thresholds", "x"), /对象或 null/);
+});
+
 test("state-changing Windows service requests require JSON", () => {
   assert.doesNotThrow(() => assertJsonMutation({ method: "POST", headers: { "content-type": "application/json; charset=utf-8" } }));
   assert.throws(() => assertJsonMutation({ method: "POST", headers: { "content-type": "text/plain" } }), /JSON/);
@@ -170,6 +191,61 @@ test("conversation retention removes confirmed raw voice before the conversation
   const retained = await store.get(conversation.id);
   assert.equal(retained.status, "active");
   assert.equal("rawVoice" in retained.messages[0], false);
+});
+
+test("prune trims compactionLog and summaries to retention caps (STORE 3.2)", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-meta-trim-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const now = new Date("2026-07-17T12:00:00.000Z");
+  const store = new ConversationStore({ root, clock: () => now, retention: { compactionLogMax: 3, summariesMax: 2 } });
+  const conv = await store.create({});
+  const loaded = await store.get(conv.id);
+  loaded.compactionLog = Array.from({ length: 10 }, (_, i) => ({ at: now.toISOString(), action: "layer2", n: i }));
+  loaded.summaries = Array.from({ length: 8 }, (_, i) => ({ at: now.toISOString(), summary: `s${i}`, version: i + 1 }));
+  await store.save(loaded);
+  await store.prune();
+  const retained = await store.get(conv.id);
+  assert.equal(retained.compactionLog.length, 3);
+  assert.equal(retained.compactionLog[0].n, 7); // 保留最近 3 条（n=7,8,9）
+  assert.equal(retained.summaries.length, 2);
+  assert.equal(retained.summaries[0].version, 7); // 保留最近 2 条（version 7,8）
+});
+
+test("archive externalizes past threshold, lazy-loaded via getArchive (STORE 3.2)", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-archive-ext-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const now = new Date("2026-07-17T12:00:00.000Z");
+  const store = new ConversationStore({ root, clock: () => now, retention: { archiveExternalThreshold: 3 } });
+  const conv = await store.create({});
+  // 第一批：达到阈值 → 外置，主文件清空 archive 并留 archiveRef
+  await store.archiveMessages(conv.id, Array.from({ length: 3 }, (_, i) => ({ role: "tool", content: `old-${i}` })));
+  const after1 = await store.get(conv.id);
+  assert.equal(after1.archive.length, 0, "外置后主文件 archive 清空");
+  assert.ok(after1.archiveRef, "主文件留 archiveRef");
+  assert.equal((await store.getArchive(conv.id)).length, 3, "getArchive 读到全部 3 条");
+  // 第二批：已外置 → 追加（不丢老数据）
+  await store.archiveMessages(conv.id, [{ role: "tool", content: "new-0" }]);
+  assert.equal((await store.getArchive(conv.id)).length, 4, "追加后共 4 条，老数据不丢");
+  // 未达阈值的小对话仍内联（行为不变）
+  const small = await store.create({});
+  await store.archiveMessages(small.id, [{ role: "tool", content: "x" }]);
+  const smallLoaded = await store.get(small.id);
+  assert.equal(smallLoaded.archive.length, 1, "小对话 archive 内联");
+  assert.ok(!smallLoaded.archiveRef);
+});
+
+test("prune trims external archive by archivedDays (STORE 3.2)", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-archive-prune-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const now = new Date("2026-07-17T12:00:00.000Z");
+  const store = new ConversationStore({ root, clock: () => now, retention: { archiveExternalThreshold: 1 } });
+  const conv = await store.create({});
+  await store.archiveMessages(conv.id, [{ role: "tool", content: "fresh" }], "compaction", now.toISOString());
+  await store.archiveMessages(conv.id, [{ role: "tool", content: "stale" }], "compaction", new Date(now.getTime() - 40 * 86400000).toISOString());
+  await store.prune();
+  const archive = await store.getArchive(conv.id);
+  assert.equal(archive.length, 1, "老 archive 被 30 天保留裁掉，新的保留");
+  assert.equal(archive[0].content, "fresh");
 });
 
 test("state archive excludes credentials, verifies hashes and restores only to an empty target", async (t) => {

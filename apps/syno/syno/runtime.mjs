@@ -7,6 +7,7 @@ import { ApprovalAdvisor, minimalAdvice } from "./approval-advisor.mjs";
 import { ChannelHub, WebChannelAdapter, WindowsNotificationAdapter } from "./channels.mjs";
 import { ClaimEvidenceService } from "./claim-evidence-service.mjs";
 import { NativeCognitiveRuntime } from "./cognitive-runtime.mjs";
+import { ContextManager } from "./context-manager.mjs";
 import { ConversationStore } from "./conversation-store.mjs";
 import { ConversationRouter } from "./conversation-router.mjs";
 import { executeDomainOperation } from "./domain-operations.mjs";
@@ -176,9 +177,23 @@ function createSynoRuntime(options = {}) {
       execute: ({ key, value }) => settingsRegistry.set(key, value, { actor: "agent" }),
     },
   ]);
-  const agent = options.agent || new ToolLoopAgent({ provider, tools, conversations });
+  // Phase 4：压缩/轮转时经 LLM 判定的有价值内容 → ingest.receive+propose（走可审批 Job，不直接写 vault）。
+  const onExtractValuable = async (items, { conversationId } = {}) => {
+    for (const item of items || []) {
+      const payload = { kind: "text", value: String(item.content || ""), title: `对话要点·${item.type || "decision"}` };
+      const receipt = await ingest.receive(payload, { ownerId: "local-user", channel: "compression", conversationId });
+      ingest.propose(receipt.artifact.id).catch(() => {});
+    }
+  };
+  // 阈值外部化 seam（OBS 3.1）：调用方可经 options.contextThresholds 注入（如 bootstrap 从 settings 读取），
+  // 构造期快照注入，与每 run 冻结的 runConfig 互不冲突（解 ROADMAP §8.1）。
+  const contextManager = options.contextManager || new ContextManager({
+    provider, credentials, tools, conversationStore: conversations, onExtractValuable,
+    ...(options.contextThresholds ? { thresholds: options.contextThresholds } : {}),
+  });
+  const agent = options.agent || new ToolLoopAgent({ provider, tools, conversations, contextManager });
   const cognitiveRuntime = options.cognitiveRuntime || new NativeCognitiveRuntime({ agent, tools });
-  const baseExecutor = options.executor || new ToolLoopExecutor({ runtime: cognitiveRuntime });
+  const baseExecutor = options.executor || new ToolLoopExecutor({ runtime: cognitiveRuntime, conversations, conversationRouter });
   let reports;
   const executor = new OperationExecutor({
     fallback: baseExecutor,
@@ -295,6 +310,7 @@ function createSynoRuntime(options = {}) {
     tools,
     agent,
     cognitiveRuntime,
+    contextManager,
     settingsRegistry,
     windowsService,
     developmentMode: options.developmentMode === true || process.env.SYNO_DEVELOPMENT_MODE === "true",
@@ -334,6 +350,10 @@ async function routeSynoApi(runtime, req, url, readBody) {
     ok: true, product: HEALTH_PRODUCT, protocolVersion: HEALTH_PROTOCOL_VERSION,
     repoFingerprint: REPO_FINGERPRINT, now: new Date().toISOString(),
   };
+  if (method === "GET" && url.pathname === "/api/syno/context/stats") {
+    // 压缩遥测（OBS 3.1）：只读聚合视图，不含凭证。
+    return typeof runtime.contextManager?.stats === "function" ? runtime.contextManager.stats() : { ok: false, reason: "context-manager-unavailable" };
+  }
   if (method === "GET" && url.pathname === "/api/syno/windows-service") return runtime.windowsService.status();
   if (method === "POST" && url.pathname === "/api/syno/windows-service/install") return runtime.windowsService.mutate("install", webContext);
   if (method === "POST" && url.pathname === "/api/syno/windows-service/uninstall") return runtime.windowsService.mutate("uninstall", webContext);

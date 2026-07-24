@@ -30,6 +30,7 @@ class ProviderClient {
     const config = Object.freeze({ ...await this.credentials.load() });
     return Object.freeze({
       modelId: config.modelId,
+      contextLength: config.contextLength,
       complete: (messages, tools = [], options = {}) => this.completeWithConfig(config, messages, tools, options),
     });
   }
@@ -41,7 +42,7 @@ class ProviderClient {
 
   async completeWithConfig(config, messages, tools = [], { signal, temperature = 0.2 } = {}) {
     const estimatedTokens = estimateTokens(messages, tools);
-    if (estimatedTokens > config.contextLength - 1_024) {
+    if (estimatedTokens > Math.floor(config.contextLength * 0.97)) {
       throw new ProviderError("PROVIDER_CONTEXT_LIMIT", `请求上下文约 ${estimatedTokens} tokens，超过配置长度 ${config.contextLength} 的安全预算`, { retryable: false });
     }
     const controller = new AbortController();

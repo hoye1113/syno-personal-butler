@@ -47,13 +47,14 @@ function repairDanglingToolCalls(messages = []) {
 }
 
 class ToolLoopAgent {
-  constructor({ provider, tools, conversations, maxTurns = 8, systemPrompt = DEFAULT_SYSTEM_PROMPT } = {}) {
+  constructor({ provider, tools, conversations, maxTurns = 8, systemPrompt = DEFAULT_SYSTEM_PROMPT, contextManager = null } = {}) {
     if (!provider || !tools || !conversations) throw new Error("ToolLoopAgent 缺少 Provider、ToolRegistry 或 ConversationStore");
     this.provider = provider;
     this.tools = tools;
     this.conversations = conversations;
     this.maxTurns = maxTurns;
     this.systemPrompt = systemPrompt;
+    this.contextManager = contextManager;
   }
 
   async run(request, { conversationId, channel = "web", ownerId = "local-user", signal } = {}) {
@@ -72,15 +73,39 @@ class ToolLoopAgent {
     const userMessage = { role: "user", content: String(request?.text || request?.message || "") };
     conversation.messages.push(userMessage);
     await this.conversations.save(conversation);
-    const messages = [{ role: "system", content: this.systemPrompt }, ...conversation.messages];
 
     try {
       const provider = typeof this.provider.bindRun === "function" ? await this.provider.bindRun() : this.provider;
+      const runConfig = Number.isFinite(provider?.contextLength) ? { contextLength: provider.contextLength } : null;
       for (let turn = 1; turn <= this.maxTurns; turn += 1) {
         if (signal?.aborted) throw Object.assign(new Error("Agent 已取消"), { code: "AGENT_CANCELED" });
+
+        // Mid-turn 压缩：每 turn 顶部从 conversation.messages 重建，发送前压缩
+        let messages = [{ role: "system", content: this.systemPrompt }, ...conversation.messages];
+        if (this.contextManager) {
+          const compressed = await this.contextManager.compress(messages, { conversationId: conversation.id, runConfig });
+          if (compressed.action === "rotate") {
+            return {
+              rotate: true,
+              handoff: compressed.handoff,
+              fromConversationId: conversation.id,
+              pendingRequest: request,
+              channel, ownerId,
+            };
+          }
+          if (compressed.action !== "none") {
+            messages = compressed.messages;
+            this.contextManager.applyCompaction(conversation, compressed);
+          }
+        }
+
         const completion = await provider.complete(messages, this.tools.list(), { signal });
+
+        if (this.contextManager && completion.usage) {
+          this.contextManager.trackUsage(completion.usage, conversation.id);
+        }
+
         const assistant = completion.message;
-        messages.push(assistant);
         conversation.messages.push(assistant);
         const calls = assistant.tool_calls || [];
         if (!calls.length) {
@@ -104,8 +129,10 @@ class ToolLoopAgent {
               },
             };
           }
+          if (this.contextManager) {
+            result = this.contextManager.truncateToolResult(result, name);
+          }
           const toolMessage = { role: "tool", tool_call_id: call.id, content: JSON.stringify(result) };
-          messages.push(toolMessage);
           conversation.messages.push(toolMessage);
         }
         await this.conversations.save(conversation);
