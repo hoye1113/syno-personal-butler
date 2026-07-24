@@ -69,8 +69,8 @@ per-feature token 归因（summary/judge/guard 各自开销），账本只暴露
 
 ## 7. 快速复核
 ```bash
-git log --oneline -3     # 顶 057433d(M2b)；往下 787656f(M2a)；再下 d3c2b29
-pnpm test                # 310/310（calendar-sync 全量并发下偶发 45s 超时，单跑 11s 通过，非回归）
+git log --oneline -4     # 顶 d63908d(M2b review)；往下 057433d(M2b)/1b5cefa(docs)；再下 787656f(M2a)
+pnpm test                # 312/312（calendar-sync 全量并发下偶发 45s 超时，单跑 11s 通过，非回归）
 node --test tests/eval/  # on-demand 跑 eval（M2b 重写走真前传路径）
 ```
 
@@ -96,9 +96,23 @@ node --test tests/eval/  # on-demand 跑 eval（M2b 重写走真前传路径）
 `tests/eval/handoff-drift.eval.mjs`（`6f0e9f0`）实测跨 rotate 锚点存活曲线 → **depth1=存活、depth2/3/5=丢失（depth≥2 0%）**，低于 §4 决策门 80%。根因经读码核实（HandoffGen L131-144 + rotate L313-318）：`generateHandoff` 只读 `role==="user"`(全部)+末 3 assistant、不读 system/summary/上轮 handoff；`rotateConversation` 把 handoff 存为 system 消息 → 下一轮 `generateHandoff` 过滤掉它 → 锚点丢失。
 
 **改造（稳定摘要载体 `handoffContext` 从「只写」变「累积+前传」）：**
-- **`tool-loop-executor.mjs`**：`accumulateDigest(prev, digest)` 滚动窗口（`HANDOFF_CONTEXT_CAP=8000` 字符，新摘要前置 + 旧载体续接、超上限截头部保最新）；`rotateConversation` 把 `old.summaries[-1]?.summary || handoff` 作 digest，与 `old.handoffContext` 累积进 `fresh.handoffContext`（此前 `fresh.handoffContext = handoff` 直接覆盖、且全仓只写不读）。
+- **`tool-loop-executor.mjs`**：`accumulateDigest(prev, digest)` 滚动窗口（`HANDOFF_CONTEXT_CAP=8000` 字符，新摘要前置 + 旧载体续接、超上限截头部保最新）；`rotateConversation` 把 `old.summaries[-1]?.summary || handoff` 作 digest，与 `old.handoffContext` 累积进 `fresh.handoffContext`（此前 `fresh.handoffContext = handoff` 直接覆盖、且全仓只写不读）。（注：签名与上限后于 §10 外置为 `accumulateDigest(prev,digest,cap)` + `RETENTION.handoffContextCharsMax`。）
 - **`context-manager.mjs`**：`compress({handoffContext})` 透传到 Layer4 rotate 的 `generateHandoff`；`HandoffGen.#preamble` 把上轮载体折成 `## 前情（上一段对话延续，未经核实）`前置，占 `charCap` ≤40%（留余量给近期内容），截断路径仍保留 preamble（防跨 rotate 遗忘）。
 - **`tool-loop-agent.mjs`**：compress 调用传入 `conversation.handoffContext`。
 - **验证**：`tests/context-fidelity.test.mjs` +4（compose e2e 持久化 summary、HandoffGen preamble、rotateConversation 前传 latest summary+累积旧 handoffContext、accumulateDigest 上限）；重写 `handoff-drift.eval.mjs` 走真前传路径（传 `handoffContext` 进 `compress` + `accumulateDigest` 累积）→ **depth 1/2/3/5 全存活（depth≥2 0%→100%）**。**310/310 绿**。前情一律 `factualStatus:"unverified"`（FIDELITY 不变式）。
 
 **未做（留待 M2c）**：per-feature token 归因（COST）。
+
+---
+
+## 10. Review 收尾（2026-07-24 落库，`d63908d`）
+
+M2b 落库后做了一轮结构化 review（`/code-review`），5 项 finding 逐一核查后落地：
+
+- **[Optional] cap 外置**：`HANDOFF_CONTEXT_CAP`（`tool-loop-executor` 局部魔法常量）→ `RETENTION.handoffContextCharsMax`（`conversation-store`，与 `summariesMax` 同源）；`accumulateDigest(prev, digest, cap=DEFAULT)` 参数化、非法/缺省退回默认；`rotateConversation` 从 `store.retention` 读上限。
+- **[FYI#2 → 探活推翻审查结论]**：审查曾把 `digest = ... || handoff` 的「re-injection」标为冗余、拟改 preamble-free 精简 digest。**实跑探活推翻**：精简 digest 在 depth≥3 回退存活（d3/d5 ✗ vs 当前 d1–d5 全 ✓）——re-injection 是**承载性**的（把累积前情再渲染进新 digest 头部，使滚动窗口「保头部」时旧决策始终位于头端而存活）。故保持行为、补注释固化语义 + 用 eval depth≥3 断言当回归锁。
+- **[FYI#3/#4/#5 doc]**：`#preamble` 的 40% charCap 上限默认不咬合（防御性，仅 tokenCap<~2500 时生效）；信任边界（既往用户派生内容持续带入未来轮次）已用 `未经核实` 标记 + system prompt 区分缓解，无代码改动；eval 刻意压测最坏（无 layer3 summary）路径，summary 在场路径由 CI 单测覆盖。
+
+**验证**：`pnpm test` 312/312（+2：cap 参数生效、`store.retention` 注入上限）；drift eval depth 1/2/3/5 全存活；repo verify 1287 通过。
+
+**教训（已入 memory `syno-context-probe-before-change`）**：本子系统（compress/rotate/handoff）行为反直觉，读码断言已多次出错（finding #2、本处 lean-digest 险些回归）——改这类行为前先跑 eval/探活，勿凭 trace 下结论。
