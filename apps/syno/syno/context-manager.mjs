@@ -146,6 +146,8 @@ class HandoffGen {
 
   // 跨 rotate 的稳定摘要载体：把上轮 handoffContext（累积的各段 summary / handoff）
   // 作「前情」前置（标未经核实），让早期决策跨 rotate 存活。占 charCap 的 ≤40%，留余量给近期内容。
+  // 注：40% 上限是防御性的——默认 tokenCap(50000)→charCap(160000) 的 40%=64000 ≫ handoffContext
+  // 上限(8000)，故恒不咬合；仅当 tokenCap 被调到 ~2500 以下时才实际截断（此时确能保护「留余量」语义）。
   #preamble(handoffContext) {
     const body = String(handoffContext || "").slice(0, Math.floor(this.charCap * 0.4)).trim();
     return body ? `## 前情（上一段对话延续，未经核实）\n${body}` : "";

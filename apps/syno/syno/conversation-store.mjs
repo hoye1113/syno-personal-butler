@@ -5,7 +5,7 @@ import path from "node:path";
 import { PATHS } from "./paths.mjs";
 import { ProcessFileLock } from "./process-lock.mjs";
 
-const RETENTION = Object.freeze({ completedChatDays: 30, confirmedVoiceDays: 7, failedPayloadDays: 30, archivedDays: 30, archivedConvDays: 90, compactionLogMax: 200, summariesMax: 50, archiveExternalThreshold: 100 });
+const RETENTION = Object.freeze({ completedChatDays: 30, confirmedVoiceDays: 7, failedPayloadDays: 30, archivedDays: 30, archivedConvDays: 90, compactionLogMax: 200, summariesMax: 50, archiveExternalThreshold: 100, handoffContextCharsMax: 8000 });
 const DAY_MS = 86_400_000;
 
 async function atomicJson(file, value) {

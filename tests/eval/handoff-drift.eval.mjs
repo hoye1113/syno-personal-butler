@@ -19,6 +19,13 @@
 //   (2) handoffContext = accumulateDigest(old.handoffContext, digest)
 // 然后把 handoffContext 传进下一轮 compress({ handoffContext })，校验生成的 handoff 含锚点。
 // 这正是 tool-loop-agent.mjs + tool-loop-executor.mjs 的真实数据流。
+//
+// 覆盖范围（on-demand，不进 CI glob）：
+//   - 本 eval 跑的是「无 layer3 summary」的最坏路径（digest 退回 handoff）——这是 re-injection 真正
+//     起作用、最该压测的路径。depth≥3 的硬断言**锁住了「digest=handoff 的 re-injection」语义**：
+//     若有人改成 preamble-free 精简 digest，depth≥3 会翻转为 ✗（probe 已验证 d3/d5 回退）。
+//   - 「summary 在场」的首选路径（digest=summaries[-1]?.summary）由 CI 单测
+//     `rotateConversation forwards ... into fresh.handoffContext` 覆盖，此处不重复。
 
 import test from "node:test";
 import assert from "node:assert/strict";

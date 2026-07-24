@@ -193,3 +193,31 @@ test("accumulateDigest bounds growth (rolling window keeps newest)", () => {
   assert.ok(out.length <= 8000, "must cap at HANDOFF_CONTEXT_CAP");
   assert.ok(out.startsWith("x"), "keeps head (newest digest)");
 });
+
+test("accumulateDigest honors an injected cap (externalized from store.retention)", () => {
+  const big = "x".repeat(4000);
+  // cap=3000：4000 单段即超 → 截到 3000
+  const out = accumulateDigest("", big, 3000);
+  assert.equal(out.length, 3000, "must respect the injected cap");
+  // 非法/缺省 cap 退回默认
+  const def = accumulateDigest(big, big);
+  assert.ok(def.length <= 8000, "falls back to default cap when cap omitted/invalid");
+  const zero = accumulateDigest(big, big, 0);
+  assert.ok(zero.length <= 8000, "falls back to default cap when cap is 0");
+});
+
+test("rotateConversation uses store.retention.handoffContextCharsMax as the accumulation cap", async (t) => {
+  const root = tmpDir(t, "syno-fidelity-cap-");
+  const store = new ConversationStore({ root, retention: { handoffContextCharsMax: 1200 } });
+  const router = new ConversationRouter({ stateFile: path.join(root, "routing.json") });
+  const old = await store.create({ id: "conversation-cap-old", channel: "weixin", ownerId: "local-user" });
+  old.summaries = [{ at: "t", summary: "s".repeat(5000), version: 1 }]; // 5000 ≫ 1200 与默认 8000
+  await store.save(old);
+  await router.resolve({ ownerKey: "local-user", conversationId: old.id });
+  const newId = await rotateConversation({
+    conversations: store, conversationRouter: router, ownerKey: "local-user",
+    oldConversationId: old.id, handoff: "h".repeat(5000), channel: "weixin", ownerId: "local-user",
+  });
+  const fresh = await store.get(newId);
+  assert.ok(fresh.handoffContext.length <= 1200, "must cap at the store's handoffContextCharsMax, not the 8000 default");
+});
