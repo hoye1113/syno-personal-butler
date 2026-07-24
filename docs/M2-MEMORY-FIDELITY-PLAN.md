@@ -1,6 +1,6 @@
 # M2 — 记忆保真 执行计划（补强版，2026-07-24）
 
-> **状态**：M2a 已落库（`787656f`）。核查中**推翻了原 finding #2**——发现并修复了 M1 的 Layer3 摘要注入死代码（摘要此前根本不进活跃上下文）。M2b（DRIFT eval）待做。对照 `docs/CONTEXT-MANAGEMENT-ROADMAP.md` §4.1/4.2 + §7-M2。
+> **状态**：M2 全片落库——M2a（`787656f`）/ M2b（`057433d` + review `d63908d`）/ M2c（`953f3a5`）。核查中**推翻了原 finding #2**——发现并修复了 M1 的 Layer3 摘要注入死代码（摘要此前根本不进活跃上下文）。对照 `docs/CONTEXT-MANAGEMENT-ROADMAP.md` §4.1/4.2 + §7-M2。
 > **不变约束**：不 push（分支 `codex/round3-remediation`）；原 Obsidian vault 永久只读；知识写入走可审批 Job；不可信内容按 `unverified`/`<untrusted>` 隔离；Provider token 不泄露。
 
 ---
@@ -60,8 +60,8 @@
 - **决策门**：depth≥2 存活率 ≥80% → 不改策略；否则改造（见 #7：把 handoffContext/稳定 summary 前传承接）。
 - 开放问题 Q3：**先测后定**。
 
-## 5. M2c — COST（后置）
-per-feature token 归因（summary/judge/guard 各自开销），账本只暴露聚合，接 OBS `/api/syno/context/stats`。用于回答「护栏该不该上 LLM 自检」。
+## 5. M2c — COST（✅ 已落库 `953f3a5`，见 §11）
+per-feature token 归因（agent/summary/judge 各自开销；guard/handoff 是规则、0 token 不记账），账本只暴露聚合，接 OBS `/api/syno/context/stats`（passthrough，handler 零改动）。用于回答「护栏该不该上 LLM 自检」。
 
 ## 6. 提交结构（精确路径，本地不 push）
 1. `feat(context): 摘要护栏 + factualStatus 标记` — `apps/syno/syno/context-manager.mjs` + `apps/syno/syno/tool-loop-executor.mjs` + `tests/context-fidelity.test.mjs`。
@@ -69,8 +69,8 @@ per-feature token 归因（summary/judge/guard 各自开销），账本只暴露
 
 ## 7. 快速复核
 ```bash
-git log --oneline -4     # 顶 d63908d(M2b review)；往下 057433d(M2b)/1b5cefa(docs)；再下 787656f(M2a)
-pnpm test                # 312/312（calendar-sync 全量并发下偶发 45s 超时，单跑 11s 通过，非回归）
+git log --oneline -5     # 顶 docs(M2c 同步)/953f3a5(M2c)；往下 d63908d(M2b review)/057433d(M2b)；再下 787656f(M2a)
+pnpm test                # 316/316（calendar-sync 全量并发下偶发 45s 超时，单跑通过，非回归）
 node --test tests/eval/  # on-demand 跑 eval（M2b 重写走真前传路径）
 ```
 
@@ -116,3 +116,24 @@ M2b 落库后做了一轮结构化 review（`/code-review`），5 项 finding �
 **验证**：`pnpm test` 312/312（+2：cap 参数生效、`store.retention` 注入上限）；drift eval depth 1/2/3/5 全存活；repo verify 1287 通过。
 
 **教训（已入 memory `syno-context-probe-before-change`）**：本子系统（compress/rotate/handoff）行为反直觉，读码断言已多次出错（finding #2、本处 lean-digest 险些回归）——改这类行为前先跑 eval/探活，勿凭 trace 下结论。
+
+---
+
+## 11. 执行结果（2026-07-24 落库，`953f3a5`）— M2c COST
+
+**M2 收口片。** 此前 ContextManager 几乎不记 LLM token 账本：`#summarize` / `#judgeValuable` 直接丢弃 `completion.usage`（`provider.complete()` 本就返回 `{message, usage, model}`，这俩调用点只读 `.message.content`）；`trackUsage`（唯一真调用方 `tool-loop-agent.mjs:105`）只把 `prompt_tokens` 覆盖式存进 per-conversation last-seen map（无累计、无按特征聚合）；`#stats` 无 token 维度；`TokenTracker.lastRealTokens` 是 dead-exposed（导出但 0 消费者）。结果无法回答 ROADMAP「摘要护栏 / 提取判定值不值得上 LLM 自检」。
+
+**改动（全在 ContextManager 内部，纯只读旁路记账，不碰 FIDELITY 行为）：**
+- **`#stats.byFeature`**：`{ [feature]: { calls, promptTokens, completionTokens, totalTokens } }`，标签 agent/summary/judge（guard/handoff 是规则、0 token，不记账）。
+- **私有 `#recordFeatureUsage(feature, usage)`**（镜像 `#recordCompression`）：usage 缺失/字段非有限 → no-op（绝不产生 NaN），累计 calls/prompt/completion/total + set `lastUpdated`。
+- **三个捕获点**：`trackUsage(usage, conversationId, feature="agent")`（默认 agent 向后兼容，旧调用方省略第三参仍归 agent；test stub `context-manager.test.mjs:223` 忽略参数不破）；`#summarize` LLM 分支记 `"summary"`（rule 回退天然不记）；`#judgeValuable` 在 `complete()` 后、JSON 解析前记 `"judge"`（解析失败仍已记账——LLM 调用确已发生）。
+- **`stats()` 返回浅克隆 `byFeature`**（防外部 mutation，对齐 `byAction` 克隆惯例）；`GET /api/syno/context/stats` 是 passthrough → byFeature 自动上 wire、**handler 零改动**。
+- **`tool-loop-agent.mjs:105`** 显式传 `"agent"`。
+
+**scope（用户 2026-07-24 裁定）**：核心保真路径 agent+summary+judge。`ApprovalAdvisor.#enhance`（intake 独立类、无 contextManager 引用）留作**已记录的未追踪缺口**——纳入需共享 `TokenAccountant` sink + 跨类布线，不在「记忆保真」链路内，非本片。
+
+**隐私 / 语义**：只暴露聚合、无 per-conversation 明文（ROADMAP §1）。内存态、重启清零（与 `#stats` 既有语义一致；OUTSTANDING §4「stats 落盘」是 deferred，本片不引入持久化）。**不改 `TokenTracker`**（`lastRealTokens` 虽 dead-exposed 但它是导出公开 API；byFeature.agent 已补上缺失的「累计」语义）。
+
+**验证**：`pnpm test` **312→316**（+4：summary 归因 / rule 回退不记 / judge 归因 / agent 归因+NaN 守卫+默认值向后兼容）；drift eval depth 1/2/3/5 仍全存活（旁挂未污染 compress 路径）；repo verify 1287。
+
+**未做（登记）**：approval-advisor 归因（见 scope）；stats 落盘；`lastRealTokens` 死代码清理（可选小提交）。**M2 至此收口**——下一大里程碑按 OUTSTANDING §3（Phase 2 大文件精华提取 或 M3 DISTILL/UNIFY）。

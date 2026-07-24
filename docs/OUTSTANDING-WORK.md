@@ -7,8 +7,8 @@
 
 ## 0. 一句话现状
 
-M1 上下文管理 + host 端口修复 + **Phase 1 收尾** + **M2a 记忆保真**（摘要护栏 + factualStatus + Layer3 注入死代码修复）+ **M2b 跨 rotate summary 前传**（实测 depth≥2 存活 0%→100%）均已实现、本地提交（未 push）。分支 `codex/round3-remediation`。
-在途：**M2c COST**（per-feature token 归因，见 §3）；**Phase 1 端到端手动验收**（浏览器，主人）。Windows 常驻验收已通过 2026-07-24（见 §2）。
+M1 上下文管理 + host 端口修复 + **Phase 1 收尾** + **M2 记忆保真全片**（M2a 摘要护栏 + factualStatus + Layer3 注入死代码修复；M2b 跨 rotate summary 前传，实测 depth≥2 存活 0%→100%；M2c per-feature token 归因）均已实现、本地提交（未 push）。分支 `codex/round3-remediation`。
+在途：**Phase 1 端到端手动验收**（浏览器，主人）。Windows 常驻验收已通过 2026-07-24（见 §2）。
 
 ---
 
@@ -21,6 +21,7 @@ M1 上下文管理 + host 端口修复 + **Phase 1 收尾** + **M2a 记忆保真
 | **M2a 记忆保真**（Layer3 摘要注入死代码修复 + 摘要护栏 + factualStatus 标记） | `787656f` | `pnpm test` 306/306；`tests/context-fidelity.test.mjs` +6。核查发现 M1 的「记忆压缩」此前根本不保记忆（摘要只写不读）。设计/执行见 `docs/M2-MEMORY-FIDELITY-PLAN.md` |
 | **M2b 跨 rotate summary 前传**（修 handoffContext 只写不读 → 跨段 depth≥2 全遗忘） | `057433d` | `pnpm test` 310/310（+4）；`tests/eval/handoff-drift.eval.mjs` 重写走真前传路径 → depth 1/2/3/5 全存活（depth≥2 0%→100%）。设计/执行见 `docs/M2-MEMORY-FIDELITY-PLAN.md` |
 | **M2b review 收尾**（cap 外置 + re-injection 锁定） | `d63908d` | `pnpm test` 312/312（+2）。`HANDOFF_CONTEXT_CAP` 收进 `RETENTION.handoffContextCharsMax`（`accumulateDigest` 参数化）；探活证实 `digest=handoff` 的 re-injection 是承载性的（改精简 digest 在 depth≥3 回退存活）→ 补注释 + eval depth≥3 断言锁定。见 `docs/M2-MEMORY-FIDELITY-PLAN.md` §10 |
+| **M2c COST**（per-feature token 归因） | `953f3a5` | `pnpm test` 316/316（+4）。`#stats.byFeature`（agent/summary/judge）+ `#recordFeatureUsage`；`#summarize`/`#judgeValuable` 不再丢弃 `completion.usage`；`trackUsage(…, feature="agent")` 向后兼容；`stats()` 浅克隆上 wire、`GET /context/stats` handler 零改动。纯只读旁路记账、不碰 FIDELITY 行为。见 `docs/M2-MEMORY-FIDELITY-PLAN.md` §11 |
 
 > 三个 SHA 均经 `git cat-file -t` 确认为 commit 对象（syno-job 的 churn 提交夹在中间，但未覆盖上述提交）。
 
@@ -59,10 +60,11 @@ M1 上下文管理 + host 端口修复 + **Phase 1 收尾** + **M2a 记忆保真
 ## 3. 下一里程碑（每个都大，需新会话）
 
 ### M2 — 记忆保真（`docs/CONTEXT-MANAGEMENT-ROADMAP.md` §4 + §7-M2）
-> **进度（2026-07-24）**：**M2a 已落库（`787656f`）**——Layer3 摘要注入死代码修复 + 摘要护栏（幻觉强实体→不物化）+ factualStatus 标记。**M2b 已落库（`057433d`）**——DRIFT eval（`6f0e9f0`）实测跨 rotate depth≥2 存活 0%（HandoffGen 不读 summary/handoff、rotate 存 system 消息被下次过滤），据此改造 summary 前传（`accumulateDigest` 滚动累积 `handoffContext` + `HandoffGen.#preamble` 折成「前情（未经核实）」段）；重写 eval 走真前传路径验证 0%→100%。详见 `docs/M2-MEMORY-FIDELITY-PLAN.md`。剩 **M2c（COST）**。
+> **进度（2026-07-24）**：**M2 全片落库**。M2a（`787656f`）——Layer3 摘要注入死代码修复 + 摘要护栏（幻觉强实体→不物化）+ factualStatus 标记。M2b（`057433d`）——DRIFT eval（`6f0e9f0`）实测跨 rotate depth≥2 存活 0%（HandoffGen 不读 summary/handoff、rotate 存 system 消息被下次过滤），据此改造 summary 前传（`accumulateDigest` 滚动累积 `handoffContext` + `HandoffGen.#preamble` 折成「前情（未经核实）」段）；重写 eval 走真前传路径验证 0%→100%。**M2c（`953f3a5`）——per-feature token 归因**（agent/summary/judge；`#summarize`/`#judgeValuable` 不再丢弃 `completion.usage`、`stats()` 加 `byFeature` 浅克隆、`GET /context/stats` passthrough 零改动）。详见 `docs/M2-MEMORY-FIDELITY-PLAN.md`。**M2 收口完成**。
 
 - **FIDELITY（§4.1）**：✅ 已做（注入修复 + 护栏 + 标记 + compose e2e 持久化测试）。
 - **DRIFT（§4.2）**：✅ 已做（`6f0e9f0` 测量 + `057433d` 改造）。实测 post-M1 偏遗忘（depth≥2 0%）→ summary 前传后 depth≥2 100%。
+- **COST（§5）**：✅ 已做（`953f3a5`）。`#stats.byFeature` 按 agent/summary/judge 累计 token；纯只读旁路记账、不改 compress 行为；`ApprovalAdvisor.#enhance` 留作已记录缺口。
 - **为什么优先**：压缩 = 知识 butler 的「记忆边界」。「永不污染记忆」与「持续可改进」是 ROADMAP §1 的两大并列锚点——M1 解决了后者（可观测），M2 守前者（不污染）。
 - 需新会话：设计 + 多文件 + 测试，单个上下文窗口放不下。
 
@@ -112,10 +114,10 @@ M1 上下文管理 + host 端口修复 + **Phase 1 收尾** + **M2a 记忆保真
 ## 7. 快速复核命令（重启后 / 新会话第一件事）
 
 ```bash
-git log --oneline -6              # 顶 d63908d(M2b review 收尾)；往下 1b5cefa(docs)/057433d(M2b)；再下 787656f(M2a)
+git log --oneline -6              # 顶 docs(M2c 同步)；下 953f3a5(M2c COST)；再下 d63908d(M2b review)/057433d(M2b)/787656f(M2a)
 git status --short                # 期望 clean
 git branch --show-current         # codex/round3-remediation
-pnpm test                         # 期望 312/312（calendar-sync 全量并发下偶发 45s 超时，单跑通过，非回归）
+pnpm test                         # 期望 316/316（calendar-sync 全量并发下偶发 45s 超时，单跑通过，非回归）
 node --test tests/eval/handoff-drift.eval.mjs  # on-demand：depth 1/2/3/5 全存活（前传路径）
 ```
 ```powershell
