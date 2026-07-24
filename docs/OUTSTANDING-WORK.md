@@ -7,8 +7,8 @@
 
 ## 0. 一句话现状
 
-M1 上下文管理 + host 端口修复**均已实现、上线、验证、本地提交（未 push）**。分支 `codex/round3-remediation`，工作树 clean。
-唯一在途动作：**无**（Windows 常驻验收已通过 2026-07-24，见 §2）。下一个里程碑是 M2（需新会话）。
+M1 上下文管理 + host 端口修复 + **Phase 1 收尾（审批两个边界 bug + mammoth 集成测试）** 均已实现、上线、本地提交（未 push）。分支 `codex/round3-remediation`，工作树 clean。
+唯一在途动作：**Phase 1 端到端手动验收**（浏览器，主人，见 §3）；其余无（Windows 常驻验收已通过 2026-07-24，见 §2）。下一个里程碑是 M2（需新会话）。
 
 ---
 
@@ -64,9 +64,9 @@ M1 上下文管理 + host 端口修复**均已实现、上线、验证、本地�
 ### 审批即时反馈 + 多格式收录（✅ Phase 1 已实现，2026-07-24 核实）
 - **Phase 1 已落库**：commit `2dc77b8`（2026-07-22）实现了方案一（审批即时反馈：`decide()` 点即置灰 + `is-resolving` + 「执行中…」、`loadJobs({silent})` 静默刷新不清屏）+ 方案二（docx/html/markdown 收录：`fileKindFromName` 精确映射、intake docx/html 分支、artifact enum 扩 docx/html、mammoth）。测试 298/298 绿。设计/变更说明见 `docs/APPROVAL-AND-MULTIFORMAT-INTAKE-PLAN.md`（该文档曾误标「未实现」，已纠正）。
 - **Phase 1 收尾待办（非阻塞）**：
-  - **端到端手动验收缺口**：测试覆盖不了 DOM 交互与 mammoth 真实解析，需手动点审批（看即时反馈 + 不清屏）、分别传 `.md/.docx/.html/.pdf/未知` 验 approve 写入且标题为真文件名。P5 验收门未列此项，等于没验过。
-  - **两个边界 bug**（对照代码核实 2026-07-24）：① `syno.js` 审批 POST 成功后的静默 `loadJobs` 若 GET 失败，卡片卡 `is-resolving` 灰态零反馈（decide catch 只兜 POST，不兜 GET）；② 前端 fileMode 仅 `[pdf,txt,docx,html]`、markdown 未入，选「Markdown」传 .md 走粘贴路径（后端已支持 markdown base64，前后端不对齐）。
-  - mammoth 真实 `convertToHtml` 路径无集成测试（docx 测试全注入 fake extractor）。
+  - ✅ **两个边界 bug 已修（`3199e62`，2026-07-24）**：① 审批 POST 成功后静默 `loadJobs` 若 GET 失败不再吞错——silent 模式抛给 `decide` 兜底（解除 `is-resolving` 灰态 + alert 提示手动刷新，此前卡片卡灰态零反馈）；② 主表单「Markdown」现支持粘贴与 .md 文件双路径（change handler 同显文件框+textarea，submitIntake 在 markdown+文件 时走 base64，前后端不再错位）。**已在线**——serveStatic 逐请求读盘 + `Cache-Control: no-store`，浏览器刷新即生效，无需重启 host。
+  - ✅ **mammoth 真实路径集成测试已补（`d3c2b29`，2026-07-24）**：`tests/helpers/minimal-docx.mjs`（STORE-method ZIP 生成器，Node 内建 `zlib.crc32`，无二进制 fixture）+ 真实 `extractDocxText` happy/空文本两例。此前 docx 测试全注入 fake extractor、真实 `convertToHtml`（`{buffer}` 互操作 + convertImage 丢图）零覆盖。
+  - **端到端手动验收缺口（仍待主人，浏览器）**：DOM 交互测不了，需手动点审批（看即时反馈 + 不清屏 + GET 失败时 alert）、分别传 `.md/.docx/.html/.pdf/未知` 验 approve 写入且标题为真文件名。**重点 DOCX**（mammoth 真实解析现已补单测，但仍建议真人点一遍端到端）。P5 验收门未列此项，等于没验过。
 - **Phase 2（方案三大文件精华提取）**：Phase 1 既已落地、可启动；见下方「更长期路线图」。
 
 ### 更长期路线图（M2 之后，登记用，避免下次「发现漏了」）
@@ -107,10 +107,10 @@ M1 上下文管理 + host 端口修复**均已实现、上线、验证、本地�
 ## 7. 快速复核命令（重启后 / 新会话第一件事）
 
 ```bash
-git log --oneline -6              # 顶应是 eabbbe6；往下能找到 6071aec / ddd28b9
+git log --oneline -6              # 顶 d3c2b29(mammoth test) / 3199e62(approval fix)；往下 b41bba8(docs) / eabbbe6(端口)
 git status --short                # 期望 clean
 git branch --show-current         # codex/round3-remediation
-pnpm test                         # 期望 298/298
+pnpm test                         # 期望 300/300
 ```
 ```powershell
 pnpm windows:status               # 期望 running=true, webUrl=…:8888
