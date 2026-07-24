@@ -7,8 +7,8 @@
 
 ## 0. 一句话现状
 
-M1 上下文管理 + host 端口修复 + **Phase 1 收尾** + **M2a 记忆保真**（摘要护栏 + factualStatus 标记 + **核查中修复的 Layer3 摘要注入死代码**）均已实现、本地提交（未 push）。分支 `codex/round3-remediation`。
-在途：**M2b DRIFT eval**（on-demand，见 §3）；**Phase 1 端到端手动验收**（浏览器，主人）。Windows 常驻验收已通过 2026-07-24（见 §2）。
+M1 上下文管理 + host 端口修复 + **Phase 1 收尾** + **M2a 记忆保真**（摘要护栏 + factualStatus + Layer3 注入死代码修复）+ **M2b 跨 rotate summary 前传**（实测 depth≥2 存活 0%→100%）均已实现、本地提交（未 push）。分支 `codex/round3-remediation`。
+在途：**M2c COST**（per-feature token 归因，见 §3）；**Phase 1 端到端手动验收**（浏览器，主人）。Windows 常驻验收已通过 2026-07-24（见 §2）。
 
 ---
 
@@ -19,15 +19,16 @@ M1 上下文管理 + host 端口修复 + **Phase 1 收尾** + **M2a 记忆保真
 | M1 上下文管理（HANDOFF / STORE / OBS） | `ddd28b9`（code+tests）+ `6071aec`（docs） | `pnpm test` 298/298；线上 `GET /api/syno/context/stats` 可达（M1 新增端点） |
 | host 端口 4317→8888（`DEFAULT_WEB_PORT` 单一来源） | `eabbbe6` | `pnpm windows:restart` exit=0；`windows:status` running=true、webUrl=`…:8888` |
 | **M2a 记忆保真**（Layer3 摘要注入死代码修复 + 摘要护栏 + factualStatus 标记） | `787656f` | `pnpm test` 306/306；`tests/context-fidelity.test.mjs` +6。核查发现 M1 的「记忆压缩」此前根本不保记忆（摘要只写不读）。设计/执行见 `docs/M2-MEMORY-FIDELITY-PLAN.md` |
+| **M2b 跨 rotate summary 前传**（修 handoffContext 只写不读 → 跨段 depth≥2 全遗忘） | `057433d` | `pnpm test` 310/310（+4）；`tests/eval/handoff-drift.eval.mjs` 重写走真前传路径 → depth 1/2/3/5 全存活（depth≥2 0%→100%）。设计/执行见 `docs/M2-MEMORY-FIDELITY-PLAN.md` |
 
 > 三个 SHA 均经 `git cat-file -t` 确认为 commit 对象（syno-job 的 churn 提交夹在中间，但未覆盖上述提交）。
 
 **已上线的关键文件：**
-- `apps/syno/syno/context-manager.mjs` — M1 核心：内存 `#stats` + `stats()`；`extractValuable` 跳过 `_syno.kind==="handoff"`
+- `apps/syno/syno/context-manager.mjs` — M1 核心：内存 `#stats` + `stats()`；`extractValuable` 跳过 `_syno.kind==="handoff"`/`"summary"`；M2a `#splitForSummary`+`SummaryGuard`（Layer3 真注入）；M2b `HandoffGen.#preamble` + `compress({handoffContext})`
 - `apps/syno/syno/conversation-store.mjs` — STORE：`compactionLogMax`/`summariesMax` cap、`archiveExternalThreshold` 外置 + 懒加载 `getArchive()`、prune 30 天
 - `apps/syno/syno/runtime.mjs` — `GET /api/syno/context/stats`（L355）；`options.contextThresholds` 注入 seam（L188-192）；`contextManager` 进 runtime（L313）
 - `apps/syno/syno/settings-registry.mjs` — `context.thresholds`（confirmationRequired 组，校验 light/moderate/heavy/overflow ∈ (0,1) 或 null）
-- `apps/syno/syno/tool-loop-executor.mjs` — handoff 正名为 `{role:"system", _syno:{kind:"handoff"}}`
+- `apps/syno/syno/tool-loop-executor.mjs` — handoff 正名 `{role:"system",_syno:{kind:"handoff"}}`；M2b `accumulateDigest`（8000 滚动窗口）+ `rotateConversation` 前传 `old.summaries[-1]?.summary || handoff` 累积进 `fresh.handoffContext`
 - `apps/syno/syno/paths.mjs` — `DEFAULT_WEB_PORT = 8888`（JS 单一来源）
 
 **线上运行模型（已验证）：** host = `node apps/syno/server.mjs`，**从源码运行，无 build 步骤**，监听 `127.0.0.1:8888`（`server.mjs` `PORT || DEFAULT_WEB_PORT`）。改了源码必须 kill 8888 上的 host + 重拉才生效（详见 memory `syno-host-deploy-runbook`）。微信路由 = `conversation-ec193dc2-f1bc-48be-9fe5-18903ef50fd6`（持久在 `%LOCALAPPDATA%\Syno\state\conversation-routing.json`）。
@@ -57,10 +58,10 @@ M1 上下文管理 + host 端口修复 + **Phase 1 收尾** + **M2a 记忆保真
 ## 3. 下一里程碑（每个都大，需新会话）
 
 ### M2 — 记忆保真（`docs/CONTEXT-MANAGEMENT-ROADMAP.md` §4 + §7-M2）
-> **进度（2026-07-24）**：**M2a 已落库（`787656f`）**——含核查中修复的 Layer3 摘要注入死代码（M1 的「记忆压缩」此前根本不保记忆：摘要只写 `conversation.summaries`、全仓只写不读、永不进活跃上下文）+ 摘要护栏（幻觉强实体→不物化）+ factualStatus 标记。详见 `docs/M2-MEMORY-FIDELITY-PLAN.md`。剩 **M2b（DRIFT eval）** + **M2c（COST）**。
+> **进度（2026-07-24）**：**M2a 已落库（`787656f`）**——Layer3 摘要注入死代码修复 + 摘要护栏（幻觉强实体→不物化）+ factualStatus 标记。**M2b 已落库（`057433d`）**——DRIFT eval（`6f0e9f0`）实测跨 rotate depth≥2 存活 0%（HandoffGen 不读 summary/handoff、rotate 存 system 消息被下次过滤），据此改造 summary 前传（`accumulateDigest` 滚动累积 `handoffContext` + `HandoffGen.#preamble` 折成「前情（未经核实）」段）；重写 eval 走真前传路径验证 0%→100%。详见 `docs/M2-MEMORY-FIDELITY-PLAN.md`。剩 **M2c（COST）**。
 
-- **FIDELITY（§4.1）**：✅ 核心已做（注入修复+护栏+标记）；忠实度 on-demand eval 待补。
-- **DRIFT（§4.2）**：跨轮转上下文漂移测量（多轮压缩后语义偏移量化）。
+- **FIDELITY（§4.1）**：✅ 已做（注入修复 + 护栏 + 标记 + compose e2e 持久化测试）。
+- **DRIFT（§4.2）**：✅ 已做（`6f0e9f0` 测量 + `057433d` 改造）。实测 post-M1 偏遗忘（depth≥2 0%）→ summary 前传后 depth≥2 100%。
 - **为什么优先**：压缩 = 知识 butler 的「记忆边界」。「永不污染记忆」与「持续可改进」是 ROADMAP §1 的两大并列锚点——M1 解决了后者（可观测），M2 守前者（不污染）。
 - 需新会话：设计 + 多文件 + 测试，单个上下文窗口放不下。
 
@@ -110,10 +111,11 @@ M1 上下文管理 + host 端口修复 + **Phase 1 收尾** + **M2a 记忆保真
 ## 7. 快速复核命令（重启后 / 新会话第一件事）
 
 ```bash
-git log --oneline -6              # 顶 787656f(M2a)；往下 d3c2b29/3199e62；再往下 b41bba8/eabbbe6
+git log --oneline -6              # 顶 057433d(M2b)；往下 787656f(M2a)；再往下 d3c2b29/3199e62
 git status --short                # 期望 clean
 git branch --show-current         # codex/round3-remediation
-pnpm test                         # 期望 306/306（calendar-sync 全量并发下偶发 45s 超时，单跑通过，非回归）
+pnpm test                         # 期望 310/310（calendar-sync 全量并发下偶发 45s 超时，单跑通过，非回归）
+node --test tests/eval/handoff-drift.eval.mjs  # on-demand：depth 1/2/3/5 全存活（前传路径）
 ```
 ```powershell
 pnpm windows:status               # 期望 running=true, webUrl=…:8888

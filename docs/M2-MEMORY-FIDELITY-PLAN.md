@@ -69,9 +69,9 @@ per-feature token 归因（summary/judge/guard 各自开销），账本只暴露
 
 ## 7. 快速复核
 ```bash
-git log --oneline -3     # 顶 787656f(M2a)；往下 d3c2b29/3199e62
-pnpm test                # 306/306（calendar-sync 全量并发下偶发 45s 超时，单跑 11s 通过，非回归）
-node --test tests/eval/  # on-demand 跑 eval（M2b 落库后）
+git log --oneline -3     # 顶 057433d(M2b)；往下 787656f(M2a)；再下 d3c2b29
+pnpm test                # 310/310（calendar-sync 全量并发下偶发 45s 超时，单跑 11s 通过，非回归）
+node --test tests/eval/  # on-demand 跑 eval（M2b 重写走真前传路径）
 ```
 
 ---
@@ -87,3 +87,18 @@ node --test tests/eval/  # on-demand 跑 eval（M2b 落库后）
 - **测试 +6**（`tests/context-fidelity.test.mjs`）：guard 单元 / 矛盾摘要降级+tail 保留 / 忠实摘要注入+标记 / 规则摘要豁免 / handoff 标记 / 防自污染。**306/306 绿**。
 
 **未做（留待 M2b/M2c）**：忠实度+漂移 on-demand eval（改动③、M2b）；per-feature token 归因（M2c）。
+
+---
+
+## 9. 执行结果（2026-07-24 落库，`057433d`）
+
+**先测后改（对 finding #7「post-M1 偏遗忘」不再靠读码断言——本会话已栽过一次于 finding #2）：**
+`tests/eval/handoff-drift.eval.mjs`（`6f0e9f0`）实测跨 rotate 锚点存活曲线 → **depth1=存活、depth2/3/5=丢失（depth≥2 0%）**，低于 §4 决策门 80%。根因经读码核实（HandoffGen L131-144 + rotate L313-318）：`generateHandoff` 只读 `role==="user"`(全部)+末 3 assistant、不读 system/summary/上轮 handoff；`rotateConversation` 把 handoff 存为 system 消息 → 下一轮 `generateHandoff` 过滤掉它 → 锚点丢失。
+
+**改造（稳定摘要载体 `handoffContext` 从「只写」变「累积+前传」）：**
+- **`tool-loop-executor.mjs`**：`accumulateDigest(prev, digest)` 滚动窗口（`HANDOFF_CONTEXT_CAP=8000` 字符，新摘要前置 + 旧载体续接、超上限截头部保最新）；`rotateConversation` 把 `old.summaries[-1]?.summary || handoff` 作 digest，与 `old.handoffContext` 累积进 `fresh.handoffContext`（此前 `fresh.handoffContext = handoff` 直接覆盖、且全仓只写不读）。
+- **`context-manager.mjs`**：`compress({handoffContext})` 透传到 Layer4 rotate 的 `generateHandoff`；`HandoffGen.#preamble` 把上轮载体折成 `## 前情（上一段对话延续，未经核实）`前置，占 `charCap` ≤40%（留余量给近期内容），截断路径仍保留 preamble（防跨 rotate 遗忘）。
+- **`tool-loop-agent.mjs`**：compress 调用传入 `conversation.handoffContext`。
+- **验证**：`tests/context-fidelity.test.mjs` +4（compose e2e 持久化 summary、HandoffGen preamble、rotateConversation 前传 latest summary+累积旧 handoffContext、accumulateDigest 上限）；重写 `handoff-drift.eval.mjs` 走真前传路径（传 `handoffContext` 进 `compress` + `accumulateDigest` 累积）→ **depth 1/2/3/5 全存活（depth≥2 0%→100%）**。**310/310 绿**。前情一律 `factualStatus:"unverified"`（FIDELITY 不变式）。
+
+**未做（留待 M2c）**：per-feature token 归因（COST）。
