@@ -206,6 +206,13 @@ switch ($Action) {
       }
       $replacementAttempted = $true
       Register-ScheduledTask -TaskName $taskName -InputObject $task -Force | Out-Null
+      # 加固(2026-07-24): LogonTrigger 延迟 30 秒启动,避开登录会话初始化期间 wrapper 收到
+      # CTRL_CLOSE (0xC000013A) 被终止的竞态。New-ScheduledTaskTrigger -RandomDelay 与后赋
+      # $trigger.Delay 经 Register 对象 API 均会丢失(已实测),必须注册后用 CIM
+      # Set-ScheduledTask -InputObject 才持久化。仅影响 LogonTrigger 自动触发,不影响下方手动 Start。
+      $withDelay = Get-ScheduledTask -TaskName $taskName
+      $withDelay.Triggers[0].Delay = "PT30S"
+      Set-ScheduledTask -InputObject $withDelay | Out-Null
       Start-ScheduledTask -TaskName $taskName
       if (-not (Wait-SynoTaskReady 30)) { throw "Syno task was registered but the Host did not become healthy" }
     } catch {

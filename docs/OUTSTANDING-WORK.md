@@ -43,7 +43,11 @@ M1 上下文管理 + host 端口修复**均已实现、上线、验证、本地�
 3. `pnpm windows:restart` 恢复 → `running=true`、`lastTaskResult=267009`（= `0x41301` 运行中态，**非失败**）。
 4. 60s 轮询稳定：`State=Running`、wrapper 进程始终 1 个存活、health ok。自愈链确认工作。
 
-**残留风险（非阻塞）：** 登录时 wrapper 被 Ctrl+C 是一次性事件，根因（登录会话初始化竞态 / 启动期软件干扰）未完全定位；若将来某次登录复现 `0xC000013A`，node 会再变孤儿丢自愈。可选加固：给 wrapper 跑 PowerShell 自身加 `-WindowStyle Hidden`/分离控制台，或加一个轻量 watchdog 任务周期确认 wrapper 存在。非必须。
+**残留风险与已应用加固（2026-07-24）：** 登录时 wrapper 偶发收到 `0xC000013A`（STATUS_CONTROL_C_EXIT）被一次性终止、node 变孤儿；根因（登录会话初始化竞态 / 启动期软件干扰）未完全定位。**预防加固已应用**：LogonTrigger 现带 `Delay=PT30S`（登录后延迟 30s 启动 wrapper，避开会话初始化窗口）。
+- **代码**：`scripts/manage-windows-task.ps1` Install 流程在 `Register-ScheduledTask` 之后用 CIM `Set-ScheduledTask -InputObject` 注入 Delay——`New-ScheduledTaskTrigger -RandomDelay` 与后赋 `$trigger.Delay` 经 Register 对象 API 均会丢失（已实测），只有注册后 CIM Set 持久化。注意：注册后 `Set` 会把任务态置 `Ready`，故脚本紧接 `Start-ScheduledTask` 复启（已验证恢复 `Running`）。
+- **已验证**：AST 语法 0 错；对线上任务 clear→re-inject 复现 `PT30S` 并跨 `Start` 持久化；任务回到 `Running` / 1 wrapper / health ok。
+- **验证边界**：Delay 对登录触发的实际效果只能在下次重启/重新登录时确认（本会话无法触发登录事件）。
+- **任务历史日志**（`Microsoft-Windows-TaskScheduler/Operational`）启用需管理员：`wevtutil sl Microsoft-Windows-TaskScheduler/Operational /e:true`（本会话未执行，待主人提权运行）；启用后若再复现可定位 RestartOnFailure 是否触发。
 
 **若需复验：** 重启电脑 → 登录 → `pnpm windows:status`（期望 `running=true`）。若又报 `running=false` 但 `health ok`，即登录一次性 wrapper 中断复发，跑 `pnpm windows:restart` 恢复（kill 8888 host + 重拉）。
 

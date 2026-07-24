@@ -27,7 +27,7 @@
 - 原库：555 个受 Git 跟踪的 Markdown，HEAD `883fbf5c457156805b9e9b53358175ce84940b59`，已有 19 项用户修改；永久只读。
 - 当前验证：Node 240/240（含渠道容错 + P4 proactive + backlog 推进 6 例）、vault pytest 57/57、Repository verify 1139 files。
 - Host 端口改为 8888（原 4317→6666→8888，6666 被 Chrome unsafe-port 拦截）；Provider 已配置；微信和飞书均显示 running、available、ownerBound。
-- Windows 登录任务 "Syno"：LogonTrigger、start-syno.ps1、崩溃重启 999 次/1 分钟、无电池限制；配置正确，**常驻验收已通过（2026-07-24）**——登录时 wrapper 一次性 `0xC000013A`（node 成孤儿），`pnpm windows:restart` 恢复后 task=`Running`、`lastResult=267009`、wrapper 存活、60s 稳定、health ok；自愈链确认工作。
+- Windows 登录任务 "Syno"：LogonTrigger、start-syno.ps1、崩溃重启 999 次/1 分钟、无电池限制；配置正确，**常驻验收已通过（2026-07-24）**——登录时 wrapper 一次性 `0xC000013A`（node 成孤儿），`pnpm windows:restart` 恢复后 task=`Running`、`lastResult=267009`、wrapper 存活、60s 稳定、health ok；自愈链确认工作。**预防加固（2026-07-24）**：LogonTrigger 已加 `Delay=PT30S`（登录后延迟 30s 启动 wrapper，避开会话初始化竞态）——`manage-windows-task.ps1` 用注册后 CIM `Set-ScheduledTask` 注入并已验证持久化；实际效果待下次重启/登录确认。详见 `docs/OUTSTANDING-WORK.md` §2。
 - 未 Push。
 
 ## 已完成
