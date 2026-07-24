@@ -397,3 +397,42 @@ test("stats aggregates compression actions, rotates, and extractions (OBS 3.1)",
   assert.ok(s.extractionsProposed >= 1);
   assert.ok(s.lastUpdated, "lastUpdated 已记录");
 });
+
+test("M2c COST: trackUsage attributes agent token usage (default feature + accumulation + NaN guard)", async () => {
+  const cm = new ContextManager({ tools: new ToolRegistry([makeTool()]) });
+  const u1 = { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 };
+  const u2 = { prompt_tokens: 200, completion_tokens: 40, total_tokens: 240 };
+  cm.trackUsage(u1, "conv-a", "agent"); // 显式 agent
+  cm.trackUsage(u2, "conv-a");          // 省略第三参 → 默认 agent（向后兼容）
+  let agent = cm.stats().byFeature.agent;
+  assert.equal(agent.calls, 2);
+  assert.equal(agent.promptTokens, 300);
+  assert.equal(agent.completionTokens, 60);
+  assert.equal(agent.totalTokens, 360);
+  // null / 缺字段 usage 必须是 no-op（绝不产生 NaN、不计 calls）
+  cm.trackUsage(null, "conv-a");
+  cm.trackUsage({ prompt_tokens: 5 }, "conv-a"); // 缺 completion/total → 非有限 → no-op
+  agent = cm.stats().byFeature.agent;
+  assert.equal(agent.calls, 2, "malformed usage must not be counted");
+  assert.ok(Number.isFinite(agent.promptTokens) && Number.isFinite(agent.totalTokens), "no NaN leakage");
+});
+
+test("M2c COST: extraction judge records per-feature token usage (byFeature.judge)", async () => {
+  const provider = {
+    async complete() {
+      return { message: { content: '{"keep":[1]}' }, model: "fixed", usage: { prompt_tokens: 500, completion_tokens: 10, total_tokens: 510 } };
+    },
+  };
+  const cm = new ContextManager({ tools: new ToolRegistry([makeTool()]), provider, onExtractValuable: async () => {} });
+  // rotate（4M 字）→ 触发提取 → #judgeValuable；rotate 路径不调 #summarize，故 byFeature.summary 不应出现
+  const big = "x".repeat(4_000_000);
+  await cm.compress([{ role: "system", content: "sys" }, { role: "user", content: `我决定采用方案A并记录为待办 ${big}` }], { runConfig: { contextLength: 100_000 } });
+  await cm.drainExtractions();
+  const s = cm.stats();
+  const judge = s.byFeature.judge;
+  assert.ok(judge, "judge feature must be recorded");
+  assert.ok(judge.calls >= 1);
+  assert.ok(judge.promptTokens >= 500);
+  assert.ok(judge.totalTokens >= 510);
+  assert.equal(s.byFeature.summary, undefined, "rotate path must not invoke #summarize");
+});

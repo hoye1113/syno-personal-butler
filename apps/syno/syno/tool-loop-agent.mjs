@@ -102,7 +102,7 @@ class ToolLoopAgent {
         const completion = await provider.complete(messages, this.tools.list(), { signal });
 
         if (this.contextManager && completion.usage) {
-          this.contextManager.trackUsage(completion.usage, conversation.id);
+          this.contextManager.trackUsage(completion.usage, conversation.id, "agent");
         }
 
         const assistant = completion.message;

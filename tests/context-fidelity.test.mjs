@@ -221,3 +221,25 @@ test("rotateConversation uses store.retention.handoffContextCharsMax as the accu
   const fresh = await store.get(newId);
   assert.ok(fresh.handoffContext.length <= 1200, "must cap at the store's handoffContextCharsMax, not the 8000 default");
 });
+
+test("M2c COST: LLM summary records per-feature token usage (byFeature.summary)", async () => {
+  const cm = cmWith({
+    async complete() {
+      return { message: { content: "忠实摘要：用户讨论了项目进展" }, usage: { prompt_tokens: 1200, completion_tokens: 80, total_tokens: 1280 } };
+    },
+  });
+  const r = await compressHeavy(cm); // 触发 layer3 → #summarize LLM 分支
+  assert.equal(r.action, "layer3");
+  const summary = cm.stats().byFeature.summary;
+  assert.ok(summary, "summary feature must be recorded");
+  assert.ok(summary.calls >= 1);
+  assert.equal(summary.promptTokens, 1200);
+  assert.equal(summary.completionTokens, 80);
+  assert.equal(summary.totalTokens, 1280);
+});
+
+test("M2c COST: rule-based summary path records no summary tokens (no LLM call)", async () => {
+  const cm = cmWith({ async complete() { throw new Error("provider down"); } });
+  await compressHeavy(cm); // provider 抛错 → #summarize 降级到 rule（无 LLM 调用）
+  assert.equal(cm.stats().byFeature.summary, undefined, "no LLM call → no summary accounting");
+});

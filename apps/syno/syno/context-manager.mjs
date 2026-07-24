@@ -203,8 +203,10 @@ class ContextManager {
   #judged = new Map();
   #active = [];
   // 压缩遥测（OBS 3.1）：进程内聚合，重启重置。统计各层动作分布、rotate、提取、anti-thrash、token 均值。
+  // byFeature（M2c COST）：按特征累计 token 开销（agent/summary/judge），聚合暴露、无 per-conversation 明细。
   #stats = {
     byAction: { none: 0, layer1: 0, layer2: 0, layer3: 0, rotate: 0 },
+    byFeature: {}, // { [feature]: { calls, promptTokens, completionTokens, totalTokens } }
     compressions: 0,
     compactions: 0,
     rotates: 0,
@@ -263,8 +265,10 @@ class ContextManager {
   }
 
   // ---- 对外委托 ----
-  trackUsage(usage, conversationId) {
+  // feature（M2c COST，默认 "agent"）把本次 usage 累计进 byFeature 账本；向后兼容（旧调用方省略第三参仍归 "agent"）。
+  trackUsage(usage, conversationId, feature = "agent") {
     this.tokenTracker.trackUsage(usage, conversationId);
+    this.#recordFeatureUsage(feature, usage);
   }
 
   estimateForMessages(messages) {
@@ -284,6 +288,7 @@ class ContextManager {
     return {
       ...this.#stats,
       byAction: { ...this.#stats.byAction },
+      byFeature: Object.fromEntries(Object.entries(this.#stats.byFeature).map(([k, v]) => [k, { ...v }])),
       avgBeforeTokens: this.#stats.compactions ? Math.round(this.#stats.totalBeforeTokens / this.#stats.compactions) : 0,
       avgAfterTokens: this.#stats.compactions ? Math.round(this.#stats.totalAfterTokens / this.#stats.compactions) : 0,
     };
@@ -458,6 +463,7 @@ class ContextManager {
           [],
           { temperature: 0.2 },
         );
+        this.#recordFeatureUsage("summary", completion?.usage);
         const text = String(completion?.message?.content || "").trim();
         if (text) return { text, origin: "llm" };
       } catch {
@@ -501,6 +507,23 @@ class ContextManager {
       "## 最近进展",
       ...assistants,
     ].filter((s) => s && s.trim()).join("\n");
+  }
+
+  // M2c COST：按特征累计一次 LLM 调用的 token 开销（OpenAI 格式 usage）。
+  // usage 缺失 / 字段非有限数 → no-op（绝不产生 NaN），与 TokenTracker.trackUsage 的防御一致。只暴露聚合、无明文。
+  #recordFeatureUsage(feature, usage) {
+    if (!usage) return;
+    const promptTokens = Number(usage.prompt_tokens);
+    const completionTokens = Number(usage.completion_tokens);
+    const totalTokens = Number(usage.total_tokens);
+    if (![promptTokens, completionTokens, totalTokens].every(Number.isFinite)) return;
+    const entry = this.#stats.byFeature[feature] || { calls: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+    entry.calls += 1;
+    entry.promptTokens += promptTokens;
+    entry.completionTokens += completionTokens;
+    entry.totalTokens += totalTokens;
+    this.#stats.byFeature[feature] = entry;
+    this.#stats.lastUpdated = this.clock().toISOString();
   }
 
   // 记录一次压缩结果到遥测（OBS 3.1）。layer1/2/3 才计入 token 均值分母（真正的压缩）。
@@ -577,6 +600,7 @@ class ContextManager {
         [],
         { temperature: 0 },
       );
+      this.#recordFeatureUsage("judge", completion?.usage);
       const match = String(completion?.message?.content || "").match(/\{[\s\S]*\}/);
       if (!match) return [];
       const keep = new Set((JSON.parse(match[0]).keep || []).map((n) => Number(n)).filter((n) => Number.isInteger(n) && n >= 1 && n <= items.length));
