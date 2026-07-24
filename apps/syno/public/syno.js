@@ -180,7 +180,7 @@
     button.textContent = "正在提交…";
     try {
       let payload = { kind, value };
-      if (["pdf", "docx", "txt", "html"].includes(kind)) {
+      if (["pdf", "docx", "txt", "html"].includes(kind) || (kind === "markdown" && fileInput.files[0])) {
         if (!fileInput.files[0]) throw new Error("请先选择文件");
         payload = await buildFileIntakePayload(fileInput.files[0], kind);
       }
@@ -284,6 +284,7 @@
       }
     } catch (error) {
       if (!silent) target.replaceChildren(node("p", "syno-error", error.message));
+      else throw error; // silent 模式（仅 decide 用）把 GET 刷新失败抛给调用方兜底
     }
   }
 
@@ -314,7 +315,13 @@
       alert(error.message);
       return;
     }
-    await loadJobs({ silent: true });
+    try {
+      await loadJobs({ silent: true });
+    } catch {
+      // POST 已成功、静默刷新 GET 失败（如网络抖动）——服务端实际已处理完，仅解除灰态并提示手动刷新
+      if (card) card.classList.remove("is-resolving");
+      alert("操作已完成，但任务列表刷新失败，请点刷新按钮查看最新状态。");
+    }
   }
 
   // 渲染审批顾问建议：三段（这是什么 / 管家建议 / 理由）+ 可选「注意」+ 离线徽标 + 原始信息折叠。
@@ -936,9 +943,11 @@
   });
   document.querySelector("#synoJobsRefresh")?.addEventListener("click", loadJobs);
   document.querySelector("#synoIntakeKind")?.addEventListener("change", (event) => {
-    const fileMode = ["pdf", "txt", "docx", "html"].includes(event.target.value);
+    const kind = event.target.value;
+    const fileMode = ["pdf", "txt", "docx", "html", "markdown"].includes(kind);
     document.querySelector("#synoIntakeFile").hidden = !fileMode;
-    document.querySelector("#synoIntakeValue").hidden = fileMode;
+    // markdown 同时支持文件上传与粘贴：保留 textarea；其余文件类型隐藏粘贴框
+    document.querySelector("#synoIntakeValue").hidden = ["pdf", "txt", "docx", "html"].includes(kind);
   });
   document.querySelector("#synoIntakeSubmit")?.addEventListener("click", submitIntake);
   document.querySelector("#synoQuickCaptureSubmit")?.addEventListener("click", submitQuickCapture);
