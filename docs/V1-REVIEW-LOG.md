@@ -35,3 +35,5 @@ Standards findings:
 - `syno-code` could expose more host-code execution capability than required.
 
 Remediation is in progress. The last green release candidate remains `a75502c` (66/66 tests). Branch `codex/round3-remediation` contains checkpoint `5540bd8` and most recently passed 53/66 tests, so Round 3 is not closed. Continue from `docs/HANDOFF-EXECUTION-PLAN.md` and do not tag V1 until all P1 findings are closed and the full suite is green.
+
+> **Closure (2026-07-24):** The Round 3 *code-review* remediation above is complete — all listed P1 findings were resolved and the full suite went green (see `FINAL-ACCEPTANCE.md`, baseline `a4ec17d`; also `KNOWN-LIMITATIONS.md` confirms `a4ec17d` final regression). The "in progress / 53/66" status above is the **07-17 checkpoint record**, superseded by the final green result. This closes the V1 *code review*; the broader product Goal (P5 backup / real-channel / browser acceptance) remains open per `docs/OUTSTANDING-WORK.md`.

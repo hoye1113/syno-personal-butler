@@ -4,6 +4,12 @@
 
 > 完整读取根 `AGENTS.md`、`NEXT_SESSION.md` 和 `docs/TODO-EXECUTION-PLAN.md`。先核对分支、HEAD、工作树、Host、渠道和 Windows 登录任务，再从 TODO 的当前断点继续。不要修改原 Obsidian 库，不要预创建 LearningState，不要绕过 Policy，不要 reset，不要 Push。
 
+## ⚠️ 2026-07-24 更新（M1 + 端口修复，读此优先）
+
+后续会话（2026-07-24）已完成 **M1 上下文管理**（HANDOFF/STORE/OBS）+ **host 端口 4317→8888 单一来源**修复：均本地提交（`ddd28b9` code+tests / `6071aec` docs / `eabbbe6` port）、上线、`pnpm test` **298/298**。（本文件下方「240/240」为 07-21 旧值，已过时；分支仍 `codex/round3-remediation`、未 Push。）
+
+**Windows 常驻验收已通过（2026-07-24）**——重启后登录自启确认（task 起 `10:53:43` → node 起 `10:53:58`，ownership `.runtime/syno-host.pid` mode=owned）；但登录时 wrapper（`start-syno.ps1`）以 `0xC000013A` 一次性中断、node 沦为孤儿（父进程已退），故 `health ok` 而 `windows:status running=false`。`pnpm windows:restart` 恢复后 task=`Running`、`lastTaskResult=267009`（= `0x41301` 运行中态）、wrapper 存活、60s 轮询稳定。自愈链确认工作。根因（登录会话初始化竞态）未完全定位，不阻塞。**当前无立即在途动作**；下一个里程碑是 M2（需新会话）。**完整待办见 `docs/OUTSTANDING-WORK.md`**——M2 记忆保真、审批/多格式收录计划、deferred 小项都在里头，且全部基于已核实事实。新会话优先读那份。
+
 ## 权威入口
 
 - 下一阶段唯一详细计划：`docs/TODO-EXECUTION-PLAN.md`
@@ -21,7 +27,7 @@
 - 原库：555 个受 Git 跟踪的 Markdown，HEAD `883fbf5c457156805b9e9b53358175ce84940b59`，已有 19 项用户修改；永久只读。
 - 当前验证：Node 240/240（含渠道容错 + P4 proactive + backlog 推进 6 例）、vault pytest 57/57、Repository verify 1139 files。
 - Host 端口改为 8888（原 4317→6666→8888，6666 被 Chrome unsafe-port 拦截）；Provider 已配置；微信和飞书均显示 running、available、ownerBound。
-- Windows 登录任务 "Syno"：LogonTrigger、start-syno.ps1、崩溃重启 999 次/1 分钟、无电池限制；配置正确，尚未通过重启验收（搁置）。
+- Windows 登录任务 "Syno"：LogonTrigger、start-syno.ps1、崩溃重启 999 次/1 分钟、无电池限制；配置正确，**常驻验收已通过（2026-07-24）**——登录时 wrapper 一次性 `0xC000013A`（node 成孤儿），`pnpm windows:restart` 恢复后 task=`Running`、`lastResult=267009`、wrapper 存活、60s 稳定、health ok；自愈链确认工作。
 - 未 Push。
 
 ## 已完成
@@ -44,7 +50,7 @@
 
 ## 尚未完成
 
-1. P5：主人裁决、Windows 常驻验收、浏览器、真实渠道和备份恢复。（三轮审查已完成，见下；fresh clone 见阶段三）
+1. P5：主人裁决、~~Windows 常驻验收~~（已通过 2026-07-24，见顶部更新 + `docs/OUTSTANDING-WORK.md` §2）、浏览器、真实渠道和备份恢复。（三轮审查已完成，见下；fresh clone 见阶段三）
 2. ~~全局 Goal 需通过 goals.create Job + 审批创建~~ 已创建：`goal-643fb7fc`（focusAreas 校准为 vault 实际 snake_case tag：ai_coding/coding_agent/harness/context/loop_engineering/ai_philosophy/ai_career/ai_evaluation；title 曾因 curl 中文编码乱码已直接修文件）。planner 已引用并选中 AI Agent Development 笔记（plan/today 验证通过）。
 3. ~~fresh clone 本地回归验证~~ 已完成（阶段三）：本地路径 clone 到 `D:\tmp\syno-clone-test`（HEAD `d90b503` 与原仓库一致，未 push），`pnpm install --frozen-lockfile` 81 包 833ms，`pnpm verify` 1131 files，Node test 233/233，`pytest vault/tests` 57 passed，`node --check` planner/today/profile 通过。证据证明提交后 HEAD 可干净复现。
 
@@ -101,7 +107,7 @@
   4. `vault/02-Resources/AI and Agents/Authors/ConardLi.md`
 - 5 个固定排除项继续保持排除：两篇敏感凭据课程、两篇敏感凭据资源、一个源工作区缺失附件；精确路径保存在迁移 Manifest 和审计记录中。
 - 1 个无证据 Claim（`claim-4f0ba8ac`，JIT Context 策略原则）：保持 candidate，不降级——principle 级声明确定性高，等 KnowledgeMaintenanceSource 自动发现 evidence gap。
-- Windows 常驻验收：搁置，需重启电脑验证登录自启。任务名 "Syno"，配置已确认正确（LogonTrigger、start-syno.ps1、崩溃重启 999 次/1 分钟、无电池限制）。上次结果 0xC000013A（进程被终止，非任务故障）。
+- ~~Windows 常驻验收：搁置~~ **已通过（2026-07-24）**：重启后登录自启确认；登录时 wrapper 一次性 `0xC000013A`（STATUS_CONTROL_C_EXIT，进程被 Ctrl+C 终止，node 成孤儿），`pnpm windows:restart` 恢复后 task=`Running`、`lastResult=267009`（= `0x41301` 运行中态，非失败）、wrapper 存活、60s 轮询稳定。根因未完全定位，不阻塞。**残留风险**：若某次登录复现 `0xC000013A`，node 会再变孤儿丢自愈；可选加固（wrapper 跑 PowerShell 自身加 `-WindowStyle Hidden`/分离控制台，或加轻量 watchdog 任务周期确认 wrapper 存在），非必须。任务名 "Syno"，配置已确认正确（LogonTrigger、start-syno.ps1、崩溃重启 999 次/1 分钟、无电池限制）。
 
 ## 完成定义
 

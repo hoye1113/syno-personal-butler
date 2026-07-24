@@ -2,7 +2,9 @@
 
 更新日期：2026-07-21（Asia/Shanghai）
 
-本文是迁移完成后的唯一详细执行计划。`NEXT_SESSION.md` 只维护当前执行入口，`docs/HANDOFF-EXECUTION-PLAN.md` 只维护长期目标、架构边界和历史摘要；若三者对下一阶段任务的描述冲突，以本文为准。
+本文是迁移完成后的 P0–P5 执行计划的**历史归档（2026-07-21 快照）**。`NEXT_SESSION.md` 维护当前执行入口，`docs/OUTSTANDING-WORK.md` 维护 2026-07-24 起的现状与断点，`docs/HANDOFF-EXECUTION-PLAN.md` 维护长期目标、架构边界和历史摘要。
+
+> ⚠️ **状态指针（2026-07-24 补）**：本文 §1 的数字均为 **07-21 快照，已被超越**——Node `205/205`→`298/298`、verify `1125`→`1227`、`Goal 0`→已建 `goal-643fb7fc`、画像"539 篇过期"→已 v2 重构、Windows `running=false`/`4294967295`/`4317`→常驻验收已过（`8888`、`running=true`、`lastResult=267009`）、"两个 SHA 相同的 Anthropic 候选"→已删剩 1 个（且"SHA 相同"已证伪）、P2 Capture L166 同源已删。**冲突时以 `docs/OUTSTANDING-WORK.md` + `git log` 实跑为准，不再以本文为准。** P0–P5 正文保留作执行计划档案与设计意图参考。
 
 ## 1. 当前可信基线
 
