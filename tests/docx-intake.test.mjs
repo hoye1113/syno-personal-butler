@@ -4,7 +4,8 @@ import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { IntakeService, MAX_ATTACHMENT_BYTES } from "../apps/syno/syno/intake.mjs";
+import { IntakeService, MAX_ATTACHMENT_BYTES, extractDocxText } from "../apps/syno/syno/intake.mjs";
+import { makeMinimalDocx } from "./helpers/minimal-docx.mjs";
 
 test("DOCX intake validates PK magic bytes and size", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-docx-"));
@@ -56,4 +57,19 @@ test("DOCX extractor receives a Buffer argument", async () => {
   const pkBytes = Buffer.from("PK\x03\x04mock");
   await service.prepare({ kind: "docx", base64: pkBytes.toString("base64") });
   assert.equal(Buffer.isBuffer(receivedArg), true);
+});
+
+test("extractDocxText parses a real minimal DOCX via mammoth (default extractor)", async () => {
+  // 既有 docx 测试全注入 fake extractor，真实 mammoth.convertToHtml（{buffer} 互操作 +
+  // convertImage 丢图）零端到端覆盖——本例补这个盲区，不注入、走默认 extractDocxText。
+  const docx = makeMinimalDocx("Hello Syno mammoth integration test 世界");
+  assert.equal(docx[0], 0x50, "DOCX 以 PK magic byte 开头");
+  assert.equal(docx[1], 0x4b);
+  const { text } = await extractDocxText(docx);
+  assert.match(text, /Hello Syno mammoth integration test 世界/, "UTF-8 正文经 mammoth 真实解析后保留");
+});
+
+test("extractDocxText rejects a DOCX with no extractable text (default extractor)", async () => {
+  const docx = makeMinimalDocx("");
+  await assert.rejects(() => extractDocxText(docx), /没有可提取的文本/);
 });
