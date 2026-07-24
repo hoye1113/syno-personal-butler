@@ -7,8 +7,8 @@
 
 ## 0. 一句话现状
 
-M1 上下文管理 + host 端口修复 + **Phase 1 收尾（审批两个边界 bug + mammoth 集成测试）** 均已实现、上线、本地提交（未 push）。分支 `codex/round3-remediation`，工作树 clean。
-唯一在途动作：**Phase 1 端到端手动验收**（浏览器，主人，见 §3）；其余无（Windows 常驻验收已通过 2026-07-24，见 §2）。下一个里程碑是 M2（需新会话）。
+M1 上下文管理 + host 端口修复 + **Phase 1 收尾** + **M2a 记忆保真**（摘要护栏 + factualStatus 标记 + **核查中修复的 Layer3 摘要注入死代码**）均已实现、本地提交（未 push）。分支 `codex/round3-remediation`。
+在途：**M2b DRIFT eval**（on-demand，见 §3）；**Phase 1 端到端手动验收**（浏览器，主人）。Windows 常驻验收已通过 2026-07-24（见 §2）。
 
 ---
 
@@ -18,6 +18,7 @@ M1 上下文管理 + host 端口修复 + **Phase 1 收尾（审批两个边界 b
 |---|---|---|
 | M1 上下文管理（HANDOFF / STORE / OBS） | `ddd28b9`（code+tests）+ `6071aec`（docs） | `pnpm test` 298/298；线上 `GET /api/syno/context/stats` 可达（M1 新增端点） |
 | host 端口 4317→8888（`DEFAULT_WEB_PORT` 单一来源） | `eabbbe6` | `pnpm windows:restart` exit=0；`windows:status` running=true、webUrl=`…:8888` |
+| **M2a 记忆保真**（Layer3 摘要注入死代码修复 + 摘要护栏 + factualStatus 标记） | `787656f` | `pnpm test` 306/306；`tests/context-fidelity.test.mjs` +6。核查发现 M1 的「记忆压缩」此前根本不保记忆（摘要只写不读）。设计/执行见 `docs/M2-MEMORY-FIDELITY-PLAN.md` |
 
 > 三个 SHA 均经 `git cat-file -t` 确认为 commit 对象（syno-job 的 churn 提交夹在中间，但未覆盖上述提交）。
 
@@ -56,7 +57,9 @@ M1 上下文管理 + host 端口修复 + **Phase 1 收尾（审批两个边界 b
 ## 3. 下一里程碑（每个都大，需新会话）
 
 ### M2 — 记忆保真（`docs/CONTEXT-MANAGEMENT-ROADMAP.md` §4 + §7-M2）
-- **FIDELITY（§4.1）**：持久化 LLM 产出完整性治理（压缩摘要的幻觉 / 关键内容缺失防护）。
+> **进度（2026-07-24）**：**M2a 已落库（`787656f`）**——含核查中修复的 Layer3 摘要注入死代码（M1 的「记忆压缩」此前根本不保记忆：摘要只写 `conversation.summaries`、全仓只写不读、永不进活跃上下文）+ 摘要护栏（幻觉强实体→不物化）+ factualStatus 标记。详见 `docs/M2-MEMORY-FIDELITY-PLAN.md`。剩 **M2b（DRIFT eval）** + **M2c（COST）**。
+
+- **FIDELITY（§4.1）**：✅ 核心已做（注入修复+护栏+标记）；忠实度 on-demand eval 待补。
 - **DRIFT（§4.2）**：跨轮转上下文漂移测量（多轮压缩后语义偏移量化）。
 - **为什么优先**：压缩 = 知识 butler 的「记忆边界」。「永不污染记忆」与「持续可改进」是 ROADMAP §1 的两大并列锚点——M1 解决了后者（可观测），M2 守前者（不污染）。
 - 需新会话：设计 + 多文件 + 测试，单个上下文窗口放不下。
@@ -107,10 +110,10 @@ M1 上下文管理 + host 端口修复 + **Phase 1 收尾（审批两个边界 b
 ## 7. 快速复核命令（重启后 / 新会话第一件事）
 
 ```bash
-git log --oneline -6              # 顶 d3c2b29(mammoth test) / 3199e62(approval fix)；往下 b41bba8(docs) / eabbbe6(端口)
+git log --oneline -6              # 顶 787656f(M2a)；往下 d3c2b29/3199e62；再往下 b41bba8/eabbbe6
 git status --short                # 期望 clean
 git branch --show-current         # codex/round3-remediation
-pnpm test                         # 期望 300/300
+pnpm test                         # 期望 306/306（calendar-sync 全量并发下偶发 45s 超时，单跑通过，非回归）
 ```
 ```powershell
 pnpm windows:status               # 期望 running=true, webUrl=…:8888
