@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -12,6 +12,116 @@ import { JobStore } from "../apps/syno/syno/job-store.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "..");
+
+function runPowerShell(script, input = "") {
+  return new Promise((resolve, reject) => {
+    const child = spawn("powershell.exe", ["-NoProfile", "-Command", script], {
+      windowsHide: true,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.once("error", reject);
+    child.once("exit", (code) => code === 0
+      ? resolve(stdout.trim())
+      : reject(new Error(stderr.trim() || `PowerShell exited ${code}`)));
+    child.stdin.end(input);
+  });
+}
+
+const taskXmlFixture = `<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo><Description>Syno personal knowledge butler</Description></RegistrationInfo>
+  <Triggers><LogonTrigger><Enabled>true</Enabled><UserId>TEST\\Owner</UserId></LogonTrigger></Triggers>
+  <Principals><Principal id="Author"><UserId>TEST\\Owner</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RestartOnFailure><Interval>PT1M</Interval><Count>999</Count></RestartOnFailure>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Hidden>true</Hidden>
+  </Settings>
+  <Actions Context="Author"><Exec>
+    <Command>C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe</Command>
+    <Arguments>-NoProfile -File "D:\\Syno Workspace\\scripts\\start-syno.ps1"</Arguments>
+    <WorkingDirectory>D:\\Syno Workspace</WorkingDirectory>
+  </Exec></Actions>
+</Task>`;
+
+function taskXmlCommand(action) {
+  const modulePath = path.join(root, "scripts", "Syno.WindowsTaskXml.psm1").replaceAll("'", "''");
+  const common = `-ExpectedUser 'TEST\\Owner' -ExpectedCommand 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe' -ExpectedArguments '-NoProfile -File "D:\\Syno Workspace\\scripts\\start-syno.ps1"' -ExpectedWorkingDirectory 'D:\\Syno Workspace'`;
+  return `Import-Module '${modulePath}' -Force; $xml=[Console]::In.ReadToEnd(); ${action} -XmlText $xml ${common}`;
+}
+
+test("Windows task XML contract adds one logon delay without changing execution authority", { skip: process.platform !== "win32" }, async () => {
+  const output = await runPowerShell(taskXmlCommand("Protect-SynoTaskXml"), taskXmlFixture);
+
+  assert.equal((output.match(/<Delay>PT30S<\/Delay>/g) || []).length, 1);
+  assert.match(output, /<UserId>TEST\\Owner<\/UserId><Delay>PT30S<\/Delay>/);
+  assert.match(output, /<Command>C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell\.exe<\/Command>/);
+  assert.match(output, /<Arguments>-NoProfile -File "D:\\Syno Workspace\\scripts\\start-syno\.ps1"<\/Arguments>/);
+  assert.match(output, /<WorkingDirectory>D:\\Syno Workspace<\/WorkingDirectory>/);
+  assert.match(output, /<UserId>TEST\\Owner<\/UserId>/);
+});
+
+test("Windows task XML contract verifies the persisted protected form without mutating it", { skip: process.platform !== "win32" }, async () => {
+  const modulePath = path.join(root, "scripts", "Syno.WindowsTaskXml.psm1").replaceAll("'", "''");
+  const script = `Import-Module '${modulePath}' -Force; $xml=[Console]::In.ReadToEnd(); $protected=Protect-SynoTaskXml -XmlText $xml -ExpectedUser 'TEST\\Owner' -ExpectedCommand 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe' -ExpectedArguments '-NoProfile -File "D:\\Syno Workspace\\scripts\\start-syno.ps1"' -ExpectedWorkingDirectory 'D:\\Syno Workspace'; Test-SynoTaskXml -XmlText $protected -ExpectedUser 'TEST\\Owner' -ExpectedCommand 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe' -ExpectedArguments '-NoProfile -File "D:\\Syno Workspace\\scripts\\start-syno.ps1"' -ExpectedWorkingDirectory 'D:\\Syno Workspace'`;
+  const output = await runPowerShell(script, taskXmlFixture);
+
+  assert.equal(output, "True");
+});
+
+test("Windows task XML contract is idempotent and fails closed on trigger or authority drift", { skip: process.platform !== "win32" }, async () => {
+  const once = await runPowerShell(taskXmlCommand("Protect-SynoTaskXml"), taskXmlFixture);
+  const twice = await runPowerShell(taskXmlCommand("Protect-SynoTaskXml"), once);
+  assert.equal((twice.match(/<Delay>PT30S<\/Delay>/g) || []).length, 1);
+
+  const duplicateTrigger = taskXmlFixture.replace("</Triggers>", "<LogonTrigger><Enabled>true</Enabled><UserId>TEST\\Owner</UserId></LogonTrigger></Triggers>");
+  await assert.rejects(runPowerShell(taskXmlCommand("Protect-SynoTaskXml"), duplicateTrigger), /exactly one logon trigger/);
+
+  const alteredCommand = taskXmlFixture.replace("powershell.exe</Command>", "cmd.exe</Command>");
+  await assert.rejects(runPowerShell(taskXmlCommand("Protect-SynoTaskXml"), alteredCommand), /unexpected command/);
+
+  const wrongNamespace = taskXmlFixture.replace("http://schemas.microsoft.com/windows/2004/02/mit/task", "urn:not-task-scheduler");
+  await assert.rejects(runPowerShell(taskXmlCommand("Protect-SynoTaskXml"), wrongNamespace), /unsupported namespace/);
+});
+
+test("Windows installer protects and verifies exported task XML before starting", async () => {
+  const manager = await fs.readFile(path.join(root, "scripts", "manage-windows-task.ps1"), "utf8");
+  const installStart = manager.indexOf('"Install"');
+  const baseRegister = manager.indexOf("Register-ScheduledTask -TaskName $taskName -InputObject $task", installStart);
+  const firstExport = manager.indexOf("Export-ScheduledTask -TaskName $taskName", baseRegister);
+  const protect = manager.indexOf("Protect-SynoTaskXml", firstExport);
+  const xmlRegister = manager.indexOf("Register-ScheduledTask -TaskName $taskName -Xml", protect);
+  const secondExport = manager.indexOf("Export-ScheduledTask -TaskName $taskName", xmlRegister);
+  const verify = manager.indexOf("Test-SynoTaskXml", secondExport);
+  const start = manager.indexOf("Start-ScheduledTask -TaskName $taskName", verify);
+
+  assert.match(manager, /taskXmlModule[\s\S]*Syno\.WindowsTaskXml\.psm1[\s\S]*Import-Module \$taskXmlModule/);
+  assert.ok(baseRegister >= 0 && firstExport > baseRegister && protect > firstExport);
+  assert.ok(xmlRegister > protect && secondExport > xmlRegister && verify > secondExport && start > verify);
+  assert.doesNotMatch(manager, /\.Triggers\[0\]\.Delay|schtasks(?:\.exe)?\s+\/Change/i);
+});
+
+test("Windows installer reuses an existing healthy task only after its XML contract passes", async () => {
+  const manager = await fs.readFile(path.join(root, "scripts", "manage-windows-task.ps1"), "utf8");
+  const installStart = manager.indexOf('"Install"');
+  const existingLookup = manager.indexOf("$existing = Get-TaskOrNull $taskName", installStart);
+  const existingExport = manager.indexOf("Export-ScheduledTask -TaskName $taskName", existingLookup);
+  const existingVerify = manager.indexOf("Test-SynoTaskXml", existingExport);
+  const healthyFastPath = manager.indexOf("Wait-SynoHealth 2", existingVerify);
+
+  assert.ok(existingLookup >= 0 && existingExport > existingLookup);
+  assert.ok(existingVerify > existingExport && healthyFastPath > existingVerify);
+});
 
 test("Windows lifecycle mutations are canonical audited operations", async (t) => {
   await fs.mkdir(path.join(root, ".runtime"), { recursive: true });

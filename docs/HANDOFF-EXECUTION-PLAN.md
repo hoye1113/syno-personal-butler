@@ -18,8 +18,8 @@ Syno 负责降低整理成本、维护知识库、发现学习缺口、安排复
 
 - 原知识库单向迁移已经完成，迁移管道、审批、GitGuard 和审计记录已落地。
 - OpenCode 重构固定起点为 `f0333f3`，实现提交为 `5890dad`。
-- R0–R4 的代码与自动化接缝已经完成；Node 370/370、vault 57/57、Repository verify 1358 files。
-- 当前产品尚未封板：独立 Zen Token、真实模型提示注入、跨渠道计数、OpenCode 重启恢复和 Windows 登录恢复仍属 R5 门槛。
+- R0–R4 的代码与自动化接缝已经完成；Windows 任务 XML 加固后的当前结果为 Node 375/375、vault 57/57、Repository verify 1359 files。
+- 主人已授权将全局 OpenCode 配置中的可用凭据一次性迁入 Syno DPAPI，产品不会自动读取全局 `auth.json`。当前产品尚未封板：真实模型提示注入、跨渠道计数、OpenCode 重启恢复和 Windows 登录恢复仍属 R5 门槛。
 - R6 删除旧实现严格未开始。
 
 ## 迁移历史摘要

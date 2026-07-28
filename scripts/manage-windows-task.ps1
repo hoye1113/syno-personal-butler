@@ -26,6 +26,8 @@ if ($nodeExtension -in @(".cmd", ".bat")) {
 $resolvedNode = [IO.Path]::GetFullPath($NodePath)
 $commonScript = Join-Path $PSScriptRoot "windows-service-common.ps1"
 . $commonScript
+$taskXmlModule = Join-Path $PSScriptRoot "Syno.WindowsTaskXml.psm1"
+Import-Module $taskXmlModule -Force
 $startScript = Join-Path $resolvedRoot "scripts\start-syno.ps1"
 $serverPath = Join-Path $resolvedRoot "apps\syno\server.mjs"
 $pidFile = Join-Path $resolvedRoot ".runtime\syno-host.pid"
@@ -186,11 +188,19 @@ switch ($Action) {
     if (-not (Test-Path -LiteralPath $resolvedNode -PathType Leaf)) { throw "Node executable not found: $resolvedNode" }
     if (-not (Test-Path -LiteralPath $startScript -PathType Leaf)) { throw "Syno launcher not found: $startScript" }
     $existing = Get-TaskOrNull $taskName
-    if ($existing -and (Test-SynoTaskDefinition $existing) -and $existing.State -eq "Running" -and (Wait-SynoHealth 2)) {
+    $allowedUsers = @($definition.user, $definition.user.Split("\")[-1])
+    $existingXml = if ($existing) { Export-ScheduledTask -TaskName $taskName } else { $null }
+    $existingXmlValid = $false
+    if ($existingXml) {
+      try {
+        [void](Test-SynoTaskXml -XmlText $existingXml -ExpectedUser $allowedUsers -ExpectedCommand $powerShellPath -ExpectedArguments $taskArguments -ExpectedWorkingDirectory $resolvedRoot)
+        $existingXmlValid = $true
+      } catch { }
+    }
+    if ($existing -and $existingXmlValid -and (Test-SynoTaskDefinition $existing) -and $existing.State -eq "Running" -and (Wait-SynoHealth 2)) {
       Write-Result (Get-SynoStatus)
       exit 0
     }
-    $existingXml = if ($existing) { Export-ScheduledTask -TaskName $taskName } else { $null }
     $existingWasRunning = [bool]($existing -and $existing.State -eq "Running")
     $taskAction = New-ScheduledTaskAction -Execute $powerShellPath -Argument $taskArguments -WorkingDirectory $resolvedRoot
     $trigger = New-ScheduledTaskTrigger -AtLogOn -User $definition.user
@@ -206,13 +216,11 @@ switch ($Action) {
       }
       $replacementAttempted = $true
       Register-ScheduledTask -TaskName $taskName -InputObject $task -Force | Out-Null
-      # 加固(2026-07-24): LogonTrigger 延迟 30 秒启动,避开登录会话初始化期间 wrapper 收到
-      # CTRL_CLOSE (0xC000013A) 被终止的竞态。New-ScheduledTaskTrigger -RandomDelay 与后赋
-      # $trigger.Delay 经 Register 对象 API 均会丢失(已实测),必须注册后用 CIM
-      # Set-ScheduledTask -InputObject 才持久化。仅影响 LogonTrigger 自动触发,不影响下方手动 Start。
-      $withDelay = Get-ScheduledTask -TaskName $taskName
-      $withDelay.Triggers[0].Delay = "PT30S"
-      Set-ScheduledTask -InputObject $withDelay | Out-Null
+      $baseXml = Export-ScheduledTask -TaskName $taskName
+      $protectedXml = Protect-SynoTaskXml -XmlText $baseXml -ExpectedUser $allowedUsers -ExpectedCommand $powerShellPath -ExpectedArguments $taskArguments -ExpectedWorkingDirectory $resolvedRoot
+      Register-ScheduledTask -TaskName $taskName -Xml $protectedXml -Force | Out-Null
+      $persistedXml = Export-ScheduledTask -TaskName $taskName
+      [void](Test-SynoTaskXml -XmlText $persistedXml -ExpectedUser $allowedUsers -ExpectedCommand $powerShellPath -ExpectedArguments $taskArguments -ExpectedWorkingDirectory $resolvedRoot)
       Start-ScheduledTask -TaskName $taskName
       if (-not (Wait-SynoTaskReady 30)) { throw "Syno task was registered but the Host did not become healthy" }
     } catch {

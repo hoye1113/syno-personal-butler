@@ -14,10 +14,12 @@
   `%LOCALAPPDATA%\mise\installs\node\24.13.0\node_modules\opencode-ai\bin\opencode.exe`
 - OpenCode 子进程端口：`127.0.0.1:4318`
 - mise shim 后台启动会递归，禁止作为生产启动目标。
-- 最新自动验证：Node 370/370、vault pytest 57/57、Repository verify 1358 files、`git diff --check` 通过。
+- Windows 计划任务 XML 加固前的 OpenCode 自动验证：Node 370/370、vault pytest 57/57、Repository verify 1358 files。
+- Windows 计划任务 XML 加固后的当前自动验证：Node 375/375、vault pytest 57/57、Repository verify 1359 files、`git diff --check` 通过。
 - 干净克隆 `C:\tmp\syno-fresh-863bcca`：Node 370/370、vault 57/57、Repository verify 1356 files；按现有锁文件安装成功。
 - 真实无模型 OpenCode 探针已通过 1.18.2、loopback、Basic Auth、Session create/abort/delete、静态 `syno` MCP 和禁止内置工具不可调用。
-- 当前独立 OpenCode Zen Token 尚未配置，不能把 Fake/无模型探针表述为真实模型验收。
+- 主人已明确授权将全局 OpenCode 配置中的可用凭据一次性迁入 Syno DPAPI；产品运行时不会自动读取或依赖全局 `auth.json`。
+- 真实免费模型、渠道与 Windows 登录恢复仍由主人验收，不能把凭据已配置、Fake/无模型探针或 XML 单元测试表述为真实产品验收。
 
 ## 必须保留的主人变更
 
@@ -42,15 +44,15 @@
 - `waiting_provider` 有周期恢复；并发后台/手动重试只能有一个调用取得 Job 执行权。
 - Proposal 修改会取消旧 Job；附件正文不能触发审批。
 - Standards / Spec / Security 三轴已完成修复复核，未解决 P0/P1 为 0。
+- Windows 安装器已改为通过 `Syno.WindowsTaskXml.psm1` 保护并验证任务 XML：固定单一登录触发器、30 秒延迟、执行身份、命令、参数、工作目录、单实例、隐藏运行、无限执行和每分钟重启。现有健康任务只有在导出 XML 通过同一契约后才可复用。
 
 ## 当前断点
 
-1. 主人通过 `pnpm opencode:configure` 或 Web 设置配置独立 Zen Token。
-2. 用非敏感内容执行真实模型与提示注入探针。
-3. 完成真实微信、飞书、Web 多轮上下文、工具、普通审批、双审批和三类来源计数。
-4. 验证 OpenCode 重启后的上下文与 PendingDecision 恢复。
-5. 复验 Windows 登录后 Syno Host 与 OpenCode 子进程共同恢复。
-6. 真实门槛全部满足前不得进入 R6 或删除旧实现。
+1. 主人运行 `pnpm opencode:doctor`，确认凭据状态，再运行 `pnpm start`，用非敏感内容执行真实模型与提示注入探针。
+2. 主人停止手动 Host 后运行 `pnpm windows:install`、`pnpm windows:status` 和 `pnpm windows:restart`，验证计划任务安装、健康与受控重启。
+3. 主人完成真实微信、飞书、Web 多轮上下文、工具、普通审批、双审批和三类来源计数。
+4. 主人验证 OpenCode 重启后的上下文与 PendingDecision 恢复，并在下次 Windows 登录后复验 Syno Host 与 OpenCode 子进程共同恢复。
+5. 真实门槛全部满足前不得进入 R6 或删除旧实现。
 
 ## R6 封板门槛
 

@@ -9,9 +9,11 @@
 - 飞书消息已完成 Owner 私聊、真实 ID 重放拒绝与重启恢复；飞书日历已完成 user 授权、主日历 CRUD、错误拒绝与恢复。
 - `0cc2669` 的 fresh clone 已通过 Node 172/172、vault 57/57 和仓库校验；`a4ec17d` 完成最终回归。真实 Windows Web 生命周期与桌面/移动浏览器增量复验通过。当前代码完整 bundle 为 `C:\tmp\syno-repository-backup-a4ec17d.bundle`，SHA-256 见最终验收矩阵。
 
-旧固定 Provider 的历史验收已经完成，但 OpenCode 重构重新打开了运行时发布门槛。当前尚未配置 Syno 独立 Zen Token，也未完成 R5 的真实跨渠道计数、提示注入、OpenCode 重启恢复和 Windows 登录恢复。不得把自动测试或旧 Provider 证据表述为 OpenCode 已封板。
+旧固定 Provider 的历史验收已经完成，但 OpenCode 重构重新打开了运行时发布门槛。主人已明确授权将全局 OpenCode 配置中的可用凭据一次性迁入 Syno DPAPI，产品运行时不会自动读取或依赖全局 `auth.json`；R5 的真实模型、跨渠道计数、提示注入、OpenCode 重启恢复和 Windows 登录恢复仍未完成。不得把凭据已配置、自动测试或旧 Provider 证据表述为 OpenCode 已封板。
 
 OpenCode 自动化基线已经通过 Node 370/370、vault 57/57、Repository verify 1358 files，并通过真实 1.18.2 无模型 Server 探针；三轴审查未解决 P0/P1 为 0。这些证据验证接缝与安全边界，不替代上述真实 R5 门槛。
+
+Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导出、保护、重注册并再次导出验证，且健康快路径也必须先通过同一契约。加固后的当前自动验证为 Node 375/375、vault 57/57、Repository verify 1359 files、`git diff --check` 通过。真实 Task Scheduler 安装、重启和下次登录恢复按本轮边界未由 Codex 执行，仍由主人完成。
 
 当前 OpenCode 提交的 fresh clone 已在 `C:\tmp\syno-fresh-863bcca` 通过 Node 370/370、vault 57/57 和 Repository verify 1356 files。首次纯离线安装因本机 pnpm store 缺少 `mammoth@1.9.1` tarball 失败；随后按未改变的锁文件联网补齐缓存并通过，故“任意机器完全离线安装”不是已保证能力。
 

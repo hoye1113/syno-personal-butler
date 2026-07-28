@@ -19,6 +19,7 @@
 - [x] 微信/飞书 Adapter 的鉴权、去重、顺序、降级和恢复边界有 Fake/契约测试。
 - [x] 状态归档 CLI 在隔离目录完成 backup、verify、restore 和拒绝覆盖演练。
 - [x] Playwright 完成桌面/移动、键盘、减少动画、Token 不回显和控制台验收。
+- [x] Windows 任务 XML 的单一登录触发器、`PT30S` 延迟、执行权限、固定命令/参数/目录、单实例、隐藏、无限执行和失败重启契约已有自动测试；安装器在启动前验证持久化后的 XML。
 
 ## C. 主人本机外部验收
 
@@ -51,8 +52,8 @@ Provider 自动采用门、故障注入与主人真实断网步骤见 `docs/PROV
 - [x] 未自动 Push。Push 或远端发布只能由主人另行明确要求。
 
 上述旧 Provider 封板证据不等于 OpenCode 运行时验收。当前 R5/R6 门槛以
-`docs/TODO-EXECUTION-PLAN.md` 为准；独立 Zen Token、真实跨渠道计数、OpenCode
-重启恢复和旧实现删除尚未完成。
+`docs/TODO-EXECUTION-PLAN.md` 为准；主人已授权完成一次性凭据迁移，但真实模型、
+真实跨渠道计数、OpenCode 重启恢复和旧实现删除尚未完成。
 
 若 C、D 或 E 中任一必选项未完成，保持全局 Goal active，不把“本地功能可用”等同于“最终切换完成”。
 
@@ -61,6 +62,7 @@ Provider 自动采用门、故障注入与主人真实断网步骤见 `docs/PROV
 - [x] Today、Capture、Knowledge、Learn、Create 已按渐进披露原则收敛，并完成桌面/移动浏览器复验。
 - [x] `pnpm start` 默认启动完整 Host；`SYNO_WEB_ONLY=true` 保留为隔离诊断入口。
 - [x] Windows 管理命令、固定参数 Web API、JSON/同源保护和 Dry Run 自动测试已完成。
+- [ ] OpenCode 重构后的真实 `Syno` 计划任务安装、状态、重启及下次 Windows 登录恢复由主人验收；本轮 Codex 未触碰真实 Task Scheduler。
 - [x] 真实 `Syno` 登录任务已完成安装、显式打开、受控 PID 重启、卸载数据保留和重装恢复；最终任务为 Running，PID 从 57656 受控切换到 59040，PID 文件、Node 路径、仓库指纹与 4317 监听进程一致，未检测到 `Syno Worker`。
 - [x] 真实演练覆盖交互式 Host 接管，以及未知 4317 服务导致新任务安装失败时按原 XML 恢复旧任务；恢复前后 XML SHA-256 同为 `65af6957e340540353e79f5ecaf53f582604a9d6ad196b45bce2ef71ebf9a79b`。旧任务停止、PID 所有权校验和替换注册均已纳入同一回滚边界。
 - [x] 以 `1c4e782` 干净克隆叠加本轮精确路径完成隔离复验，并修复两条飞书测试误写真实 `%LOCALAPPDATA%\Syno` 的隔离遗漏。

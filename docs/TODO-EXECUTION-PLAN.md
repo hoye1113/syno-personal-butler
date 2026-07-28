@@ -19,11 +19,12 @@
 - mise shim 在后台启动时曾产生递归进程风暴，生产环境永久禁止直接启动 shim、`.cmd` 或 `.bat`。
 - 本轮开始前 Node 测试 316/316、Repository verify 1326 files。
 - `5890dad` 完成后：Node 370/370、vault pytest 57/57、Repository verify 1358 files。
+- Windows 计划任务 XML 加固后：Node 375/375、vault pytest 57/57、Repository verify 1359 files、`git diff --check` 通过。
 - `C:\tmp\syno-fresh-863bcca` 从文档提交前的 `863bcca` 克隆并按锁文件安装：Node 370/370、vault 57/57、Repository verify 1356 files；安装未改变锁文件。
 - 工作树中有两项主人知识变更，不属于本轮，禁止覆盖或暂存：
   - `vault/02-Resources/AI and Agents/MOC - Agent 架构与工程.md`
   - `vault/02-Resources/AI and Agents/Agent Design & Patterns/当编码不再是瓶颈 - Berkeley RDI 软件自主开发三级框架.md`
-- 独立 OpenCode Zen 凭据尚未配置，因此真实免费模型、真实跨渠道对话和真实审批计数尚未验收。
+- 主人已明确授权将全局 OpenCode 配置中的可用凭据一次性迁入 Syno DPAPI；产品运行时不会自动读取或依赖全局 `auth.json`。真实免费模型、真实跨渠道对话和真实审批计数仍未验收。
 
 ## 2. 目标架构
 
@@ -84,8 +85,8 @@
 
 - Doctor 不读取或输出 Token。
 - 路径失效或版本不是 1.18.2 时进入 `setup_required`。
-- 不把真实凭据缺失误报为产品已完成。
-- 2026-07-28 本机 Doctor 已确认真实 exe 与 1.18.2；唯一未通过检查是预期中的独立 Zen Token 尚未配置。
+- 不把凭据已配置误报为真实模型或产品验收已完成。
+- 2026-07-28 本机 Doctor 已确认真实 exe 与 1.18.2；主人随后授权完成一次性凭据迁移，下一步由主人重新运行 Doctor 并执行真实模型探针。
 
 ### R1：Supervisor 与 Server 接缝 — 自动化与真实无模型探针已完成
 
@@ -98,12 +99,13 @@
 - 真实二进制探针覆盖健康、Session 创建、中止、删除与端口释放。
 - `pnpm start:test` 会在测试环境联启 Syno Host 与 Fake OpenCode；生产环境无法启用 Fake Supervisor。
 - 2026-07-28 真实探针确认：认证成功、Session create/abort/delete 成功、`syno` MCP connected、禁止内置工具可调用数为 0。
+- Windows 安装器通过 `Syno.WindowsTaskXml.psm1` 对导出的 Task Scheduler XML 做保护与闭环验证：只允许一个登录触发器，固定 `PT30S` 延迟，并锁定执行身份、命令、参数、工作目录、单实例、隐藏、无限执行和每分钟重启。重注册后必须再次导出验证，既有健康任务也只有在同一 XML 契约通过后才能复用。
 
 剩余：
 
 - 在 Windows 登录任务场景下复验 Syno Host 与 OpenCode 子进程共同恢复。
 
-### R2：CognitiveRuntime 与 Session — 自动化完成，真实 Token 待验收
+### R2：CognitiveRuntime 与 Session — 自动化完成，真实模型待验收
 
 已实现：
 
@@ -164,10 +166,11 @@
 
 仍需：
 
-1. 主人通过 `pnpm opencode:configure` 或 Web 设置独立 Zen Token。
-2. 用非敏感内容完成真实模型探针。
-3. 完成微信、飞书、Web 跨渠道上下文和工具调用验收。
-4. 复验 Windows 登录任务恢复 OpenCode 子进程。
+1. 主人运行 `pnpm opencode:doctor`，确认一次性迁移后的凭据状态。
+2. 主人运行 `pnpm start`，用非敏感内容完成真实模型与提示注入探针。
+3. 停止手动 Host 后，由主人运行 `pnpm windows:install`、`pnpm windows:status` 和 `pnpm windows:restart`，验收真实任务定义、健康与重启。
+4. 完成微信、飞书、Web 跨渠道上下文和工具调用验收。
+5. 复验下次 Windows 登录后 Syno Host 与 OpenCode 子进程共同恢复。
 
 ### R6：删除重复实现与封板 — 严格未开始
 
@@ -208,10 +211,9 @@
 
 ## 6. 当前执行入口
 
-1. 主人通过 CLI 或 Web 配置独立 Zen Token。
-2. 以非敏感内容完成真实模型与提示注入探针。
+1. 主人运行 Doctor 并以非敏感内容完成真实模型与提示注入探针。
+2. 主人完成真实 Windows 任务安装、状态、重启和下次登录恢复验收。
 3. 完成 R5 的微信、飞书、Web、审批、来源和重启恢复计数。
-4. 复验 Windows 登录后 Syno Host 与 OpenCode 子进程共同恢复。
-5. 只有达到全部门槛后进入 R6 删除、fresh-clone、浏览器与最终封板。
+4. 只有达到全部门槛后进入 R6 删除、fresh-clone、浏览器与最终封板。
 
 任何时候都不得重置分支、修改原始 Obsidian 仓库、覆盖两项主人知识变更、使用 `git add -A` 或自动 Push。
