@@ -1,10 +1,10 @@
 # Syno 主动式知识闭环管家：长期执行纲要
 
-更新日期：2026-07-21（Asia/Shanghai）
+更新日期：2026-07-28（Asia/Shanghai）
 
-本文维护长期产品目标、架构边界和迁移历史摘要。下一阶段的唯一详细任务、公共接口、阶段顺序和验收门槛位于 `docs/TODO-EXECUTION-PLAN.md`（07-21 历史归档）；当前执行断点位于根目录 `NEXT_SESSION.md`。
+本文维护长期产品目标、架构边界和迁移历史摘要。OpenCode 重构的唯一详细任务、公共接口、R0–R6 阶段顺序和验收门槛位于 `docs/TODO-EXECUTION-PLAN.md`；当前执行断点位于根目录 `NEXT_SESSION.md`。旧 P0–P5 计划仅保存在 `docs/archive/`。
 
-> ⚠️ **状态指针（2026-07-24 补）**：本文「当前阶段」(L19–20) 与「迁移历史摘要」(L32) 为 **07-21 快照，部分已被超越**：Goal 已建 `goal-643fb7fc`、画像已 v2 重构、Windows 登录任务已 `running=true`（常驻验收已过，端口 `8888`）、两个 SHA 相同的 Anthropic 候选已删（仅剩 1 个非官方原文）。**当前现状与断点以 `docs/OUTSTANDING-WORK.md` 为准**；本文「产品目标」「不可变架构边界」部分仍有效。
+> 当前执行状态以 `docs/TODO-EXECUTION-PLAN.md` 与根 `NEXT_SESSION.md` 为准；历史验收不替代 OpenCode R5 的真实模型、渠道和 Windows 恢复证据。
 
 ## 产品目标
 
@@ -17,10 +17,10 @@ Syno 负责降低整理成本、维护知识库、发现学习缺口、安排复
 ## 当前阶段
 
 - 原知识库单向迁移已经完成，迁移管道、审批、GitGuard 和审计记录已落地。
-- 当前固定起点为 `b79d2e5`，Syno `vault/` 有 512 个受 Git 跟踪的 Markdown，原库有 555 个，差值 43。
-- 当前产品尚未封板：Goal、每日计划、真实学习状态、输出机会和维护轮换尚未初始化。
-- 最近持久化知识画像已经过期，Windows 登录任务已安装但没有运行；两者均列为下一阶段 P0。
-- 下一步必须从 `docs/TODO-EXECUTION-PLAN.md` 的 P0 开始，不得恢复旧的“预创建零掌握状态”设计。
+- OpenCode 重构固定起点为 `f0333f3`，实现提交为 `5890dad`。
+- R0–R4 的代码与自动化接缝已经完成；Node 370/370、vault 57/57、Repository verify 1358 files。
+- 当前产品尚未封板：独立 Zen Token、真实模型提示注入、跨渠道计数、OpenCode 重启恢复和 Windows 登录恢复仍属 R5 门槛。
+- R6 删除旧实现严格未开始。
 
 ## 迁移历史摘要
 
@@ -37,9 +37,10 @@ Syno 负责降低整理成本、维护知识库、发现学习缺口、安排复
 
 - `vault/` 是唯一可写知识事实源，`ops/` 是任务、行动、证据、产物和事件事实源，`.runtime/` 是可删除重建的缓存与建议状态。
 - 原始 `D:\workSpace\obsidian_repository` 永久只读，不做双向同步。
-- 产品只启用一个 `CognitiveRuntime`；原生 `ToolLoopAgent` 是当前唯一活动实现。
-- Hermes 固定版本未通过单端点 Provider 门槛，当前不采用、不并行、不接触真实 Token；OpenCode/OpenClaw 也不是产品运行时。
-- Provider 只使用一个固定 OpenAI-compatible Base URL、一个 Model ID 和原生非流式 tool calls；不可自动切换 Provider、模型或 fallback。
+- 产品只启用一个 `CognitiveRuntime`；目标活动实现是受 Syno 监管的 OpenCode CLI Server，原生 `ToolLoopAgent` 仅在真实验收门槛完成前作为非活动迁移回滚代码。
+- Hermes 固定版本未通过门槛，不采用、不并行。OpenClaw 不是产品运行时。
+- Provider 固定为 OpenCode，模型链由 Syno 确定性控制；模型不得选择 Provider、模型或回退，且产生不可逆副作用后禁止重试。
+- OpenCode 只负责会话、压缩、推理、Skill 和工具规划；所有工具调用必须回到静态 Syno Tool Bridge、ToolRegistry、Policy、Approval 和 GitGuard。
 - `SignalEngine → PriorityEngine → CognitiveRuntime → ToolRegistry → Policy/Approval/GitGuard` 的权限链不可绕过。
 - 模型不得自行唤醒、扩大能力、修改 Policy、审批、安全规则、源码或 ToolRegistry。
 - Syno 不能修改自身源码，只能修改 `SettingsRegistry` 白名单配置并生成 BugReport/ImprovementProposal。
@@ -56,12 +57,11 @@ Syno 负责降低整理成本、维护知识库、发现学习缺口、安排复
 
 ## Provider、渠道和保留规则
 
-- 默认 Base URL：`https://server.flowyaipc.cn/claw/v1`
-- 请求：`POST {baseUrl}/chat/completions`，非流式，原生 tool calls
-- Token 使用 Windows DPAPI 保存，禁止回显、日志输出或提交。
-- Provider 不可用时本地搜索、计划、提醒和队列继续；LLM Job 进入 `waiting_provider`，恢复后仍使用同一固定 Model ID。
-- Web、微信、飞书共用同一个 Owner、Conversation、Policy、审批和事实源。
-- Web 负责今日决策、审批、深度学习、知识维护与创作；微信/飞书负责快速收录、查询、提醒和低风险动作。
+- OpenCode Server 固定为本机 `127.0.0.1:4318`，版本 1.18.2，随机 Basic Auth。
+- 独立 OpenCode Zen Token 使用 Windows DPAPI 保存，禁止回显、日志输出、命令行传递、提交或复制全局 OpenCode auth。
+- Provider 不可用时本地搜索、收录回执、审批解析、计划、提醒和队列继续；LLM Job 进入 `waiting_provider`。
+- Web、微信、飞书共用同一个 Owner、OpenCode main Session、Policy、审批和事实源。
+- Web 负责完整差异、诊断、深度学习、知识维护与创作；微信/飞书可以完成询问、收录、复习以及严格绑定的单/双审批。
 - 对话保留 30 天；确认转录后的原始语音 7 天；失败载荷 30 天；未完成任务保留到终态。
 
 ## 审批与 Git 规则
@@ -84,4 +84,4 @@ Syno 负责降低整理成本、维护知识库、发现学习缺口、安排复
 
 ## 完成定义
 
-迁移已完成，但私人管家尚未封板。只有 `docs/TODO-EXECUTION-PLAN.md` 的 P0–P5 全部通过，且原库未改变、当前分支未重置、远端未 Push，才能将全局 Goal 标记 complete。
+迁移与 OpenCode 自动化重构已完成，但私人管家尚未封板。只有 `docs/TODO-EXECUTION-PLAN.md` 的 R5 真实门槛和 R6 删除/最终验收全部通过，且原库未改变、当前分支未重置、远端未 Push，才能将全局 Goal 标记 complete。

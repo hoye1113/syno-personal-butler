@@ -1,6 +1,6 @@
 # Syno 已知限制
 
-更新日期：2026-07-20
+更新日期：2026-07-28
 
 ## 发布门槛状态
 
@@ -9,14 +9,18 @@
 - 飞书消息已完成 Owner 私聊、真实 ID 重放拒绝与重启恢复；飞书日历已完成 user 授权、主日历 CRUD、错误拒绝与恢复。
 - `0cc2669` 的 fresh clone 已通过 Node 172/172、vault 57/57 和仓库校验；`a4ec17d` 完成最终回归。真实 Windows Web 生命周期与桌面/移动浏览器增量复验通过。当前代码完整 bundle 为 `C:\tmp\syno-repository-backup-a4ec17d.bundle`，SHA-256 见最终验收矩阵。
 
-当前没有未完成的发布门槛。下列内容是产品运行限制和兼容性债务，不影响本轮切换结论。
+旧固定 Provider 的历史验收已经完成，但 OpenCode 重构重新打开了运行时发布门槛。当前尚未配置 Syno 独立 Zen Token，也未完成 R5 的真实跨渠道计数、提示注入、OpenCode 重启恢复和 Windows 登录恢复。不得把自动测试或旧 Provider 证据表述为 OpenCode 已封板。
+
+OpenCode 自动化基线已经通过 Node 370/370、vault 57/57、Repository verify 1358 files，并通过真实 1.18.2 无模型 Server 探针；三轴审查未解决 P0/P1 为 0。这些证据验证接缝与安全边界，不替代上述真实 R5 门槛。
+
+当前 OpenCode 提交的 fresh clone 已在 `C:\tmp\syno-fresh-863bcca` 通过 Node 370/370、vault 57/57 和 Repository verify 1356 files。首次纯离线安装因本机 pnpm store 缺少 `mammoth@1.9.1` tarball 失败；随后按未改变的锁文件联网补齐缓存并通过，故“任意机器完全离线安装”不是已保证能力。
 
 ## 运行时限制
 
 - 仅支持 Windows；Provider Token、微信 Bot/回复上下文和飞书 App Secret 使用当前 Windows 用户的 DPAPI，不可作为跨用户可移植凭据。
-- 只启用一个固定 OpenAI-compatible Provider 和一个 Model ID，没有自动模型分层、Provider 切换或 fallback。
+- 只启用 OpenCode Provider；Syno 按固定三模型链确定性尝试。仅在枚举的瞬态/契约失败且尚无不可逆副作用时尝试下一模型，不切换 Provider 或 Runtime。
 - Hermes `0.18.2` 因会访问 Chat Completions 以外的模型元数据路径而被淘汰；Hermes sidecar 代码仅保留审计和回归用途，不可选用。
-- Provider 不可用时，本地搜索、任务、提醒与审批继续工作；需要模型的 Job 保留为 `waiting_provider`，不会自动换模型。
+- OpenCode/模型不可用时，本地搜索、收录回执、任务、提醒与审批解析继续工作；需要模型的 Job 保留为 `waiting_provider`，不会自动换 Provider 或原生 Agent。
 - Syno 不能修改自身源码；只能产生 `BugReport`、`ImprovementProposal` 和 SettingsRegistry 白名单内的偏好变更。
 
 ## 数据与渠道限制
@@ -31,5 +35,5 @@
 
 ## 兼容性债务
 
-- 历史 OpenCode/Claude Executor 仍为旧 V1 回归和未迁移操作保留在代码中，但不是产品 Agent Runtime，也不应暴露为用户运行时选择。
+- 原生 Provider/ToolLoopAgent/ContextManager/ConversationStore、旧 OpenCode/Claude Executor 和 Hermes 代码在 R6 真实验收门槛前保留，但全部不是活动回退路径。达到门槛后应删除，而不是长期维护第二套 Agent。
 - 当前事实记录以 Markdown/JSON 契约版本 1 为基线；未来破坏性契约变更必须新增显式迁移器，不能原地静默升级。

@@ -1,6 +1,6 @@
 # Deterministic policy
 
-Syno enables exactly one `CognitiveRuntime` and one configured model ID. The active implementation is `NativeCognitiveRuntime` around `ToolLoopAgent`; pinned Hermes `0.18.2` failed the Provider-surface hard gate and is not selectable. Runtimes never run in parallel and never silently fall back to each other. The model never chooses a provider, permission, risk level, approval count, wake-up time or retry escalation.
+Syno enables exactly one product `CognitiveRuntime`. The default implementation is `OpenCodeCognitiveRuntime`; the native implementation remains inactive only until the R6 evidence gate and is never an automatic fallback. Syno owns the fixed model chain and may advance only for an enumerated transient/contract failure before any irreversible effect. The model never chooses a provider, model, permission, risk level, approval count, wake-up time or retry escalation.
 
 | Action | Initial approval | Workspace | Notes |
 |---|---:|---|---|
@@ -18,4 +18,4 @@ Agent-adjustable settings are limited to reminders, notification cadence, quiet 
 
 Learning mastery requires an approved `LearningEvidence` carrying an actual Owner-authored raw output Artifact. A caller-supplied Artifact reference, AI draft or unapproved intake payload cannot increase mastery. Ingest payloads and proposals remain rebuildable local state until an explicit `IngestDecision` is approved; only then may the isolated Job write `ops/` or `vault/`.
 
-Weixin may approve only a low-risk single-approval Job. Double approval and destructive operations require Web. Low-risk automation is bounded by a deterministic whitelist and a default budget of three proactive notifications per day.
+The bound Owner may approve through a Weixin or Feishu private conversation. A single unambiguous low-risk decision accepts a natural confirmation; multiple decisions require an index or code. Existing-file changes, deletion, rename and other high-risk changes require a real isolated diff followed by `确认应用 <六位码>`, bound to the same Owner/thread, expiry and diff digest. Groups and unknown senders cannot approve. Web remains an optional full-diff console. Low-risk automation is bounded by a deterministic whitelist and a default budget of three proactive notifications per day.

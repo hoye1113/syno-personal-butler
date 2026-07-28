@@ -1,300 +1,217 @@
-# Syno 主动知识闭环：下一阶段权威执行计划
+# Syno 转换为 OpenCode CLI Agent：权威执行计划
 
-更新日期：2026-07-21（Asia/Shanghai）
+更新日期：2026-07-28（Asia/Shanghai）
 
-本文是迁移完成后的 P0–P5 执行计划的**历史归档（2026-07-21 快照）**。`NEXT_SESSION.md` 维护当前执行入口，`docs/OUTSTANDING-WORK.md` 维护 2026-07-24 起的现状与断点，`docs/HANDOFF-EXECUTION-PLAN.md` 维护长期目标、架构边界和历史摘要。
-
-> ⚠️ **状态指针（2026-07-24 补）**：本文 §1 的数字均为 **07-21 快照，已被超越**——Node `205/205`→`298/298`、verify `1125`→`1227`、`Goal 0`→已建 `goal-643fb7fc`、画像"539 篇过期"→已 v2 重构、Windows `running=false`/`4294967295`/`4317`→常驻验收已过（`8888`、`running=true`、`lastResult=267009`）、"两个 SHA 相同的 Anthropic 候选"→已删剩 1 个（且"SHA 相同"已证伪）、P2 Capture L166 同源已删。**冲突时以 `docs/OUTSTANDING-WORK.md` + `git log` 实跑为准，不再以本文为准。** P0–P5 正文保留作执行计划档案与设计意图参考。
+本文是当前唯一详细执行入口。旧的知识闭环 P0–P5 计划已归档到
+`docs/archive/TODO-EXECUTION-PLAN-2026-07-21.md`；长期产品目标和迁移历史仍见
+`docs/HANDOFF-EXECUTION-PLAN.md`。
 
 ## 1. 当前可信基线
 
 - 仓库：`D:\workSpace\syno-personal-butler`
 - 分支：`codex/round3-remediation`
-- 固定起点：`b79d2e5 chore(vault): remove LangGraph.js tutorial series (32 files)`
-- 当前工作树不是 clean：`NEXT_SESSION.md`、`docs/HANDOFF-EXECUTION-PLAN.md` 已修改，本文为未跟踪文件；这些是计划文档工作，不得丢弃。
-- 当前 Syno `vault/` 有 512 个受 Git 跟踪的 Markdown；原库有 555 个受 Git 跟踪的 Markdown；差值为 43。
-- 原库 HEAD：`883fbf5c457156805b9e9b53358175ce84940b59`，已有 19 项用户修改；原库永久只读。
-- 当前验证：Node 205/205、vault pytest 57/57、Repository verify 1125 files。
-- Provider 已配置为固定 `AIPC-deepseek-v4-flash`；微信和飞书均显示 running、available、ownerBound。
-- Windows 登录任务显示 installed=true、startup=at_logon，但 running=false、lastTaskResult=4294967295；当前 4317 Host 健康不等于登录任务验收通过。
-- 当前领域数据：Goal 0、LearningState 0、LearningEvidence 0、OutputOpportunity 0。
-- 当前待处理数据：两个正文 SHA-256 相同的 Anthropic 收录候选；4 个 keep-syno 冲突 Proposal；5 个固定排除项；1 个无证据 Claim。
-- 最新持久化知识画像已过期：仍统计 539 篇并包含已删除的 LangGraph 系列，禁止直接用于学习或输出初始化。
+- 本轮固定起点：`f0333f3`
+- OpenCode 重构实现提交：`5890dad`
+- OpenCode CLI 锁定版本：`1.18.2`
+- 真实二进制：
+  `%LOCALAPPDATA%\mise\installs\node\24.13.0\node_modules\opencode-ai\bin\opencode.exe`
+- OpenCode 子进程固定监听 `127.0.0.1:4318`；Syno Host 当前监听端口由现有配置决定。
+- mise shim 在后台启动时曾产生递归进程风暴，生产环境永久禁止直接启动 shim、`.cmd` 或 `.bat`。
+- 本轮开始前 Node 测试 316/316、Repository verify 1326 files。
+- `5890dad` 完成后：Node 370/370、vault pytest 57/57、Repository verify 1358 files。
+- `C:\tmp\syno-fresh-863bcca` 从文档提交前的 `863bcca` 克隆并按锁文件安装：Node 370/370、vault 57/57、Repository verify 1356 files；安装未改变锁文件。
+- 工作树中有两项主人知识变更，不属于本轮，禁止覆盖或暂存：
+  - `vault/02-Resources/AI and Agents/MOC - Agent 架构与工程.md`
+  - `vault/02-Resources/AI and Agents/Agent Design & Patterns/当编码不再是瓶颈 - Berkeley RDI 软件自主开发三级框架.md`
+- 独立 OpenCode Zen 凭据尚未配置，因此真实免费模型、真实跨渠道对话和真实审批计数尚未验收。
 
-迁移本身已经完成；当前未完成的是“目标驱动的每日规划、用户学习证据、复习、输出、维护轮换和主动渠道”组成的产品闭环。
-
-## 2. 已完成且不得回退
-
-- content 迁移：`job-20260720-01b25db9`，合并提交 `1631c23`。
-- integration 迁移：`job-20260721-f9be2d0b`，合并提交 `824a317`。
-- 后续迁移 Job：`job-20260721-c0f18eba`、`job-20260721-eb7deddc` 已完成；`job-20260721-e4501b3d` 保持失败审计。
-- GitGuard 已使用 stdin NUL pathspec 处理 Windows 大批长路径；不得退回命令行拼接所有路径。
-- 原始 Obsidian 仓库永久只读，不写缓存、不格式化、不清理、不提交、不双向同步。
-- `vault/` 是唯一可写知识事实源，`ops/` 是任务、证据和产物事实源，`.runtime/` 只保存可删除重建的状态。
-- 原生 `ToolLoopAgent` 是唯一活动 `CognitiveRuntime`；Hermes 不进入当前产品运行时。
-- 固定单一 Provider 和 Model ID，无自动 Provider/模型切换或 fallback。
-- AI 草稿不能提高掌握度；只有主人自己的口述、打字、答题或实践可以成为 `LearningEvidence`。
-- Syno 不能修改自身源码，只能调整 `SettingsRegistry` 白名单配置并生成 BugReport/ImprovementProposal。
-- 禁止 `git add -A`、自动 Push、重置整改分支或丢弃用户修改。
-
-## 3. 关键设计修正
-
-### 3.1 每日推荐与掌握状态分离
-
-`LearningState` 表示主人接受过真实测试后的掌握事实，契约要求 `lastTestedAt` 和 evidence refs。迁移笔记尚未测试，不能为了进入队列而伪造掌握状态。
-
-新增可重建的 `DailyKnowledgePlan` 和 `DailyAction`：
-
-- 每日计划只说明“今天建议做什么、为什么、从哪里进入”。
-- 每日计划保存在 `.runtime/`，不写入 mastery、lastTestedAt 或虚构 evidence。
-- 主人完成输出并通过审批后，现有 `LearningService.record()` 才创建 LearningEvidence、LearningState 和下一次复习时间。
-
-### 3.2 画像计算与画像持久化分离
-
-- `inspect()`：只读计算当前画像，不写文件。
-- `latest()`：读取最近一次持久化画像并返回 fresh/stale。
-- `persist()`：通过既有 `knowledge.profile.generate` Job 和审批写入 `ops/knowledge/profiles/`。
-- Profile v2 只统计可搜索的个人知识；协议、审计、测试和 Skill 模板不得污染主题、来源、稳定性、可靠性、死链或过期统计。
-
-### 3.3 Today 返回可执行动作
-
-后端必须返回明确的 `area + intent + ref`，前端不再把多种信号压成通用 `news` 后猜测跳转位置。
-
-固定映射：
-
-| 信号 | area | intent |
-|---|---|---|
-| ingest-pending | capture | review-ingest |
-| claim-review | knowledge | review-claim |
-| output-opportunity | create | continue-output |
-| knowledge-maintenance | knowledge | review-maintenance |
-| review | learn | start-review |
-| goal | today | view-goal |
-| commitment / approval | approvals | view-job |
-
-## 4. 固定执行顺序
-
-`P0 可信基线 → P1 Goal/Planner → P2 Today/Capture/Learn → P3 维护/周复盘 → P4 Create/主动渠道 → P5 封板`
-
-每阶段先写失败测试，再实现最小闭环，再运行针对性测试；阶段完成后才进入下一阶段。需要审批时输出精确差异和 changed paths，批准后从断点继续。
-
-## 5. P0：恢复可信产品基线
-
-### 实施
-
-1. 修正文档和运行状态中的数量、HEAD、工作树、画像 freshness 与 Windows 状态。
-2. 将知识画像重构为 inspect/latest/persist 三个语义接口。
-3. 扩展知识画像契约为 v2：标记 `scope: personal-knowledge`，保留个人笔记数、可搜索数和被排除系统笔记数。
-4. `GET /api/syno/knowledge/profile/latest` 返回 `profile`、`fresh`、`currentVaultFingerprint`、`excludedSystemNotes`。
-5. fingerprint 不一致时，Web 显示“画像需要重新生成”，Planner 拒绝消费旧画像。
-6. 对 43 个源库/目标库差异形成确定清单：32 个主动删除、5 个固定排除、4 个 keep-syno 冲突和剩余差异，不再使用“其他”作为长期描述。
-7. 对 Windows 登录任务执行只读诊断，输出任务定义、PID/launcher、last result 和 4317 进程归属；本阶段不修改 Task Scheduler。
-
-### 验收
-
-- 新画像不包含已删除的 LangGraph 系列。
-- 系统协议、审计和 Skill 模板不进入个人质量统计。
-- latest 能区分 fresh/stale，旧画像仍可审计但不能驱动计划。
-- 文档、Git、Profile 和运行 API 的数字一致。
-- 原始 Obsidian 仓库 HEAD、dirty entries 和文件哈希未变化。
-
-## 6. P1：全局 Goal 与 KnowledgeLoopPlanner
-
-### 全局 Goal
-
-通过现有 `goals.create` Job 和一次审批创建：
-
-- title：`把 AI、Agent、AI Coding、工程实践、人生哲理与未来趋势转化为可解释、可应用、可输出的个人能力`
-- status：`active`
-- priority：`100`
-- focusAreas：`AI`、`Agent`、`AI Coding`、`工程实践`、`人生哲理`、`未来趋势`
-
-### 新深模块
-
-建立唯一规划接口：
+## 2. 目标架构
 
 ```text
-KnowledgeLoopPlanner.planDay(context)  -> DailyKnowledgePlan
-KnowledgeLoopPlanner.planWeek(context) -> WeeklyKnowledgePlan
+微信 / 飞书 / Web
+  → ChannelConversationHandler
+  → OpenCode Session
+  → 静态 Syno Tool Bridge
+  → ToolRegistry / Policy / Approval / GitGuard
+  → vault / ops
 ```
 
-`DailyKnowledgePlan` 至少包含：
+职责边界：
 
-- id、ownerId、localDate、generatedAt、vaultFingerprint
-- goalRefs、capacity、allocation、items
+- OpenCode 负责对话上下文、压缩、意图理解、Skill 选择和工具规划。
+- Syno 负责 Owner 身份、渠道去重、来源、任务、审批、权限、受控写入和事实源。
+- Web 是可选控制台，不是普通收录、询问或审批的强制入口。
+- OpenCode 不得直接读取仓库、写文件、执行 Shell/Git、修改源码、分享会话、启动子 Agent 或动态加载 MCP。
+- 任意写入仍必须经过 ToolRegistry、Policy、Job、隔离 worktree、validators 和 GitGuard。
 
-`DailyAction` 至少包含：
+## 3. 不可变运行契约
 
-- id、kind、title、reason、priority
-- area、intent、ref、status
-- 可选 dueAt
+### 3.1 唯一运行时
 
-### 选择规则
+- 产品运行时目标是唯一启用 `OpenCodeCognitiveRuntime`。
+- 原生 `ToolLoopAgent` 只在 R6 真实验收前作为非活动迁移回滚实现，绝不自动回退。
+- Hermes、旧 OpenCode/Claude Executor 不得进入产品对话路径。
+- OpenCode 失败后，自由对话和 LLM Job 等待；本地收录回执、审批解析、搜索和状态查询继续工作。
 
-优先级固定为：
+### 3.2 模型链
 
-1. 活跃目标和明确项目。
-2. 已承诺事项与待审批工作。
-3. 到期复习。
-4. 与目标相关但尚未验证的知识。
-5. 输出所需的知识缺口。
-6. 新收录候选。
-7. 少量知识维护和自由探索。
+固定顺序：
 
-- 每日容量默认 5。
-- 60% 消化、25% 收录、15% 维护使用滚动 20 个推荐槽实现为 12/5/3；明确目标、承诺和到期复习可覆盖比例。
-- 某一类无候选时，空余容量优先回填已有知识消化。
-- 相同 owner、localDate、vaultFingerprint、Goal 和设置下结果必须幂等。
-- Goal、Vault 或相关设置变化后计划失效并重算。
+1. `opencode/mimo-v2.5-free`
+2. `opencode/deepseek-v4-flash-free`
+3. `opencode/laguna-s-2.1-free`
 
-### 公共接口
+只有不可用、限流、连接失败、超时、5xx、空响应或契约失败，且本次尝试未产生不可逆副作用时，Syno 才可确定性尝试下一模型。模型不能选择模型、Provider 或回退目标；全部失败进入 `waiting_provider`。
 
-- `GET /api/syno/learning/plan/today`
-- `GET /api/syno/learning/plan/week`
+### 3.3 凭据与隐私
 
-### 验收
+- Zen Token 使用 Windows DPAPI 独立保存在 `%LOCALAPPDATA%\Syno\credentials`。
+- 不读取、复制或依赖用户全局 OpenCode `auth.json`。
+- Token 只通过子进程环境提供，并由内联配置的环境变量引用；不进入命令行、仓库、状态元数据、日志或 OpenCode profile。
+- 免费模型默认只接收当前任务必要的限长知识片段；敏感笔记不出本机。
 
-- 同日重复读取结果一致。
-- 计划生成不创建 LearningState、LearningEvidence、Goal 或知识笔记。
-- 到期复习和活跃 Goal 始终高于自由探索。
-- Provider 离线时仍能生成确定性本地计划。
+## 4. 阶段状态
 
-## 7. P2：Today、Capture 与 Learn 动作闭环
+### R0：规格固化与 Doctor — 自动化与本机 Doctor 已完成
 
-### Capture
+已实现：
 
-- 新增 `GET /api/syno/intake/pending`。
-- 展示所有待确认 Artifact/Proposal，而不是只轮询刚上传的单个 Artifact ID。
-- 两个相同 SHA-256 的 Anthropic Proposal 分组展示，提供“保留其一/暂不处理”的主人决策入口，不自动合并或删除。
-- 最近收录中的项目可以打开对应方案详情和审批入口。
+- `pnpm opencode:doctor/status/restart/configure`
+- 真实二进制发现、shim 拒绝、版本锁定、项目 Agent/Skills 检查和脱敏凭据状态。
+- 根 `AGENTS.md` 已切换为三模型固定链与无 Claude/原生回退规则。
 
-### Today
+验收：
 
-- primary、needsYou、recentIntake 都返回 typed action。
-- 每个可操作项目必须可点击并进入对应对象。
-- Goal 为 0 时显示“告诉 Syno 你最近最想掌握什么”，而不是用孤岛维护填满首屏。
-- 健康状态只在异常时展开，Windows 登录任务异常需要可见但不得覆盖更高优先级承诺。
+- Doctor 不读取或输出 Token。
+- 路径失效或版本不是 1.18.2 时进入 `setup_required`。
+- 不把真实凭据缺失误报为产品已完成。
+- 2026-07-28 本机 Doctor 已确认真实 exe 与 1.18.2；唯一未通过检查是预期中的独立 Zen Token 尚未配置。
 
-### Learn
+### R1：Supervisor 与 Server 接缝 — 自动化与真实无模型探针已完成
 
-- 分开展示“今天建议学习”和“到期复习”。
-- 每项显示推荐原因、关联 Goal、来源与质量状态。
-- `开始复习` 打开实际知识内容和 Teach-back/打字/实践入口。
-- 主人提交至少 20 字原始输出后，继续使用既有审批、LearningEvidence 和 LearningState 语义。
+已实现：
 
-### 验收
+- `OpenCodeSupervisor.start/stop/restart/health/status/configure`。
+- loopback、4318、Basic Auth、随机进程密码、独立 profile、固定启动参数。
+- 只终止自有 PID 树；未知进程占端口时拒绝启动。
+- OpenCode 配置显式关闭内置文件、Shell、任务、网络、分享、插件、LSP、formatter 和动态 MCP。
+- 真实二进制探针覆盖健康、Session 创建、中止、删除与端口释放。
+- `pnpm start:test` 会在测试环境联启 Syno Host 与 Fake OpenCode；生产环境无法启用 Fake Supervisor。
+- 2026-07-28 真实探针确认：认证成功、Session create/abort/delete 成功、`syno` MCP connected、禁止内置工具可调用数为 0。
 
-- 所有 Today kind 都进入正确 area 和对象。
-- 从 Today 到学习证据审批、状态更新、下一次复习形成端到端闭环。
-- AI 提纲和空白提交不能更新 mastery。
-- 空、加载、错误、禁用、键盘焦点和 390×844 布局均可用。
+剩余：
 
-## 8. P3：知识维护轮换与周度复盘
+- 在 Windows 登录任务场景下复验 Syno Host 与 OpenCode 子进程共同恢复。
 
-### 实施
+### R2：CognitiveRuntime 与 Session — 自动化完成，真实 Token 待验收
 
-- KnowledgeMaintenanceSource 使用 vault fingerprint 作为缓存键。
-- 同一普通问题 7 天内不重复推荐。
-- 按主题轮换，避免固定展示相同的前 N 个孤岛。
-- 每日最多一个普通维护行动；安全问题或明确损坏除外。
-- 大批孤岛、死链、缺少来源和时效候选进入周度摘要。
-- 推荐历史复用 `.runtime` 通知状态，不另建知识或用户记忆事实源。
-- 周度摘要默认只读；主人选择保存时才通过一次审批写入 `ops/`。
-- 维护候选只提出建议，不自动创建链接、标签、MOC 或覆盖笔记。
+已实现：
 
-### 验收
+- Capability v2。
+- Owner 的微信、飞书、Web 共用 `main` Session；主动任务使用独立 `proactive` Session。
+- 每个 Session 串行、取消、30 天保留清理、`/新对话`。
+- 只持久化 Session binding 元数据，不保存第二份完整对话。
+- 每次消息显式固定 Agent、Model 和允许工具，禁止模型扩大能力。
+- 切换前活跃对话仅迁移脱敏摘要与最近用户消息；工具输出、assistant/system、private/sensitive 内容和密钥模式全部排除。
+- Provider 恢复任务每 60 秒检查一次到期 `waiting_provider`；手动与后台重试通过同一 Job 锁原子取得执行权，禁止重复执行。
 
-- 连续 7 天不重复普通维护项。
-- 主题可以轮换，重启后冷却语义仍成立。
-- 维护项不会压过 Goal、承诺、审批和到期复习。
-- 周摘要与当前画像一致且不含系统噪声。
+剩余：
 
-## 9. P4：Create 输出闭环与主动渠道
+- 验证 OpenCode 重启后的上下文恢复与 30 天清理。
 
-### 实施
+### R3：Skills 与 Tool Bridge — 已实现，提示注入实测待完成
 
-- 基于 Goal、DailyKnowledgePlan、用户学习证据和知识缺口生成一个首要 OutputOpportunity。
-- 首期优先 AI、Agent、AI Coding 和 Harness 深度文章。
-- 输出模板固定要求：自己的解释、小白可懂的例子、实际应用、反方观点、适用边界。
-- AI 只能生成提纲、追问和反馈，不写入主人原始输出字段。
-- 继续使用现有 OutputOpportunity 接受、草稿、演练、发布、反馈状态机。
-- 晨间计划、到期复习和晚间复盘使用同一 DailyAction。
-- 微信、飞书只发送摘要、提醒和低风险快捷动作；复杂审批与维护回到 Web。
-- 每日主动通知最多 3 次并遵守安静时间。
-- Provider 离线时本地计划、搜索、提醒继续；LLM Job 进入 waiting_provider，不切换模型。
+已实现：
 
-### 验收
+- `.opencode/agents/syno.md`。
+- 六个薄 Skills：capture、knowledge、learn、review、create、maintain。
+- 唯一静态 MCP `syno`，底层工具名由 Bridge 映射为最终 `syno_*`。
+- `syno_workflow_context` 从 canonical Skill 读取规则，不复制第二套知识语义。
+- Bridge 调用继续经过 ToolRegistry Schema、Policy 和固定 Owner 上下文。
+- 知识读取为限长 snippet，敏感 frontmatter 默认拒绝。
 
-- 一次主人 Teach-back 能同时留下证据、安排复习并推进输出机会。
-- Web、微信、飞书引用同一 Goal、Plan、Job 和知识对象。
-- 重复消息、乱序回执和重启不会重复创建事实记录。
-- 未经主人输出的 AI 内容不提高掌握度。
+剩余：
 
-## 10. P5：审查、Windows 与最终封板
+- 使用真实模型执行提示注入探针，证明 Shell、文件、Git、分享、模型切换、子 Agent 和动态 MCP 不可调用。
 
-### 主人裁决
+### R4：渠道审批与来源闭环 — 已实现核心接缝，真实渠道待验收
 
-- 两个重复 Anthropic Proposal：保留其一或继续搁置。
-- 4 个 keep-syno 冲突 Proposal：合并、忽略或后续手工处理。
-- 5 个排除项：保持排除，除非主人清理敏感内容后重新提交。
-- 无证据 Claim：补证、降级或保持 candidate，不把候选写成事实。
+已实现：
 
-### 三轮审查
+- 微信、飞书统一使用 `ChannelConversationHandler`。
+- 渠道顺序固定为：身份/去重 → 附件 → PendingDecision → 快捷命令 → OpenCode → 回复。
+- `PendingDecision` 支持单一自然确认、多个决定编号、TTL、重放保护、Owner/thread 绑定。
+- 高风险双审批支持“确认生成差异”与“确认应用 六位码”，并绑定 changed paths 和 diff digest。
+- `SourceDescriptor` 支持 URL、文件、个人观点和未知来源；Note 初始为 `knowledge_state: captured`。
+- 收录完成回执包含路径、来源可靠性、重复/关联、候选和未验证事项。
+- `修改：……` 会生成新版 Proposal，并把旧 Job 终结为 `canceled`，旧审批无法从 Web 或渠道继续应用。
+- 附件在审批语义之前隔离处理；正文中的“确认”不能被解释为 Owner 审批。
 
-1. Profile、Planner、Policy、契约和数据事实源。
-2. Today、Capture、Learn、Create 与跨渠道流程。
-3. Standards、Spec、安全、运行、恢复和交付复审。
+剩余：
 
-审查范围分开固定：
+- 补足 HTML/转发内容的明确提取支持边界。
+- 真实验证 URL、文本、Markdown、TXT、PDF 至少三种来源类型。
+- 真实验证微信和飞书的多待办、跨渠道、过期、重放与完整双审批。
 
-- 历史：`e8cc714..b79d2e5`
-- 新实现：`b79d2e5..最终 HEAD`
+### R5：唯一运行时切换 — 代码默认已切换，产品验收未完成
 
-每轮高优先级发现修复后必须重审，最终两个轴均为 0 个未解决高优先级问题。
+当前代码默认选择 OpenCode Runtime，原生 Runtime 不参与自动回退。Web 已提供：
 
-### Windows
+- OpenCode 健康、当前尝试和凭据状态。
+- Zen Token 配置入口。
+- OpenCode 重启入口。
+- Provider 不可用时 LLM Job 持久化为 `waiting_provider`，到期后由后台确定性恢复；本地回执、审批解析与状态查询继续可用。
 
-真实修改前展示计划任务精确定义并获得审批。最终必须满足：
+仍需：
 
-- installed=true
-- running=true
-- startup=at_logon
-- lastTaskResult=0
-- 登录和异常退出后 4317 自动恢复
-- 不自动打开浏览器
-- 只存在精确的 Syno 任务，不删除 state、vault、ops 或 credentials
+1. 主人通过 `pnpm opencode:configure` 或 Web 设置独立 Zen Token。
+2. 用非敏感内容完成真实模型探针。
+3. 完成微信、飞书、Web 跨渠道上下文和工具调用验收。
+4. 复验 Windows 登录任务恢复 OpenCode 子进程。
 
-### 完整验证
+### R6：删除重复实现与封板 — 严格未开始
 
-- `pnpm test`
-- `python -m pytest vault/tests`
-- `pnpm verify`
-- `pnpm --dir apps/syno verify`
-- 修改过的 JavaScript 使用 `node --check`
-- fresh clone 安装、启动和完整回归
-- 桌面与 390×844 浏览器流程、键盘、焦点、减少动画、0 console error/warning
-- Provider、微信、飞书真实探针
-- Windows 登录、重启和异常恢复
-- state backup、verify、空目录 restore
+只有以下真实证据全部满足后才能删除旧实现：
 
-当前仓库没有正式 build/typecheck 工具链；文档不得宣称已执行这两项，除非后续确实引入对应工具。
+- 30 条真实跨渠道消息。
+- 10 组多轮追问。
+- 5 次 ToolRegistry 调用。
+- 3 次普通审批。
+- 1 次完整双审批。
+- 3 种来源类型的收录。
+- OpenCode 重启后上下文与 PendingDecision 恢复。
 
-### 交付
+满足后才删除原生 `ProviderClient`、`ToolLoopAgent`、`ContextManager`、重复 `ConversationStore`、旧 ExecutorRouter 和非活动 Hermes 代码。删除前后各运行一次完整回归；历史架构决定只留文档。
 
-- 每阶段只暂存 Job 或计划声明的精确路径，不使用 `git add -A`。
-- 每阶段创建独立本地提交，不 Push。
-- 最终生成 Git bundle，记录大小和 SHA-256。
-- 最终报告区分：已验证、主人已裁决、候选、已知限制和后续 backlog。
+## 5. 自动测试与安全验收
 
-## 11. 阶段完成门槛
+每阶段必须覆盖：
 
-| 阶段 | 完成门槛 |
-|---|---|
-| P0 | 当前画像可信、差异可解释、运行状态与文档一致 |
-| P1 | Goal 已批准；每日/每周计划幂等且不伪造掌握状态 |
-| P2 | Today 到真实 LearningEvidence 的 Web 闭环通过 |
-| P3 | 维护冷却、轮换和周摘要不会刷屏 |
-| P4 | Learn/Create/主动渠道共用同一事实与动作语义 |
-| P5 | 三轮审查、fresh clone、浏览器、真实渠道、Windows、备份恢复全部有当前证据 |
+- Binary：shim、`.cmd`、版本漂移、路径失效、空格路径、单进程。
+- Server：loopback、401、Session、消息、中止、删除、未知端口占用、自有 PID。
+- Runtime：跨渠道连续性、串行、取消、超时、崩溃、固定回退、不可逆副作用。
+- 权限：内置工具不可调用，伪造工具名和权限字段被拒绝。
+- 审批：单一/多个/重放/过期/跨 Owner/双审批 digest 变化。
+- 收录：来源、哈希、重复、失效 URL、恶意正文和完整追溯。
+- 隐私：Token 不进入输出、参数、仓库、备份或 profile。
+- 完整回归：Node、vault pytest、repository verify、fresh clone、浏览器、真实渠道和 Windows。
 
-只有 P0–P5 全部完成，才能将“Syno 原知识库迁移与私人管家封板”Goal 标记 complete。
+三轮审查：
+
+1. Standards：代码遵循仓库约定，模块接口足够深。
+2. Spec：逐条对照 R0–R6 和公共契约。
+3. Security：权限、凭据、注入、审批、GitGuard 和进程边界。
+
+每轮高优先级发现修复后重审，最终要求 0 个未解决高优先级问题。
+
+2026-07-28 已完成 Standards、Spec、Security 三轴复核。发现的凭据输入回显、工具副作用回退、私密迁移、旧 Proposal 继续可批、Fake Supervisor 边界和并发 Provider 重试等高优先级问题均已修复并重审；当前未解决 P0/P1 为 0。
+
+## 6. 当前执行入口
+
+1. 主人通过 CLI 或 Web 配置独立 Zen Token。
+2. 以非敏感内容完成真实模型与提示注入探针。
+3. 完成 R5 的微信、飞书、Web、审批、来源和重启恢复计数。
+4. 复验 Windows 登录后 Syno Host 与 OpenCode 子进程共同恢复。
+5. 只有达到全部门槛后进入 R6 删除、fresh-clone、浏览器与最终封板。
+
+任何时候都不得重置分支、修改原始 Obsidian 仓库、覆盖两项主人知识变更、使用 `git add -A` 或自动 Push。

@@ -7,7 +7,7 @@
 - [x] 分支保持 `codex/round3-remediation`，没有 reset 原有整改历史。
 - [x] 原始 `D:\workSpace\obsidian_repository` 不属于运行写入根，保持只读。
 - [x] `vault/` 与 `ops/` 分别是知识和行动事实源；`.runtime/` 可删除重建。
-- [x] 原生 `ToolLoopAgent` 是唯一活动 `CognitiveRuntime`；Hermes 淘汰且无静默回退。
+- [ ] OpenCode CLI 是唯一活动 `CognitiveRuntime`；原生运行时只保留为非活动迁移回滚，且无静默回退。此项须在 R5 真实验收后确认。
 - [x] Syno 不具备源码、Shell、任意文件、Git、Policy 或 Skill 修改工具。
 
 ## B. 自动验证
@@ -43,12 +43,16 @@ Provider 自动采用门、故障注入与主人真实断网步骤见 `docs/PROV
 - [x] 启动 Web/Worker，验证 Today、本地搜索、审批、提醒和微信/飞书消息通道健康；日历授权与选择在重启后恢复。
 - [x] 检查 `docs/KNOWN-LIMITATIONS.md`；当前没有未完成的发布门槛，剩余条目均为显式运行限制或后续兼容性债务。
 
-## E. 封板
+## E. 历史封板（已被 OpenCode R0–R6 重构重新打开）
 
 - [x] 更新 `docs/FINAL-ACCEPTANCE.md` 为全部必选项通过，并附真实外部证据摘要。
 - [x] 对 `3c2b362` 再次运行完整测试、仓库和 `C:\tmp\syno-fresh-3c2b362`；锁文件离线安装下载 0，Node 150/150、vault 57/57、主/fresh 仓库校验均为 570 项；隔离 4327 端口冷启动通过。最新服务已完成桌面/移动无溢出、焦点恢复、减少动画、Token 不回显与 0 error/0 warning 浏览器复验。
 - [x] 仅精确暂存本 Job 路径并创建本地提交；未使用 `git add -A`。
 - [x] 未自动 Push。Push 或远端发布只能由主人另行明确要求。
+
+上述旧 Provider 封板证据不等于 OpenCode 运行时验收。当前 R5/R6 门槛以
+`docs/TODO-EXECUTION-PLAN.md` 为准；独立 Zen Token、真实跨渠道计数、OpenCode
+重启恢复和旧实现删除尚未完成。
 
 若 C、D 或 E 中任一必选项未完成，保持全局 Goal active，不把“本地功能可用”等同于“最终切换完成”。
 
