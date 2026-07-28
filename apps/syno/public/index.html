@@ -639,7 +639,7 @@
               <option value="create_content_brief">创建 Content Brief</option>
               <option value="create_action">创建行动</option>
               <option value="create_memory_proposal">长期记忆候选</option>
-              <option value="complex_analysis">复杂分析（固定升级 Claude）</option>
+              <option value="complex_analysis">深度分析</option>
             </select>
             <button class="accent-btn" type="submit">发送</button>
           </div>
@@ -657,15 +657,14 @@
         <details id="synoAiSettings" class="setting-detail">
           <summary>AI 服务常用设置</summary>
           <p id="synoProviderHint" class="form-hint" aria-live="polite"></p>
+          <div class="syno-job-actions"><button id="synoOpenCodeRestart" class="ghost-btn" type="button">重启 AI 内核</button></div>
           <details id="synoAdvancedSettings" class="setting-detail is-advanced">
             <summary>高级设置</summary>
             <form id="synoProviderForm" class="syno-stack-form">
-              <label class="visually-hidden">Provider 账户<input type="text" name="username" value="syno-local-provider" autocomplete="username" tabindex="-1" /></label>
-              <label>OpenAI 兼容 Base URL<input id="synoProviderBaseUrl" type="url" required /></label>
-              <label>Token<input id="synoProviderToken" type="password" autocomplete="new-password" required placeholder="保存后不会回显" /></label>
-              <label>固定 Model ID<input id="synoProviderModel" required /></label>
-              <label>上下文长度<input id="synoProviderContext" type="number" min="4096" value="128000" required /></label>
-              <button class="accent-btn" type="submit">安全保存 AI 服务</button>
+              <label class="visually-hidden">OpenCode 账户<input type="text" name="username" value="syno-opencode" autocomplete="username" tabindex="-1" /></label>
+              <label>OpenCode Zen Token<input id="synoOpenCodeToken" type="password" autocomplete="new-password" required placeholder="保存后不会回显" /></label>
+              <p>固定顺序：MiMo v2.5 Free → DeepSeek v4 Flash Free → Laguna S 2.1 Free。仅在连接、限流、超时或契约失败且尚无副作用时切换。</p>
+              <button class="accent-btn" type="submit">安全保存并重启 AI 内核</button>
             </form>
           </details>
         </details>

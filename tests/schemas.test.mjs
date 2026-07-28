@@ -105,6 +105,12 @@ test("artifact contract accepts docx and html kinds", async () => {
   const base = {
     id: "artifact-20260722-abcd1234", path: "local-state://ingest/artifact-20260722-abcd1234",
     created: "2026-07-22T12:00:00.000Z", isolated: true, status: "accepted",
+    sourceDescriptor: {
+      kind: "file", originalFilename: "document.bin", contentSha256: "a".repeat(64),
+      observedAt: "2026-07-22T12:00:00.000Z", capturedAt: "2026-07-22T12:00:00.000Z",
+      captureChannel: "test", sourceTier: "unknown", reliability: "unverified",
+      userSuppliedSource: false, verificationStatus: "unverified",
+    },
   };
   await validateContractRecord("artifact", { ...base, kind: "docx" });
   await validateContractRecord("artifact", { ...base, kind: "html" });

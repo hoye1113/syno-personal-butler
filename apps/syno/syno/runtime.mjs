@@ -1,10 +1,11 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { AgentHost } from "./agent-host.mjs";
 import { ApprovalAdvisor, minimalAdvice } from "./approval-advisor.mjs";
 import { ChannelHub, WebChannelAdapter, WindowsNotificationAdapter } from "./channels.mjs";
+import { ChannelConversationHandler } from "./channel-conversation-handler.mjs";
 import { ClaimEvidenceService } from "./claim-evidence-service.mjs";
 import { NativeCognitiveRuntime } from "./cognitive-runtime.mjs";
 import { ContextManager } from "./context-manager.mjs";
@@ -22,9 +23,14 @@ import { KnowledgeMaintenanceSource } from "./knowledge-maintenance-source.mjs";
 import { KnowledgeProfileService } from "./knowledge-profile-service.mjs";
 import { LearningService } from "./learning-service.mjs";
 import { NotificationStore } from "./notification-store.mjs";
+import { assertOpenCodeServerSecurity, OpenCodeCognitiveRuntime, OpenCodeHttpClient, OpenCodeSessionBindingStore } from "./opencode-cognitive-runtime.mjs";
+import { OpenCodeCredentialStore } from "./opencode-credential-store.mjs";
+import { OpenCodeSupervisor } from "./opencode-supervisor.mjs";
+import { OpenCodeTestSupervisor } from "./opencode-test-supervisor.mjs";
 import { OperationExecutor } from "./operation-executor.mjs";
+import { PendingDecisionStore } from "./pending-decision.mjs";
 import { buildOperationRequest } from "./operation-registry.mjs";
-import { PATHS } from "./paths.mjs";
+import { DEFAULT_WEB_PORT, PATHS } from "./paths.mjs";
 import { PlannerService } from "./planner-service.mjs";
 import { OutputService } from "./output-service.mjs";
 import { ProviderClient } from "./provider-client.mjs";
@@ -34,6 +40,7 @@ import { ReportService } from "./reports.mjs";
 import { SettingsRegistry } from "./settings-registry.mjs";
 import { SignalSourceRegistry } from "./signal-source-registry.mjs";
 import { SynoCore } from "./syno-core.mjs";
+import { SynoToolBridge } from "./syno-tool-bridge.mjs";
 import { ToolLoopAgent } from "./tool-loop-agent.mjs";
 import { ToolLoopExecutor } from "./tool-loop-executor.mjs";
 import { ToolRegistry } from "./tool-registry.mjs";
@@ -42,7 +49,7 @@ import { WeixinIlinkAdapter } from "./weixin-ilink.mjs";
 import { VaultMigrationService } from "./vault-migration-service.mjs";
 import { WindowsServiceManager } from "./windows-service-manager.mjs";
 import { WindowsServiceControl } from "./windows-service-control.mjs";
-import { createWeixinMessageHandler, parseWeixinApproval } from "./weixin-message-handler.mjs";
+import { artifactToIntakePayload, createWeixinMessageHandler, parseWeixinApproval } from "./weixin-message-handler.mjs";
 
 const PUBLIC_COMMAND_INTENTS = Object.freeze({
   search: "search",
@@ -59,11 +66,70 @@ const REPO_FINGERPRINT = createHash("sha256")
   .update(path.resolve(PATHS.repoRoot).toLocaleLowerCase("en-US"), "utf8")
   .digest("hex").slice(0, 16);
 
+const WORKFLOW_FILES = Object.freeze({
+  capture: ["vault/99-System/Agent/ROUTER.md", "vault/99-System/Agent/INGEST-CONTRACT.md", "vault/99-System/Skills/vskill-vault-curate/SKILL.md"],
+  knowledge: ["vault/99-System/Agent/ROUTER.md", "vault/99-System/Skills/vskill-vault-discuss/SKILL.md"],
+  learn: ["vault/99-System/Agent/ROUTER.md"],
+  review: ["vault/99-System/Agent/ROUTER.md"],
+  create: ["vault/99-System/Agent/ROUTER.md", "vault/99-System/Agent/DENSITY-PROFILE.md", "vault/99-System/Skills/vskill-vault-write/SKILL.md"],
+  maintain: ["vault/99-System/Agent/ROUTER.md", "vault/99-System/Skills/vskill-vault-relate/SKILL.md", "vault/99-System/Skills/vskill-vault-moc-builder/SKILL.md"],
+});
+
+async function workflowContext(domain) {
+  const files = WORKFLOW_FILES[domain];
+  if (!files) throw Object.assign(new Error(`未知工作流领域：${domain}`), { code: "WORKFLOW_CONTEXT_DENIED" });
+  const sections = [];
+  for (const relative of files) {
+    const content = await fs.readFile(path.join(PATHS.repoRoot, relative), "utf8");
+    sections.push({ path: relative, content: content.slice(0, 12_000) });
+  }
+  return { domain, authority: "canonical-vault-skills", sections };
+}
+
+async function readKnowledgeSnippet(knowledge, notePath, maxChars = 6_000) {
+  const note = await knowledge.read(notePath);
+  if (/^(?:sensitive|private):\s*(?:true|yes)$/imu.test(note.markdown)
+    || /^privacy:\s*(?:private|sensitive)$/imu.test(note.markdown)) {
+    const error = new Error("该笔记标记为敏感内容，禁止发送给远程模型");
+    error.code = "KNOWLEDGE_SENSITIVE_DENIED";
+    throw error;
+  }
+  const limit = Math.min(8_000, Math.max(200, Number(maxChars) || 6_000));
+  return { path: note.path, title: note.title, snippet: note.markdown.slice(0, limit), truncated: note.markdown.length > limit };
+}
+
+function redactMigrationText(value) {
+  const text = String(value || "");
+  if (/^(?:sensitive|private):\s*(?:true|yes)$/imu.test(text)
+    || /^privacy:\s*(?:private|sensitive)$/imu.test(text)
+    || /\[(?:private|sensitive)\]|私密内容/iu.test(text)) return "";
+  return text
+    .replace(/\b(?:sk|key|token)-[A-Za-z0-9_-]{8,}\b/giu, "[REDACTED_SECRET]")
+    .replace(/\bBearer\s+[A-Za-z0-9._~+\/=-]{8,}\b/giu, "Bearer [REDACTED_SECRET]")
+    .replace(/^.*(?:api[_ -]?key|access[_ -]?token|refresh[_ -]?token|password|secret)\s*[:=].*$/gimu, "[REDACTED_SECRET_LINE]")
+    .trim();
+}
+
+function buildOpenCodeMigrationContext(conversation) {
+  if (!conversation) return "";
+  const summary = redactMigrationText(conversation.summaries?.slice(-1)[0]?.summary || conversation.handoffContext || "");
+  const recent = (conversation.messages || []).filter((message) => message.role === "user").slice(-12)
+    .map((message) => redactMigrationText(message.content))
+    .filter(Boolean)
+    .map((content) => `user: ${content.slice(0, 1_500)}`)
+    .join("\n");
+  return [
+    summary ? `旧对话摘要：\n${summary}` : "",
+    recent ? `最近主人消息：\n${recent}` : "",
+  ].filter(Boolean).join("\n\n").slice(0, 16_000);
+}
+
 function createSynoRuntime(options = {}) {
   const notifications = options.notifications || new NotificationStore();
   const web = new WebChannelAdapter({ notifications });
   const windows = options.windowsChannel || new WindowsNotificationAdapter();
   const jobStore = options.jobStore || new JobStore();
+  const pendingDecisions = options.pendingDecisions || new PendingDecisionStore();
   const knowledge = options.knowledge || new KnowledgeStore();
   const credentials = options.credentials || new ProviderCredentialStore();
   const provider = options.provider || new ProviderClient({ credentials });
@@ -87,16 +153,30 @@ function createSynoRuntime(options = {}) {
   let core;
   const tools = options.tools || new ToolRegistry([
     {
+      name: "workflow.context", description: "读取 Syno canonical 工作流的必要片段", risk: "read", permission: "syno-read", retry: "safe", version: "1",
+      inputSchema: { type: "object", required: ["domain"], properties: { domain: { enum: ["capture", "knowledge", "learn", "review", "create", "maintain"] } }, additionalProperties: false },
+      outputSchema: { type: "object", required: ["domain", "authority", "sections"], properties: { domain: { type: "string" }, authority: { type: "string" }, sections: { type: "array", items: { type: "object" } } } },
+      execute: ({ domain }) => workflowContext(domain),
+    },
+    {
       name: "knowledge.search", description: "搜索 Syno 知识库", risk: "read", permission: "syno-read", retry: "safe", version: "1",
       inputSchema: { type: "object", required: ["query"], properties: { query: { type: "string", minLength: 1 }, limit: { type: "integer", minimum: 1, maximum: 20 } }, additionalProperties: false },
       outputSchema: { type: "array", items: { type: "object" } },
-      execute: ({ query, limit }) => knowledge.search(query, { limit: limit || 8 }),
+      execute: async ({ query, limit }) => (await knowledge.search(query, { limit: limit || 8 }))
+        .filter((item) => item.sensitive !== true)
+        .map(({ sensitive, ...item }) => item),
     },
     {
       name: "knowledge.read", description: "读取搜索结果中的完整知识笔记", risk: "read", permission: "syno-read", retry: "safe", version: "1",
       inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string", minLength: 1 } }, additionalProperties: false },
       outputSchema: { type: "object" },
       execute: ({ path: notePath }) => knowledge.read(notePath),
+    },
+    {
+      name: "knowledge.read_snippet", description: "读取单篇非敏感知识笔记的限长必要片段", risk: "read", permission: "syno-read", retry: "safe", version: "1",
+      inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string", minLength: 1 }, maxChars: { type: "integer", minimum: 200, maximum: 8000 } }, additionalProperties: false },
+      outputSchema: { type: "object", required: ["path", "title", "snippet", "truncated"], properties: { path: { type: "string" }, title: { type: "string" }, snippet: { type: "string" }, truncated: { type: "boolean" } } },
+      execute: ({ path: notePath, maxChars }) => readKnowledgeSnippet(knowledge, notePath, maxChars),
     },
     {
       name: "today.read", description: "读取按目标、承诺和到期复习排序的今日工作台", risk: "read", permission: "syno-read", retry: "safe", version: "1",
@@ -115,6 +195,36 @@ function createSynoRuntime(options = {}) {
       inputSchema: { type: "object", required: ["title"], properties: { title: { type: "string", minLength: 1 }, claims: { type: "array", items: { type: "string" } } }, additionalProperties: false },
       outputSchema: { type: "object", required: ["title", "questions", "evidenceRule"], properties: { title: { type: "string" }, questions: { type: "array", items: { type: "string" } }, evidenceRule: { type: "string" }, claimRefs: { type: "array" } } },
       execute: ({ title, claims }) => outputs.teachBackPrompt({ title, claims }),
+    },
+    {
+      name: "learning.submit", description: "把主人的原始输出提交为待审批的学习证据", risk: "low", permission: "syno-ops", retry: "idempotent", version: "1", approvalBoundary: true,
+      inputSchema: { type: "object", required: ["knowledgeRef", "inputMode", "rawOutput", "rubric", "selfAssessment"], properties: { knowledgeRef: { type: "string", minLength: 1 }, inputMode: { enum: ["teach-back", "typed", "quiz", "practice", "voice"] }, rawOutput: { type: "string", minLength: 20 }, assistedLevel: { enum: ["none", "prompted", "outlined", "heavily-assisted"] }, selfAssessment: { enum: ["solid", "mostly", "shaky", "lost"] }, rubric: { type: "object", required: ["accurate", "explained", "applied", "discriminated"], properties: { accurate: { type: "number", minimum: 0, maximum: 1 }, explained: { type: "number", minimum: 0, maximum: 1 }, applied: { type: "number", minimum: 0, maximum: 1 }, discriminated: { type: "number", minimum: 0, maximum: 1 } }, additionalProperties: false }, misconceptions: { type: "array", items: { type: "string" } }, isReview: { type: "boolean" } }, additionalProperties: false },
+      outputSchema: { type: "object", required: ["id", "status", "requiresApproval"], properties: { id: { type: "string" }, status: { type: "string" }, requiresApproval: { type: "boolean" } } },
+      execute: async (input, context) => {
+        const result = await host.receive(buildOperationRequest("learning.evidence.record", { ...input, producer: "user", assistedLevel: input.assistedLevel || "prompted", isReview: input.isReview === true }), { channel: context.channel, senderId: context.ownerId, messageId: context.conversationId });
+        return { id: result.job.id, status: result.job.status, requiresApproval: result.requiresApproval === true };
+      },
+    },
+    {
+      name: "capture.receive", description: "立即接收待收录内容并返回 Artifact", risk: "low", permission: "syno-ops", retry: "idempotent", version: "1", approvalBoundary: true,
+      inputSchema: { type: "object", required: ["kind", "value"], properties: { kind: { enum: ["url", "text", "markdown", "txt"] }, value: { type: "string", minLength: 1 }, title: { type: "string" }, filename: { type: "string" }, sourceKind: { enum: ["personal", "unknown"] } }, additionalProperties: false },
+      outputSchema: { type: "object", required: ["artifact", "proposalPending"], properties: { artifact: { type: "object" }, proposalPending: { type: "boolean" } } },
+      execute: (input, context) => ingest.receive(input, { ownerId: context.ownerId, channel: context.channel, messageId: context.conversationId }),
+    },
+    {
+      name: "capture.status", description: "读取 Artifact 安全提取与收录方案状态", risk: "read", permission: "syno-read", retry: "safe", version: "1",
+      inputSchema: { type: "object", required: ["artifactId"], properties: { artifactId: { type: "string", minLength: 1 } }, additionalProperties: false },
+      outputSchema: { type: "object", required: ["found"], properties: { found: { type: "boolean" }, item: {} } },
+      execute: async ({ artifactId }) => {
+        const item = await ingest.status(artifactId);
+        return item ? { found: true, item } : { found: false };
+      },
+    },
+    {
+      name: "capture.prepare", description: "为已接收 Artifact 安全提取、查重并形成 IngestProposal", risk: "low", permission: "syno-ops", retry: "idempotent", version: "1", approvalBoundary: true,
+      inputSchema: { type: "object", required: ["artifactId"], properties: { artifactId: { type: "string", minLength: 1 } }, additionalProperties: false },
+      outputSchema: { type: "object", required: ["candidate", "proposal"], properties: { candidate: { type: "object" }, proposal: { type: "object" } } },
+      execute: ({ artifactId }) => ingest.propose(artifactId),
     },
     {
       name: "goals.list", description: "查看主人的活跃目标和项目", risk: "read", permission: "syno-read", retry: "safe", version: "1",
@@ -156,11 +266,14 @@ function createSynoRuntime(options = {}) {
       execute: ({ limit }) => host.list({ limit: limit || 20 }),
     },
     {
-      name: "jobs.submit", description: "提交需经 Policy 和审批的行动、记忆候选或报告 Job", risk: "low", permission: "syno-ops", retry: "idempotent", version: "1", approvalBoundary: true,
-      inputSchema: { type: "object", required: ["mode", "text"], properties: { mode: { enum: ["action", "memory", "report", "output"] }, text: { type: "string", minLength: 1 }, reason: { type: "string" } }, additionalProperties: false },
+      name: "jobs.submit", description: "提交需经 Policy 和审批的收录、行动、记忆候选或报告 Job", risk: "low", permission: "syno-ops", retry: "idempotent", version: "1", approvalBoundary: true,
+      inputSchema: { type: "object", required: ["mode"], properties: { mode: { enum: ["ingest", "action", "memory", "report", "output"] }, text: { type: "string", minLength: 1 }, reason: { type: "string" }, artifactId: { type: "string", minLength: 1 }, decision: { type: "object", required: ["action"], properties: { action: { enum: ["create", "reject", "append-source", "link-only"] } }, additionalProperties: false } }, additionalProperties: false },
       outputSchema: { type: "object", required: ["id", "status", "requiresApproval"], properties: { id: { type: "string" }, status: { type: "string" }, requiresApproval: { type: "boolean" }, approval: {} } },
-      execute: async ({ mode, text, reason }, context) => {
+      execute: async ({ mode, text, reason, artifactId, decision }, context) => {
+        if (mode === "ingest" && (!artifactId || !decision)) throw Object.assign(new Error("收录 Job 需要 artifactId 和 decision"), { code: "TOOL_INPUT_INVALID" });
+        if (mode !== "ingest" && !text) throw Object.assign(new Error(`${mode} Job 需要 text`), { code: "TOOL_INPUT_INVALID" });
         const requests = {
+          ingest: () => buildOperationRequest("ingest.apply", { artifactId, decision }),
           action: () => buildOperationRequest("actions.create", { title: text }),
           memory: () => buildOperationRequest("memory.proposals.create", { statement: text, reason }),
           report: () => buildOperationRequest("reports.create", { kind: text }),
@@ -192,7 +305,61 @@ function createSynoRuntime(options = {}) {
     ...(options.contextThresholds ? { thresholds: options.contextThresholds } : {}),
   });
   const agent = options.agent || new ToolLoopAgent({ provider, tools, conversations, contextManager });
-  const cognitiveRuntime = options.cognitiveRuntime || new NativeCognitiveRuntime({ agent, tools });
+  const nativeCognitiveRuntime = new NativeCognitiveRuntime({ agent, tools });
+  const openCodeCredentials = options.openCodeCredentials || new OpenCodeCredentialStore();
+  const bridgeToken = options.bridgeToken || randomBytes(32).toString("base64url");
+  const toolBridge = options.toolBridge || new SynoToolBridge({
+    tools,
+    token: bridgeToken,
+    onResult: async ({ tool, result, ownerKey, threadKey }) => {
+      if (!result?.requiresApproval || !result.id) return;
+      const job = await jobStore.get(result.id);
+      if (!job) return;
+      const request = await jobStore.loadRequest(job).catch(() => ({}));
+      await pendingDecisions.add({
+        jobId: job.id,
+        ownerKey,
+        threadKey,
+        kind: job.approval === "double" || job.risk === "high" ? "double" : "single",
+        phase: job.phase || "execution",
+        summary: `${tool.description}：${job.id}`,
+        options: job.changedPaths || [],
+        diffDigest: job.result?.diffHash,
+        approvalCode: job.approvalCode,
+        artifactId: request.artifactId,
+      });
+    },
+  });
+  const fakeOpenCode = process.env.NODE_ENV === "test" && process.env.SYNO_OPENCODE_FAKE_SERVER === "true";
+  const openCodeSupervisor = options.openCodeSupervisor || (fakeOpenCode
+    ? new OpenCodeTestSupervisor({ port: Number(process.env.SYNO_OPENCODE_TEST_PORT || 4318) })
+    : new OpenCodeSupervisor({
+    repoRoot: PATHS.repoRoot,
+    tokenLoader: async () => {
+      const status = await openCodeCredentials.status();
+      return status.configured ? openCodeCredentials.loadToken() : "";
+    },
+    bridgeOrigin: `http://127.0.0.1:${Number(process.env.PORT || DEFAULT_WEB_PORT)}/api/syno/opencode/mcp`,
+    bridgeToken,
+  }));
+  const openCodeClient = options.openCodeClient || new OpenCodeHttpClient({
+    credentials: async () => openCodeSupervisor.connection(),
+  });
+  const openCodeBindings = options.openCodeBindings || new OpenCodeSessionBindingStore();
+  const openCodeCognitiveRuntime = options.openCodeCognitiveRuntime || new OpenCodeCognitiveRuntime({
+    client: openCodeClient,
+    bindings: openCodeBindings,
+    tools: toolBridge,
+    migrationLoader: async ({ ownerKey, threadKey }) => {
+      const conversationId = await conversationRouter.resolve({ ownerKey, threadKey });
+      const conversation = await conversations.get(conversationId).catch(() => null);
+      if (!conversation) return null;
+      const text = buildOpenCodeMigrationContext(conversation);
+      return text.trim() ? { conversationId, text } : { conversationId };
+    },
+  });
+  const runtimeMode = options.cognitiveRuntime ? "injected-test" : "opencode";
+  const cognitiveRuntime = options.cognitiveRuntime || openCodeCognitiveRuntime;
   const baseExecutor = options.executor || new ToolLoopExecutor({ runtime: cognitiveRuntime, conversations, conversationRouter });
   let reports;
   const executor = new OperationExecutor({
@@ -256,34 +423,51 @@ function createSynoRuntime(options = {}) {
   });
   const channelCore = {
     execute: (...args) => core.execute(...args),
+    inspect: (...args) => core.inspect(...args),
     approve: (...args) => core.approve(...args),
+    reject: (...args) => core.reject(...args),
+    requestModification: (...args) => core.requestModification(...args),
   };
-  const weixin = options.weixin || new WeixinIlinkAdapter({ onMessage: createWeixinMessageHandler({ core: channelCore, ingest, conversationRouter }) });
+  const channelConversationHandler = options.channelConversationHandler || new ChannelConversationHandler({
+    runtime: cognitiveRuntime,
+    core: channelCore,
+    ingest,
+    pendingDecisions,
+    attachmentToPayload: (artifact) => artifactToIntakePayload(artifact),
+  });
+  const weixin = options.weixin || new WeixinIlinkAdapter({
+    onMessage: (message) => channelConversationHandler.handle({ ...message, ownerKey: "local-user", threadKey: "main", channel: "weixin" }),
+  });
   const feishu = options.feishu || new FeishuChannelAdapter({
-    onMessage: async (message) => {
-      const trimmed = String(message.text || "").trim();
-      if (/^https?:\/\/\S+$/i.test(trimmed)) {
-        const receipt = await ingest.receive({ kind: "url", value: trimmed }, { channel: "feishu", ownerId: message.senderId });
-        ingest.propose(receipt.artifact.id).catch(() => {});
-        return { text: `已接收 Artifact ${receipt.artifact.id}，正在生成收录方案。` };
-      }
-      const conversationId = await conversationRouter.resolve({ ownerKey: "local-user" });
-      const result = await core.execute({ text: trimmed }, { channel: "feishu", senderId: message.senderId, messageId: message.id, conversationId });
-      return { text: result.error?.message || result.job?.result?.text || `任务 ${result.job?.id || ""} 已记录` };
-    },
+    onMessage: (message) => channelConversationHandler.handle({ ...message, ownerKey: "local-user", threadKey: "main", channel: "feishu" }),
   });
   const channels = options.channels || new ChannelHub({ web, windows, weixin, feishu });
   reports = new ReportService({ host, knowledge, notifications, channels, gitGuard });
   const today = options.today || new TodayService({ goals, learning, host, settingsRegistry, signalSources, planner });
   core = new SynoCore({ host, knowledge, notifications, channels, reports, today });
-  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, settingsRegistry, signalSources, maintenance: knowledgeMaintenance });
+  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance: knowledgeMaintenance });
   const approvalAdvisor = options.approvalAdvisor || new ApprovalAdvisor({ provider, ingest });
   let channelRecoveryTimer = null;
+  let providerRecoveryTimer = null;
+  async function startOpenCodeSecurely({ restart = false } = {}) {
+    const status = restart
+      ? await openCodeSupervisor.restart()
+      : await openCodeSupervisor.start();
+    try {
+      assertOpenCodeServerSecurity(await openCodeClient.securityStatus({ repoRoot: PATHS.repoRoot }));
+      return status;
+    } catch (error) {
+      await openCodeSupervisor.stop().catch(() => {});
+      throw error;
+    }
+  }
 
   return {
     core,
     host,
     jobStore,
+    pendingDecisions,
+    channelConversationHandler,
     approvalAdvisor,
     knowledge,
     intake: sourceIntake,
@@ -310,9 +494,17 @@ function createSynoRuntime(options = {}) {
     tools,
     agent,
     cognitiveRuntime,
+    runtimeMode,
+    nativeCognitiveRuntime,
+    openCodeCognitiveRuntime,
+    openCodeSupervisor,
+    openCodeCredentials,
+    openCodeBindings,
+    toolBridge,
     contextManager,
     settingsRegistry,
     windowsService,
+    restartOpenCode: () => startOpenCodeSecurely({ restart: true }),
     developmentMode: options.developmentMode === true || process.env.SYNO_DEVELOPMENT_MODE === "true",
     async initialize({ worker = false } = {}) {
       await Promise.all([
@@ -321,12 +513,20 @@ function createSynoRuntime(options = {}) {
         fs.mkdir(PATHS.stateRoot, { recursive: true }),
       ]);
       await host.recover();
+      if (runtimeMode === "opencode") {
+        try {
+          await startOpenCodeSecurely();
+        } catch (error) {
+          console.error("[syno] OpenCode 未就绪，LLM Job 将等待 Provider:", String(error?.message || error));
+        }
+      }
       // 渠道启动不阻塞 Web API：微信/飞书离线或握手超时降级运行，
       // channelRecoveryTimer（worker 模式）会周期重试，不应让 synoReady 永远 pending。
       channels.start().catch((error) => console.error("[syno] channels.start 降级运行，渠道将后台重试:", String(error?.message || error)));
       if (worker) {
         proactive.start().catch((error) => console.error("[syno] proactive.start 降级:", String(error?.message || error)));
         channelRecoveryTimer = setInterval(() => Promise.allSettled([weixin.start(), feishu.start()]), 60_000);
+        providerRecoveryTimer = setInterval(() => host.retryWaitingProvider().catch(() => {}), 60_000);
       }
       return core.snapshot();
     },
@@ -334,7 +534,10 @@ function createSynoRuntime(options = {}) {
       proactive.stop();
       if (channelRecoveryTimer) clearInterval(channelRecoveryTimer);
       channelRecoveryTimer = null;
+      if (providerRecoveryTimer) clearInterval(providerRecoveryTimer);
+      providerRecoveryTimer = null;
       await channels.stop();
+      await openCodeSupervisor.stop().catch(() => {});
     },
   };
 }
@@ -353,6 +556,27 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "GET" && url.pathname === "/api/syno/context/stats") {
     // 压缩遥测（OBS 3.1）：只读聚合视图，不含凭证。
     return typeof runtime.contextManager?.stats === "function" ? runtime.contextManager.stats() : { ok: false, reason: "context-manager-unavailable" };
+  }
+  if (method === "POST" && url.pathname === "/api/syno/opencode/mcp") {
+    return runtime.toolBridge.handle({ authorization: req.headers?.authorization, body: await readBody(req) });
+  }
+  if (method === "GET" && url.pathname === "/api/syno/opencode") {
+    return {
+      runtimeMode: runtime.runtimeMode,
+      supervisor: await runtime.openCodeSupervisor.health(),
+      credential: await runtime.openCodeCredentials.status(),
+      capabilities: runtime.openCodeCognitiveRuntime.capabilities(),
+      cognitive: { lastAttempts: runtime.openCodeCognitiveRuntime.lastAttempts || [] },
+    };
+  }
+  if (method === "POST" && url.pathname === "/api/syno/opencode/restart") {
+    return runtime.restartOpenCode();
+  }
+  if (method === "POST" && url.pathname === "/api/syno/opencode/credential") {
+    const body = await readBody(req);
+    const status = await runtime.openCodeCredentials.save(body.token);
+    await runtime.restartOpenCode();
+    return status;
   }
   if (method === "GET" && url.pathname === "/api/syno/windows-service") return runtime.windowsService.status();
   if (method === "POST" && url.pathname === "/api/syno/windows-service/install") return runtime.windowsService.mutate("install", webContext);
@@ -498,4 +722,4 @@ async function routeSynoApi(runtime, req, url, readBody) {
   throw error;
 }
 
-export { PUBLIC_COMMAND_INTENTS, createSynoRuntime, createWeixinMessageHandler, parseWeixinApproval, routeSynoApi };
+export { PUBLIC_COMMAND_INTENTS, buildOpenCodeMigrationContext, createSynoRuntime, createWeixinMessageHandler, parseWeixinApproval, redactMigrationText, routeSynoApi };

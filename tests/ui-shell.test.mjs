@@ -108,10 +108,11 @@ test("paper-cut guardian is layered and reduced-motion safe", async () => {
   assert.match(css, /:focus-visible/);
 });
 
-test("Provider secret form exposes username semantics without exposing a real identity", async () => {
+test("OpenCode secret form exposes username semantics without exposing a real identity", async () => {
   const html = await fs.readFile(path.join(root, "apps", "syno", "public", "index.html"), "utf8");
-  assert.match(html, /name="username" value="syno-local-provider" autocomplete="username"/);
-  assert.match(html, /id="synoProviderToken" type="password"/);
+  assert.match(html, /name="username" value="syno-opencode" autocomplete="username"/);
+  assert.match(html, /id="synoOpenCodeToken" type="password"/);
+  assert.doesNotMatch(html, /id="synoProviderBaseUrl"|id="synoProviderModel"/);
 });
 
 test("closed work drawer is inert and restores a bounded modal focus loop when opened", async () => {

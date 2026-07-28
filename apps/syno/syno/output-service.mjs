@@ -5,6 +5,8 @@ import path from "node:path";
 import { parseRecord, writeRecord } from "./markdown-record.mjs";
 import { PATHS } from "./paths.mjs";
 import { isActionableOutput, outputTransition, presentOutputOpportunity } from "./output-lifecycle.mjs";
+import { validateContractRecord } from "./schema-registry.mjs";
+import { buildSourceDescriptor } from "./source-descriptor.mjs";
 
 class OutputService {
   constructor({ opsRoot = PATHS.opsRoot, clock = () => new Date() } = {}) { this.opsRoot = opsRoot; this.clock = clock; }
@@ -68,7 +70,17 @@ class OutputService {
       const artifactId = `artifact-${now.slice(0, 10).replaceAll("-", "")}-${randomUUID().slice(0, 8)}`;
       const artifactFile = path.join(opsRoot, "artifacts", "output", `${artifactId}.md`);
       userArtifactRef = path.relative(path.dirname(opsRoot), artifactFile).replace(/\\/g, "/");
-      const artifact = { id: artifactId, kind: "text", path: userArtifactRef, created: now, isolated: false, status: "accepted", size: Buffer.byteLength(userOutput), ownerId: "local-user", content: userOutput, purpose: "creative-output" };
+      const artifact = {
+        id: artifactId, kind: "text", path: userArtifactRef, created: now, isolated: false,
+        status: "accepted", size: Buffer.byteLength(userOutput), ownerId: "local-user",
+        content: userOutput, purpose: "creative-output",
+        sourceDescriptor: buildSourceDescriptor({
+          payload: { kind: "text", value: userOutput, sourceKind: "personal" },
+          channel: "create",
+          now,
+        }),
+      };
+      await validateContractRecord("artifact", artifact);
       await writeRecord(artifactFile, artifact, { schema: "artifact", title: `User output artifact ${artifactId}`, summaryKeys: ["id", "kind", "path", "created", "status", "size", "purpose"] });
       changedPaths.push(path.relative(path.dirname(opsRoot), artifactFile).replace(/\\/g, "/"));
     }

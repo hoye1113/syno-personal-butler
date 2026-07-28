@@ -75,7 +75,8 @@ class PlannerService {
     const dueReviews = await this.learning.due({ opsRoot, now, limit: 20 });
     const pendingIngest = this.ingest ? await this.ingest.pending({ limit: 20 }) : [];
     const maintenanceFindings = this.maintenance ? await this.maintenance.inspect({ limit: 10 }) : [];
-    const searchable = notes.filter((n) => n.searchable);
+    const sensitiveRefs = new Set(notes.filter((note) => note.sensitive).map((note) => note.path));
+    const searchable = notes.filter((note) => note.searchable && !note.sensitive);
     const learningStates = await this.learning.listStates({ opsRoot });
     const coveredRefs = new Set(learningStates.map((s) => String(s.knowledgeRef || "")));
 
@@ -87,7 +88,7 @@ class PlannerService {
     for (const state of dueReviews) {
       if (items.length >= this.capacity) break;
       const ref = String(state.knowledgeRef || "");
-      if (!ref || usedRefs.has(ref)) continue;
+      if (!ref || usedRefs.has(ref) || sensitiveRefs.has(ref)) continue;
       usedRefs.add(ref);
       items.push(actionDate(
         "review",
@@ -157,8 +158,9 @@ class PlannerService {
     }
 
     // 5. 维护建议（每日最多 1 个）
-    if (items.length < this.capacity && maintenanceFindings.length > 0) {
-      const finding = maintenanceFindings[0];
+    const publicMaintenance = maintenanceFindings.filter((finding) => !sensitiveRefs.has(finding.path));
+    if (items.length < this.capacity && publicMaintenance.length > 0) {
+      const finding = publicMaintenance[0];
       items.push(actionDate(
         "maintenance",
         `维护：${finding.path}`,

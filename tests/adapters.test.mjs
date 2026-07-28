@@ -10,7 +10,7 @@ import { ChannelHub, FakeChannelAdapter } from "../apps/syno/syno/channels.mjs";
 import { FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, renderRegistrationQr, SILENT_SDK_LOGGER, validateRegistrationUrl } from "../apps/syno/syno/feishu-channel.mjs";
 import { ProcessFileLock } from "../apps/syno/syno/process-lock.mjs";
 import { createWeixinMessageHandler, parseWeixinApproval } from "../apps/syno/syno/runtime.mjs";
-import { LocalCredentialStore, LocalProcessLock, normalizeInbound, parseAttachmentKey, readLimitedBody, renderLoginQr, resolveAttachmentUrl, sniffMime, validateIlinkBaseUrl, validateLoginQrUrl, WeixinIlinkAdapter, WeixinIlinkClient } from "../apps/syno/syno/weixin-ilink.mjs";
+import { isDirectMessage, isGroupMessage, LocalCredentialStore, LocalProcessLock, normalizeInbound, parseAttachmentKey, readLimitedBody, renderLoginQr, resolveAttachmentUrl, sniffMime, validateIlinkBaseUrl, validateLoginQrUrl, WeixinIlinkAdapter, WeixinIlinkClient } from "../apps/syno/syno/weixin-ilink.mjs";
 
 async function removeTemp(root) {
   await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
@@ -72,6 +72,16 @@ test("Weixin Adapter normalizes text/voice and keeps login behind a seam", async
   assert.equal(saved.ownerId, "owner");
   assert.throws(() => validateIlinkBaseUrl("https://attacker.example/api"), /官方域名/);
   assert.throws(() => validateLoginQrUrl("https://attacker.example/qr"), /官方域名/);
+});
+
+test("Weixin rejects common group-message markers before Owner approval routing", () => {
+  assert.equal(isGroupMessage({ chat_type: "group" }), true);
+  assert.equal(isGroupMessage({ conversation_type: 2 }), true);
+  assert.equal(isGroupMessage({ room_id: "room-1" }), true);
+  assert.equal(isGroupMessage({ chat_type: "single", from_user_id: "owner" }), false);
+  assert.equal(isDirectMessage({ message_type: 1, chat_type: "single", from_user_id: "owner", context_token: "context" }), true);
+  assert.equal(isDirectMessage({ message_type: 1, chat_type: "group", from_user_id: "owner", context_token: "context" }), false);
+  assert.equal(isDirectMessage({ message_type: 1, from_user_id: "owner" }), false);
 });
 
 test("Weixin login URL renders to an in-memory PNG data URL", async () => {

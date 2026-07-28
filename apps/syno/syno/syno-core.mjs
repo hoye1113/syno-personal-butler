@@ -22,8 +22,10 @@ class SynoCore {
   search(query, options) { return this.knowledge.search(query, options); }
   read(path) { return this.knowledge.read(path); }
   rebuildIndex() { return this.knowledge.rebuild(); }
+  inspect(id) { return this.host.inspect(id); }
   approve(id, approval) { return this.host.approve(id, approval); }
   reject(id, reason) { return this.host.reject(id, reason); }
+  requestModification(id, modification) { return this.host.requestModification(id, modification); }
   cancel(id) { return this.host.cancel(id); }
   report(kind, context = {}) {
     return this.host.receive(buildOperationRequest("reports.create", { kind }, { text: `生成 ${kind} 报告` }), context);

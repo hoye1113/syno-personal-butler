@@ -10,7 +10,7 @@ import { buildClaudeArgs, runProcess } from "../apps/syno/syno/executors.mjs";
 import { assertJsonMutation, assertSameOriginMutation, securityHeaders } from "../apps/syno/syno/http-security.mjs";
 import { assertRegisteredOperation, buildOperationRequest } from "../apps/syno/syno/operation-registry.mjs";
 import { OutputService } from "../apps/syno/syno/output-service.mjs";
-import { routeSynoApi } from "../apps/syno/syno/runtime.mjs";
+import { buildOpenCodeMigrationContext, routeSynoApi } from "../apps/syno/syno/runtime.mjs";
 import { ConversationStore } from "../apps/syno/syno/conversation-store.mjs";
 import { validateValue } from "../apps/syno/syno/settings-registry.mjs";
 import { backupState, restoreState, verifyArchive } from "../apps/syno/syno/state-archive.mjs";
@@ -19,6 +19,22 @@ import { isPrivateAddress } from "../apps/syno/syno/source-fetcher.mjs";
 import { frontmatterData } from "../apps/syno/syno/validator.mjs";
 
 const execFileAsync = promisify(execFile);
+
+test("legacy conversation migration excludes tool output, private turns, and secrets", () => {
+  const migrated = buildOpenCodeMigrationContext({
+    summaries: [{ summary: "此前讨论 Agent；api_key = super-secret-value" }],
+    messages: [
+      { role: "tool", content: "完整本地知识正文不应外发" },
+      { role: "assistant", content: "工具返回：本地绝密资料" },
+      { role: "user", content: "继续讨论 Tool Loop" },
+      { role: "user", content: "privacy: private\n这是私密内容" },
+      { role: "user", content: "Authorization: Bearer abcdefghijklmnop" },
+    ],
+  });
+  assert.match(migrated, /继续讨论 Tool Loop/);
+  assert.doesNotMatch(migrated, /完整本地知识|本地绝密|这是私密内容|super-secret-value|abcdefghijklmnop/);
+  assert.match(migrated, /REDACTED_SECRET/);
+});
 
 test("public Job API rejects Policy fields and maps only server-owned modes", async () => {
   const calls = [];
@@ -139,6 +155,35 @@ test("Windows service Web API exposes only fixed status, install and uninstall a
   await routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/windows-service/uninstall"), readBody);
   assert.deepEqual(calls, [["status"], ["mutate", "install", "web", "local-user"], ["mutate", "uninstall", "web", "local-user"]]);
   await assert.rejects(routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/windows-service/restart"), readBody), /未知 Syno API/);
+});
+
+test("OpenCode Web API exposes redacted status, fixed restart, credential save, and authenticated MCP only", async () => {
+  const calls = [];
+  const runtime = {
+    runtimeMode: "opencode",
+    openCodeSupervisor: {
+      async health() { return { healthy: true, state: "running", pid: 42 }; },
+    },
+    async restartOpenCode() { calls.push("restart"); return { state: "running" }; },
+    openCodeCredentials: {
+      async status() { return { configured: true, provider: "opencode" }; },
+      async save(token) { calls.push(["save", token]); return { configured: true, provider: "opencode" }; },
+    },
+    openCodeCognitiveRuntime: {
+      lastAttempts: [{ modelId: "opencode/mimo-v2.5-free", status: "completed" }],
+      capabilities() { return { version: 2, adapter: "opencode-cli-server" }; },
+    },
+    toolBridge: {
+      async handle(input) { calls.push(["mcp", input.authorization]); return { jsonrpc: "2.0", id: 1, result: {} }; },
+    },
+  };
+  const status = await routeSynoApi(runtime, { method: "GET" }, new URL("http://localhost/api/syno/opencode"), async () => ({}));
+  assert.equal(status.credential.configured, true);
+  assert.equal(Object.hasOwn(status.credential, "token"), false);
+  await routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/opencode/restart"), async () => ({}));
+  await routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/opencode/credential"), async () => ({ token: "secret-from-test" }));
+  await routeSynoApi(runtime, { method: "POST", headers: { authorization: "Bearer bridge" } }, new URL("http://localhost/api/syno/opencode/mcp"), async () => ({ jsonrpc: "2.0", id: 1, method: "ping" }));
+  assert.deepEqual(calls, ["restart", ["save", "secret-from-test"], "restart", ["mcp", "Bearer bridge"]]);
 });
 
 test("Syno health identifies the product, protocol and exact repository without exposing its path", async () => {

@@ -315,6 +315,25 @@ function messageKey(message) {
   return String(message.message_id || message.client_id || `${message.from_user_id}:${message.seq}:${message.create_time_ms}`);
 }
 
+function isGroupMessage(message) {
+  const type = String(message.chat_type || message.conversation_type || message.scene || "").toLocaleLowerCase("en-US");
+  return Boolean(
+    message.group_id
+    || message.room_id
+    || message.chatroom_id
+    || ["group", "groupchat", "chatroom", "2"].includes(type),
+  );
+}
+
+function isDirectMessage(message) {
+  if (isGroupMessage(message)) return false;
+  const type = String(message.chat_type || message.conversation_type || message.scene || "").toLocaleLowerCase("en-US");
+  if (type && !["single", "p2p", "direct", "1"].includes(type)) return false;
+  return Number(message.message_type || 1) === 1
+    && Boolean(message.from_user_id)
+    && Boolean(message.context_token);
+}
+
 function normalizeInbound(message) {
   const items = message.item_list || [];
   const text = items.filter((item) => item.type === 1).map((item) => item.text_item?.text || "").join("\n").trim();
@@ -477,6 +496,7 @@ class WeixinIlinkAdapter {
 
   async handleInbound(raw) {
     if (raw.message_type && raw.message_type !== 1) return;
+    if (!isDirectMessage(raw)) return;
     const message = normalizeInbound(raw);
     if (this.seen.has(message.id)) return;
 
@@ -506,7 +526,7 @@ class WeixinIlinkAdapter {
       try { artifacts.push(await this.#quarantine(item)); } catch (error) { artifacts.push({ rejected: true, reason: error.message }); }
     }
     if (!message.text && !artifacts.length) { await this.#markProcessed(message.id); return; }
-    const response = await this.onMessage({ channel: "weixin", ...message, artifacts });
+    const response = await this.onMessage({ channel: "weixin", ...message, artifacts, privateConversation: true });
     const delivery = await this.send({ toUserId: message.senderId, contextToken: message.contextToken, text: response?.text || response?.job?.result?.text || "任务已记录，请在 Syno 查看状态。" });
     if (!delivery.delivered) throw new Error(`微信回复未送达：${delivery.reason || "unknown"}`);
     await this.#markProcessed(message.id);
@@ -568,6 +588,8 @@ export {
   WeixinIlinkAdapter,
   WeixinIlinkClient,
   fetchJson,
+  isDirectMessage,
+  isGroupMessage,
   normalizeInbound,
   parseAttachmentKey,
   readLimitedBody,

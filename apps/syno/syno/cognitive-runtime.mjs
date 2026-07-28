@@ -12,7 +12,22 @@ function capabilityError(message) {
 }
 
 function assertCognitiveCapabilities(report, { expectedTools } = {}) {
-  if (!report || report.version !== 1 || report.agentCount !== 1) throw capabilityError("CognitiveRuntime 必须声明单一 Agent 的 v1 能力清单");
+  if (!report || ![1, 2].includes(report.version) || report.agentCount !== 1) throw capabilityError("CognitiveRuntime 必须声明单一 Agent 的受支持能力清单");
+  if (report.version === 2) {
+    for (const name of ["agentSelectableModel", "providerFallback", "directFileAccess", "terminal", "sourceWrite", "dynamicMcp"]) {
+      if (report[name] !== false) throw capabilityError(`CognitiveRuntime v2 禁止能力未关闭：${name}`);
+    }
+    if (report.adapter !== "opencode-cli-server" || report.provider !== "opencode") throw capabilityError("CognitiveRuntime v2 必须使用受控 OpenCode CLI Server Adapter");
+    if (!Array.isArray(report.models) || !report.models.length || report.models.some((model) => !String(model).startsWith("opencode/"))) {
+      throw capabilityError("CognitiveRuntime v2 模型链无效");
+    }
+    const tools = [...new Set((report.tools || []).map(String))].sort();
+    if (expectedTools) {
+      const expected = [...new Set(expectedTools.map(String))].sort();
+      if (JSON.stringify(tools) !== JSON.stringify(expected)) throw capabilityError(`CognitiveRuntime 工具清单不匹配：${tools.join(", ")}`);
+    }
+    return Object.freeze({ ...report, models: Object.freeze([...report.models]), tools: Object.freeze(tools) });
+  }
   for (const name of FORBIDDEN_CAPABILITIES) {
     if (report[name] !== false) throw capabilityError(`CognitiveRuntime 禁止能力未关闭：${name}`);
   }

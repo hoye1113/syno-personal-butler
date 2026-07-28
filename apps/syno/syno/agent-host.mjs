@@ -42,6 +42,8 @@ class AgentHost {
       decision,
       channel: context.channel || "web",
       senderId: context.senderId || "local-user",
+      ownerKey: context.ownerKey || "local-user",
+      threadKey: context.threadKey || "main",
       conversationId: context.conversationId || "",
       requestKey: context.messageId ? `${context.channel || "web"}:${context.senderId || "local-user"}:${context.messageId}` : "",
     });
@@ -88,6 +90,13 @@ class AgentHost {
     return { job };
   }
 
+  async requestModification(jobId, modification) {
+    const job = await this.#withJobLock(jobId, async () =>
+      this.store.requestModification(await this.#requiredJob(jobId), modification));
+    await this.#commitSystemRecords(job, `syno: request modification ${job.id}`);
+    return { job };
+  }
+
   async cancel(jobId) {
     const job = await this.#withJobLock(jobId, async () => {
       const current = await this.#requiredJob(jobId);
@@ -105,9 +114,29 @@ class AgentHost {
   }
 
   async retry(jobId) {
-    const job = await this.#requiredJob(jobId);
-    if (job.status !== "waiting_provider") throw new Error("Job 当前不等待 Provider 重试");
-    return this.#execute(job);
+    const job = await this.#withJobLock(jobId, async () => {
+      const current = await this.#requiredJob(jobId);
+      if (current.status !== "waiting_provider") throw new Error("Job 当前不等待 Provider 重试");
+      await this.store.transition(current, "running");
+      return current;
+    });
+    return this.#execute(job, { alreadyRunning: true });
+  }
+
+  async retryWaitingProvider({ limit = 50, now = new Date() } = {}) {
+    const waiting = (await this.store.list({ limit: Math.max(limit, 100) }))
+      .filter((job) => job.status === "waiting_provider"
+        && (!job.nextRetryAt || new Date(job.nextRetryAt) <= now))
+      .slice(0, limit);
+    const results = [];
+    for (const job of waiting) {
+      try {
+        results.push({ jobId: job.id, result: await this.retry(job.id) });
+      } catch (error) {
+        results.push({ jobId: job.id, error: { code: error.code || "PROVIDER_RETRY_FAILED", message: error.message } });
+      }
+    }
+    return results;
   }
 
   async #execute(job, { alreadyRunning = false } = {}) {

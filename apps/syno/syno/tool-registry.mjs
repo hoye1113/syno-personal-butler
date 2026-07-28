@@ -31,7 +31,7 @@ class ToolRegistry {
     return tool;
   }
 
-  async execute(name, input, context = {}) {
+  validateInput(name, input) {
     const tool = this.resolve(name);
     const errors = [];
     validateValue(input, tool.inputSchema, "$", errors);
@@ -40,6 +40,11 @@ class ToolRegistry {
       error.code = "TOOL_INPUT_INVALID";
       throw error;
     }
+    return tool;
+  }
+
+  async execute(name, input, context = {}) {
+    const tool = this.validateInput(name, input);
     const approvedBoundary = tool.approvalBoundary === true && context.allowJobSubmission === true;
     const adjustableBoundary = tool.agentAdjustableBoundary === true && context.allowAgentSettings === true;
     if (tool.risk !== "read" && !context.allowWrites && !approvedBoundary && !adjustableBoundary) {

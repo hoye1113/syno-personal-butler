@@ -256,6 +256,35 @@ test("ProactiveOrchestrator drives the single Agent but keeps local fallback and
   assert.equal(isQuietTime(new Date("2026-07-20T23:30:00+08:00"), { start: "23:00", end: "07:00" }), true);
 });
 
+test("ProactiveOrchestrator uses a separate OpenCode proactive session and appends the result to main", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-proactive-opencode-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const calls = [];
+  const cognitiveRuntime = {
+    async run(request, context) {
+      calls.push(["run", request.intent, context.ownerKey, context.threadKey, context.messageId]);
+      return { text: "先复习 Tool Bridge" };
+    },
+    async appendSystemEvent(event) {
+      calls.push(["append", event.ownerKey, event.threadKey, event.text]);
+    },
+  };
+  const proactive = new ProactiveOrchestrator({
+    host: { async receive() { throw new Error("must use CognitiveRuntime directly"); } },
+    cognitiveRuntime,
+    today: { async snapshot() { return { priorities: [{ title: "复习 Tool Bridge" }] }; } },
+    channels: { async send() { return { web: { delivered: true } }; } },
+    signalEngine: new SignalEngine({ schedule: { morningHour: 8, eveningHour: 20, weeklyDay: 0, maxDailyNotifications: 1 } }),
+    stateFile: path.join(root, "state.json"),
+    quietHours: { start: "23:00", end: "07:00" },
+  });
+  const delivered = await proactive.tick({ now: new Date("2026-07-20T08:30:00+08:00") });
+  assert.equal(delivered[0].localFallback, false);
+  assert.deepEqual(calls[0].slice(0, 4), ["run", "chat", "local-user", "proactive"]);
+  assert.deepEqual(calls[1].slice(0, 3), ["append", "local-user", "main"]);
+  assert.match(calls[1][3], /先复习 Tool Bridge/);
+});
+
 test("ProactiveOrchestrator weekly signal calls maintenance.weeklySummary and targets all channels", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-proactive-weekly-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));

@@ -5,6 +5,8 @@ import path from "node:path";
 import { IntakeService } from "./intake.mjs";
 import { parseRecord, writeRecord } from "./markdown-record.mjs";
 import { PATHS } from "./paths.mjs";
+import { validateContractRecord } from "./schema-registry.mjs";
+import { buildSourceDescriptor } from "./source-descriptor.mjs";
 
 function slug(value) {
   return String(value || "capture").toLocaleLowerCase("zh-CN").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 60) || "capture";
@@ -33,24 +35,29 @@ class IngestService {
     this.intake = intake; this.knowledge = knowledge; this.opsRoot = opsRoot; this.stateRoot = stateRoot; this.clock = clock;
   }
 
-  async receive(payload, { ownerId = "local-user", channel = "web" } = {}) {
+  async receive(payload, { ownerId = "local-user", channel = "web", messageId = "" } = {}) {
     const now = this.clock().toISOString();
     const id = `artifact-${now.slice(0, 10).replaceAll("-", "")}-${randomUUID().slice(0, 8)}`;
     const serialized = JSON.stringify(payload);
+    const sourceDescriptor = buildSourceDescriptor({ payload, channel, messageId, now });
     const record = {
       id, kind: String(payload.kind || "text"), path: `local-state://ingest/${id}`, created: now, isolated: true,
       size: Buffer.byteLength(serialized), status: "received", ownerId,
       ...(payload.kind === "url" ? { sourceUrl: String(payload.value || "") } : {}),
+      sourceDescriptor,
       dedupeKey: createHash("sha256").update(serialized).digest("hex"),
     };
     const localFile = path.join(this.stateRoot, `${id}.json`);
-    await atomicJson(localFile, { payload, ownerId, channel, status: "received", created: now, artifact: record });
+    await atomicJson(localFile, { payload, ownerId, channel, messageId, status: "received", created: now, artifact: record });
     return { artifact: record, proposalPending: true };
   }
 
   async propose(id) {
     const stateFile = path.join(this.stateRoot, `${id}.json`);
     const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
+    if (state.status === "proposed" && state.candidate && state.proposal) {
+      return { candidate: state.candidate, proposal: state.proposal };
+    }
     try {
       const prepared = await this.intake.prepare(state.payload);
     const title = titleFromPrepared(prepared, state.payload);
@@ -64,6 +71,7 @@ class IngestService {
       id: `ingest-${randomUUID().slice(0, 8)}`, candidateId: candidate.id, status: "proposed",
       suggestedPath: `vault/00-Inbox/${slug(title)}-${id.slice(-8)}.md`, suggestedTags: [],
       suggestedLinks: matches.slice(0, 3).map((item) => item.path), risk: matches.length ? "merge" : "additive", created: now,
+      sourceDescriptor: buildSourceDescriptor({ payload: state.payload, prepared, channel: state.channel, messageId: state.messageId, now: state.created }),
       ...(matches[0] ? { existingNoteRef: matches[0].path } : {}),
     };
     await atomicJson(stateFile, { ...state, status: "proposed", prepared, candidate, proposal });
@@ -72,6 +80,26 @@ class IngestService {
       await atomicJson(stateFile, { ...state, status: "failed", error: { code: error.code || "INGEST_PROPOSAL_FAILED", message: error.message, retryable: error.retryable === true } });
       throw error;
     }
+  }
+
+  async revise(id, revisionRequest) {
+    const stateFile = path.join(this.stateRoot, `${id}.json`);
+    const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
+    if (!state.proposal) throw Object.assign(new Error("收录方案尚未生成"), { code: "INGEST_PROPOSAL_MISSING" });
+    const revision = String(revisionRequest || "").trim();
+    if (!revision) throw Object.assign(new Error("修改要求不能为空"), { code: "INGEST_REVISION_REQUIRED" });
+    const now = this.clock().toISOString();
+    const proposal = {
+      ...state.proposal,
+      id: `ingest-${randomUUID().slice(0, 8)}`,
+      status: "proposed",
+      previousProposalId: state.proposal.id,
+      revisionRequest: revision,
+      created: now,
+    };
+    await validateContractRecord("ingest-proposal", proposal);
+    await atomicJson(stateFile, { ...state, status: "proposed", proposal, revisedAt: now });
+    return { candidate: state.candidate, proposal };
   }
 
   async status(id) {
@@ -135,8 +163,9 @@ class IngestService {
     if (!allowed.has(action)) throw Object.assign(new Error(`收录决策 ${action} 不适用于 ${state.proposal.risk} 方案`), { code: "INGEST_DECISION_INVALID" });
     const relative = action === "append-source" || action === "link-only" ? state.proposal.existingNoteRef : state.proposal.suggestedPath;
     const target = relative ? path.join(workspace, relative) : null;
-    const source = state.prepared.sourceUrl ? `source_url: ${JSON.stringify(state.prepared.sourceUrl)}\n` : "";
-    const content = `---\ntitle: ${JSON.stringify(state.candidate.title)}\nstatus: captured\nfactual_status: unverified\n${source}---\n\n# ${state.candidate.title}\n\n${state.prepared.content || state.prepared.text}\n\n## 关系状态\n\n${state.proposal.suggestedLinks.length ? state.proposal.suggestedLinks.map((item) => `- 候选关联：[[${item.replace(/^vault\//, "").replace(/\.md$/, "")}]]`).join("\n") : "当前标记为 orphan，等待后续渐进关联。"}\n`;
+    const descriptor = state.proposal.sourceDescriptor || state.artifact?.sourceDescriptor || buildSourceDescriptor({ payload: state.payload, prepared: state.prepared, channel: state.channel, messageId: state.messageId, now: state.created });
+    const source = descriptor.canonicalUrl ? `source_url: ${JSON.stringify(descriptor.canonicalUrl)}\n` : "";
+    const content = `---\ntitle: ${JSON.stringify(state.candidate.title)}\nknowledge_state: captured\nfactual_status: unverified\nsource_kind: ${descriptor.kind}\nsource_tier: ${descriptor.sourceTier}\nsource_reliability: ${descriptor.reliability}\nsource_verification: ${descriptor.verificationStatus}\n${source}---\n\n# ${state.candidate.title}\n\n${state.prepared.content || state.prepared.text}\n\n## 关系状态\n\n${state.proposal.suggestedLinks.length ? state.proposal.suggestedLinks.map((item) => `- 候选关联：[[${item.replace(/^vault\//, "").replace(/\.md$/, "")}]]`).join("\n") : "当前标记为 orphan，等待后续渐进关联。"}\n`;
     const changedPaths = [];
     if (action === "create" || action === "keep-separate") {
       try { await fs.access(target); throw Object.assign(new Error("目标笔记已存在，需要重新查重"), { code: "INGEST_TARGET_EXISTS" }); } catch (error) { if (error.code !== "ENOENT") throw error; }
@@ -154,7 +183,22 @@ class IngestService {
 
     const lifecycle = await this.#writeLifecycle(state, { workspace, action, applied: action !== "reject" });
     changedPaths.push(...lifecycle.changedPaths);
-    return { artifactId: id, applied: action !== "reject", action, path: relative || "", lifecycle, changedPaths: [...new Set(changedPaths)] };
+    return {
+      artifactId: id,
+      applied: action !== "reject",
+      action,
+      path: relative || "",
+      source: descriptor,
+      duplicateOrRelations: {
+        matches: state.candidate.dedupeMatches || [],
+        suggestedLinks: state.proposal.suggestedLinks || [],
+      },
+      candidates: { claimRefs: [], evidenceRefs: [] },
+      unverifiedIssues: descriptor.verificationStatus === "verified" ? [] : ["来源或内容尚未通过事实核验"],
+      knowledgeState: "captured",
+      lifecycle,
+      changedPaths: [...new Set(changedPaths)],
+    };
   }
 
   async applyBatch(ids, options = {}) {
@@ -184,9 +228,18 @@ class IngestService {
       ownerId: state.ownerId || "local-user",
     };
     try { existingArtifact = parseRecord(await fs.readFile(artifactFile, "utf8")); } catch (error) { if (error.code !== "ENOENT") throw error; }
-    const artifact = { ...existingArtifact, status: applied ? "accepted" : "rejected" };
+    const sourceDescriptor = state.proposal.sourceDescriptor
+      || state.artifact?.sourceDescriptor
+      || buildSourceDescriptor({
+        payload: state.payload,
+        prepared: state.prepared,
+        channel: state.channel,
+        messageId: state.messageId,
+        now: state.created,
+      });
+    const artifact = { ...existingArtifact, sourceDescriptor: existingArtifact.sourceDescriptor || sourceDescriptor, status: applied ? "accepted" : "rejected" };
     const candidate = { ...state.candidate, status: applied ? "accepted" : "rejected" };
-    const proposal = { ...state.proposal, status: applied ? "applied" : "rejected" };
+    const proposal = { ...state.proposal, sourceDescriptor: state.proposal.sourceDescriptor || sourceDescriptor, status: applied ? "applied" : "rejected" };
     await writeRecord(artifactFile, artifact, { schema: "artifact", title: `Artifact ${artifact.id}`, summaryKeys: ["id", "kind", "created", "isolated", "status", "sourceUrl"] });
     await writeRecord(candidateFile, candidate, { schema: "inbox-candidate", title: candidate.title, summaryKeys: ["id", "artifactId", "title", "status", "confidence", "created"] });
     await writeRecord(proposalFile, proposal, { schema: "ingest-proposal", title: `Ingest proposal: ${candidate.title}`, summaryKeys: ["id", "candidateId", "status", "suggestedPath", "risk", "created"] });

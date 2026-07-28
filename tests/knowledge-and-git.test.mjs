@@ -35,6 +35,20 @@ test("knowledge search combines tag, source, stability and date filters", async 
   assert.deepEqual(await knowledge.search("Agent", { stability: "principle" }), []);
 });
 
+test("knowledge index never stores a sensitive note excerpt", async (t) => {
+  const testRoot = path.join(path.resolve(import.meta.dirname, ".."), ".runtime", "tests");
+  await fs.mkdir(testRoot, { recursive: true });
+  const root = await fs.mkdtemp(path.join(testRoot, "syno-sensitive-index-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const indexFile = path.join(root, "index.json");
+  await fs.writeFile(path.join(root, "private.md"), "---\ntitle: 私密记录\nprivacy: private\n---\n绝不能发送的正文", "utf8");
+  const knowledge = new KnowledgeStore({ vaultRoot: root, indexFile });
+  const results = await knowledge.search("私密记录");
+  assert.equal(results[0].sensitive, true);
+  assert.equal(results[0].excerpt, "");
+  assert.doesNotMatch(await fs.readFile(indexFile, "utf8"), /绝不|发送|正文/);
+});
+
 test("knowledge index finds Chinese concepts and hides system noise by default", async (t) => {
   const testRoot = path.join(path.resolve(import.meta.dirname, ".."), ".runtime", "tests");
   await fs.mkdir(testRoot, { recursive: true });

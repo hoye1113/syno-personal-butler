@@ -15,7 +15,9 @@
     "updated": { "type": "string", "format": "date-time" },
     "request": { "type": "object" },
     "changedPaths": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
-    "advice": { "type": "object", "description": "审批顾问懒加载生成的建议（可选缓存；含 whatIsIt/recommendation/recommendationLabel/reason/caveat/detail/via/generatedAt）" }
+    "advice": { "type": "object", "description": "审批顾问懒加载生成的建议（可选缓存；含 whatIsIt/recommendation/recommendationLabel/reason/caveat/detail/via/generatedAt）" },
+    "ownerKey": { "type": "string" },
+    "threadKey": { "type": "string" }
   },
   "additionalProperties": true
 }

@@ -77,9 +77,9 @@ function prioritiesBody(snapshot) {
 }
 
 class ProactiveOrchestrator {
-  constructor({ host, today, channels, conversations, settingsRegistry, signalSources, maintenance, signalEngine = new SignalEngine(), stateFile = path.join(PATHS.stateRoot, "proactive.json"), clock = () => new Date(), quietHours = DEFAULT_QUIET_HOURS } = {}) {
+  constructor({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance, signalEngine = new SignalEngine(), stateFile = path.join(PATHS.stateRoot, "proactive.json"), clock = () => new Date(), quietHours = DEFAULT_QUIET_HOURS } = {}) {
     if (!host || !today || !channels) throw new Error("ProactiveOrchestrator 缺少 host、today 或 channels");
-    this.host = host; this.today = today; this.channels = channels; this.conversations = conversations;
+    this.host = host; this.today = today; this.channels = channels; this.conversations = conversations; this.cognitiveRuntime = cognitiveRuntime;
     this.settingsRegistry = settingsRegistry; this.signalSources = signalSources; this.maintenance = maintenance; this.signalEngine = signalEngine; this.stateFile = stateFile; this.clock = clock; this.quietHours = quietHours; this.timer = null;
   }
 
@@ -113,14 +113,28 @@ class ProactiveOrchestrator {
       const prompt = `这是由确定性 SignalEngine 触发的${fallback.title}。请基于 today.read 工具，用不超过 180 字给出主人今天的优先行动；不要扩大权限，不要创建写任务。`;
       let result;
       try {
-        result = await this.host.receive({ text: prompt, intent: "chat" }, {
-          channel: "scheduler", senderId: "syno-worker", messageId: signal.key, trustedAutomation: true,
-        });
+        if (this.cognitiveRuntime) {
+          const run = await this.cognitiveRuntime.run({ text: prompt, intent: "chat" }, {
+            ownerKey: "local-user",
+            threadKey: "proactive",
+            channel: "scheduler",
+            messageId: signal.key,
+            proactive: true,
+          });
+          result = { job: { id: signal.key, status: "completed", result: { text: run.text } } };
+        } else {
+          result = await this.host.receive({ text: prompt, intent: "chat" }, {
+            channel: "scheduler", senderId: "syno-worker", messageId: signal.key, trustedAutomation: true,
+          });
+        }
       } catch (error) {
         result = { job: { id: signal.key, status: "local-fallback" }, error: { code: error.code || "AGENT_UNAVAILABLE" } };
       }
       const completedText = result.job?.status === "completed" ? result.job.result?.text : "";
       const message = completedText ? { ...fallback, body: completedText, text: `${fallback.title}\n${completedText}` } : fallback;
+      if (completedText && this.cognitiveRuntime?.appendSystemEvent) {
+        await this.cognitiveRuntime.appendSystemEvent({ ownerKey: "local-user", threadKey: "main", text: message.text }).catch(() => {});
+      }
       await this.channels.send(message, ["web", "windows", "weixin", "feishu"]);
       state.lastRuns[signal.kind] = date;
       state.lastRuns[signal.key] = date;
@@ -133,6 +147,7 @@ class ProactiveOrchestrator {
     }
     if (this.conversations && state.lastPruned !== date) {
       await this.conversations.prune();
+      await this.cognitiveRuntime?.cleanupExpired?.();
       state.lastPruned = date;
     }
     state.pending = Object.fromEntries(Object.entries(state.pending).slice(-200));

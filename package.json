@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "node apps/syno/server.mjs",
+    "start:test": "node scripts/start-test-host.mjs",
     "worker": "node apps/syno/worker.mjs",
-    "test": "node --test apps/syno/tests/*.test.mjs tests/*.test.mjs",
+    "test": "node --test --test-concurrency=1 apps/syno/tests/*.test.mjs tests/*.test.mjs",
     "verify": "node scripts/verify-repository.mjs",
     "state:archive": "node scripts/state-archive.mjs",
     "vault:migrate": "node scripts/vault-migrate.mjs",
@@ -20,7 +21,12 @@
     "probe:feishu": "node scripts/probe-feishu.mjs",
     "probe:hermes": "node scripts/probe-hermes.mjs",
     "probe:hermes-sidecar": "node scripts/probe-hermes-sidecar.mjs",
-    "probe:provider-real": "node scripts/probe-provider-real.mjs"
+    "probe:provider-real": "node scripts/probe-provider-real.mjs",
+    "opencode:doctor": "node scripts/opencode-runtime.mjs doctor",
+    "opencode:status": "node scripts/opencode-runtime.mjs status",
+    "opencode:restart": "node scripts/opencode-runtime.mjs restart",
+    "opencode:configure": "node scripts/opencode-runtime.mjs configure",
+    "probe:opencode-server": "node scripts/probe-opencode-server.mjs"
   },
   "engines": {
     "node": ">=22"

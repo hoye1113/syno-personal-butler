@@ -3,7 +3,7 @@
   "$id": "https://syno.local/contracts/ingest-proposal.schema.json",
   "title": "IngestProposal",
   "type": "object",
-  "required": ["id", "candidateId", "status", "suggestedPath", "suggestedTags", "suggestedLinks", "risk", "created"],
+  "required": ["id", "candidateId", "status", "suggestedPath", "suggestedTags", "suggestedLinks", "sourceDescriptor", "risk", "created"],
   "properties": {
     "id": { "type": "string" },
     "candidateId": { "type": "string" },
@@ -13,6 +13,9 @@
     "suggestedLinks": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
     "splitTitles": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
     "existingNoteRef": { "type": "string" },
+    "previousProposalId": { "type": "string" },
+    "revisionRequest": { "type": "string", "minLength": 1 },
+    "sourceDescriptor": { "$ref": "source-descriptor.schema.json" },
     "risk": { "enum": ["additive", "overwrite", "merge", "new-tag", "new-moc"] },
     "created": { "type": "string", "format": "date-time" }
   },

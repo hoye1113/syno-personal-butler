@@ -49,7 +49,19 @@ async function loadContract(name) {
   if (!/^[a-z][a-z0-9-]*$/.test(name)) throw new Error(`非法 Contract 名称：${name}`);
   if (!cache.has(name)) {
     const schema = JSON.parse(await fs.readFile(path.join(CONTRACT_ROOT, `${name}.schema.json`), "utf8"));
-    cache.set(name, schema);
+    async function resolveRefs(value, seen = new Set()) {
+      if (Array.isArray(value)) return Promise.all(value.map((item) => resolveRefs(item, seen)));
+      if (!value || typeof value !== "object") return value;
+      if (typeof value.$ref === "string") {
+        if (!/^[a-z][a-z0-9-]*\.schema\.json$/.test(value.$ref)) throw new Error(`不支持的 Contract 引用：${value.$ref}`);
+        if (seen.has(value.$ref)) throw new Error(`Contract 循环引用：${value.$ref}`);
+        const referenced = JSON.parse(await fs.readFile(path.join(CONTRACT_ROOT, value.$ref), "utf8"));
+        return resolveRefs(referenced, new Set([...seen, value.$ref]));
+      }
+      return Object.fromEntries(await Promise.all(Object.entries(value).map(async ([key, child]) => [key, await resolveRefs(child, seen)])));
+    }
+    const resolved = await resolveRefs(schema);
+    cache.set(name, resolved);
   }
   return cache.get(name);
 }

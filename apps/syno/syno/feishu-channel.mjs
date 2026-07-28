@@ -305,7 +305,14 @@ class FeishuChannelAdapter {
       while (this.queue.length) {
         const message = this.queue.shift();
         try {
-          const response = await this.onMessage({ channel: "feishu", id: message.messageId, senderId: message.senderId, text: message.content, chatId: message.chatId });
+          const response = await this.onMessage({
+            channel: "feishu",
+            id: message.messageId,
+            senderId: message.senderId,
+            text: message.content,
+            chatId: message.chatId,
+            privateConversation: true,
+          });
           const delivery = await this.send({ chatId: message.chatId, replyTo: message.messageId, text: response?.text || "任务已记录，请在 Syno 查看状态。" });
           if (!delivery?.delivered) throw Object.assign(new Error(`飞书回复未送达：${delivery?.reason || "unknown"}`), { code: "FEISHU_REPLY_UNDELIVERED", retryable: true });
           await this.stateStore.complete(message.messageId);

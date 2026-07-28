@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/source-descriptor.schema.json",
+  "title": "SourceDescriptor",
+  "type": "object",
+  "required": [
+    "kind",
+    "observedAt",
+    "capturedAt",
+    "captureChannel",
+    "sourceTier",
+    "reliability",
+    "userSuppliedSource",
+    "verificationStatus"
+  ],
+  "properties": {
+    "kind": { "enum": ["url", "file", "personal", "unknown", "platform"] },
+    "canonicalUrl": { "type": "string", "format": "uri" },
+    "originalFilename": { "type": "string" },
+    "contentSha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "author": { "type": "string" },
+    "publisher": { "type": "string" },
+    "publishedAt": { "type": "string", "format": "date-time" },
+    "observedAt": { "type": "string", "format": "date-time" },
+    "capturedAt": { "type": "string", "format": "date-time" },
+    "captureChannel": { "type": "string" },
+    "platformMessageId": { "type": "string" },
+    "sourceTier": { "enum": ["first-party", "primary", "secondary", "community", "personal", "unknown"] },
+    "reliability": { "enum": ["verified", "traceable", "partial", "unverified", "personal"] },
+    "userSuppliedSource": { "type": "boolean" },
+    "verificationStatus": { "enum": ["verified", "partial", "unverified", "needs_source", "personal"] }
+  },
+  "additionalProperties": false
+}

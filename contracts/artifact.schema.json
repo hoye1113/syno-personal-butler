@@ -3,7 +3,7 @@
   "$id": "https://syno.local/contracts/artifact.schema.json",
   "title": "Artifact",
   "type": "object",
-  "required": ["id", "kind", "path", "created", "isolated"],
+  "required": ["id", "kind", "path", "created", "isolated", "sourceDescriptor"],
   "properties": {
     "id": { "type": "string" },
     "kind": { "enum": ["url", "wechat", "text", "markdown", "txt", "pdf", "docx", "html", "image", "voice", "file", "bilibili-opus", "github-doc"] },
@@ -11,6 +11,7 @@
     "created": { "type": "string", "format": "date-time" },
     "isolated": { "type": "boolean" },
     "sourceUrl": { "type": "string", "format": "uri" },
+    "sourceDescriptor": { "$ref": "source-descriptor.schema.json" },
     "size": { "type": "integer", "minimum": 0, "maximum": 10485760 },
     "mime": { "type": "string" },
     "status": { "enum": ["received", "quarantined", "extracted", "proposed", "accepted", "rejected", "failed"] },

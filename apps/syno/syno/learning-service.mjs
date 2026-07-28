@@ -5,6 +5,7 @@ import path from "node:path";
 import { parseRecord, writeRecord } from "./markdown-record.mjs";
 import { PATHS } from "./paths.mjs";
 import { validateContractRecord } from "./schema-registry.mjs";
+import { buildSourceDescriptor } from "./source-descriptor.mjs";
 
 const STAGES = Object.freeze(["captured", "curated", "understood", "applied", "expressed", "retained", "integrated"]);
 const ASSISTANCE = Object.freeze({ none: 1, prompted: 0.9, outlined: 0.7, "heavily-assisted": 0.4 });
@@ -80,6 +81,11 @@ class LearningService {
       id: artifactId, kind: input.inputMode === "voice" ? "voice" : "text", path: rawArtifactRef,
       created: now.toISOString(), isolated: false, status: "accepted", size: Buffer.byteLength(rawOutput),
       ownerId: "local-user", content: rawOutput, purpose: "learning-evidence",
+      sourceDescriptor: buildSourceDescriptor({
+        payload: { kind: "text", value: rawOutput, sourceKind: "personal" },
+        channel: input.inputMode === "voice" ? "voice" : "learning",
+        now: now.toISOString(),
+      }),
     };
     await validateContractRecord("artifact", artifact);
     const refs = [...new Set([...(previous?.evidenceRefs || []), id])];

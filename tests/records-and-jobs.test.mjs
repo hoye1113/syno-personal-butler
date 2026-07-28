@@ -59,13 +59,15 @@ test("AgentHost enforces no-approval, single-approval and isolated merge states"
   assert.equal(git.removals.length, 2);
 });
 
-test("Weixin cannot approve high-risk or double-approval jobs", async (t) => {
+test("bound channel approval accepts high-risk phases only with the exact decision code", async (t) => {
   const opsRoot = path.join(PATHS.runtimeRoot, "tests", `weixin-approval-${Date.now()}`);
   t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
   const store = new JobStore({ opsRoot });
   const decision = { intent: "delete", profile: "syno-curate", approval: "double", risk: "high", allowedRoots: ["vault"], needsWorktree: true };
   const job = await store.create({ request: { text: "delete" }, decision, channel: "weixin", senderId: "owner" });
-  await assert.rejects(store.approve(job, { channel: "weixin", senderId: "owner", code: job.approvalCode }), /微信只能批准/);
+  await assert.rejects(store.approve(job, { channel: "weixin", senderId: "owner", code: "BAD999" }), (error) => error.code === "INVALID_APPROVAL_CODE");
+  const approved = await store.approve(job, { channel: "weixin", senderId: "owner", code: job.approvalCode });
+  assert.equal(approved.ready, true);
 });
 
 test("high-risk failures remove their isolated worktree", async (t) => {
@@ -155,6 +157,24 @@ test("channel message request keys deduplicate retried jobs", async (t) => {
   assert.equal(second.job.id, first.job.id);
 });
 
+test("requesting a proposal modification invalidates the original approvable Job", async (t) => {
+  const opsRoot = path.join(PATHS.runtimeRoot, "tests", `job-revision-${Date.now()}`);
+  t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
+  const store = new JobStore({ opsRoot });
+  const job = await store.create({
+    request: { intent: "curate_note", text: "收录原方案" },
+    decision: {
+      intent: "curate_note", allowed: true, approval: "single", risk: "low",
+      profile: "syno-curate", needsWorktree: true, allowedRoots: ["vault", "ops"],
+      validators: ["changed-paths", "ops-contracts", "markdown", "vault-contract"],
+    },
+  });
+  const revised = await store.requestModification(job, "调整标题");
+  assert.equal(revised.status, "canceled");
+  assert.equal(revised.error.code, "PROPOSAL_REVISION_REQUESTED");
+  await assert.rejects(store.approve(revised), /不等待审批/);
+});
+
 test("read-only channel jobs preserve unrelated developer changes", async (t) => {
   const opsRoot = path.join(PATHS.runtimeRoot, "tests", `dirty-read-${Date.now()}`);
   t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
@@ -216,9 +236,44 @@ test("retryable Provider failures stay durable without switching executors", asy
   const deferred = await host.receive({ intent: "search", text: "需要模型" });
   assert.equal(deferred.job.status, "waiting_provider");
   assert.equal(deferred.job.error.retryable, true);
-  const retried = await host.retry(deferred.job.id);
-  assert.equal(retried.job.status, "completed");
-  assert.equal(retried.job.error, null);
-  assert.equal(retried.job.nextRetryAt, null);
+  const recovery = await host.retryWaitingProvider({ now: new Date(Date.now() + 61_000) });
+  assert.equal(recovery.length, 1);
+  assert.equal(recovery[0].jobId, deferred.job.id);
+  assert.equal(recovery[0].result.job.status, "completed");
+  assert.equal(recovery[0].result.job.error, null);
+  assert.equal(recovery[0].result.job.nextRetryAt, null);
+  assert.equal(attempts, 2);
+});
+
+test("concurrent Provider retries acquire one execution lease", async (t) => {
+  const opsRoot = path.join(PATHS.runtimeRoot, "tests", `provider-retry-lock-${Date.now()}`);
+  t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
+  const store = new JobStore({ opsRoot });
+  let attempts = 0;
+  let releaseRetry;
+  const retryGate = new Promise((resolve) => { releaseRetry = resolve; });
+  const executor = {
+    async submit() {
+      attempts += 1;
+      if (attempts === 1) {
+        throw Object.assign(new Error("Provider 当前不可用"), { code: "PROVIDER_UNAVAILABLE", retryable: true });
+      }
+      await retryGate;
+      return { runId: "provider-retry-once", executor: "tool-loop-agent", text: "恢复完成" };
+    },
+    inspect() { return null; }, cancel() { return false; },
+  };
+  const git = { async changedPaths() { return []; }, async commitPaths() { return { committed: false }; } };
+  const host = new AgentHost({ store, executor, gitGuard: git });
+  const deferred = await host.receive({ intent: "search", text: "需要模型" });
+  assert.equal(deferred.job.status, "waiting_provider");
+
+  const first = host.retry(deferred.job.id);
+  const second = host.retry(deferred.job.id);
+  await assert.rejects(second, /当前不等待 Provider 重试/);
+  releaseRetry();
+  const recovered = await first;
+
+  assert.equal(recovered.job.status, "completed");
   assert.equal(attempts, 2);
 });

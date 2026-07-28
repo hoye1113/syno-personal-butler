@@ -66,10 +66,13 @@ class KnowledgeStore {
       const source = frontmatter.values.source_url || frontmatter.values.source || "";
       const stability = frontmatter.values.stability || frontmatter.values.stability_class || "";
       const date = frontmatter.values.updated || frontmatter.values.created || frontmatter.values.date || "";
-      notes.push({ path: relativeToRepo(entry.file), title, excerpt: text.slice(0, 280), tags: frontmatter.tags, legacyTags, source, stability, date, searchable: isContentNote(this.vaultRoot, entry.file),
+      const privacy = String(frontmatter.values.privacy || "").toLocaleLowerCase("en-US");
+      const sensitive = ["true", "yes"].includes(String(frontmatter.values.sensitive || frontmatter.values.private || "").toLocaleLowerCase("en-US"))
+        || ["private", "sensitive"].includes(privacy);
+      notes.push({ path: relativeToRepo(entry.file), title, excerpt: sensitive ? "" : text.slice(0, 280), tags: frontmatter.tags, legacyTags, source, stability, date, searchable: isContentNote(this.vaultRoot, entry.file), sensitive,
         knowledgeState: frontmatter.values.knowledge_state || "", linkStatus: frontmatter.values.link_status || "",
         qualityStatus: frontmatter.values.quality_status || (frontmatter.values.source || frontmatter.values.source_url ? "traceable" : "needs_source"),
-        index: { title: tokens(title), tags: tokens(frontmatter.tags.join(" ")), legacyTags: tokens(legacyTags.join(" ")), body: tokens(text), source: tokens(source) } });
+        index: { title: tokens(title), tags: tokens(frontmatter.tags.join(" ")), legacyTags: tokens(legacyTags.join(" ")), body: sensitive ? [] : tokens(text), source: tokens(source) } });
     }
     this.cache = notes; this.fingerprint = fingerprint;
     await fs.mkdir(path.dirname(this.indexFile), { recursive: true });

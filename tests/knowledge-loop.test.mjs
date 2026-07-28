@@ -42,6 +42,7 @@ test("ingest returns an immediate Artifact then builds an additive proposal", as
   const { proposal } = await service.propose(receipt.artifact.id);
   assert.equal(proposal.risk, "additive");
   assert.match(proposal.suggestedPath, /^vault\/00-Inbox\//);
+  assert.equal((await service.propose(receipt.artifact.id)).proposal.id, proposal.id);
   await assert.rejects(fs.access(path.join(root, "ops", "artifacts")), { code: "ENOENT" });
   const legacyStateFile = path.join(root, "state", `${receipt.artifact.id}.json`);
   const legacyState = JSON.parse(await fs.readFile(legacyStateFile, "utf8"));
@@ -53,6 +54,60 @@ test("ingest returns an immediate Artifact then builds an additive proposal", as
   assert.equal(applied.lifecycle.proposal.status, "applied");
   assert.equal(applied.lifecycle.candidate.status, "accepted");
   assert.equal(applied.lifecycle.artifact.status, "accepted");
+});
+
+test("ingest preserves SourceDescriptor through receipt, proposal, and completion", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-source-ingest-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const service = new IngestService({
+    stateRoot: path.join(root, "state"),
+    knowledge: { async search() { return []; } },
+    intake: {
+      async prepare(payload) {
+        return {
+          sourceType: "url",
+          sourceUrl: payload.value,
+          content: "Reference content",
+          title: "Reference",
+          author: "Primary Author",
+          sourceTier: "primary",
+          reliability: "traceable",
+          verificationStatus: "partial",
+        };
+      },
+    },
+    clock: () => new Date("2026-07-28T08:00:00.000Z"),
+  });
+  const receipt = await service.receive(
+    { kind: "url", value: "https://example.com/post?utm_source=wechat&id=7" },
+    { ownerId: "owner", channel: "weixin", messageId: "wx-42" },
+  );
+  assert.equal(receipt.artifact.sourceDescriptor.canonicalUrl, "https://example.com/post?id=7");
+  const prepared = await service.propose(receipt.artifact.id);
+  assert.equal(prepared.proposal.sourceDescriptor.author, "Primary Author");
+  assert.equal(prepared.proposal.sourceDescriptor.sourceTier, "primary");
+  assert.equal(prepared.proposal.sourceDescriptor.reliability, "traceable");
+  const completed = await service.apply(receipt.artifact.id, { workspace: root, decision: { action: "create" } });
+  assert.equal(completed.source.verificationStatus, "partial");
+  assert.match(await fs.readFile(path.join(root, completed.path), "utf8"), /source_verification: partial/);
+});
+
+test("ingest persists a revision as a new proposal without applying the old decision", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-ingest-revision-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const service = new IngestService({
+    stateRoot: path.join(root, "state"),
+    knowledge: { async search() { return []; } },
+    intake: { async prepare(payload) { return { sourceType: "text", text: payload.value, title: "原方案" }; } },
+    clock: () => new Date("2026-07-28T08:00:00.000Z"),
+  });
+  const receipt = await service.receive({ kind: "text", value: "需要调整的内容" });
+  const original = await service.propose(receipt.artifact.id);
+  const revised = await service.revise(receipt.artifact.id, "标题改成更适合小白的表述");
+  assert.notEqual(revised.proposal.id, original.proposal.id);
+  assert.equal(revised.proposal.previousProposalId, original.proposal.id);
+  assert.equal(revised.proposal.revisionRequest, "标题改成更适合小白的表述");
+  assert.equal((await service.status(receipt.artifact.id)).proposal.id, revised.proposal.id);
 });
 
 test("dedupe matches force merge review instead of silent overwrite", async (t) => {

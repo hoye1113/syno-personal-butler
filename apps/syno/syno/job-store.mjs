@@ -47,7 +47,7 @@ class JobStore {
     this.clock = clock;
   }
 
-  async create({ request, decision, channel = "web", senderId = "local-user", conversationId = "", requestKey = "" }) {
+  async create({ request, decision, channel = "web", senderId = "local-user", ownerKey = "local-user", threadKey = "main", conversationId = "", requestKey = "" }) {
     if (requestKey) {
       const existing = (await this.list({ limit: 2_000 })).find((job) => job.requestKey === requestKey);
       if (existing) return { ...existing, deduplicated: true };
@@ -67,6 +67,8 @@ class JobStore {
       risk: decision.risk,
       channel,
       senderId,
+      ownerKey,
+      threadKey,
       conversationId: conversationId || undefined,
       requestKey: requestKey || undefined,
       created: now,
@@ -152,12 +154,7 @@ class JobStore {
 
   async approve(job, { channel = "web", senderId = "local-user", code = "" } = {}) {
     if (job.status !== "awaiting_approval") throw new Error("Job 当前不等待审批");
-    if (channel === "weixin" && (job.risk !== "low" || job.approval !== "single" || job.phase !== "execution")) {
-      const error = new Error("微信只能批准低风险单审批任务");
-      error.code = "APPROVAL_CHANNEL_FORBIDDEN";
-      throw error;
-    }
-    if (channel === "weixin" && String(code).toUpperCase() !== job.approvalCode) {
+    if (["weixin", "feishu"].includes(channel) && String(code).toUpperCase() !== job.approvalCode) {
       const error = new Error("审批码无效");
       error.code = "INVALID_APPROVAL_CODE";
       throw error;
@@ -174,6 +171,21 @@ class JobStore {
 
   async reject(job, reason = "用户拒绝") {
     return this.transition(job, "rejected", { error: { code: "REJECTED", message: reason } });
+  }
+
+  async requestModification(job, modification) {
+    if (job.status !== "awaiting_approval") throw new Error("Job 当前不等待方案修改");
+    const revisionRequest = {
+      text: String(modification),
+      requestedAt: this.clock().toISOString(),
+      status: "pending",
+    };
+    await this.transition(job, "canceled", {
+      revisionRequest,
+      error: { code: "PROPOSAL_REVISION_REQUESTED", message: "原审批已失效，等待修订方案产生新 Job" },
+    });
+    await this.event(job, "job.modification_requested", { text: String(modification) });
+    return job;
   }
 
   async event(job, type, data = {}) {

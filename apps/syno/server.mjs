@@ -121,7 +121,7 @@ const httpServer = createServer(async (req, res) => {
 
     if (url.pathname.startsWith("/api/syno/")) {
       await synoReady;
-      if (url.pathname.startsWith("/api/syno/windows-service")) {
+      if (url.pathname.startsWith("/api/syno/windows-service") || ["/api/syno/opencode/restart", "/api/syno/opencode/credential"].includes(url.pathname)) {
         assertJsonMutation(req);
         assertSameOriginMutation(req);
       }

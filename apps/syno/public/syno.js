@@ -829,21 +829,35 @@
   async function loadProviderStatus() {
     const hint = document.querySelector("#synoProviderHint");
     try {
-      const status = await api("/api/syno/provider");
-      document.querySelector("#synoProviderBaseUrl").value = status.baseUrl;
-      document.querySelector("#synoProviderModel").value = status.modelId || "";
-      document.querySelector("#synoProviderContext").value = status.contextLength;
-      hint.textContent = status.configured ? `已配置 ${status.modelId}；Token 已加密保存。` : "尚未配置；本地搜索、任务与提醒仍可使用。";
-      setSettingStatus("#synoSettingAi", status.configured ? "已连接" : "未连接", status.configured);
-      setupState.ai = Boolean(status.configured); setHealthIssue("provider", status.configured ? "" : "AI 服务尚未连接"); refreshOnboarding();
+      const status = await api("/api/syno/opencode");
+      const configured = status.credential?.configured === true;
+      const healthy = status.supervisor?.healthy === true;
+      const lastModel = status.cognitive?.lastAttempts?.slice(-1)[0]?.modelId;
+      hint.textContent = !configured
+        ? "需要配置 OpenCode Zen Token；本地收录回执、审批解析、搜索与提醒仍可使用。"
+        : healthy ? `OpenCode 1.18.2 正常运行${lastModel ? `；最近模型 ${lastModel}` : ""}。` : `Token 已加密保存；AI 内核状态：${status.supervisor?.state || "未就绪"}。`;
+      setSettingStatus("#synoSettingAi", healthy ? "已连接" : configured ? "需重启" : "未连接", healthy);
+      setupState.ai = configured && healthy;
+      setHealthIssue("provider", healthy ? "" : configured ? "OpenCode AI 内核未就绪" : "OpenCode Zen Token 尚未配置");
+      refreshOnboarding();
     } catch (error) { hint.textContent = error.message; setSettingStatus("#synoSettingAi", "检测失败", false); setHealthIssue("provider", "无法读取 AI 服务状态"); }
   }
 
   async function saveProvider(event) {
     event.preventDefault(); const hint = document.querySelector("#synoProviderHint"); hint.textContent = "正在使用 DPAPI 保存…";
     try {
-      const status = await api("/api/syno/provider", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ baseUrl: document.querySelector("#synoProviderBaseUrl").value.trim(), token: document.querySelector("#synoProviderToken").value, modelId: document.querySelector("#synoProviderModel").value.trim(), contextLength: Number(document.querySelector("#synoProviderContext").value) }) });
-      document.querySelector("#synoProviderToken").value = ""; hint.textContent = `已安全保存 ${status.modelId}。`;
+      await api("/api/syno/opencode/credential", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: document.querySelector("#synoOpenCodeToken").value }) });
+      document.querySelector("#synoOpenCodeToken").value = ""; hint.textContent = "Token 已使用 DPAPI 保存，OpenCode AI 内核已重启。";
+      await loadProviderStatus();
+    } catch (error) { hint.textContent = error.message; }
+  }
+
+  async function restartOpenCode() {
+    const hint = document.querySelector("#synoProviderHint");
+    if (!window.confirm("重启 OpenCode AI 内核？本地收录、审批和提醒不会停止，进行中的自由对话会短暂等待。")) return;
+    hint.textContent = "正在重启 OpenCode AI 内核…";
+    try {
+      await api("/api/syno/opencode/restart", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       await loadProviderStatus();
     } catch (error) { hint.textContent = error.message; }
   }
@@ -967,6 +981,7 @@
   document.querySelector("#synoTeachBackForm")?.addEventListener("submit", submitTeachBack);
   document.querySelector("#synoOutputForm")?.addEventListener("submit", submitOutput);
   document.querySelector("#synoProviderForm")?.addEventListener("submit", saveProvider);
+  document.querySelector("#synoOpenCodeRestart")?.addEventListener("click", restartOpenCode);
   document.querySelector("#synoPreferenceForm")?.addEventListener("submit", savePreferences);
   document.querySelector("#synoFeishuRegister")?.addEventListener("click", () => feishuAction("register/start"));
   document.querySelector("#synoFeishuConnect")?.addEventListener("click", () => feishuAction("connect"));
