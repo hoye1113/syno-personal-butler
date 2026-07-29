@@ -14,9 +14,9 @@ reviewBaseline:
   reviewedAt: 2026-07-29
 
 implementation:
-  branch: codex/exec-p03-session-lifecycle
-  baseCommit: 41ebf1c
-  headCommit: pending
+  branch: codex/exec-p10-r6-seal
+  baseCommit: f9d9206
+  headCommit: pending-owner-acceptance
 ```
 
 已完成：PR-00 `codex/exec-p00-contracts`，`567f23d` → `41a324d`，文档、ADR 与迁移策略门禁通过。
@@ -25,7 +25,9 @@ implementation:
 
 已完成：PR-02 `codex/exec-p02-cancellable-scheduler`，`5b12fd8` → `41ebf1c`，可取消 Session/Bridge Scheduler 门禁通过。
 
-进行中：PR-03 `codex/exec-p03-session-lifecycle`，Binding mutation 与 Session 生命周期。
+已完成自动实现：PR-04A0～PR-09，包含 AcceptedRequest、ChannelDeliveryOutbox、Effect Receipt/Unknown、移动 Decision、Session fallback、Ephemeral Capture、持久 Chunk 和调度门控；各阶段实际 HEAD 与测试证据见 `NEXT_SESSION.md` 与 `ops/acceptance/`。
+
+进行中：PR-10 `codex/exec-p10-r6-seal`，只读 R6 readiness 与 Owner 验收模板；真实 Owner 验收、移动生产切换和 Legacy 清理仍未开始。
 
 后续每个 PR 必须从前一个已验收 PR 的实际 HEAD 建分支，并独立记录 `baseCommit/headCommit`。执行顺序：
 
@@ -46,10 +48,10 @@ implementation:
 
 详细不可变边界见 ADR 0003–0005。PR-00～PR-03 完整回归和真实本机门禁通过前，不进入移动生产路径切换。
 
-## 当前执行状态（2026-07-28）
+## 当前执行状态（2026-07-29）
 
 - P4.0–P4.6 的实现、自动测试、三轴复审和 Windows 任务安装/受控重启已完成。
-- 当前 Goal 状态为 `blocked`：剩余 P4.7 门槛需要主人真实操作，不能用 Fake、探针或单元测试替代。
+- 当前 Goal 状态为 active：PR-10 readiness 已实现，但 Owner 手机、真实渠道、Windows 冷启动和 Legacy 清理门槛仍未完成；不能用 Fake、探针或单元测试替代。
 - 最近证据（2026-07-28 约 22:26 CST 本次复核）：Node 454/454、vault pytest 57/57、Repository verify 1396 files、`git diff --check` 通过；Syno Host 在 8888 返回 `health ok`（监听进程 PID 14368 为更早手动启动，非当前活动任务实例托管），OpenCode supervisor 健康（pid 26144、`127.0.0.1:4318`、1.18.2、凭据 configured、`healthy=true`）。
 - Windows `Syno` 计划任务当前 `State=Ready`（**未运行**）：`LastRunTime=2026-07-28 20:31:19`、`LastTaskResult=3221225786`（0xC000013A 控制中断退出）、`NextRunTime` 空、`legacyTaskDetected=false`。任务安装与受控重启在本轮历史中确已成功（曾等待 8 秒仍为 `Running` 并留有启动器日志），但当前实例已回落未运行且上次退出码异常；不得把当前 Host 存活当作任务 `Running` 或下次登录冷启动恢复证据，退出根因需主人在冷启动验收中确认。
 - 工作树仍包含本轮未提交实现和两项主人知识变更；本次同步只修改文档，不暂存、不提交、不 Push。

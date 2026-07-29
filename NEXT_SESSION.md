@@ -3,16 +3,16 @@
 ## 当前实施入口
 
 - 审查基线：`567f23d2d9b423a98d0e88868c6cc2eb3859d16f`。
-- 当前实施分支：`codex/exec-p03-session-lifecycle`。
-- PR-00 已提交为 `41a324d`，PR-01 已提交为 `5b12fd8`，PR-02 已提交为 `41ebf1c`；PR-03 从该实际 HEAD 派生，后续目标仍不得表述为已实现。
-- 微信、飞书是主要日常入口；ACK 前持久化、原渠道最终交付、ChannelDeliveryOutbox、Effect Receipt 和 Unknown Case Store 仍是待实现能力。
-- PR-00～PR-03 自动与真实本机门禁通过前，不进入移动投递切换；Owner 真实微信/飞书和 Windows 下次登录验收仍保留为 R6 独立门槛。
+- 当前实施分支：`codex/exec-p10-r6-seal`。
+- 已提交阶段 HEAD：PR-04A0 `3c8fae5`、PR-04A `ad187cb`、PR-04B `3df84cd`、PR-04C/04D `7f094c4`、PR-05/06 `b813764`、PR-07A `e63b5e9`、PR-07B `043d3ba`、PR-08 `fd34708`、PR-09 `f9d9206`。
+- 微信、飞书是主要日常入口；AcceptedRequest、ChannelDeliveryOutbox、Effect Receipt、Unknown Case、Decision、Ephemeral Capture 和持久 Chunk 已实现，但 PR-04A/04B 生产切换与 Owner 实测仍未完成。
+- PR-10 只生成 Owner 验收模板和只读 readiness；未取得 Owner 手机、真实渠道和 Windows 冷启动证据前，不切换移动生产路径、不删除 Legacy、不标记 Goal complete。
 - 执行语义见 `docs/adr/0003-execution-semantics.md`，移动交付见 `docs/adr/0004-mobile-delivery-contract.md`，迁移规则见 `docs/adr/0005-schema-migration-policy.md`。
 
 ## 当前 Goal 状态
 
 - Goal：按 `docs/TODO-EXECUTION-PLAN.md` 实施 PR-00～PR-10。
-- 当前状态：PR-03 实施中；Owner 真实微信/飞书、跨渠道连续性和 Windows 下次登录仍是不可由自动化替代的后续门槛。
+- 当前状态：PR-10 R6 门禁准备中；Owner 真实微信/飞书、跨渠道连续性、Unknown/Decision、PDF/DOCX、Windows 下次登录仍是不可由自动化替代的门槛。
 - 不修改 `vault/` 内容或原始 Obsidian 仓库；每个 PR 精确暂存，不 Push。
 
 ## 新对话第一句话
@@ -28,7 +28,7 @@
 - OpenCode 实际二进制：
   `%LOCALAPPDATA%\mise\installs\node\24.13.0\node_modules\opencode-ai\bin\opencode.exe`
 - OpenCode 子进程端口：`127.0.0.1:4318`
-- 当前 HEAD：`f38ab18e6a2e2e09d4e7250ff8b98fc380f8510d`
+- 当前可信执行 HEAD：以 `git log` 为准；本轮 PR-10 分支从 `f9d9206` 派生，尚未提交 R6 模板。
 - mise shim 后台启动会递归，禁止作为生产启动目标。
 - Windows 计划任务 XML 加固前的 OpenCode 自动验证：Node 370/370、vault pytest 57/57、Repository verify 1358 files。
 - Windows 计划任务 XML 加固后的基线验证：Node 375/375、vault pytest 57/57、Repository verify 1359 files、`git diff --check` 通过。
@@ -47,7 +47,13 @@
 - `vault/02-Resources/AI and Agents/MOC - Agent 架构与工程.md`
 - `vault/02-Resources/AI and Agents/Agent Design & Patterns/当编码不再是瓶颈 - Berkeley RDI 软件自主开发三级框架.md`
 
-## 已实现
+## 已实现（本轮新增）
+
+- AcceptedRequest + DPAPI 恢复载荷、ChannelDeliveryOutbox、Effect Receipt/Unknown Case、RecentInteraction/Decision presentation。
+- OpenCode Session 状态可知性、abort unknown 冻结、保守 fallback 和过滤消息复制策略。
+- Capture ephemeral Session、持久 Chunk Manifest、重启恢复、策略失效、coverage、优先级/Aging/Provider/预算门控。
+
+## 已实现（历史）
 
 - OpenCode Supervisor、真实二进制解析、版本锁定、Basic Auth、loopback、独立 profile、自有 PID 树。
 - `opencode:doctor/status/restart/configure` 与真实 Server 探针。
@@ -69,7 +75,7 @@
 
 ## 当前断点
 
-1. P1、P2 和 P3 自动门禁已完成；P4.0–P4.6 的自然语言会话控制与受限网页抓取已实现，P4.7 真实验收仍待主人执行。
+1. PR-00～PR-09 的自动门禁已分阶段通过；PR-04A/04B 生产切换、P4.7/R6 真实验收仍待主人执行。
 2. 可信提交基线为 HEAD `f38ab18`；当前未提交差异已完成 454/454 全量回归，不把提交基线冒充为当前实现证据。
 3. R4.1–R4.7 的主要代码已经位于未提交工作树：持久 Workflow、Context Compiler、capture Session、Outbox、统一渠道、canonical Proposal、受控写入和闭环候选均已实现。
 4. 复审中发现的 P1 已修复：拒绝意图先落盘；恢复先核对 Job 状态，已拒绝 Job 不重发 Proposal。
@@ -77,8 +83,8 @@
 6. `docs/TODO-EXECUTION-PLAN.md` 的 P4.0–P4.6 已执行：自然语言意图路由、动态能力说明、项目级 `syno-web-capture` Skill、受限 `syno_browser_*` Tool Bridge、Coordinator 自动指派、可观察性与 Doctor；Node 24 pinned DNS `lookup` 和 Kimi `/command` envelope 兼容性已修复，并用真实 OpenRouter 直抓、知乎 403 WebBridge 兜底复验。
 7. Windows 任务已真实注册并通过安装/状态/受控重启：使用真实 `node.exe`，等待 8 秒仍为 `Running`，Host 健康，启动器日志已落盘。本次复核补充：任务现已回落至 `State=Ready`、未运行，`LastRunTime=2026-07-28 20:31:19` 以 `0xC000013A`（控制中断）退出；不要把当前 8888 上存活的手动启动 Host（PID 14368）当作任务 `Running` 或下次登录恢复证据，退出根因需在冷启动验收中确认。
 8. 架构已根据主人反馈修正：OpenCode 会真实加载项目 Skill 并完成多步浏览器抓取；Syno 仍持有授权、URL/动作边界、Workflow 状态、决策和写入控制。全局 `kimi-webbridge` 仅作为上游方法与版本参照，不作为隔离运行时的隐式依赖。
-9. P4.0–P4.6 代码与自动验证已完成；下一步从 P4.7 主人真实验收开始，不得把自动测试当作真实渠道、浏览器或 Windows 证据。
-10. 自动实现完成后进入 P4.7 主人真实验收；主人完成全部门槛前，不得进入 R6 或删除旧实现。
+9. OpenCode fork/clone/read 真实能力未验证，当前策略为 `retain_current_session`；不得据客户端类型声明升级。
+10. PR-10 `ops/acceptance/pr-10-r6-seal/owner-acceptance.json` 仍为 `pending_owner`；主人完成全部门槛前不得删除旧实现。
 
 ## 当前运行态探针记录
 
