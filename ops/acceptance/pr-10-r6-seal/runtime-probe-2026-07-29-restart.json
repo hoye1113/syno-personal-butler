@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "runAt": "2026-07-29T20:14:32+08:00",
+  "scope": "read_only_runtime_probe_after_authorized_task_restart",
+  "host": {
+    "health": { "status": 200, "alive": true, "state": "ready", "protocolVersion": 2 },
+    "readiness": { "status": 200, "state": "ready", "store": "ready", "openCode": "ready", "channels": "ready" },
+    "mobileDelivery": { "status": 200, "mode": "legacy", "outboxPending": 0, "outboxUnknown": 0 }
+  },
+  "opencode": {
+    "ready": true,
+    "healthy": true,
+    "version": "1.18.2",
+    "provider": "opencode",
+    "providerFallback": false,
+    "sessionRecovery": {
+      "readMessages": "unsupported_by_client",
+      "fork": "unsupported_by_client",
+      "clone": "unsupported_by_client",
+      "strategy": "retain_current_session",
+      "conservativeFallback": "clean_and_abort_confirmed_only"
+    }
+  },
+  "channels": {
+    "weixin": { "ok": true, "configured": true, "ownerBound": true, "connected": true, "source": "running_worker" },
+    "feishu": { "ok": true, "configured": true, "ownerBound": true, "connected": true, "source": "running_worker" }
+  },
+  "windowsTask": { "supported": true, "installed": true, "running": true, "startup": "at_logon", "legacyTaskDetected": false },
+  "ownerAcceptance": "not_performed",
+  "notes": "未发送消息、未注销 Windows、未读取或保存凭据、Token、Cookie、PID 或私人正文；mode=legacy 是验收前的锁定默认值。"
+}
