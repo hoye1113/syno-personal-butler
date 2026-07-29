@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { ChannelConversationHandler } from "../apps/syno/syno/channel-conversation-handler.mjs";
 import { MobileDeliveryMode } from "../apps/syno/syno/mobile-delivery-mode.mjs";
+import { routeSynoApi } from "../apps/syno/syno/runtime.mjs";
 
 test("MobileDeliveryMode keeps v2 cutover behind Owner, ingress and legacy gates", () => {
   const mode = new MobileDeliveryMode();
@@ -60,4 +61,20 @@ test("v2 mobile handler persists before returning and sends final through the sa
   assert.equal(events[1].responseKind, "final");
   assert.equal(events[1].targetChannel, "weixin");
   assert.equal(updates.some((item) => item.patch.status === "final_pending"), true);
+});
+
+test("mobile delivery diagnostics expose only aggregate AcceptedRequest, Outbox and Unknown status", async () => {
+  const result = await routeSynoApi({
+    mobileDeliveryMode: { snapshot: () => ({ mode: "legacy", supportedModes: ["legacy", "shadow", "v2"] }) },
+    acceptedRequests: { async list() { return [{ status: "accepted" }, { status: "delivered" }]; } },
+    channelDeliveryOutbox: { async list() { return [{ status: "pending" }, { status: "delivery_unknown" }]; } },
+    reconciliationCases: { async list() { return [{ status: "open" }]; } },
+  }, { method: "GET" }, new URL("http://localhost/api/syno/mobile-delivery"), async () => ({}));
+  assert.deepEqual(result, {
+    mode: "legacy",
+    supportedModes: ["legacy", "shadow", "v2"],
+    acceptedRequests: { total: 2, byStatus: { accepted: 1, delivered: 1 } },
+    outbox: { total: 2, byStatus: { pending: 1, delivery_unknown: 1 } },
+    unknownCases: { total: 1, byStatus: { open: 1 } },
+  });
 });

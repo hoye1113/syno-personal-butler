@@ -1162,13 +1162,24 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "GET" && url.pathname === "/api/syno/jobs") return { jobs: await runtime.host.list({ limit: 100 }) };
   if (method === "GET" && url.pathname === "/api/syno/notifications") return { notifications: await runtime.notifications.list({ limit: 100 }) };
   if (method === "GET" && url.pathname === "/api/syno/channels") return { channels: runtime.channels.status() };
-  if (method === "GET" && url.pathname === "/api/syno/mobile-delivery") return {
-    ...runtime.mobileDeliveryMode.snapshot(),
-    outbox: runtime.channelDeliveryOutbox ? {
-      pending: (await runtime.channelDeliveryOutbox.list({ status: "pending", limit: 1000 })).length,
-      unknown: (await runtime.channelDeliveryOutbox.list({ status: "delivery_unknown", limit: 1000 })).length,
-    } : null,
-  };
+  if (method === "GET" && url.pathname === "/api/syno/mobile-delivery") {
+    const [accepted, outbox, unknownCases] = await Promise.all([
+      runtime.acceptedRequests?.list({ ownerKey: "local-user", limit: 1000 }) || [],
+      runtime.channelDeliveryOutbox?.list({ limit: 1000 }) || [],
+      runtime.reconciliationCases?.list({ ownerKey: "local-user", limit: 1000 }) || [],
+    ]);
+    const aggregate = (items) => items.reduce((counts, item) => {
+      const key = String(item.status || "unknown");
+      counts[key] = (counts[key] || 0) + 1;
+      return counts;
+    }, {});
+    return {
+      ...runtime.mobileDeliveryMode.snapshot(),
+      acceptedRequests: { total: accepted.length, byStatus: aggregate(accepted) },
+      outbox: { total: outbox.length, byStatus: aggregate(outbox) },
+      unknownCases: { total: unknownCases.length, byStatus: aggregate(unknownCases) },
+    };
+  }
   if (method === "GET" && url.pathname === "/api/syno/recent-interactions") return runtime.recentInteractions.snapshot({ ownerKey: "local-user", channel: url.searchParams.get("channel") || undefined, threadKey: url.searchParams.get("thread") || "main" });
   if (method === "GET" && url.pathname === "/api/syno/effect-cases") return { cases: (await runtime.reconciliationCases?.list({ ownerKey: "local-user", limit: 100 }) || []).map((item) => ({ caseId: item.caseId, toolName: item.toolName, status: item.status, attempts: item.attempts, nextReconcileAt: item.nextReconcileAt, lastErrorCode: item.lastErrorCode, ownerResolution: item.ownerResolution, systemResolution: item.systemResolution, createdAt: item.createdAt, updatedAt: item.updatedAt })) };
   if (method === "GET" && url.pathname === "/api/syno/provider") return runtime.credentials.status();
