@@ -27,7 +27,7 @@
 | 对话可用性 | 对话永远不会因为 context 超限而永久卡死 |
 | 信息保留 | 压缩时保留关键决策、错误、待办，不丢失"成果" |
 | 可恢复性 | 原始消息归档不删除，可审计、可回溯 |
-| 知识沉淀 | 压缩前将有价值内容通过**可审批 Job** 写入，过程可清理，成果不丢 |
+| 知识沉淀 | 压缩前将有价值内容通过**受控 Job** 写入，过程可清理，成果不丢 |
 | 分层递进 | 先轻后重，能用简单手段解决的不上复杂方案 |
 | 长期可维护 | 独立模块，不侵入核心 Agent Loop 逻辑 |
 
@@ -227,12 +227,12 @@ constructor({ provider, credentials, tools, conversationStore, options })
 - **大小上限（R7）：** 规则拼装后若 > `handoffTokenCap`（默认 50000 tokens），只保留最近 N 条 user（倒序截断到 cap 内）+ 末尾 1 条 assistant，确保 handoff 自身不会让新对话 turn1 顶部又触发 Layer4。
 - 仅当 trim 后的消息能塞进 LLM 且有余量时才用 LLM 润色（非必需）
 
-**FlushToKnowledge（v3 R6/O11——正则预筛 + LLM 判定 + 走 Job 审批 + 时序节流）：**
+**FlushToKnowledge（v3 R6/O11——正则预筛 + LLM 判定 + 走受控 Job + 时序节流）：**
 - 触发：`compress()` 在 rotate（Layer4）与 layer2/layer3 确定后，经 `#fireExtraction` **fire-and-forget** 异步发起（不阻塞压缩主路径；Layer1 仅清工具结果、无内容离开活跃上下文，不触发）
 - 管道：`extractValuable(messages)`（正则预筛中文决策词，快）→ per-对话 content-hash 去重 + `extractMaxPerConversation` 节流 → `#judgeValuable`（LLM 判定 keep/reject；Provider 不可用或解析失败返回空）→ `onExtractValuable` 回调
 - 输出：`[{ type: "decision", content, source: "user" }]`（正则预筛当前仅标注 decision）
-- **不直接写 vault**——上层 `onExtractValuable` 据此创建 ingest proposal（`ingestService.receive` + `propose`，`kind: "text"`），遵守"知识写入必须创建可审批 Job"
-- 时序：整条管道 fire-and-forget、失败被吞，绝不污染压缩结果；同对话按 content hash 去重，避免刷屏审批队列
+- **不直接写 vault**——上层 `onExtractValuable` 据此创建 ingest proposal（`ingestService.receive` + `propose`，`kind: "text"`），遵守"知识写入必须创建受控 Job"
+- 时序：整条管道 fire-and-forget、失败被吞，绝不污染压缩结果；同对话按 content hash 去重，避免刷屏决策队列
 
 #### 6.2 `provider-client.mjs`（修改）
 
@@ -453,8 +453,8 @@ async function rotateConversation({ conversations, conversationRouter, ownerKey,
 1. `#fireExtraction` **fire-and-forget** 异步发起提取（不阻塞压缩主路径）
 2. 管道：`extractValuable`（正则预筛）→ per-对话 hash 去重 + 节流 → `#judgeValuable`（LLM 判定 keep/reject）→ `onExtractValuable` 回调
 3. 编排层（runtime）对每条经 LLM 判定保留的内容 fire-and-forget 调 `ingestService.receive({ kind: "text", value, title })` + `propose()`
-4. 同对话按 content hash 去重（`extractMaxPerConversation` 节流），避免刷屏审批队列
-5. 走正常收录审批流程，不直接写 vault；整条管道失败被吞，绝不污染压缩结果
+4. 同对话按 content hash 去重（`extractMaxPerConversation` 节流），避免刷屏决策队列
+5. 走正常收录受控执行流程，不直接写 vault；整条管道失败被吞，绝不污染压缩结果
 
 ### Phase 5：测试（1 个新建 + 1 个微调）
 
@@ -609,7 +609,7 @@ Phase 5: 测试（context-manager.test.mjs + provider-agent 0.97/rotate 用例�
 4. Layer3 压缩后，摘要物化为活跃 message，模型不"失忆"
 5. 压缩后模型回答质量不显著下降（保留关键决策和错误记录）
 6. 所有压缩操作记录在 `compactionLog`，被移除消息带 archivedAt 入 archive，可审计可恢复
-7. FlushToKnowledge 输出走 ingest proposal（可审批 Job + 去重），不直接写 vault
+7. FlushToKnowledge 输出走 ingest proposal（受控 Job + 去重），不直接写 vault
 8. rotate 超深度时降级兜底，用户总能收到回复
 9. 现有测试（+ 0.97 边界/rotate 用例）+ 新测试全部通过
 

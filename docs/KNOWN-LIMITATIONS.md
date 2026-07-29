@@ -4,7 +4,7 @@
 
 ## 发布门槛状态
 
-- 当前 Goal 状态为 `blocked`：P4.0–P4.6 已完成，P4.7 的真实渠道、审批、跨渠道连续性、重启恢复和下次 Windows 登录冷启动仍需主人验收；不得把自动测试、探针或当前任务 Running 状态表述为封板。
+- 当前 Goal 状态为 `blocked`：P4.0–P4.6 已完成，P4.7 的真实渠道、自动执行与澄清、跨渠道连续性、重启恢复和下次 Windows 登录冷启动仍需主人验收；不得把自动测试、探针或当前任务 Running 状态表述为封板。
 
 - token-cloud 固定模型五轮真实工具调用、故障持久等待和同模型恢复已通过，不再是发布门槛。
 - 微信 iLink 已完成扫码、Owner 绑定、4/4 连续回复、故障恢复和 durable seen ID 跨重启；主人直发真实 MD 收到 Artifact 回执，后台形成 Proposal 且未写入 vault。
@@ -26,20 +26,20 @@ Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导�
 - 仅支持 Windows；Provider Token、微信 Bot/回复上下文和飞书 App Secret 使用当前 Windows 用户的 DPAPI，不可作为跨用户可移植凭据。
 - 只启用 OpenCode Provider；Syno 按固定三模型链确定性尝试。仅在枚举的瞬态/契约失败且尚无不可逆副作用时尝试下一模型，不切换 Provider 或 Runtime。
 - Hermes `0.18.2` 因会访问 Chat Completions 以外的模型元数据路径而被淘汰；Hermes sidecar 代码仅保留审计和回归用途，不可选用。
-- OpenCode/模型不可用时，本地搜索、收录回执、任务、提醒与审批解析继续工作；需要模型的 Job 保留为 `waiting_provider`，不会自动换 Provider 或原生 Agent。
+- OpenCode/模型不可用时，本地搜索、收录回执、任务、提醒与决策解析继续工作；需要模型的 Job 保留为 `waiting_provider`，不会自动换 Provider 或原生 Agent。
 - Syno 不能修改自身源码；只能产生 `BugReport`、`ImprovementProposal` 和 SettingsRegistry 白名单内的偏好变更。
 
 ## 数据与渠道限制
 
 - 当前 R4.1–R4.7 工作树已完成全量 Node、vault、Repository verify、fresh clone 和 `git diff --check` 自动门禁；浏览器真实页面、Windows 登录冷启动和微信/飞书设备行为仍由主人 P4 验收。
-- 持久 Outbox 已采用 5 分钟可恢复租约、稳定 eventId/idempotencyKey 和接收方幂等边界，仍按 durable at-least-once 语义设计。若渠道已经接收而进程在送达状态落盘前崩溃，恢复后可能重复通知；这不会重复审批或知识写入，已作为显式产品限制保留。
+- 持久 Outbox 已采用 5 分钟可恢复租约、稳定 eventId/idempotencyKey 和接收方幂等边界，仍按 durable at-least-once 语义设计。若渠道已经接收而进程在送达状态落盘前崩溃，恢复后可能重复通知；这不会重复写入或重复触发澄清，已作为显式产品限制保留。
 - Bilibili 专用 canonical 规则、HTML/DOCX 边界和来源更新组合场景已有 Spec/组合测试；Bilibili 未完成语义审阅时保持 incomplete，不伪报 verified。
 - 当前差异的 Standards、Spec、Security 最终复审均完成，未解决 P0/P1 为 0。
 - 当前项目没有 TypeScript 源码、`tsconfig` 或 `typecheck` 脚本；`pnpm run typecheck` 会返回 `ERR_PNPM_NO_SCRIPT`，JavaScript 语法与行为由 Node 全量测试覆盖。
 - `vault/` 是唯一可写知识事实源。原始 Obsidian 仓库只读，不双向同步；渠道会话和飞书文档不是知识事实源。
 - 状态归档只包含 `%LOCALAPPDATA%\Syno\state`，不包含 DPAPI credentials，也不代替对 Git 跟踪的 `vault/`、`ops/` 和配置文档做备份。
-- Web/系统投递通知是可重建运行状态，只写 `.runtime/notifications`，不会因 Host 启动自动污染 `ops/`；需要长期保留的任务、审批和学习证据仍写入 canonical `ops/`。
-- 自动收录先形成 `IngestProposal`；覆盖、移动、合并、新 tag 和新 MOC 仍需独立审批，以降低错误整理的不可逆成本。
+- Web/系统投递通知是可重建运行状态，只写 `.runtime/notifications`，不会因 Host 启动自动污染 `ops/`；需要长期保留的任务、待决策项和学习证据仍写入 canonical `ops/`。
+- 自动收录先形成 `IngestProposal`；覆盖、移动、合并、新 tag 和新 MOC 在隔离工作区自动执行，整理冲突时暂停澄清，以降低错误整理的不可逆成本。
 - 飞书消息长连接使用 Syno 注册的 Feishu App；日历排期仍使用历史 `lark-cli` 授权。两者共享 Syno Policy 和 Markdown 事实源，但当前需要分别完成消息与日历授权，后续可统一凭据体验。
 - 微信仅支持绑定 Owner 的私聊入口，不读取个人聊天历史，也不支持群聊授权。
 - 外部网页、Bilibili、PDF 和附件受来源、大小、MIME、SSRF 与隔离规则限制；失效链接或无法安全提取的内容会保留失败状态，不会猜测补全。

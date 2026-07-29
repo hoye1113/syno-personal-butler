@@ -106,7 +106,7 @@ M1 上下文管理 + host 端口修复 + **Phase 1 收尾** + **M2 记忆保真�
 
 - **不 Push**（分支 `codex/round3-remediation`，全部本地）。
 - 原 Obsidian 库 `D:\workSpace\obsidian_repository` **永久只读**。
-- 知识写入走可审批 Job；不绕过 Policy、不 reset、不预创建 LearningState。
+- 知识写入走受控 Job；不绕过 Policy、不 reset、不预创建 LearningState。
 - Provider token 不泄露。
 
 ---

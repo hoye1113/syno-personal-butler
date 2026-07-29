@@ -3,7 +3,7 @@
 ## 当前 Goal 状态
 
 - Goal：按 `docs/TODO-EXECUTION-PLAN.md` 完成 P4.0–P4.7。
-- 当前状态：`blocked`，不是代码失败，而是连续审计确认剩余门槛只需要主人真实操作：微信/飞书消息、主人审批、跨渠道连续性、OpenCode/Workflow 重启恢复和下次 Windows 登录冷启动。
+- 当前状态：`blocked`，不是代码失败，而是连续审计确认剩余门槛只需要主人真实操作：微信/飞书消息、自动执行与澄清验收、跨渠道连续性、OpenCode/Workflow 重启恢复和下次 Windows 登录冷启动。
 - 本次文档同步为 document-only 操作：不修改执行代码、`vault/`、`ops/` 或原始 Obsidian 仓库，不暂存、不提交、不 Push。
 - 主人完成实测后，从本文件和 TODO 的 P4.7 清单恢复；必须先记录每项实际证据，再决定是否进入 P5/R6。
 
@@ -46,14 +46,14 @@
 - `OpenCodeCognitiveRuntime` Capability v2、Session binding、跨渠道 main Session、主动 proactive Session、串行、取消、保留清理和固定三模型链。
 - 项目级 `syno` Agent 与 capture/knowledge/learn/review/create/maintain 六个 Skills。
 - 静态 Syno MCP Tool Bridge；OpenCode 只能调用 ToolRegistry 允许的 `syno_*` 工具。
-- 统一渠道处理器、自然语言单审批、严格双审批、Owner/thread/TTL/digest/replay 边界。
+- 统一渠道处理器、受控执行（含冲突澄清）与 Owner/thread/TTL/digest/replay 边界。
 - SourceDescriptor 与 URL/文件/个人观点/未知来源收录追溯。
 - Web OpenCode 状态、独立 Zen Token 配置和重启入口。
 - 根 `AGENTS.md` 已移除 `hy3-free` 与 Claude 自动升级规则。
 - Token 由 DPAPI 保存，并通过内联配置引用子进程环境变量，不进入参数或状态元数据。
 - 活跃旧会话迁移只保留脱敏摘要和最近用户消息；私密内容、工具输出和密钥不进入 OpenCode。
 - `waiting_provider` 有周期恢复；并发后台/手动重试只能有一个调用取得 Job 执行权。
-- Proposal 修改会取消旧 Job；附件正文不能触发审批。
+- Proposal 修改会取消旧 Job；附件正文不能触发写入。
 - 当前差异已完成 Standards / Spec / Security 最终复审，均为 P0 0、P1 0。
 - Windows 安装器已改为通过 `Syno.WindowsTaskXml.psm1` 保护并验证任务 XML：固定单一登录触发器、30 秒延迟、执行身份、命令、参数、工作目录、单实例、隐藏运行、无限执行和每分钟重启。现有健康任务只有在导出 XML 通过同一契约后才可复用。
 - 2026-07-28 修复 Syno/OpenCode 启动循环等待：OpenCode MCP bootstrap 路由不再等待正在依赖它完成的 `synoReady`。真实 Host 已验证 8888 健康、OpenCode 1.18.2 在 4318 `ready/healthy=true`，微信/飞书恢复连接。
@@ -68,7 +68,7 @@
 5. P3 浏览器 CLI/本地 4329 页面受当前 Codex 浏览器安全策略拒绝，未将桌面、390×844、控制台或真实冷启动表述为通过；UI 静态测试和 fresh clone 自动门禁已通过，真实页面与设备验收移交 P4。
 6. `docs/TODO-EXECUTION-PLAN.md` 的 P4.0–P4.6 已执行：自然语言意图路由、动态能力说明、项目级 `syno-web-capture` Skill、受限 `syno_browser_*` Tool Bridge、Coordinator 自动指派、可观察性与 Doctor；Node 24 pinned DNS `lookup` 和 Kimi `/command` envelope 兼容性已修复，并用真实 OpenRouter 直抓、知乎 403 WebBridge 兜底复验。
 7. Windows 任务已真实注册并通过安装/状态/受控重启：使用真实 `node.exe`，等待 8 秒仍为 `Running`，Host 健康，启动器日志已落盘。本次复核补充：任务现已回落至 `State=Ready`、未运行，`LastRunTime=2026-07-28 20:31:19` 以 `0xC000013A`（控制中断）退出；不要把当前 8888 上存活的手动启动 Host（PID 14368）当作任务 `Running` 或下次登录恢复证据，退出根因需在冷启动验收中确认。
-8. 架构已根据主人反馈修正：OpenCode 会真实加载项目 Skill 并完成多步浏览器抓取；Syno 仍持有授权、URL/动作边界、Workflow 状态、审批和写入控制。全局 `kimi-webbridge` 仅作为上游方法与版本参照，不作为隔离运行时的隐式依赖。
+8. 架构已根据主人反馈修正：OpenCode 会真实加载项目 Skill 并完成多步浏览器抓取；Syno 仍持有授权、URL/动作边界、Workflow 状态、决策和写入控制。全局 `kimi-webbridge` 仅作为上游方法与版本参照，不作为隔离运行时的隐式依赖。
 9. P4.0–P4.6 代码与自动验证已完成；下一步从 P4.7 主人真实验收开始，不得把自动测试当作真实渠道、浏览器或 Windows 证据。
 10. 自动实现完成后进入 P4.7 主人真实验收；主人完成全部门槛前，不得进入 R6 或删除旧实现。
 
@@ -93,7 +93,7 @@
 2. 已完成 Outbox 语义、来源 Adapter 和组合回归。
 3. 已完成 Standards 首轮及 Spec/Security 修复复审，当前 P0/P1 均为 0。
 4. 已完成当前差异完整自动门禁和 fresh clone。
-5. 主人按 TODO 的 P4.7 清单执行自然语言会话、普通 URL、浏览器兜底、交互恢复、仅本地、跨渠道收录、审批和下次登录冷启动验收；Windows 安装/状态/受控重启已有本轮证据。
+5. 主人按 TODO 的 P4.7 清单执行自然语言会话、普通 URL、浏览器兜底、交互恢复、仅本地、跨渠道收录、自动执行/澄清和下次登录冷启动验收；Windows 安装/状态/受控重启已有本轮证据。
 6. 记录每次 Artifact/Workflow/Job、日志事件和实际结果；失败项回到对应 P4 子阶段修复。
 7. P4.7 全部通过后才规划 P5/R6，删除旧 Runtime 前必须重新三轴审查和完整回归。
 
@@ -104,8 +104,13 @@
 - 30 条真实跨渠道消息
 - 10 组多轮追问
 - 5 次 ToolRegistry 调用
-- 3 次普通审批
-- 1 次完整双审批
+- 3 次明确写入自动执行（含高风险：删除/覆盖/移动/新 MOC/新 tag）
+- 3 次系统歧义澄清（收录撞重/多方案/信息不足）
+- 1 次收录多方案澄清
+- 1 次源码越界硬拒绝
+- 1 次自我修改开关（allowSelfModify）关闭拒绝
+- 1 次系统控制开关（allowSystemControl）关闭拒绝
+- 3 次副作用恢复/对账（对应 S1 Effect Receipt，待 S1 落地后补验）
 - 3 种来源类型收录
 - OpenCode 重启后上下文与 PendingDecision 恢复
 

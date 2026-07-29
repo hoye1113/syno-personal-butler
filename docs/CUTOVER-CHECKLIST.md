@@ -41,7 +41,7 @@ Provider 自动采用门、故障注入与主人真实断网步骤见 `docs/PROV
 - [x] 使用 `git archive` 备份当前跟踪事实、源码和配置到 `C:\tmp\syno-repository-backup-3c2b362.zip`；650 项，不包含本机忽略目录或凭据，SHA-256 `430BA4B9440AB011308A43EA24EEF1F149DBA39A7D59A6795A312B2B32E491F6`。
 - [x] 执行状态 backup/verify；`C:\tmp\syno-state-final-bc5937b` 真实归档 52 项，manifest 的 `credentialsIncluded` 为 `false`，SHA-256 为 `DE0AD96C68170CA10498721C53F625A8405205DA912E095C2EFD026F70DAD969`。
 - [x] 在空隔离状态目录完成恢复演练，并验证二次恢复被拒绝；正式状态未被覆盖。
-- [x] 启动 Web/Worker，验证 Today、本地搜索、审批、提醒和微信/飞书消息通道健康；日历授权与选择在重启后恢复。
+- [x] 启动 Web/Worker，验证 Today、本地搜索、待决策项、提醒和微信/飞书消息通道健康；日历授权与选择在重启后恢复。
 - [x] 检查 `docs/KNOWN-LIMITATIONS.md`；当前没有未完成的发布门槛，剩余条目均为显式运行限制或后续兼容性债务。
 
 ## E. 历史封板（已被 OpenCode R0–R6 重构重新打开）

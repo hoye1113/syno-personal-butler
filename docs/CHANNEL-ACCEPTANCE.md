@@ -7,7 +7,7 @@
 - Web/Worker 使用同一仓库、Policy、ToolRegistry、ConversationStore 和 Owner 配置。
 - 不在命令行传 Token、Cookie、二维码、App Secret 或 context token。
 - 先备份非凭据状态；测试消息只使用不含私人知识的唯一标识文本。
-- 高风险和双审批任务只能回到 Web，不允许渠道消息绕过。
+- 高风险写入（覆盖/删除/移动/新 MOC/新 tag）只在 Web 执行，确保完整差异审计与回滚能力，不在渠道消息中直接触发。
 
 ## 微信
 

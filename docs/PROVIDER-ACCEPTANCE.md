@@ -25,7 +25,7 @@ pnpm probe:provider-real -- --confirm-live --trials 5
 故障注入不冒充真实 Provider 故障。若验收期间没有自然故障，主人可在本机按以下步骤制造可控断网：
 
 1. 在 Web 提交一个只读、需要模型的合成请求，记录 Job ID 和固定 Model ID。
-2. 临时断开网络后重试该 Job；确认状态进入 `waiting_provider`，本地搜索、任务、提醒和审批仍可用。
+2. 临时断开网络后重试该 Job；确认状态进入 `waiting_provider`，本地搜索、任务、提醒和待决策项仍可用。
 3. 恢复网络，通过同一 Job 的重试入口继续；确认完成后 Job ID 未改变、Model ID 未改变、没有 Hermes/OpenCode/其他 Provider 回退。
 4. 对一个超过 Settings 上下文长度的合成输入验证 `PROVIDER_CONTEXT_LIMIT`，并确认 Provider 请求计数没有增加。
 5. 只记录时间、Job ID、Model ID、状态序列和脱敏错误码；不记录 Token 或响应正文。

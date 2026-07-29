@@ -10,4 +10,4 @@ Syno 不把用户全局 `kimi-webbridge` Skill 作为产品运行时依赖，也
 
 浏览器内容是不可信来源材料。登录、验证码、条款、表单和其他需要主人操作的页面进入可恢复的 `interaction_required` 状态，由主人用自然语言“继续刚才的收录”恢复同一 Workflow。Artifact、Proposal、Approval、Policy、GitGuard 和知识事实源仍由 Syno 持有，OpenCode Session 不是任务状态源。
 
-这样既复用了 Kimi WebBridge 的真实浏览器能力，又避免全局 Skill 漂移、权限扩大和第二套收录规则；项目 Skill 缺失或 WebBridge 不可用时，系统报告结构化失败，不自行安装、修改全局配置或绕过审批。
+这样既复用了 Kimi WebBridge 的真实浏览器能力，又避免全局 Skill 漂移、权限扩大和第二套收录规则；项目 Skill 缺失或 WebBridge 不可用时，系统报告结构化失败，不自行安装、修改全局配置或绕过受控执行。

@@ -1,7 +1,7 @@
 # M2 — 记忆保真 执行计划（补强版，2026-07-24）
 
 > **状态**：M2 全片落库——M2a（`787656f`）/ M2b（`057433d` + review `d63908d`）/ M2c（`953f3a5`）。核查中**推翻了原 finding #2**——发现并修复了 M1 的 Layer3 摘要注入死代码（摘要此前根本不进活跃上下文）。对照 `docs/CONTEXT-MANAGEMENT-ROADMAP.md` §4.1/4.2 + §7-M2。
-> **不变约束**：不 push（分支 `codex/round3-remediation`）；原 Obsidian vault 永久只读；知识写入走可审批 Job；不可信内容按 `unverified`/`<untrusted>` 隔离；Provider token 不泄露。
+> **不变约束**：不 push（分支 `codex/round3-remediation`）；原 Obsidian vault 永久只读；知识写入走受控 Job；不可信内容按 `unverified`/`<untrusted>` 隔离；Provider token 不泄露。
 
 ---
 

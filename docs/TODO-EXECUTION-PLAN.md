@@ -41,7 +41,7 @@
 - 工作树中有两项主人知识变更，不属于本轮，禁止覆盖或暂存：
   - `vault/02-Resources/AI and Agents/MOC - Agent 架构与工程.md`
   - `vault/02-Resources/AI and Agents/Agent Design & Patterns/当编码不再是瓶颈 - Berkeley RDI 软件自主开发三级框架.md`
-- 主人已明确授权将全局 OpenCode 配置中的可用凭据一次性迁入 Syno DPAPI；产品运行时不会自动读取或依赖全局 `auth.json`。真实免费模型、真实跨渠道对话和真实审批计数仍未验收。
+- 主人已明确授权将全局 OpenCode 配置中的可用凭据一次性迁入 Syno DPAPI；产品运行时不会自动读取或依赖全局 `auth.json`。真实免费模型、真实跨渠道对话和真实写入与澄清计数仍未验收。
 - R4.1–R4.7 当前实现位于未提交工作树中；拒绝意图持久化与恢复崩溃窗口已修复，并完成当前差异的全量自动门禁与三轴复审。
 - P1–P3 自动封闭已经完成。P4.0–P4.6 的自然语言路由、项目 Skill、受限 Kimi WebBridge、自动回退、日志/Doctor 和自动测试已经实现并通过本地门禁；P4.7 的真实渠道、浏览器交互、登录后冷启动仍由主人执行。Windows 任务的安装、状态和受控重启已由本轮完成并留有日志证据。
 
@@ -59,8 +59,8 @@
 职责边界：
 
 - OpenCode 负责对话上下文、压缩、意图理解、Skill 选择和工具规划。
-- Syno 负责 Owner 身份、渠道去重、来源、任务、审批、权限、受控写入和事实源。
-- Web 是可选控制台，不是普通收录、询问或审批的强制入口。
+- Syno 负责 Owner 身份、渠道去重、来源、任务、决策、权限、受控写入和事实源。
+- Web 是可选控制台，不是普通收录、询问或决策的强制入口。
 - OpenCode 不得直接读取仓库、写文件、执行 Shell/Git、修改源码、分享会话、启动子 Agent 或动态加载 MCP。
 - 任意写入仍必须经过 ToolRegistry、Policy、Job、隔离 worktree、validators 和 GitGuard。
 
@@ -71,7 +71,7 @@
 - 产品运行时目标是唯一启用 `OpenCodeCognitiveRuntime`。
 - 原生 `ToolLoopAgent` 只在 R6 真实验收前作为非活动迁移回滚实现，绝不自动回退。
 - Hermes、旧 OpenCode/Claude Executor 不得进入产品对话路径。
-- OpenCode 失败后，自由对话和 LLM Job 等待；本地收录回执、审批解析、搜索和状态查询继续工作。
+- OpenCode 失败后，自由对话和 LLM Job 等待；本地收录回执、决策解析、搜索和状态查询继续工作。
 
 ### 3.2 模型链
 
@@ -158,24 +158,24 @@
 
 - 使用真实模型执行提示注入探针，证明 Shell、文件、Git、分享、模型切换、子 Agent 和动态 MCP 不可调用。
 
-### R4：渠道审批与来源闭环 — 已实现核心接缝，真实渠道待验收
+### R4：渠道澄清与来源闭环 — 已实现核心接缝，真实渠道待验收
 
 已实现：
 
 - 微信、飞书统一使用 `ChannelConversationHandler`。
 - 渠道顺序固定为：身份/去重 → 附件 → PendingDecision → 快捷命令 → OpenCode → 回复。
-- `PendingDecision` 支持单一自然确认、多个决定编号、TTL、重放保护、Owner/thread 绑定。
-- 高风险双审批支持“确认生成差异”与“确认应用 六位码”，并绑定 changed paths 和 diff digest。
+- `PendingDecision` 支持单一自然澄清、多个决定编号、TTL、重放保护、Owner/thread 绑定。
+- 高风险写入（覆盖/删除/移动/新 MOC/新 tag）在隔离工作区自动执行，绑定 changed paths 和 diff digest，冲突时暂停澄清。
 - `SourceDescriptor` 支持 URL、文件、个人观点和未知来源；Note 初始为 `knowledge_state: captured`。
 - 收录完成回执包含路径、来源可靠性、重复/关联、候选和未验证事项。
-- `修改：……` 会生成新版 Proposal，并把旧 Job 终结为 `canceled`，旧审批无法从 Web 或渠道继续应用。
-- 附件在审批语义之前隔离处理；正文中的“确认”不能被解释为 Owner 审批。
+- `修改：……` 会生成新版 Proposal，并把旧 Job 终结为 `canceled`，旧决策无法从 Web 或渠道继续应用。
+- 附件在写入语义之前隔离处理；正文中的“确认”不能被解释为 Owner 写入指令。
 
 剩余：
 
 - 补足 HTML/转发内容的明确提取支持边界。
 - 真实验证 URL、文本、Markdown、TXT、PDF 至少三种来源类型。
-- 真实验证微信和飞书的多待办、跨渠道、过期、重放与完整双审批。
+- 真实验证微信和飞书的多待办、跨渠道、过期、重放与冲突澄清。
 
 ### R4.1–R4.7：稳定收录与编译上下文 — 自动封闭完成，待主人真实验收
 
@@ -185,14 +185,14 @@
 2. **R4.2 持久 Workflow**：具备持久状态机、幂等接收、重启恢复、重试、规则变更 supersede 和终态保留接缝。
 3. **R4.3 Context Compiler**：使用固定 allowlist 编译带 digest 的 WorkflowContextBundle，包含来源适配、上下文预算、长内容分块和远程前 DLP。
 4. **R4.4 Capture Session**：复杂收录使用隔离 capture Session；普通语义分析继续采用最小权限配置，浏览器兜底阶段按上下文启用 `syno-web-capture` 与受限浏览器工具，全文不进入 main Session。
-5. **R4.5 渠道与 Outbox**：统一渠道状态查询、确定性审批、持久 Outbox、选项解析和重启后重新投递。
+5. **R4.5 渠道与 Outbox**：统一渠道状态查询、确定性受控执行、持久 Outbox、选项解析和重启后重新投递。
 6. **R4.6 Proposal 与写入**：具备 canonical 标签与关系、来源/内容摘要、来源更新检测、风险升级、受控写入和完整完成回执。
 7. **R4.7 知识闭环**：生成可重建的 LearningCandidate、ReviewOpportunity、OutputOpportunity 和 EvidenceCandidate，不更新掌握度事实。
 
 当前自动封闭证据：
 
 - 来源去重、内容更新、最终回执、EvidenceCandidate、DLP、规则 supersede、HTML/DOCX/PDF/URL/Markdown/TXT/personal/local-only 适配均有组合测试；当前 Node 全量 454/454 通过。
-- Outbox 已采用 5 分钟可恢复租约、稳定 eventId/idempotencyKey 和接收方幂等边界；仍保持 durable at-least-once 语义，极窄崩溃窗口的重复通知是已记录的产品限制，不会重复审批或写入。
+- Outbox 已采用 5 分钟可恢复租约、稳定 eventId/idempotencyKey 和接收方幂等边界；仍保持 durable at-least-once 语义，极窄崩溃窗口的重复通知是已记录的产品限制，不会重复写入或重复触发澄清。
 - Bilibili canonical 规则与来源报告已按保守语义实现；未完成语义审阅时明确保持 incomplete，不伪报 verified。
 - Standards、Spec、Security 最新复审均未发现未解决 P0/P1。
 - 当前工作树包含两项主人知识变更，任何测试、暂存和提交都必须继续排除它们。
@@ -206,7 +206,7 @@
 - OpenCode 健康、当前尝试和凭据状态。
 - Zen Token 配置入口。
 - OpenCode 重启入口。
-- Provider 不可用时 LLM Job 持久化为 `waiting_provider`，到期后由后台确定性恢复；本地回执、审批解析与状态查询继续可用。
+- Provider 不可用时 LLM Job 持久化为 `waiting_provider`，到期后由后台确定性恢复；本地回执、决策解析与状态查询继续可用。
 
 仍需：
 
@@ -223,8 +223,13 @@
 - 30 条真实跨渠道消息。
 - 10 组多轮追问。
 - 5 次 ToolRegistry 调用。
-- 3 次普通审批。
-- 1 次完整双审批。
+- 3 次明确写入自动执行（含高风险：删除/覆盖/移动/新 MOC/新 tag）。
+- 3 次系统歧义澄清（收录撞重/多方案/信息不足）。
+- 1 次收录多方案澄清。
+- 1 次源码越界硬拒绝。
+- 1 次自我修改开关（allowSelfModify）关闭拒绝。
+- 1 次系统控制开关（allowSystemControl）关闭拒绝。
+- 3 次副作用恢复/对账（对应 S1 Effect Receipt，待 S1 落地后补验）。
 - 3 种来源类型的收录。
 - OpenCode 重启后上下文与 PendingDecision 恢复。
 
@@ -238,7 +243,7 @@
 - Server：loopback、401、Session、消息、中止、删除、未知端口占用、自有 PID。
 - Runtime：跨渠道连续性、串行、取消、超时、崩溃、固定回退、不可逆副作用。
 - 权限：内置工具不可调用，伪造工具名和权限字段被拒绝。
-- 审批：单一/多个/重放/过期/跨 Owner/双审批 digest 变化。
+- 澄清/决策：单一/多个/重放/过期/跨 Owner/digest 变化。
 - 收录：来源、哈希、重复、失效 URL、恶意正文和完整追溯。
 - 隐私：Token 不进入输出、参数、仓库、备份或 profile。
 - 完整回归：Node、vault pytest、repository verify、fresh clone、浏览器、真实渠道和 Windows。
@@ -247,7 +252,7 @@
 
 1. Standards：代码遵循仓库约定，模块接口足够深。
 2. Spec：逐条对照 R0–R6 和公共契约。
-3. Security：权限、凭据、注入、审批、GitGuard 和进程边界。
+3. Security：权限、凭据、注入、受控执行、GitGuard 和进程边界。
 
 每轮高优先级发现修复后重审，最终要求 0 个未解决高优先级问题。
 
@@ -270,7 +275,7 @@
 
 ### P1：R4 自动封闭 — 已完成
 
-1. 为 Outbox 落实可恢复租约与接收方幂等键，或形成经测试、可观察且不影响审批/写入正确性的 at-least-once 明确边界。
+1. 为 Outbox 落实可恢复租约与接收方幂等键，或形成经测试、可观察且不影响决策与写入正确性的 at-least-once 明确边界。
 2. 逐项复核 Bilibili、HTML、DOCX、PDF、URL、Markdown/TXT 和 personal/local-only 来源适配。
 3. 为来源哈希去重、内容更新、最终回执、EvidenceCandidate、DLP 和规则 supersede 补齐组合回归。
 4. 修复本轮发现的编译、契约、恢复和错误传播问题；不得用旧 Runtime 回退绕过。
@@ -300,7 +305,7 @@
    - 斜杠命令仅作为兼容逃生口，自然语言是主交互。
    - 会话控制、能力说明、收录状态和标签页关闭等确定性意图在调用 OpenCode 前解析。
    - Kimi WebBridge 采用“项目级 OpenCode Skill + `syno_browser_*` 受限工具桥 + Syno Workflow 控制面”三层整合。
-   - OpenCode 负责按照 Skill 完成页面导航、快照读取和必要的多步语义判断；Syno 负责决定何时授权浏览器、限制目标 URL 和动作、持久化 Workflow、校验结果以及推进审批。
+   - OpenCode 负责按照 Skill 完成页面导航、快照读取和必要的多步语义判断；Syno 负责决定何时授权浏览器、限制目标 URL 和动作、持久化 Workflow、校验结果以及推进受控执行。
    - 用户全局 `kimi-webbridge` Skill 是上游方法来源，不直接作为 Syno 运行时事实源。Syno 使用项目级适配 Skill，避免隔离 profile、版本漂移、Shell 示例和全量浏览器能力绕过产品边界。
    - 直接 HTTP 抓取优先；只有确定性失败分类命中时才自动升级 WebBridge。
    - Session 仍不是任务事实源；浏览器回退不得绕过 Artifact、Workflow、Proposal、Policy、Approval 或 GitGuard。
@@ -366,7 +371,7 @@ normal_conversation
 - 路由只识别固定高置信模式；含糊表达进入普通对话，不用关键词误杀正常内容。
 - Owner 身份、平台去重、PendingDecision 的优先级继续高于意图路由。
 
-完成门槛：主人不使用 `/` 也能新建会话、查看能力、查询收录状态；现有审批语义不受影响。已由路由与渠道回归测试覆盖。
+完成门槛：主人不使用 `/` 也能新建会话、查看能力、查询收录状态；现有受控执行语义不受影响。已由路由与渠道回归测试覆盖。
 
 #### P4.2：项目级 OpenCode Skill 与引导协议
 
@@ -532,7 +537,7 @@ Artifact 已落盘并立即回执
 -> WorkflowContextCompiler
 -> capture Session 语义分析
 -> IngestProposal + PendingDecision
--> 既有审批与受控写入
+-> 既有决策与受控写入
 ```
 
 自动回退条件只允许：
@@ -587,7 +592,7 @@ capture.browser.session_closed
 
 自动测试至少覆盖：
 
-- 自然语言路由：中英文同义表达、歧义、普通聊天误判、审批优先级和 `/新对话` 兼容。
+- 自然语言路由：中英文同义表达、歧义、普通聊天误判、决策优先级和 `/新对话` 兼容。
 - Session：自然语言新建、旧 Session 保留、跨微信/飞书共用新 main Session、重启后 binding 恢复。
 - Skill：项目 Skill 可发现并按需加载；全局 Skill 缺失不影响运行；上游 digest 漂移只告警；Skill 不能扩大本次工具 allowlist。
 - WebBridge：健康、扩展离线、版本不兼容、超时、非法动作、任意 endpoint、active tab 劫持和 session 绑定。
@@ -596,7 +601,7 @@ capture.browser.session_closed
 - 安全：SSRF、重定向到私网、凭据 URL、敏感内容、Prompt Injection、超大正文和 `local-only` 零远程请求。
 - 恢复：浏览器抓取前后崩溃、`browser_interaction_required` 重启恢复、继续操作幂等和重复投递。
 - 标签页：默认不关闭；只有明确主人指令或已确认设置才关闭精确 Workflow session。
-- 闭环：WebBridge 只改变提取手段，不改变来源、审批、`knowledge_state: captured` 或掌握度规则。
+- 闭环：WebBridge 只改变提取手段，不改变来源、决策、`knowledge_state: captured` 或掌握度规则。
 
 阶段完成后已执行当前仓库完整 Node 454/454、vault pytest 57/57、Repository verify 1396 files、`git diff --check`；OpenCode Doctor（管理员上下文）、Kimi WebBridge 健康、OpenRouter 直抓和真实知乎 WebBridge 兜底回归已通过。P4 代码差异的 fresh clone、真实渠道和 Windows 登录恢复仍是 P4.7/P5 门禁。自动复审未发现未解决 P0/P1。
 
@@ -612,7 +617,7 @@ capture.browser.session_closed
 6. 发送“关闭收录标签”，确认只关闭对应 Workflow 的标签组。
 7. 使用一次“仅本地”，确认没有 direct HTTP、WebBridge 或 OpenCode 远程分析。
 8. 微信发送 Markdown，飞书发送 PDF，并验证至少三种来源类型。
-9. 修改一次 Proposal，完成三次普通审批和一次冲突双审批。
+9. 修改一次 Proposal，完成三次明确写入自动执行和一次冲突澄清。
 10. 在 Proposal 生成前重启一次，并在 PendingDecision 形成后再重启一次。
 11. 微信发起后在飞书查询或确认，验证跨渠道 Owner 连续性。
 12. 完成 30 条跨渠道消息、10 组多轮追问和 5 次 ToolRegistry 调用。
@@ -621,7 +626,7 @@ capture.browser.session_closed
 
 主人记录每项的时间、渠道、Artifact/Workflow/Job ID、期望、实际结果和日志事件。失败项回到 P4.1–P4.6 修复；全部通过前不进入 R6。
 
-在主人提交上述实测记录前，Goal 保持 `blocked`；不得以当前自动门禁或 Windows 当前 Running 状态替代真实渠道、审批和下次登录证据。
+在主人提交上述实测记录前，Goal 保持 `blocked`；不得以当前自动门禁或 Windows 当前 Running 状态替代真实渠道、自动执行/澄清和下次登录证据。
 
 ### P5：R6 清理与最终封板
 

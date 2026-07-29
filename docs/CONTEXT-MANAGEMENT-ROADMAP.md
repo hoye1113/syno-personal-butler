@@ -227,24 +227,24 @@ Phase 4 提取是「关键词正则预筛 → 二元 keep/reject」。长期看�
 **现状**
 - `extractValuable`（:224）正则预筛（中文决策词）。
 - `#judgeValuable`（:441）二元 keep/reject。
-- runtime `onExtractValuable` → `ingest.receive + propose`（审批门控，不写 vault）。
+- runtime `onExtractValuable` → `ingest.receive + propose`（受控执行门控，不写 vault）。
 
 **目标 / DoD**
-- 提取从二元判定升级为**结构化分类 + 图谱链接 + 真·去重**，且**始终走审批门**（receive + propose，永不直接写 vault）。
+- 提取从二元判定升级为**结构化分类 + 图谱链接 + 真·去重**，且**始终走受控执行门**（receive + propose，永不直接写 vault）。
 - Eval 证明召回率优于正则基线。
 
 **执行步骤**
 1. 用 LLM 提取替代正则预筛，返回结构化 `{type∈decision/fact/preference/todo/resource, content, confidence, links}`。
 2. 去重升级：propose 前查 `knowledge-store` 做语义重叠检测（不只 in-conversation hash + ingest title 搜索）。
 3. 链接：提取项关联现有图谱 / `goal-service` 目标。
-4. 保持审批门不变；提取内容仍 `<untrusted>` 包裹。
+4. 保持受控执行门不变；提取内容仍 `<untrusted>` 包裹。
 
 **验收标准**
-- Eval：召回率 vs 正则基线提升；去重测试（与已有知识重叠时不重复 propose）；端到端仍审批门控、不写 vault。
+- Eval：召回率 vs 正则基线提升；去重测试（与已有知识重叠时不重复 propose）；端到端仍受控执行门控、不写 vault。
 
 **依赖 / 阻塞**：FIDELITY（提取是 LLM 产出 → 必须 unverified / 门控）、COST（5.2，更多 LLM 调用）。
 
-**风险与缓解**：LLM 提取成本 / 噪声 → COST 核算 + confidence 阈值；安全门（审批）始终兜底。
+**风险与缓解**：LLM 提取成本 / 噪声 → COST 核算 + confidence 阈值；安全门（受控执行）始终兜底。
 
 **工作量**：L。
 
@@ -398,7 +398,7 @@ v1 原则「压缩可恢复」（CONTEXT-MANAGEMENT-PLAN §7.9）只在**存储�
 
 本路线图所有工作项**严格遵循** v1 既定约束，任何实现不得突破：
 
-- **原 Obsidian vault 永久只读**，无双向同步；知识写入必须创建**可审批 Job**（DISTILL 必须保持 receive + propose 审批门，永不直接写 vault）。
+- **原 Obsidian vault 永久只读**，无双向同步；知识写入必须创建**受控 Job**（DISTILL 必须保持 receive + propose 受控执行门，永不直接写 vault）。
 - **不 push 到远端**；当前分支 `codex/round3-remediation`。
 - **不绕过 Policy**，不 reset，不预创建 LearningState。
 - **Provider token 不泄露**（OBS / COST 端点与账本只暴露聚合指标，不含凭证）。
