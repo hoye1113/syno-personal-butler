@@ -3,18 +3,17 @@
 ## 当前实施入口
 
 - 审查基线：`567f23d2d9b423a98d0e88868c6cc2eb3859d16f`。
-- 当前实施分支：`codex/exec-p00-contracts`。
-- 新计划按 PR-00～PR-10 分批门控；当前只进入 PR-00，未把后续目标表述为已实现。
+- 当前实施分支：`codex/exec-p01-bootstrap-host`。
+- PR-00 已提交为 `41a324d`；PR-01 从该实际 HEAD 派生，后续目标仍不得表述为已实现。
 - 微信、飞书是主要日常入口；ACK 前持久化、原渠道最终交付、ChannelDeliveryOutbox、Effect Receipt 和 Unknown Case Store 仍是待实现能力。
 - PR-00～PR-03 自动与真实本机门禁通过前，不进入移动投递切换；Owner 真实微信/飞书和 Windows 下次登录验收仍保留为 R6 独立门槛。
 - 执行语义见 `docs/adr/0003-execution-semantics.md`，移动交付见 `docs/adr/0004-mobile-delivery-contract.md`，迁移规则见 `docs/adr/0005-schema-migration-policy.md`。
 
 ## 当前 Goal 状态
 
-- Goal：按 `docs/TODO-EXECUTION-PLAN.md` 完成 P4.0–P4.7。
-- 当前状态：`blocked`，不是代码失败，而是连续审计确认剩余门槛只需要主人真实操作：微信/飞书消息、自动执行与澄清验收、跨渠道连续性、OpenCode/Workflow 重启恢复和下次 Windows 登录冷启动。
-- 本次文档同步为 document-only 操作：不修改执行代码、`vault/`、`ops/` 或原始 Obsidian 仓库，不暂存、不提交、不 Push。
-- 主人完成实测后，从本文件和 TODO 的 P4.7 清单恢复；必须先记录每项实际证据，再决定是否进入 P5/R6。
+- Goal：按 `docs/TODO-EXECUTION-PLAN.md` 实施 PR-00～PR-10。
+- 当前状态：PR-01 实施中；Owner 真实微信/飞书、跨渠道连续性和 Windows 下次登录仍是不可由自动化替代的后续门槛。
+- 不修改 `vault/` 内容或原始 Obsidian 仓库；每个 PR 精确暂存，不 Push。
 
 ## 新对话第一句话
 

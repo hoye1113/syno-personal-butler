@@ -221,8 +221,10 @@ test("OpenCode Web API exposes redacted status, fixed restart, credential save, 
 test("Syno health identifies the product, protocol and exact repository without exposing its path", async () => {
   const health = await routeSynoApi({ developmentMode: false }, { method: "GET" }, new URL("http://localhost/api/syno/health"), async () => ({}));
   assert.equal(health.ok, true);
+  assert.equal(health.alive, true);
+  assert.equal(health.state, "ready");
   assert.equal(health.product, "syno-personal-butler");
-  assert.equal(health.protocolVersion, 1);
+  assert.equal(health.protocolVersion, 2);
   assert.match(health.repoFingerprint, /^[a-f0-9]{16}$/);
   assert.equal(Object.hasOwn(health, "repoRoot"), false);
 });

@@ -53,4 +53,25 @@ test("start:test launches the Syno Host and Fake OpenCode together", async (t) =
   assert.equal(openCode.runtimeMode, "opencode");
   assert.equal(openCode.supervisor.testMode, true);
   assert.equal(openCode.supervisor.healthy, true, stderr);
+
+  const second = spawn(process.execPath, ["scripts/start-test-host.mjs"], {
+    cwd: path.resolve("."),
+    env: {
+      ...process.env,
+      NODE_ENV: "test",
+      PORT: String(webPort + 10),
+      SYNO_OPENCODE_TEST_PORT: String(openCodePort + 10),
+      SYNO_LOCAL_DATA: path.join(root, "local"),
+      SYNO_RUNTIME_ROOT: path.join(root, "runtime-second"),
+      SYNO_WEB_ONLY: "true",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
+  let secondError = "";
+  second.stderr.setEncoding("utf8");
+  second.stderr.on("data", (chunk) => { secondError += chunk; });
+  const secondExit = await new Promise((resolve) => second.once("exit", (code) => resolve(code)));
+  assert.notEqual(secondExit, 0);
+  assert.match(secondError, /PROCESS_LOCK_HELD|跨进程锁已由运行中的实例持有/);
 });

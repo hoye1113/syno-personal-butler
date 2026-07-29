@@ -24,6 +24,7 @@
     "probe:hermes-sidecar": "node scripts/probe-hermes-sidecar.mjs",
     "probe:provider-real": "node scripts/probe-provider-real.mjs",
     "opencode:doctor": "node scripts/opencode-runtime.mjs doctor",
+    "syno:doctor": "node scripts/syno-doctor.mjs",
     "opencode:status": "node scripts/opencode-runtime.mjs status",
     "opencode:restart": "node scripts/opencode-runtime.mjs restart",
     "opencode:configure": "node scripts/opencode-runtime.mjs configure",

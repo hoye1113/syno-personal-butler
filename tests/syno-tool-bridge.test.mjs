@@ -201,6 +201,38 @@ test("SynoToolBridge supports the MCP initialize handshake without exposing runt
   assert.equal("resources" in initialized.result.capabilities, false);
 });
 
+test("SynoToolBridge keeps bootstrap methods available but rejects tools/call before runtime readiness", async () => {
+  const bridge = new SynoToolBridge({
+    tools: registry(),
+    token: "bridge-secret",
+    isRuntimeReady: () => false,
+  });
+  bridge.bindContext({
+    messageId: "starting-run",
+    allowedTools: ["knowledge_search"],
+  });
+  const initialized = await bridge.handle({
+    authorization: "Bearer bridge-secret",
+    body: { jsonrpc: "2.0", id: 1, method: "initialize" },
+  });
+  assert.equal(initialized.result.serverInfo.name, "syno-tool-bridge");
+  const listed = await bridge.handle({
+    authorization: "Bearer bridge-secret",
+    body: { jsonrpc: "2.0", id: 2, method: "tools/list" },
+  });
+  assert.ok(listed.result.tools.length > 0);
+  const called = await bridge.handle({
+    authorization: "Bearer bridge-secret",
+    body: {
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: { name: "knowledge_search", arguments: { query: "agent" } },
+    },
+  });
+  assert.match(called.error.message, /^RUNTIME_NOT_READY:/);
+});
+
 test("SynoToolBridge binds Owner thread and idempotency identity while tracking write effects", async () => {
   let receivedContext;
   let executions = 0;

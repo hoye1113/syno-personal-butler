@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import { AsyncLocalStorage } from "node:async_hooks";
 import path from "node:path";
@@ -14,7 +14,8 @@ import { buildOperationRequest } from "./syno/operation-registry.mjs";
 import { GitGuard } from "./syno/git-guard.mjs";
 import { assertJsonMutation, assertSameOriginMutation, securityHeaders } from "./syno/http-security.mjs";
 import { DEFAULT_WEB_PORT, PATHS, resolveInside } from "./syno/paths.mjs";
-import { requiresSynoReady } from "./syno/server-readiness.mjs";
+import { ProcessFileLock } from "./syno/process-lock.mjs";
+import { canServeBusiness, readinessHttpStatus, requiresSynoReady, runtimeNotReady } from "./syno/server-readiness.mjs";
 import { validateContractRecord } from "./syno/schema-registry.mjs";
 import {
   getPlannerConfigPath,
@@ -41,6 +42,19 @@ const PORT = Number(process.env.PORT || DEFAULT_WEB_PORT);
 const TIMEZONE = normalizeTimeZone(
   process.env.TOPIC_PLANNER_TIME_ZONE || Intl.DateTimeFormat().resolvedOptions().timeZone,
 );
+const HOST_REPO_FINGERPRINT = createHash("sha256")
+  .update(path.resolve(PATHS.repoRoot).toLocaleLowerCase("en-US"), "utf8")
+  .digest("hex").slice(0, 16);
+const hostLock = new ProcessFileLock({
+  file: path.join(PATHS.stateRoot, "locks", "syno-host.lock"),
+  failFast: true,
+  metadata: {
+    instanceId: randomUUID(),
+    repoFingerprint: HOST_REPO_FINGERPRINT,
+    entrypoint: "apps/syno/server.mjs",
+  },
+});
+const hostLease = await hostLock.acquire();
 const LARK_CLI_CANDIDATES = [
   process.env.LARK_CLI_PATH,
   ...(process.platform === "win32" ? [
@@ -113,15 +127,30 @@ const synoRuntime = createSynoRuntime({
   operationHandler: (operation, payload, context) => workbenchOperations.execute(operation, payload, context),
   onCommitted: executeLegacySideEffects,
 });
-const synoReady = synoRuntime.initialize({ worker: process.env.SYNO_WEB_ONLY !== "true" });
+let synoReady = null;
 
 const httpServer = createServer(async (req, res) => {
   try {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     if (url.pathname.startsWith("/api/")) assertLocalRequest(req);
+    const lifecycleState = synoRuntime.lifecycle().state;
+    if (
+      url.pathname.startsWith("/api/")
+      && requiresSynoReady(url.pathname)
+      && !canServeBusiness(lifecycleState)
+    ) {
+      return respondJson(res, runtimeNotReady(lifecycleState), 503);
+    }
 
     if (url.pathname.startsWith("/api/syno/")) {
-      if (requiresSynoReady(url.pathname)) await synoReady;
+      const state = lifecycleState;
+      if (url.pathname === "/api/syno/readiness") {
+        return respondJson(
+          res,
+          await routeSynoApi(synoRuntime, req, url, readJsonBody),
+          readinessHttpStatus(state),
+        );
+      }
       if (url.pathname.startsWith("/api/syno/windows-service") || ["/api/syno/opencode/restart", "/api/syno/opencode/credential"].includes(url.pathname)) {
         assertJsonMutation(req);
         assertSameOriginMutation(req);
@@ -239,13 +268,32 @@ const httpServer = createServer(async (req, res) => {
   } catch (error) {
     return respondError(res, error);
   }
-}).listen(PORT, "127.0.0.1", () => {
-  console.log(`Syno 赛诺运行于 http://127.0.0.1:${PORT}`);
+});
+await new Promise((resolve, reject) => {
+  httpServer.once("error", reject);
+  httpServer.listen(PORT, "127.0.0.1", resolve);
+}).catch(async (error) => {
+  await synoRuntime.close().catch(() => {});
+  await hostLease.release();
+  throw error;
+});
+console.log(`Syno 赛诺运行于 http://127.0.0.1:${PORT}`);
+synoReady = synoRuntime.initialize({ worker: process.env.SYNO_WEB_ONLY !== "true" });
+synoReady.catch(async (error) => {
+  console.error("[syno] Runtime 初始化失败，Host 将退出:", String(error?.message || error));
+  await shutdown();
+  process.exitCode = 1;
 });
 
+let shutdownPromise = null;
 async function shutdown() {
-  httpServer.close();
-  await synoRuntime.close();
+  if (shutdownPromise) return shutdownPromise;
+  shutdownPromise = (async () => {
+    await new Promise((resolve) => httpServer.close(resolve));
+    await synoRuntime.close();
+    await hostLease.release();
+  })();
+  return shutdownPromise;
 }
 process.once("SIGINT", shutdown);
 process.once("SIGTERM", shutdown);

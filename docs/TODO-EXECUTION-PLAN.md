@@ -14,10 +14,14 @@ reviewBaseline:
   reviewedAt: 2026-07-29
 
 implementation:
-  branch: codex/exec-p00-contracts
-  baseCommit: 567f23d2d9b423a98d0e88868c6cc2eb3859d16f
+  branch: codex/exec-p01-bootstrap-host
+  baseCommit: 41a324d
   headCommit: pending
 ```
+
+已完成：PR-00 `codex/exec-p00-contracts`，`567f23d` → `41a324d`，文档、ADR 与迁移策略门禁通过。
+
+进行中：PR-01 `codex/exec-p01-bootstrap-host`，Host Lock、Bootstrap HTTP、生命周期与 doctor。
 
 后续每个 PR 必须从前一个已验收 PR 的实际 HEAD 建分支，并独立记录 `baseCommit/headCommit`。执行顺序：
 

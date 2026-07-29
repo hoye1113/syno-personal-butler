@@ -71,7 +71,7 @@ const PUBLIC_COMMAND_INTENTS = Object.freeze({
 });
 
 const HEALTH_PRODUCT = "syno-personal-butler";
-const HEALTH_PROTOCOL_VERSION = 1;
+const HEALTH_PROTOCOL_VERSION = 2;
 const REPO_FINGERPRINT = createHash("sha256")
   .update(path.resolve(PATHS.repoRoot).toLocaleLowerCase("en-US"), "utf8")
   .digest("hex").slice(0, 16);
@@ -165,6 +165,21 @@ function parseStructuredModelOutput(text) {
 }
 
 function createSynoRuntime(options = {}) {
+  let lifecycleState = "starting";
+  let initializePromise = null;
+  let closePromise = null;
+  const componentState = {
+    store: "starting",
+    openCode: "starting",
+    channels: "starting",
+  };
+  const refreshLifecycleState = () => {
+    if (lifecycleState === "stopping") return lifecycleState;
+    if (componentState.store !== "ready") lifecycleState = "starting";
+    else if (componentState.openCode === "degraded" || componentState.channels === "degraded") lifecycleState = "degraded";
+    else lifecycleState = "ready";
+    return lifecycleState;
+  };
   const journal = options.journal || new RuntimeJournal();
   const recordEvent = (event, data, settings) => journal.record(event, data, settings).catch(() => null);
   const notifications = options.notifications || new NotificationStore();
@@ -364,6 +379,7 @@ function createSynoRuntime(options = {}) {
   const toolBridge = options.toolBridge || new SynoToolBridge({
     tools,
     token: bridgeToken,
+    isRuntimeReady: () => lifecycleState === "ready",
     onResult: async ({ tool, result, ownerKey, threadKey }) => {
       if (!result?.requiresApproval || !result.id) return;
       const job = await jobStore.get(result.id);
@@ -733,6 +749,30 @@ function createSynoRuntime(options = {}) {
   let channelRecoveryTimer = null;
   let providerRecoveryTimer = null;
   let workflowOutboxTimer = null;
+  let openCodeRecoveryPromise = null;
+  async function recoverOpenCode() {
+    if (runtimeMode !== "opencode" || componentState.openCode !== "degraded") return;
+    if (openCodeRecoveryPromise) return openCodeRecoveryPromise;
+    openCodeRecoveryPromise = (async () => {
+      try {
+        await startOpenCodeSecurely();
+        componentState.openCode = "ready";
+        refreshLifecycleState();
+        await recordEvent("syno.opencode.recovered");
+        await host.retryWaitingProvider();
+      } catch (error) {
+        await recordEvent("syno.opencode.recovery_failed", { error }, { level: "error" });
+      } finally {
+        openCodeRecoveryPromise = null;
+      }
+    })();
+    return openCodeRecoveryPromise;
+  }
+  async function recoverChannels() {
+    const results = await Promise.allSettled([weixin.start(), feishu.start()]);
+    componentState.channels = results.every((result) => result.status === "fulfilled") ? "ready" : "degraded";
+    refreshLifecycleState();
+  }
   async function drainWorkflowOutbox() {
     return workflowOutbox.deliverDue(async (event) => {
       if (event.targetChannel === "main-session") {
@@ -813,66 +853,104 @@ function createSynoRuntime(options = {}) {
     settingsRegistry,
     journal,
     windowsService,
+    lifecycle() {
+      return {
+        state: lifecycleState,
+        components: { ...componentState },
+      };
+    },
     restartOpenCode: () => startOpenCodeSecurely({ restart: true }),
     developmentMode: options.developmentMode === true || process.env.SYNO_DEVELOPMENT_MODE === "true",
     async initialize({ worker = false } = {}) {
-      await recordEvent("syno.initialize.requested", { worker, runtimeMode });
-      await Promise.all([
-        fs.mkdir(PATHS.opsRoot, { recursive: true }),
-        fs.mkdir(PATHS.runtimeRoot, { recursive: true }),
-        fs.mkdir(PATHS.stateRoot, { recursive: true }),
-      ]);
-      await host.recover();
-      await ingestWorkflows.recover();
-      await recordEvent("syno.host.recovered");
-      if (runtimeMode === "opencode") {
-        try {
-          await startOpenCodeSecurely();
-          await recordEvent("syno.opencode.ready");
-        } catch (error) {
-          await recordEvent("syno.opencode.degraded", { error }, { level: "error" });
-          console.error("[syno] OpenCode 未就绪，LLM Job 将等待 Provider:", String(error?.message || error));
+      if (initializePromise) return initializePromise;
+      if (lifecycleState === "stopping") {
+        throw Object.assign(new Error("Syno Runtime 正在停止"), { code: "RUNTIME_STOPPING" });
+      }
+      initializePromise = (async () => {
+        await recordEvent("syno.initialize.requested", { worker, runtimeMode });
+        await Promise.all([
+          fs.mkdir(PATHS.opsRoot, { recursive: true }),
+          fs.mkdir(PATHS.runtimeRoot, { recursive: true }),
+          fs.mkdir(PATHS.stateRoot, { recursive: true }),
+        ]);
+        if (lifecycleState === "stopping") throw Object.assign(new Error("Syno Runtime 正在停止"), { code: "RUNTIME_STOPPING" });
+        await host.recover();
+        await ingestWorkflows.recover();
+        if (lifecycleState === "stopping") throw Object.assign(new Error("Syno Runtime 正在停止"), { code: "RUNTIME_STOPPING" });
+        componentState.store = "ready";
+        await recordEvent("syno.host.recovered");
+        if (runtimeMode === "opencode") {
+          try {
+            await startOpenCodeSecurely();
+            componentState.openCode = "ready";
+            await recordEvent("syno.opencode.ready");
+          } catch (error) {
+            componentState.openCode = "degraded";
+            await recordEvent("syno.opencode.degraded", { error }, { level: "error" });
+            console.error("[syno] OpenCode 未就绪，LLM Job 将等待 Provider:", String(error?.message || error));
+          }
+        } else {
+          componentState.openCode = "ready";
         }
-      }
-      // 渠道启动不阻塞 Web API：微信/飞书离线或握手超时降级运行，
-      // channelRecoveryTimer（worker 模式）会周期重试，不应让 synoReady 永远 pending。
-      channels.start()
-        .then(async () => {
-          await recordEvent("syno.channels.started");
-          await drainWorkflowOutbox();
-        })
-        .catch(async (error) => {
-          await recordEvent("syno.channels.degraded", { error }, { level: "error" });
-          console.error("[syno] channels.start 降级运行，渠道将后台重试:", String(error?.message || error));
-        });
-      if (worker) {
-        proactive.start()
-          .then(() => recordEvent("syno.proactive.started"))
+        if (lifecycleState === "stopping") throw Object.assign(new Error("Syno Runtime 正在停止"), { code: "RUNTIME_STOPPING" });
+        // 渠道启动不阻塞本地 Store 恢复；失败会进入 degraded 并由恢复 Timer 重试。
+        channels.start()
+          .then(async () => {
+            if (lifecycleState === "stopping") return;
+            componentState.channels = "ready";
+            refreshLifecycleState();
+            await recordEvent("syno.channels.started");
+            await drainWorkflowOutbox();
+          })
           .catch(async (error) => {
-            await recordEvent("syno.proactive.degraded", { error }, { level: "error" });
-            console.error("[syno] proactive.start 降级:", String(error?.message || error));
+            if (lifecycleState === "stopping") return;
+            componentState.channels = "degraded";
+            refreshLifecycleState();
+            await recordEvent("syno.channels.degraded", { error }, { level: "error" });
+            console.error("[syno] channels.start 降级运行，渠道将后台重试:", String(error?.message || error));
           });
-        channelRecoveryTimer = setInterval(() => Promise.allSettled([weixin.start(), feishu.start()]), 60_000);
-        providerRecoveryTimer = setInterval(() => host.retryWaitingProvider().catch(() => {}), 60_000);
-      }
-      workflowOutboxTimer = setInterval(() => drainWorkflowOutbox().catch((error) =>
-        recordEvent("ingest.outbox.drain_failed", { error }, { level: "error" }).catch(() => {}),
-      ), 15_000);
-      await recordEvent("syno.initialize.completed", { worker, runtimeMode });
-      return core.snapshot();
+        refreshLifecycleState();
+        if (worker) {
+          proactive.start()
+            .then(() => recordEvent("syno.proactive.started"))
+            .catch(async (error) => {
+              await recordEvent("syno.proactive.degraded", { error }, { level: "error" });
+              console.error("[syno] proactive.start 降级:", String(error?.message || error));
+            });
+          channelRecoveryTimer = setInterval(() => recoverChannels().catch(() => {}), 60_000);
+          providerRecoveryTimer = setInterval(() => recoverOpenCode().catch(() => {}), 60_000);
+        }
+        workflowOutboxTimer = setInterval(() => drainWorkflowOutbox().catch((error) =>
+          recordEvent("ingest.outbox.drain_failed", { error }, { level: "error" }).catch(() => {}),
+        ), 15_000);
+        await recordEvent("syno.initialize.completed", { worker, runtimeMode, state: lifecycleState });
+        return core.snapshot();
+      })().catch(async (error) => {
+        if (lifecycleState === "stopping") throw error;
+        componentState.store = componentState.store === "ready" ? "ready" : "degraded";
+        lifecycleState = "degraded";
+        await recordEvent("syno.initialize.failed", { error }, { level: "error" });
+        throw error;
+      });
+      return initializePromise;
     },
     async close() {
-      await recordEvent("syno.shutdown.requested");
-      proactive.stop();
-      if (channelRecoveryTimer) clearInterval(channelRecoveryTimer);
-      channelRecoveryTimer = null;
-      if (providerRecoveryTimer) clearInterval(providerRecoveryTimer);
-      providerRecoveryTimer = null;
-      if (workflowOutboxTimer) clearInterval(workflowOutboxTimer);
-      workflowOutboxTimer = null;
-      await channels.stop();
-      await openCodeSupervisor.stop().catch(() => {});
-      await recordEvent("syno.shutdown.completed");
+      if (closePromise) return closePromise;
+      lifecycleState = "stopping";
+      closePromise = (async () => {
+        await recordEvent("syno.shutdown.requested");
+        proactive.stop();
+        if (channelRecoveryTimer) clearInterval(channelRecoveryTimer);
+        channelRecoveryTimer = null;
+        if (providerRecoveryTimer) clearInterval(providerRecoveryTimer);
+        providerRecoveryTimer = null;
+        if (workflowOutboxTimer) clearInterval(workflowOutboxTimer);
+        workflowOutboxTimer = null;
+        await channels.stop().catch(() => {});
+        await openCodeSupervisor.stop().catch(() => {});
+        await recordEvent("syno.shutdown.completed");
+      })();
+      return closePromise;
     },
   };
 }
@@ -884,9 +962,18 @@ async function routeSynoApi(runtime, req, url, readBody) {
     conversationId: runtime.conversationRouter ? await runtime.conversationRouter.resolve({ ownerKey: "local-user" }) : undefined,
   };
   if (!url.pathname.startsWith("/api/syno/")) return null;
+  const lifecycle = typeof runtime.lifecycle === "function"
+    ? runtime.lifecycle()
+    : { state: "ready", components: {} };
   if (method === "GET" && url.pathname === "/api/syno/health") return {
-    ok: true, product: HEALTH_PRODUCT, protocolVersion: HEALTH_PROTOCOL_VERSION,
-    repoFingerprint: REPO_FINGERPRINT, now: new Date().toISOString(),
+    ok: true, alive: true, state: lifecycle.state, product: HEALTH_PRODUCT,
+    protocolVersion: HEALTH_PROTOCOL_VERSION, repoFingerprint: REPO_FINGERPRINT,
+    now: new Date().toISOString(),
+  };
+  if (method === "GET" && url.pathname === "/api/syno/readiness") return {
+    ok: lifecycle.state === "ready",
+    state: lifecycle.state,
+    components: lifecycle.components,
   };
   if (method === "GET" && url.pathname === "/api/syno/context/stats") {
     // 压缩遥测（OBS 3.1）：只读聚合视图，不含凭证。

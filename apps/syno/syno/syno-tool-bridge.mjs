@@ -46,12 +46,13 @@ const BRIDGE_TOOL_NAMES = new Set([
 ]);
 
 class SynoToolBridge {
-  constructor({ tools, token, ownerKey = "local-user", onResult = async () => {} } = {}) {
+  constructor({ tools, token, ownerKey = "local-user", onResult = async () => {}, isRuntimeReady = () => true } = {}) {
     if (!tools || !token) throw new Error("SynoToolBridge 缺少 ToolRegistry 或进程级 Token");
     this.tools = tools;
     this.token = token;
     this.ownerKey = ownerKey;
     this.onResult = onResult;
+    this.isRuntimeReady = isRuntimeReady;
     this.effectCounter = 0;
     this.activeContext = null;
     this.idempotentResults = new Map();
@@ -112,6 +113,12 @@ class SynoToolBridge {
     if (request.method === "tools/list") return { ...response, result: { tools: this.definitions() } };
     if (request.method !== "tools/call") {
       return { ...response, error: { code: -32601, message: "Method not found" } };
+    }
+    if (!this.isRuntimeReady()) {
+      return {
+        ...response,
+        error: { code: -32004, message: "RUNTIME_NOT_READY: Syno Runtime 尚未就绪" },
+      };
     }
     const name = String(request.params?.name || "");
     const definition = this.exposed.get(name);
