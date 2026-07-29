@@ -6,6 +6,17 @@ function normalizeRecentText(value) {
 
 function parseRecentReference(value) {
   const text = normalizeRecentText(value);
+  const unknownResolution = /^(?:确认|确定)(?:该事项|这项|这个)?\s*(未执行|没有执行|已执行|已经执行)(?:\s*(?:第\s*)?(\d+)\s*(?:项|个)?)?$/u.exec(text);
+  if (unknownResolution) {
+    return {
+      kind: "unknown_resolution",
+      action: "resolve_unknown",
+      result: /未执行|没有执行/u.test(unknownResolution[1]) ? "confirmed_not_started" : "confirmed_committed",
+      confidence: 1,
+      text,
+      ...(unknownResolution[2] ? { index: Number(unknownResolution[2]) } : {}),
+    };
+  }
   if (/^(?:刚才那个|刚才的那个|刚刚那个)(?:吧|呢)?$/u.test(text)) return { kind: "recent_reference", action: "inspect", confidence: 1, text };
   if (/^(?:取消|停止)(?:刚才|刚刚)(?:的)?(?:任务|请求)?(?:吧|呢)?$/u.test(text)) return { kind: "recent_reference", action: "cancel", confidence: 1, text };
   const continuation = /^(?:继续|恢复)\s*(?:(?:刚才|刚刚)(?:的)?)?\s*(?:第\s*)?(\d+)?\s*(?:项|个)?(?:请求|任务|收录)?(?:吧|呢)?$/u.exec(text);
@@ -64,6 +75,24 @@ class RecentInteractionView {
     const snapshot = await this.snapshot(context);
     const candidates = snapshot.recent;
     if (!candidates.length) return { kind: "none", text: "当前没有可引用的未完成事项。" };
+    if (reference.action === "resolve_unknown") {
+      const unknowns = candidates.filter((item) => item.kind === "unknown");
+      const selected = reference.index ? unknowns[reference.index - 1] : unknowns.length === 1 ? unknowns[0] : null;
+      if (!selected) {
+        if (!unknowns.length) return { kind: "none", text: "当前没有待核对的 Unknown Case。" };
+        return { kind: "ambiguous", candidates: unknowns, text: unknowns.slice(0, this.limit).map((item, index) => `${index + 1}. ${item.id}：${item.toolName || "副作用"}`).join("\n") };
+      }
+      if (typeof this.reconciliationCases?.resolveOwner !== "function") return { kind: "unsupported", item: selected, text: `事项 ${selected.id} 当前不能从移动端核对。` };
+      const resolution = await this.reconciliationCases.resolveOwner(selected.id, {
+        result: reference.result,
+        resolvedBy: "owner",
+        channel: context.channel || null,
+      });
+      const nextStep = reference.result === "confirmed_not_started"
+        ? "如需重试，请重新发起新请求；系统不会复用原 Invocation Key。"
+        : "系统不会再次执行该副作用。";
+      return { kind: "resolved", item: selected, resolution, text: `已记录 ${selected.id}：${reference.result === "confirmed_not_started" ? "确认未执行" : "确认已执行"}。${nextStep}` };
+    }
     if (reference.action === "inspect") {
       if (candidates.length > 1) return { kind: "ambiguous", candidates, text: candidates.slice(0, this.limit).map((item, index) => `${index + 1}. ${item.id}：${item.status}`).join("\n") };
       return { kind: "resolved", item: candidates[0], text: `最近事项 ${candidates[0].id}：${candidates[0].status}。` };

@@ -11,6 +11,8 @@ test("recent references parse deterministically without asking the model", () =>
   assert.deepEqual(parseRecentReference("刚才那个"), { kind: "recent_reference", action: "inspect", confidence: 1, text: "刚才那个" });
   assert.deepEqual(parseRecentReference("取消刚才的"), { kind: "recent_reference", action: "cancel", confidence: 1, text: "取消刚才的" });
   assert.deepEqual(parseRecentReference("继续第 2 项"), { kind: "recent_reference", action: "continue", confidence: 1, text: "继续第 2 项", index: 2 });
+  assert.deepEqual(parseRecentReference("确认未执行"), { kind: "unknown_resolution", action: "resolve_unknown", result: "confirmed_not_started", confidence: 1, text: "确认未执行" });
+  assert.deepEqual(parseRecentReference("确定已执行第 2 项"), { kind: "unknown_resolution", action: "resolve_unknown", result: "confirmed_committed", confidence: 1, text: "确定已执行第 2 项", index: 2 });
   assert.equal(parseRecentReference("帮我想个标题"), null);
 });
 
@@ -40,6 +42,21 @@ test("RecentInteractionView cancels only the explicitly selected recent Job", as
   const result = await view.resolve(parseRecentReference("取消刚才的"), { ownerKey: "owner", channel: "feishu" });
   assert.equal(result.kind, "resolved");
   assert.deepEqual(canceled, ["job-2"]);
+});
+
+test("RecentInteractionView resolves one Unknown Case from mobile without retrying its effect", async () => {
+  const resolutions = [];
+  const view = new RecentInteractionView({
+    core: { host: { async list() { return []; } } },
+    reconciliationCases: {
+      async list() { return [{ caseId: "case-unknown-1", toolName: "settings.adjust", status: "open", createdAt: "2026-07-29T00:01:00.000Z", updatedAt: "2026-07-29T00:01:00.000Z" }]; },
+      async resolveOwner(id, resolution) { resolutions.push({ id, resolution }); return { caseId: id, ownerResolution: { source: "owner", ...resolution } }; },
+    },
+  });
+  const result = await view.resolve(parseRecentReference("确认未执行"), { ownerKey: "owner", channel: "weixin" });
+  assert.equal(result.kind, "resolved");
+  assert.match(result.text, /重新发起新请求/);
+  assert.deepEqual(resolutions, [{ id: "case-unknown-1", resolution: { result: "confirmed_not_started", resolvedBy: "owner", channel: "weixin" } }]);
 });
 
 test("PendingDecision presentation fixes ordered IDs, channel and version across repeated reads", async (t) => {
