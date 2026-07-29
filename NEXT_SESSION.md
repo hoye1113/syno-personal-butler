@@ -5,9 +5,9 @@
 - 审查基线：`567f23d2d9b423a98d0e88868c6cc2eb3859d16f`。
 - 当前实施分支：`codex/exec-p10-r6-seal`。
 - 已提交阶段 HEAD：PR-04A0 `3c8fae5`、PR-04A `ad187cb`、PR-04B `3df84cd`、PR-04C/04D `7f094c4`、PR-05/06 `b813764`、PR-07A `e63b5e9`、PR-07B `043d3ba`、PR-08 `fd34708`、PR-09 `f9d9206`。
-- PR-10 当前实现提交：`62ad13d`，R6 自动证据 `cbbe5b0`，任务重启运行证据 `c5fe5dd`。
+- PR-10 当前实现提交：`3d67f112`，R6 自动证据待随本提交更新，任务重启与 Host lock 身份证据在 `ops/acceptance/pr-10-r6-seal/`。
 - 诊断聚合与完整回归提交：`80e60a6`，Node 520/520；陈旧 Host lock doctor 恢复证据在 `ops/acceptance/pr-10-r6-seal/lock-recovery-2026-07-29.json`。
-- 严格 readiness 与移动 Unknown Resolution 提交：`d24f492`、`dc98e7c`；最新 Node 522/522、fresh clone 522/522、Python 3.11 Vault 57/57。
+- 严格 readiness 与移动 Unknown Resolution 提交：`d24f492`、`dc98e7c`；Windows lock 身份修复提交：`3d67f112`；最新 Node 523/523、fresh clone 523/523、Python 3.11 Vault 57/57。
 - 微信、飞书是主要日常入口；AcceptedRequest、ChannelDeliveryOutbox、Effect Receipt、Unknown Case、Decision、Ephemeral Capture 和持久 Chunk 已实现，PR-04A/04B 已接入受门控的 `legacy/shadow/v2` runtime seam，但生产切换与 Owner 实测仍未完成。
 - PR-10 只生成 Owner 验收模板和只读 readiness；未取得 Owner 手机、真实渠道和 Windows 冷启动证据前，不切换移动生产路径、不删除 Legacy、不标记 Goal complete。
 - 执行语义见 `docs/adr/0003-execution-semantics.md`，移动交付见 `docs/adr/0004-mobile-delivery-contract.md`，迁移规则见 `docs/adr/0005-schema-migration-policy.md`。
@@ -17,28 +17,29 @@
 - Goal：按 `docs/TODO-EXECUTION-PLAN.md` 实施 PR-00～PR-10。
 - 当前状态：PR-10 R6 门禁准备中；Owner 真实微信/飞书、跨渠道连续性、Unknown/Decision、PDF/DOCX、Windows 下次登录仍是不可由自动化替代的门槛。
 - 不修改 `vault/` 内容或原始 Obsidian 仓库；每个 PR 精确暂存，不 Push。
-- 最新自动回归：Node 522/522、Repository verify 1463 files、active docs 7；R6 readiness 已确认 automatedPassed=true，但仍因 Owner 验收未通过而保持 blocked。计划任务当前 Running，但 Windows 冷启动仍未由 Owner 验收。
+- 最新自动回归：Node 523/523、Repository verify 1464 files、active docs 7；fresh clone Node 523/523、verify 1461 files、Python 3.11 Vault 57/57；R6 readiness automatedPassed=true，但 Owner 验收未通过，Goal 保持 active。计划任务当前 Running，Host lock 身份核验通过，但 Windows 冷启动仍未由 Owner 验收。
 
 ## 新对话第一句话
 
-> 完整读取根 `AGENTS.md`、`NEXT_SESSION.md` 和 `docs/TODO-EXECUTION-PLAN.md`。先核对分支、HEAD、工作树与真实测试，再从当前 OpenCode 重构断点继续。保留两项主人知识变更；不要修改原 Obsidian 库，不要 reset，不要 `git add -A`，不要 Push。
+> 完整读取根 `AGENTS.md`、`NEXT_SESSION.md` 和 `docs/TODO-EXECUTION-PLAN.md`。先核对分支、HEAD、工作树与真实测试，再从 `codex/exec-p10-r6-seal` 的 R6 Owner 门禁继续。保留两项主人知识变更；不要修改原 Obsidian 库，不要 reset，不要 `git add -A`，不要 Push。
 
-## 当前基线
+## 历史基线与兼容信息
 
-- 分支：`codex/round3-remediation`
+- 分支：`codex/exec-p10-r6-seal`
 - 本轮固定起点：`f0333f3`
 - 已完成实现提交：`5890dad`
 - OpenCode CLI：`1.18.2`
 - OpenCode 实际二进制：
   `%LOCALAPPDATA%\mise\installs\node\24.13.0\node_modules\opencode-ai\bin\opencode.exe`
 - OpenCode 子进程端口：`127.0.0.1:4318`
-- 当前可信执行 HEAD：以 `git log` 为准；本轮 PR-10 分支从 `f9d9206` 派生，尚未提交 R6 模板。
+- 当前可信执行 HEAD：`3d67f112d7e7101192f70d89c3ea5f2e99a186b9`；本轮 PR-10 分支从 `f9d9206` 派生，R6 模板仍待 Owner 填写。
 - mise shim 后台启动会递归，禁止作为生产启动目标。
 - Windows 计划任务 XML 加固前的 OpenCode 自动验证：Node 370/370、vault pytest 57/57、Repository verify 1358 files。
 - Windows 计划任务 XML 加固后的基线验证：Node 375/375、vault pytest 57/57、Repository verify 1359 files、`git diff --check` 通过。
 - OpenCode 启动死锁与运行日志修复后的历史验证：Node 381/381、vault pytest 57/57、Repository verify 1365 files、`git diff --check` 通过。
 - 当前工作树 P4.0–P4.6 自动门禁：Node 454/454、vault pytest 57/57、Repository verify 1396 files、`git diff --check` 通过。
-- 最近只读运行态（2026-07-28 约 22:26 CST 复核）：Syno Host `/api/syno/health` 返回 `ok=true`（监听进程 PID 14368，20:05:47 起的手动启动 Host，非活动任务实例托管）；Windows 任务 `Syno` 当前 `State=Ready`、未运行，`LastRunTime=2026-07-28 20:31:19`、`LastTaskResult=3221225786`（0xC000013A 控制中断退出），`scripts/manage-windows-task.ps1 -Action Status` 报告 `running=False`；OpenCode supervisor 健康（pid 26144、`127.0.0.1:4318`、1.18.2、凭据 configured、`healthy=true`）。
+- 历史只读运行态（2026-07-28 约 22:26 CST 复核）：当时任务曾为 `State=Ready`；该快照不代表当前状态。
+- 当前只读运行态（2026-07-29 21:13 CST）：Syno Host health/readiness 为 ready，Windows 任务 `Syno=Running`，微信/飞书 connected；Host lock 通过 Windows 进程启动时间身份核验。Windows 下次登录冷启动仍待 Owner 验收。
 - 当前差异 fresh clone `.runtime/p3-fresh-final-1785229932`：Node 433/433、vault 57/57、Repository verify 1378 files；按锁文件安装成功，排除了两项主人知识变更。
 - 真实无模型 OpenCode 探针已通过 1.18.2、loopback、Basic Auth、Session create/abort/delete、静态 `syno` MCP 和禁止内置工具不可调用。
 - 主人已明确授权将全局 OpenCode 配置中的可用凭据一次性迁入 Syno DPAPI；产品运行时不会自动读取或依赖全局 `auth.json`。

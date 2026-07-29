@@ -1,19 +1,19 @@
 {
   "version": 1,
-  "runAt": "2026-07-29T20:54:09+08:00",
-  "commit": "dc98e7c27d54ee81d2155aa1807fd0e75aeb1090",
+  "runAt": "2026-07-29T21:13:22+08:00",
+  "commit": "3d67f112d7e7101192f70d89c3ea5f2e99a186b9",
   "branch": "codex/exec-p10-r6-seal",
   "automated": {
-    "nodeTests": { "passed": 522, "failed": 0 },
-    "repositoryVerifyFiles": 1463,
+    "nodeTests": { "passed": 523, "failed": 0 },
+    "repositoryVerifyFiles": 1464,
     "activeDocumentationFiles": 7,
     "vaultPython311Unittest": { "passed": 57, "failed": 0 },
     "gitDiffCheck": "passed"
   },
   "freshClone": {
     "status": "verified",
-    "lastVerifiedCommit": "dc98e7c27d54ee81d2155aa1807fd0e75aeb1090",
-    "nodeTests": { "passed": 522, "failed": 0 },
+    "lastVerifiedCommit": "3d67f112d7e7101192f70d89c3ea5f2e99a186b9",
+    "nodeTests": { "passed": 523, "failed": 0 },
     "repositoryVerifyFiles": 1461,
     "activeDocumentationFiles": 7,
     "vaultPython311Unittest": { "passed": 57, "failed": 0 },
@@ -25,8 +25,9 @@
     "feishu": { "ok": true, "configured": true, "ownerBound": true, "connected": true, "source": "running_worker" },
     "windowsTask": { "installed": true, "running": true, "startup": "at_logon", "legacyTaskDetected": false },
     "mobileDelivery": { "mode": "legacy", "acceptedRequests": { "total": 5, "byStatus": { "accepted": 5 } }, "outbox": { "total": 0, "byStatus": {} }, "unknownCases": { "total": 0, "byStatus": {} }, "v2Cutover": "owner_acceptance_ingress_freeze_and_legacy_drain_required" },
+    "hostLockIdentity": { "status": "running", "verifiedAfterTaskRestart": true },
     "r6Readiness": { "ready": false, "blockers": ["OWNER_ACCEPTANCE_PENDING"] }
   },
   "ownerAcceptance": "pending_owner",
-  "notes": "不包含消息正文、凭据、Token、Cookie、PID 或本机敏感路径；Node 520/520，真实 Owner 渠道、手机操作与 Windows 冷启动尚未验收。本轮 Python 3.11 解释器启动被 Windows 拒绝，保留上一轮 57/57 证据，不将本轮解释器失败计为 Vault 测试通过；计划任务曾因已确认陈旧 Host lock 启动失败，doctor 清理后已恢复。"
+  "notes": "不包含消息正文、凭据、Token、Cookie、PID 或本机敏感路径；当前提交主仓 Node 523/523、fresh clone Node 523/523，主仓 verify 1463 文件、fresh clone verify 1461 文件，Python 3.11 Vault unittest 均 57/57，工作区干净。Host 重启后计划任务 Running、health/readiness ready、微信/飞书 connected；Host lock 通过 Windows 进程启动时间身份核验。真实 Owner 渠道消息、手机操作、Windows 冷启动/注销重登及 v2 切换仍未验收。"
 }
