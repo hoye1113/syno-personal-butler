@@ -119,7 +119,8 @@ class WeixinIlinkClient {
       signal?.removeEventListener("abort", abort);
     }
   }
-  async sendText({ toUserId, contextToken, text }) {
+  async sendText({ toUserId, contextToken, text, clientId }) {
+    const stableClientId = typeof clientId === "string" && clientId.trim() ? clientId.trim() : `syno-${randomUUID()}`;
     return this.fetcher(this.url("ilink/bot/sendmessage"), {
       method: "POST",
       headers: this.headers(),
@@ -127,7 +128,7 @@ class WeixinIlinkClient {
         msg: {
           from_user_id: "",
           to_user_id: toUserId,
-          client_id: `syno-${randomUUID()}`,
+          client_id: stableClientId,
           context_token: contextToken,
           message_type: 2,
           message_state: 2,
@@ -447,11 +448,17 @@ class WeixinIlinkAdapter {
     const toUserId = message.toUserId || this.credential?.ownerId;
     const contextToken = message.contextToken || this.contexts.get(toUserId);
     if (!toUserId || !contextToken) return { delivered: false, reason: "no_active_context" };
-    const result = await this.client.sendText({ toUserId, contextToken, text: String(message.text || message.body || "") });
+    const deliveryKey = message.deliveryKey || message.idempotencyKey || null;
+    const result = await this.client.sendText({ toUserId, contextToken, text: String(message.text || message.body || ""), ...(deliveryKey ? { clientId: String(deliveryKey) } : {}) });
     const explicitFailure = (result.ret !== undefined && Number(result.ret) !== 0)
       || (result.errcode !== undefined && Number(result.errcode) !== 0);
     const accepted = result.message_id !== undefined || Number(result.ret) === 0;
-    return { delivered: !explicitFailure && accepted, ...(!explicitFailure && accepted ? {} : { reason: "provider_rejected" }) };
+    return {
+      delivered: !explicitFailure && accepted,
+      deliveryCapability: "at_least_once",
+      ...(deliveryKey ? { deliveryKey: String(deliveryKey), stableProviderIdentity: "client_id" } : {}),
+      ...(!explicitFailure && accepted ? {} : { reason: "provider_rejected" }),
+    };
   }
 
   async #pollLoop(signal) {

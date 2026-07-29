@@ -209,8 +209,16 @@ class FeishuChannelAdapter {
   async send(message) {
     const chatId = message.chatId;
     if (!this.running || !chatId) return { delivered: false, reason: !this.running ? "not_connected" : "missing_chat" };
+    // @larksuiteoapi/node-sdk 1.64.0 does not forward a caller-supplied
+    // idempotency key to im.v1.message.create/reply. Keep the key in the
+    // local Outbox/audit record, but do not pretend it is a provider key.
+    const deliveryKey = message.deliveryKey || message.idempotencyKey || null;
     await this.channel.send(chatId, { markdown: String(message.text || message.body || "") }, message.replyTo ? { replyTo: message.replyTo } : undefined);
-    return { delivered: true };
+    return {
+      delivered: true,
+      deliveryCapability: "at_least_once",
+      ...(deliveryKey ? { deliveryKey: String(deliveryKey), stableProviderIdentity: null } : {}),
+    };
   }
 
   async beginRegistration() {

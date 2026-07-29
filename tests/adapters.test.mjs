@@ -116,6 +116,47 @@ test("Weixin gives every consecutive reply a unique client id", async () => {
   assert.deepEqual(requests.map((request) => request.msg.context_token), ["context-1", "context-2"]);
 });
 
+test("Weixin preserves an Outbox delivery key as the provider client id", async () => {
+  const requests = [];
+  const client = new WeixinIlinkClient({
+    token: "token",
+    fetcher: async (_url, options) => { requests.push(JSON.parse(options.body)); return { ret: 0 }; },
+  });
+  await client.sendText({ toUserId: "owner", contextToken: "context", text: "retry", clientId: "delivery-fixed-1" });
+  assert.equal(requests[0].msg.client_id, "delivery-fixed-1");
+});
+
+test("Weixin adapter reports stable transport without claiming exactly-once", async () => {
+  const sent = [];
+  const adapter = new WeixinIlinkAdapter({
+    client: { async sendText(value) { sent.push(value); return { ret: 0 }; } },
+    credentialStore: { async load() { return null; }, async save() {}, async clear() {} },
+  });
+  adapter.credential = { ownerId: "owner", contexts: { owner: "context" } };
+  const result = await adapter.send({ text: "retry", contextToken: "context", deliveryKey: "delivery-fixed-2" });
+  assert.equal(result.delivered, true);
+  assert.equal(result.deliveryCapability, "at_least_once");
+  assert.equal(result.stableProviderIdentity, "client_id");
+  assert.equal(sent[0].clientId, "delivery-fixed-2");
+});
+
+test("Feishu adapter keeps delivery identity local because SDK send has no provider key", async () => {
+  const calls = [];
+  const adapter = new FeishuChannelAdapter({
+    credentials: { async load() { return null; } },
+    channelFactory: () => ({ async send(...args) { calls.push(args); } }),
+  });
+  adapter.channel = { async send(...args) { calls.push(args); } };
+  adapter.running = true;
+  const result = await adapter.send({ chatId: "chat", text: "retry", deliveryKey: "delivery-feishu-1" });
+  assert.equal(result.delivered, true);
+  assert.equal(result.deliveryCapability, "at_least_once");
+  assert.equal(result.stableProviderIdentity, null);
+  assert.equal(result.deliveryKey, "delivery-feishu-1");
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0][2], undefined);
+});
+
 test("Weixin poller replies to consecutive owner messages and advances each state", async () => {
   let saved = { token: "test", baseUrl: "https://ilinkai.weixin.qq.com/", ownerId: "owner", cursor: "", contexts: {}, seenIds: [] };
   const credentials = {
