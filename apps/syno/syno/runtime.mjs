@@ -58,6 +58,8 @@ import { WindowsServiceManager } from "./windows-service-manager.mjs";
 import { WindowsServiceControl } from "./windows-service-control.mjs";
 import { WorkflowContextCompiler } from "./workflow-context-compiler.mjs";
 import { WorkflowOutbox } from "./workflow-outbox.mjs";
+import { AcceptedRequestStore } from "./accepted-request-store.mjs";
+import { AcceptedRequestRecoveryWorker } from "./accepted-request-recovery.mjs";
 import { mergeCaptureAnalyses, splitSourceText } from "./capture-analysis.mjs";
 import { artifactToIntakePayload, createWeixinMessageHandler, parseWeixinApproval } from "./weixin-message-handler.mjs";
 
@@ -200,6 +202,10 @@ function createSynoRuntime(options = {}) {
   const ingest = options.ingest || new IngestService({ intake: sourceIntake, knowledge });
   const workflowContextCompiler = options.workflowContextCompiler || new WorkflowContextCompiler();
   const workflowOutbox = options.workflowOutbox || new WorkflowOutbox();
+  const acceptedRequests = options.acceptedRequests || (process.env.NODE_ENV === "test" ? null : new AcceptedRequestStore());
+  const acceptedRecovery = acceptedRequests
+    ? (options.acceptedRecovery || new AcceptedRequestRecoveryWorker({ store: acceptedRequests }))
+    : null;
   const ingestWorkflows = options.ingestWorkflows || new IngestWorkflowCoordinator({ ingest, contextCompiler: workflowContextCompiler });
   const learning = options.learning || new LearningService();
   const outputs = options.outputs || new OutputService();
@@ -559,6 +565,7 @@ function createSynoRuntime(options = {}) {
     attachmentToPayload: (artifact) => artifactToIntakePayload(artifact),
     journal,
     browserCapture,
+    acceptedRequests,
   });
   ingestWorkflows.configure?.({
     browserCapture,
@@ -821,6 +828,8 @@ function createSynoRuntime(options = {}) {
     ingestWorkflows,
     workflowContextCompiler,
     workflowOutbox,
+    acceptedRequests,
+    acceptedRecovery,
     learning,
     outputs,
     goals,

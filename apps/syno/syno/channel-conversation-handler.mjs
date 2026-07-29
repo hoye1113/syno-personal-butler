@@ -25,7 +25,7 @@ function workflowStatusText(workflow) {
 }
 
 class ChannelConversationHandler {
-  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture } = {}) {
+  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests } = {}) {
     if (!runtime || !core || (!ingest && !ingestWorkflows) || !pendingDecisions) throw new Error("ChannelConversationHandler 缺少 Runtime、Core、IngestWorkflow 或 PendingDecision Store");
     this.runtime = runtime;
     this.core = core;
@@ -37,6 +37,7 @@ class ChannelConversationHandler {
     this.intentRouter = intentRouter || new ChannelIntentRouter();
     this.capabilityPresenter = capabilityPresenter || new CapabilityPresenter();
     this.browserCapture = browserCapture;
+    this.acceptedRequests = acceptedRequests;
   }
 
   #record(event, data = {}, options) {
@@ -88,6 +89,37 @@ class ChannelConversationHandler {
       const threadKey = String(message.threadKey || "main");
       const text = String(message.text || "").trim();
       const localOnly = /(?:^|\s)仅本地(?:\s|$)/u.test(text);
+      if (this.acceptedRequests && trace.messageId) {
+        const attachmentRefs = Array.isArray(message.artifacts)
+          ? message.artifacts.map((artifact) => ({
+            id: String(artifact.id || artifact.artifactId || artifact.path || artifact.sha256 || ""),
+            kind: String(artifact.kind || "file"),
+          })).filter((artifact) => artifact.id)
+          : [];
+        const deliveryTarget = message.channel === "feishu"
+          ? { chatId: String(message.chatId || ""), replyTo: trace.messageId }
+          : message.channel === "weixin"
+            ? { toUserId: String(message.senderId || ""), contextToken: String(message.contextToken || "") }
+            : null;
+        try {
+          await this.acceptedRequests.accept({
+            ownerKey: trace.ownerKey,
+            originChannel: trace.channel,
+            platformMessageId: trace.messageId,
+            messageDedupKey: message.messageDedupKey,
+            threadKey: trace.threadKey,
+            payloadKind: attachmentRefs.length ? "message_with_attachments" : "text",
+            payload: { text, attachments: attachmentRefs },
+            deliveryTarget,
+          });
+          await this.#record("accepted_request.shadow_persisted", { ...trace });
+        } catch (error) {
+          await this.#record("accepted_request.shadow_failed", {
+            ...trace,
+            error: { code: error.code || "ACCEPTED_REQUEST_SHADOW_FAILED", message: error.message },
+          }, { level: "error" });
+        }
+      }
       await this.#record("channel.message.received", {
         ...trace,
         hasAttachments: Array.isArray(message.artifacts) && message.artifacts.length > 0,
