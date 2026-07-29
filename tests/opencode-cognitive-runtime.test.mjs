@@ -618,6 +618,28 @@ test("OpenCode exposes browser tools only to an authorized capture Session and l
   assert.match(payloads[1].system, /syno-web-capture/);
 });
 
+test("ephemeral capture Session never becomes a formal Binding and is deleted after success", async (t) => {
+  const root = await temporaryRoot(t);
+  const deleted = [];
+  const runtime = new OpenCodeCognitiveRuntime({
+    bindings: new OpenCodeSessionBindingStore({ file: path.join(root, "bindings.json") }),
+    client: {
+      async createSession() { return { id: "ephemeral-session" }; },
+      async sendMessage() { return { parts: [{ type: "text", text: "captured" }] }; },
+      async deleteSession(id) { deleted.push(id); },
+    },
+  });
+  const result = await runtime.run({ text: "capture" }, {
+    ownerKey: "owner",
+    threadKey: "capture:artifact-ephemeral",
+    allowedTools: [],
+    ephemeralSession: true,
+  });
+  assert.equal(result.conversationId, "ephemeral-session");
+  assert.deepEqual(deleted, ["ephemeral-session"]);
+  assert.equal(await runtime.bindings.active("owner", "capture:artifact-ephemeral"), null);
+});
+
 test("capture sessions expire after seven days while main sessions retain thirty days", async (t) => {
   const root = await temporaryRoot(t);
   let now = new Date("2026-07-01T00:00:00Z");

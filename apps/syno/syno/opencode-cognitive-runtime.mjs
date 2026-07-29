@@ -522,6 +522,23 @@ class OpenCodeCognitiveRuntime {
     return lease;
   }
 
+  async #acquireEphemeralSession(threadKey) {
+    const created = await this.client.createSession(`Syno ephemeral ${threadKey}`);
+    let released = false;
+    return {
+      binding: { ownerKey: "ephemeral", threadKey, openCodeSessionId: created.id, lifecycle: "ephemeral" },
+      release: async ({ preserve = false } = {}) => {
+        if (released || preserve) return;
+        released = true;
+        try {
+          await this.client.deleteSession(created.id);
+        } catch (error) {
+          if (Number(error?.status) !== 404) this.bindings.addOrphan?.(created.id);
+        }
+      },
+    };
+  }
+
   async #deleteBinding(openCodeSessionId) {
     const deletion = await this.bindings.beginDelete(openCodeSessionId);
     if (!deletion) return { status: "busy" };
@@ -625,7 +642,9 @@ class OpenCodeCognitiveRuntime {
     const sessionTicket = this.sessionScheduler.enqueue(sessionKey, async () => {
       if (controller.signal.aborted) throw new SchedulerCancellationError();
       run.status = "claimed";
-      const sessionLease = await this.#acquireSession(ownerKey, threadKey);
+      const sessionLease = context.ephemeralSession === true
+        ? await this.#acquireEphemeralSession(threadKey)
+        : await this.#acquireSession(ownerKey, threadKey);
       const binding = sessionLease.binding;
       try {
         run.sessionId = binding.openCodeSessionId;
@@ -752,7 +771,7 @@ class OpenCodeCognitiveRuntime {
         run.bridgeTicket = bridgeTicket;
         return bridgeTicket.promise;
       } finally {
-        sessionLease.release();
+        await sessionLease.release({ preserve: context.ephemeralSession === true && run.sessionStateKnown === SESSION_STATE_KNOWN.UNKNOWN });
       }
     });
     run.sessionTicket = sessionTicket;
