@@ -9,7 +9,7 @@ function Get-SynoRepoFingerprint([string]$RepoRoot) {
 
 function Test-SynoHealthResponse($Health, [string]$RepoFingerprint) {
   return $Health -and $Health.ok -eq $true -and $Health.product -eq "syno-personal-butler" -and
-    $Health.protocolVersion -eq 1 -and $Health.repoFingerprint -eq $RepoFingerprint
+    $Health.protocolVersion -eq 2 -and $Health.repoFingerprint -eq $RepoFingerprint
 }
 
 function Test-SynoOwnershipRecord($Ownership, $Process, $Details, [string]$ResolvedNode, [string]$ServerPath, [string]$ResolvedRoot) {
