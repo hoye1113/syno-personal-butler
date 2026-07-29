@@ -11,6 +11,14 @@ import {
   OpenCodeSessionBindingStore,
   retryableFailure,
 } from "../apps/syno/syno/opencode-cognitive-runtime.mjs";
+import {
+  SESSION_STATE_KNOWN,
+  canFallbackAfterAttempt,
+  filterControlledMessages,
+  inspectSessionRecoveryCapabilities,
+  normalizeSessionState,
+  sessionStateAfterFailure,
+} from "../apps/syno/syno/opencode-session-safety.mjs";
 import { assertCognitiveCapabilities } from "../apps/syno/syno/cognitive-runtime.mjs";
 
 async function temporaryRoot(t) {
@@ -41,6 +49,30 @@ function memoryBindings() {
   };
 }
 
+test("Session fallback safety is fail-closed and controlled-message copy strips tool data", () => {
+  assert.equal(normalizeSessionState("unexpected"), SESSION_STATE_KNOWN.UNKNOWN);
+  assert.equal(sessionStateAfterFailure({ effectBefore: 1, effectAfter: 2 }), SESSION_STATE_KNOWN.DIRTY);
+  assert.equal(sessionStateAfterFailure({ effectBefore: 1, effectAfter: 1 }), SESSION_STATE_KNOWN.UNKNOWN);
+  assert.equal(canFallbackAfterAttempt({ sessionStateKnown: "clean", abortConfirmed: true }), true);
+  assert.equal(canFallbackAfterAttempt({ sessionStateKnown: "unknown", abortConfirmed: true }), false);
+  assert.equal(canFallbackAfterAttempt({ sessionStateKnown: "clean", abortConfirmed: false }), false);
+  assert.equal(canFallbackAfterAttempt({ sessionStateKnown: "clean", abortConfirmed: true, irreversibleEffect: true }), false);
+  assert.deepEqual(filterControlledMessages([
+    { role: "user", parts: [{ type: "text", text: "问题" }, { type: "tool-call", text: "ignore" }] },
+    { role: "tool", parts: [{ type: "text", text: "secret" }] },
+    { role: "assistant", parts: [{ type: "tool-result", text: "ignore" }, { type: "text", text: "回答" }] },
+  ]), [
+    { role: "user", parts: [{ type: "text", text: "问题" }] },
+    { role: "assistant", parts: [{ type: "text", text: "回答" }] },
+  ]);
+  assert.deepEqual(inspectSessionRecoveryCapabilities({}), {
+    readMessages: "unsupported_by_client",
+    fork: "unsupported_by_client",
+    clone: "unsupported_by_client",
+    conservativeFallback: "clean_and_abort_confirmed_only",
+  });
+});
+
 function bridgeTools() {
   return {
     list: () => [{ name: "knowledge.search" }],
@@ -60,6 +92,12 @@ test("OpenCodeCognitiveRuntime declares the locked v2 capability contract", () =
     models: OPENCODE_MODELS,
     agentSelectableModel: false,
     providerFallback: false,
+    sessionRecovery: {
+      readMessages: "unsupported_by_client",
+      fork: "unsupported_by_client",
+      clone: "unsupported_by_client",
+      conservativeFallback: "clean_and_abort_confirmed_only",
+    },
     directFileAccess: false,
     terminal: false,
     sourceWrite: false,
@@ -382,6 +420,30 @@ test("OpenCode model fallback is deterministic and stops after an irreversible t
     assert.equal(error.attempts.length, 1);
     return true;
   });
+});
+
+test("fallback abort unknown freezes the Session and never advances the model chain", async (t) => {
+  const root = await temporaryRoot(t);
+  let sends = 0;
+  const runtime = new OpenCodeCognitiveRuntime({
+    bindings: new OpenCodeSessionBindingStore({ file: path.join(root, "bindings.json") }),
+    client: {
+      async createSession() { return { id: "session-fallback-unknown" }; },
+      async sendMessage() {
+        sends += 1;
+        throw Object.assign(new Error("provider unavailable"), { status: 503 });
+      },
+      async abortSession() { throw Object.assign(new Error("abort acknowledgement lost"), { code: "ECONNRESET" }); },
+    },
+  });
+  await assert.rejects(runtime.run({ text: "hello" }, { ownerKey: "owner", threadKey: "main" }), (error) => {
+    assert.equal(error.code, "OPENCODE_ABORT_UNKNOWN");
+    assert.equal(error.sessionStateKnown, SESSION_STATE_KNOWN.UNKNOWN);
+    return true;
+  });
+  assert.equal(sends, 1);
+  assert.equal((await runtime.bindings.active("owner", "main"))?.lifecycle, "available");
+  await assert.rejects(runtime.run({ text: "second" }, { ownerKey: "owner", threadKey: "main" }), { code: "SCHEDULER_KEY_BLOCKED" });
 });
 
 test("OpenCode imports legacy summary and recent messages exactly once before the first reply", async (t) => {

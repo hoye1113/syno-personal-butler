@@ -3,6 +3,12 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { CancellableKeyedScheduler, SchedulerCancellationError } from "./cancellable-keyed-scheduler.mjs";
+import {
+  SESSION_STATE_KNOWN,
+  canFallbackAfterAttempt,
+  inspectSessionRecoveryCapabilities,
+  sessionStateAfterFailure,
+} from "./opencode-session-safety.mjs";
 import { PATHS } from "./paths.mjs";
 import { ProcessFileLock } from "./process-lock.mjs";
 import { inspectRemoteContent } from "./sensitive-content.mjs";
@@ -403,6 +409,7 @@ class OpenCodeCognitiveRuntime {
       models: this.models,
       agentSelectableModel: false,
       providerFallback: false,
+      sessionRecovery: inspectSessionRecoveryCapabilities(this.client),
       directFileAccess: false,
       terminal: false,
       sourceWrite: false,
@@ -456,10 +463,12 @@ class OpenCodeCognitiveRuntime {
       run.abortPromise = this.client.abortSession(run.sessionId)
         .then(() => {
           run.abortConfirmed = true;
+          run.sessionStateKnown = SESSION_STATE_KNOWN.CLEAN;
           run.status = "canceled";
         })
         .catch((error) => {
           run.abortConfirmed = false;
+          run.sessionStateKnown = SESSION_STATE_KNOWN.UNKNOWN;
           run.status = "cancel_unknown";
           run.abortError = { code: failureCode(error), message: error.message };
           this.sessionScheduler.block(run.sessionKey, "OpenCode abort 未确认");
@@ -596,6 +605,7 @@ class OpenCodeCognitiveRuntime {
       sessionKey,
       sessionId: null,
       abortConfirmed: null,
+      sessionStateKnown: SESSION_STATE_KNOWN.CLEAN,
       sessionTicket: null,
       bridgeTicket: null,
       abortPromise: null,
@@ -669,6 +679,7 @@ class OpenCodeCognitiveRuntime {
               ? `上下文状态无法确认，已切换到干净新会话。\n\n${responseBody}`
               : responseBody;
             attempts.push({ modelId: qualifiedModel, elapsedMs: Date.now() - started, status: "completed" });
+            run.sessionStateKnown = SESSION_STATE_KNOWN.CLEAN;
             this.lastAttempts = attempts;
             await this.bindings.touch(binding.openCodeSessionId);
             const result = { runId, executor: "opencode-cli-server", conversationId: binding.openCodeSessionId, text, attempts, response };
@@ -678,7 +689,13 @@ class OpenCodeCognitiveRuntime {
             return result;
           } catch (error) {
             lastError = error;
-            if ((this.tools?.effectVersion?.() ?? effectVersion) > effectVersion) error.irreversibleEffect = true;
+            const effectAfter = this.tools?.effectVersion?.() ?? effectVersion;
+            if (effectAfter > effectVersion) error.irreversibleEffect = true;
+            run.sessionStateKnown = sessionStateAfterFailure({
+              effectBefore: effectVersion,
+              effectAfter,
+              irreversibleEffect: error.irreversibleEffect === true,
+            });
             attempts.push({ modelId: qualifiedModel, elapsedMs: Date.now() - started, status: "failed", failureCode: failureCode(error) });
             if (controller.signal.aborted) {
               await run.abortPromise;
@@ -695,14 +712,21 @@ class OpenCodeCognitiveRuntime {
             // 只有服务端确认停止当前 Attempt，才允许固定模型链继续 fallback。
             try {
               await this.client.abortSession(binding.openCodeSessionId);
+              run.abortConfirmed = true;
+              run.sessionStateKnown = SESSION_STATE_KNOWN.CLEAN;
             } catch (abortError) {
               error.retryable = false;
               error.abortFailure = abortError?.message || "abort failed";
               run.status = "cancel_unknown";
               run.abortConfirmed = false;
+              run.sessionStateKnown = SESSION_STATE_KNOWN.UNKNOWN;
               this.sessionScheduler.block(sessionKey, "fallback abort 未确认");
             }
-            if (error.retryable === false) break;
+            if (error.retryable === false || !canFallbackAfterAttempt({
+              sessionStateKnown: run.sessionStateKnown,
+              abortConfirmed: run.abortConfirmed,
+              irreversibleEffect: error.irreversibleEffect === true,
+            })) break;
           } finally {
             releaseContext?.();
           }
@@ -713,11 +737,12 @@ class OpenCodeCognitiveRuntime {
           retryable: unknown ? false : retryableFailure(lastError),
           attempts,
           cause: lastError,
+          sessionStateKnown: run.sessionStateKnown,
         });
         this.lastAttempts = attempts;
         if (!unknown) run.status = "failed";
-        run.error = { code: exhausted.code, attempts };
-        context.onEvent?.({ runId, type: "run.failed", at: this.clock().toISOString(), data: { code: exhausted.code, attempts } });
+        run.error = { code: exhausted.code, attempts, sessionStateKnown: run.sessionStateKnown };
+        context.onEvent?.({ runId, type: "run.failed", at: this.clock().toISOString(), data: { code: exhausted.code, attempts, sessionStateKnown: run.sessionStateKnown } });
         throw exhausted;
         };
 
