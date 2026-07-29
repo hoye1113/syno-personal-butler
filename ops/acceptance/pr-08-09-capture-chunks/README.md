@@ -4,6 +4,7 @@
 
 - Capture 分析使用临时 OpenCode Session，成功后清理，不写正式 Binding。
 - 持久 Chunk Manifest 支持 identity、claim lease、完成/失败状态、重启恢复、策略失效和 coverage。
+- `CaptureChunkScheduler` 提供 interactive/foreground/background 优先级、Aging、保留容量、Provider 可用性和预算门控。
 - 当前不自动发布 incomplete Proposal，避免部分分析被误当作完整结论。
 
 ## 自动证据
