@@ -60,6 +60,7 @@ import { WorkflowContextCompiler } from "./workflow-context-compiler.mjs";
 import { WorkflowOutbox } from "./workflow-outbox.mjs";
 import { AcceptedRequestStore } from "./accepted-request-store.mjs";
 import { AcceptedRequestRecoveryWorker } from "./accepted-request-recovery.mjs";
+import { ChannelDeliveryOutbox } from "./channel-delivery-outbox.mjs";
 import { mergeCaptureAnalyses, splitSourceText } from "./capture-analysis.mjs";
 import { artifactToIntakePayload, createWeixinMessageHandler, parseWeixinApproval } from "./weixin-message-handler.mjs";
 
@@ -206,6 +207,7 @@ function createSynoRuntime(options = {}) {
   const acceptedRecovery = acceptedRequests
     ? (options.acceptedRecovery || new AcceptedRequestRecoveryWorker({ store: acceptedRequests }))
     : null;
+  const channelDeliveryOutbox = options.channelDeliveryOutbox || (process.env.NODE_ENV === "test" ? null : new ChannelDeliveryOutbox());
   const ingestWorkflows = options.ingestWorkflows || new IngestWorkflowCoordinator({ ingest, contextCompiler: workflowContextCompiler });
   const learning = options.learning || new LearningService();
   const outputs = options.outputs || new OutputService();
@@ -830,6 +832,7 @@ function createSynoRuntime(options = {}) {
     workflowOutbox,
     acceptedRequests,
     acceptedRecovery,
+    channelDeliveryOutbox,
     learning,
     outputs,
     goals,
