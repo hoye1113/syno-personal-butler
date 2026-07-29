@@ -10,7 +10,7 @@ link_status: connected
 source_path: "02-Resources/AI and Agents/MOC - Agent 架构与工程.md"
 source_sha256: "9427f1ab36079bd30f52ee27ce2d56564967fa1f0026e3241c9bf40b12350f9e"
 migration_id: "migration-20260720-64e79771"
-updated: 2026-07-15
+updated: 2026-07-27
 ---
 # MOC - Agent 架构与工程
 
@@ -60,6 +60,7 @@ updated: 2026-07-15
 | [[Fable 5 订阅权限又续了 5 天 - 花叔]] | OpenSquilla 多模型集成：4 个国产模型组队跑平 Fable 5，账单只有 1/3 |
 | [[一个业务 Agent 到底长啥样 - 沐洒]] | 沐洒业务 Agent 系统拆解：10 要素（目标/模型/上下文/工具/知识/状态/工作流/约束/人工节点/评估）+ 任务流动 + 规则/模型/人工三问 + 失败暴露缺口；最小闭环优先于组件齐全 |
 | [[WorkBuddy团队-从模型到可用Agent的Harness工程]] | 腾讯 WorkBuddy 五层 Harness：Context Engineering + 前馈/反馈/权限/验证/可观测（**Harness 详见 [[MOC - Harness Engineering]]**） |
+| [[当编码不再是瓶颈 - Berkeley RDI 软件自主开发三级框架]] | Berkeley RDI 立场论文：软件自主性三级框架（代码/流程/需求自主）+ 三交叉维度 + 六大转变 + 十预测；核心挑战=减弱人类控制时保留并忠实执行意图；反模式=跳级 |
 
 ---
 
