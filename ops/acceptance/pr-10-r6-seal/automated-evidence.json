@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "runAt": "2026-07-29T00:00:00+08:00",
+  "commit": "749cdd8ae6d87ca703dfb2839ae50efb1892cbbe",
+  "branch": "codex/exec-p10-r6-seal",
+  "automated": {
+    "nodeTests": { "passed": 516, "failed": 0 },
+    "repositoryVerifyFiles": 1457,
+    "activeDocumentationFiles": 7,
+    "vaultPython311Unittest": { "passed": 57, "failed": 0 },
+    "gitDiffCheck": "passed"
+  },
+  "freshClone": {
+    "nodeTests": { "passed": 516, "failed": 0 },
+    "repositoryVerifyFiles": 1454,
+    "activeDocumentationFiles": 7,
+    "vaultPython311Unittest": { "passed": 57, "failed": 0 },
+    "worktree": "clean"
+  },
+  "runtimeReadOnly": {
+    "opencode": { "version": "1.18.2", "ready": true, "healthy": true, "provider": "opencode", "providerFallback": false },
+    "weixin": { "ok": true, "configured": true, "ownerBound": true, "connected": true, "source": "running_worker" },
+    "feishu": { "ok": true, "configured": true, "ownerBound": true, "connected": true, "source": "running_worker" },
+    "windowsTask": { "installed": false, "running": false, "startup": "at_logon", "legacyTaskDetected": false },
+    "r6Readiness": { "ready": false, "blockers": ["OWNER_ACCEPTANCE_PENDING"] }
+  },
+  "ownerAcceptance": "pending_owner",
+  "notes": "不包含消息正文、凭据、Token、Cookie、PID 或本机敏感路径；真实 Owner 渠道、手机操作与 Windows 冷启动尚未验收。"
+}
