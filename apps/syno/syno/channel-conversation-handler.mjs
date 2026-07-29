@@ -1,6 +1,7 @@
 import { isDecisionReply } from "./pending-decision.mjs";
 import { CapabilityPresenter } from "./capability-presenter.mjs";
 import { ChannelIntentRouter } from "./channel-intent-router.mjs";
+import { parseRecentReference } from "./recent-interaction.mjs";
 
 const WORKFLOW_STATUS_LABELS = Object.freeze({
   received: "已接收",
@@ -25,7 +26,7 @@ function workflowStatusText(workflow) {
 }
 
 class ChannelConversationHandler {
-  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests } = {}) {
+  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions } = {}) {
     if (!runtime || !core || (!ingest && !ingestWorkflows) || !pendingDecisions) throw new Error("ChannelConversationHandler 缺少 Runtime、Core、IngestWorkflow 或 PendingDecision Store");
     this.runtime = runtime;
     this.core = core;
@@ -38,6 +39,7 @@ class ChannelConversationHandler {
     this.capabilityPresenter = capabilityPresenter || new CapabilityPresenter();
     this.browserCapture = browserCapture;
     this.acceptedRequests = acceptedRequests;
+    this.recentInteractions = recentInteractions;
   }
 
   #record(event, data = {}, options) {
@@ -149,14 +151,24 @@ class ChannelConversationHandler {
         await this.#record("channel.attachment.completed", { ...trace, artifactIds: ids, rejectedCount: rejected.length });
         return { text: `已接收附件，收录编号：${ids.join("、")}。正在后台安全提取、查重并生成收录方案${rejected.length ? `；另有 ${rejected.length} 个附件未通过检查` : ""}。` };
       }
+      const recentReference = parseRecentReference(text);
+      if (recentReference && this.recentInteractions) {
+        const resolution = await this.recentInteractions.resolve(recentReference, { ownerKey, channel: message.channel, threadKey });
+        await this.#record("channel.recent_interaction.resolved", { ...trace, action: recentReference.action, kind: resolution.kind, itemId: resolution.item?.id || null });
+        return { text: resolution.text };
+      }
       if (isDecisionReply(text)) {
         await this.#record("channel.decision.requested", { ...trace });
         if (message.privateConversation !== true) {
           throw Object.assign(new Error("澄清回复只允许已绑定 Owner 的明确私聊会话"), { code: "DECISION_PRIVATE_CHAT_REQUIRED" });
         }
+        const presentation = await this.pendingDecisions.present?.({ ownerKey, threadKey, channel: message.channel, businessVersion: message.businessVersion || "1" });
         const resolved = await this.pendingDecisions.parse(text, {
           ownerKey,
           threadKey,
+          channel: message.channel,
+          ...(presentation?.presentationId ? { presentationId: presentation.presentationId } : {}),
+          ...(message.businessVersion ? { businessVersion: message.businessVersion } : {}),
           diffDigest: message.diffDigest,
           getDiffDigest: typeof this.core.inspect === "function"
             ? async (jobId) => (await this.core.inspect(jobId))?.result?.diffHash
@@ -363,7 +375,7 @@ class ChannelConversationHandler {
         ...trace,
         error: { code: error.code || "CHANNEL_MESSAGE_FAILED", message: error.message },
       }, { level: "error" });
-      return { text: `未能处理：${error.message}` };
+      return { text: error.code === "PENDING_DECISION_REPLAYED" ? "该事项已处理，当前渠道不会重复执行。" : `未能处理：${error.message}` };
     }
   }
 }

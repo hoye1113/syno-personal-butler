@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -52,6 +53,19 @@ class PendingDecisionStore {
     }
   }
 
+  async #state() {
+    try {
+      const parsed = JSON.parse(await fs.readFile(this.file, "utf8"));
+      return {
+        decisions: Array.isArray(parsed.decisions) ? parsed.decisions : [],
+        presentations: Array.isArray(parsed.presentations) ? parsed.presentations : [],
+      };
+    } catch (error) {
+      if (error.code === "ENOENT") return { decisions: [], presentations: [] };
+      throw error;
+    }
+  }
+
   async list({ ownerKey, threadKey, includeConsumed = false } = {}) {
     return (await this.#list()).filter((item) =>
       (!ownerKey || item.ownerKey === ownerKey)
@@ -61,9 +75,9 @@ class PendingDecisionStore {
 
   async #mutate(operation) {
     const current = this.tail.catch(() => {}).then(async () => {
-      const decisions = await this.#list();
-      const result = await operation(decisions);
-      await atomicJson(this.file, { version: 1, decisions });
+      const state = await this.#state();
+      const result = await operation(state.decisions, state);
+      await atomicJson(this.file, { version: 1, decisions: state.decisions, presentations: state.presentations });
       return result;
     });
     this.tail = current;
@@ -71,7 +85,7 @@ class PendingDecisionStore {
   }
 
   async add(input) {
-    return this.#mutate(async (decisions) => {
+    return this.#mutate(async (decisions, state) => {
       const now = this.clock();
       const existing = decisions.find((item) =>
         !item.consumedAt
@@ -90,6 +104,7 @@ class PendingDecisionStore {
         summary: String(input.summary || ""),
         options: Array.isArray(input.options) ? input.options : [],
         diffDigest: input.diffDigest || undefined,
+        ...(input.businessVersion ? { businessVersion: String(input.businessVersion) } : {}),
         approvalCode: String(input.approvalCode || "").toUpperCase(),
         ...(input.artifactId ? { artifactId: String(input.artifactId) } : {}),
         createdAt: now.toISOString(),
@@ -97,6 +112,36 @@ class PendingDecisionStore {
       };
       decisions.push(record);
       return record;
+    });
+  }
+
+  async present({ ownerKey, threadKey = "main", channel = "unknown", businessVersion = "1" } = {}) {
+    return this.#mutate(async (decisions, state) => {
+      const active = decisions
+        .filter((item) => !item.consumedAt && item.ownerKey === String(ownerKey) && item.threadKey === String(threadKey))
+        .sort((a, b) => `${a.createdAt}\0${a.id}`.localeCompare(`${b.createdAt}\0${b.id}`));
+      const orderedDecisionIds = active.map((item) => item.id);
+      const effectiveBusinessVersion = businessVersion === "1"
+        ? active.map((item) => item.businessVersion || "1").join("|") || "1"
+        : String(businessVersion);
+      const existing = state.presentations.find((item) => item.ownerKey === String(ownerKey)
+        && item.threadKey === String(threadKey)
+        && item.channel === String(channel)
+        && item.businessVersion === effectiveBusinessVersion
+        && JSON.stringify(item.orderedDecisionIds) === JSON.stringify(orderedDecisionIds));
+      const presentation = existing || {
+        presentationId: `presentation-${createHash("sha256").update(`${ownerKey}\0${threadKey}\0${channel}\0${effectiveBusinessVersion}\0${orderedDecisionIds.join(",")}`, "utf8").digest("hex").slice(0, 16)}`,
+        version: 1,
+        ownerKey: String(ownerKey),
+        threadKey: String(threadKey),
+        channel: String(channel),
+        businessVersion: effectiveBusinessVersion,
+        orderedDecisionIds,
+        createdAt: this.clock().toISOString(),
+      };
+      if (!existing) state.presentations.push(presentation);
+      active.forEach((item, index) => Object.assign(item, { presentationId: presentation.presentationId, presentationIndex: index + 1 }));
+      return { ...presentation, decisions: active.map((item, index) => ({ ...item, presentationIndex: index + 1 })) };
     });
   }
 
@@ -112,10 +157,10 @@ class PendingDecisionStore {
     });
   }
 
-  async parse(text, { ownerKey, threadKey = "main", diffDigest, getDiffDigest } = {}) {
+  async parse(text, { ownerKey, threadKey = "main", channel = "unknown", presentationId, businessVersion, diffDigest, getDiffDigest } = {}) {
     const normalized = String(text || "").trim();
     if (!isDecisionReply(normalized)) throw decisionError("PENDING_DECISION_NOT_A_REPLY", "消息不是确定性审批回复");
-    return this.#mutate(async (decisions) => {
+    return this.#mutate(async (decisions, state) => {
       const reservationCutoff = this.clock().getTime() - DECISION_RESERVATION_TTL_MS;
       for (const item of decisions) {
         if (item.reservedAt && new Date(item.reservedAt).getTime() <= reservationCutoff) delete item.reservedAt;
@@ -125,6 +170,13 @@ class PendingDecisionStore {
       if (!available.length) {
         if (allBound.length) throw decisionError("PENDING_DECISION_REPLAYED", "该待确认事项已处理，拒绝重放");
         throw decisionError("PENDING_DECISION_NOT_FOUND", "当前会话没有可处理的待确认事项");
+      }
+      const selectedPresentation = presentationId
+        ? state.presentations.find((item) => item.presentationId === presentationId && item.channel === String(channel))
+        : null;
+      if (selectedPresentation) {
+        const order = new Map(selectedPresentation.orderedDecisionIds.map((id, index) => [id, index]));
+        available = available.sort((a, b) => (order.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.id) ?? Number.MAX_SAFE_INTEGER));
       }
       const numbered = /^(确认|拒绝)\s+(\d+)$/u.exec(normalized);
       let selected;
@@ -149,6 +201,9 @@ class PendingDecisionStore {
         if (!authoritativeDigest || authoritativeDigest !== selected.diffDigest) {
           throw decisionError("PENDING_DECISION_DIGEST_CHANGED", "差异摘要已变化，必须重新确认");
         }
+      }
+      if (businessVersion && selected.businessVersion && String(businessVersion) !== String(selected.businessVersion)) {
+        throw decisionError("PENDING_DECISION_VERSION_CHANGED", "业务版本已变化，必须重新展示确认事项");
       }
       const modification = /^修改：(.*)$/u.exec(normalized);
       const option = OPTION_REPLIES.get(normalized);

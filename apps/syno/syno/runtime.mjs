@@ -64,6 +64,7 @@ import { ChannelDeliveryOutbox } from "./channel-delivery-outbox.mjs";
 import { EffectReceiptStore } from "./effect-receipt-store.mjs";
 import { EffectReconciliationCaseStore } from "./effect-reconciliation-case-store.mjs";
 import { EffectReconciliationWorker } from "./effect-reconciliation-worker.mjs";
+import { RecentInteractionView } from "./recent-interaction.mjs";
 import { mergeCaptureAnalyses, splitSourceText } from "./capture-analysis.mjs";
 import { artifactToIntakePayload, createWeixinMessageHandler, parseWeixinApproval } from "./weixin-message-handler.mjs";
 
@@ -405,14 +406,13 @@ function createSynoRuntime(options = {}) {
     token: bridgeToken,
     effectReceipts,
     reconciliationCases,
-    reconciliationWorker,
     isRuntimeReady: () => lifecycleState === "ready",
-    onResult: async ({ tool, result, ownerKey, threadKey }) => {
+    onResult: async ({ tool, result, ownerKey, threadKey, channel }) => {
       if (!result?.requiresApproval || !result.id) return;
       const job = await jobStore.get(result.id);
       if (!job) return;
       const request = await jobStore.loadRequest(job).catch(() => ({}));
-      await pendingDecisions.add({
+      const decision = await pendingDecisions.add({
         jobId: job.id,
         ownerKey,
         threadKey,
@@ -421,9 +421,11 @@ function createSynoRuntime(options = {}) {
         summary: `${tool.description}：${job.id}`,
         options: job.changedPaths || [],
         diffDigest: job.result?.diffHash,
+        businessVersion: job.result?.diffHash || job.updated || "1",
         approvalCode: job.approvalCode,
         artifactId: request.artifactId,
       });
+      await pendingDecisions.present({ ownerKey, threadKey, channel: channel || "opencode", businessVersion: decision.businessVersion || "1" });
     },
   });
   const fakeOpenCode = process.env.NODE_ENV === "test" && process.env.SYNO_OPENCODE_FAKE_SERVER === "true";
@@ -571,12 +573,21 @@ function createSynoRuntime(options = {}) {
     },
   });
   const channelCore = {
+    host,
     execute: (...args) => core.execute(...args),
     inspect: (...args) => core.inspect(...args),
     approve: (...args) => core.approve(...args),
     reject: (...args) => core.reject(...args),
+    cancel: (...args) => core.cancel(...args),
     requestModification: (...args) => core.requestModification(...args),
   };
+  const recentInteractions = options.recentInteractions || new RecentInteractionView({
+    core: channelCore,
+    pendingDecisions,
+    ingestWorkflows,
+    acceptedRequests,
+    reconciliationCases,
+  });
   const channelConversationHandler = options.channelConversationHandler || new ChannelConversationHandler({
     runtime: cognitiveRuntime,
     core: channelCore,
@@ -587,6 +598,7 @@ function createSynoRuntime(options = {}) {
     journal,
     browserCapture,
     acceptedRequests,
+    recentInteractions,
   });
   ingestWorkflows.configure?.({
     browserCapture,
@@ -672,9 +684,11 @@ function createSynoRuntime(options = {}) {
         summary: `收录 ${proposal.suggestedPath}（${action}）`,
         options: proposal.risk === "additive" ? ["create", "reject"] : ["keep-separate", "append-source", "link-only", "reject"],
         diffDigest: job.result?.diffHash,
+        businessVersion: proposal.proposalDigest,
         approvalCode: job.approvalCode,
         artifactId: workflow.artifactId,
       });
+      const decisionPresentation = await pendingDecisions.present({ ownerKey: workflow.ownerKey, threadKey: workflow.threadKey, channel: workflow.originChannel, businessVersion: proposal.proposalDigest });
       const summary = [
         `收录方案需要确认：${proposal.suggestedPath}`,
         `来源状态：${proposal.sourceDescriptor.reliability}/${proposal.sourceDescriptor.verificationStatus}`,
@@ -683,6 +697,9 @@ function createSynoRuntime(options = {}) {
         proposal.risk === "additive"
           ? `回复“确认”新建笔记，或回复“修改：……”/“拒绝”。`
           : `当前方式：${action}。可回复“分开保存”“追加来源”“仅关联”切换方式，再回复“确认”。`,
+        ...(decisionPresentation.decisions.length > 1
+          ? [`当前待确认事项编号：${decisionPresentation.decisions.map((item, index) => `${index + 1}.${item.jobId}`).join("、")}；请回复“确认 1/2…”。`]
+          : []),
       ].join("\n");
       for (const targetChannel of [workflow.originChannel, "main-session"]) {
         await workflowOutbox.enqueue({
@@ -855,6 +872,8 @@ function createSynoRuntime(options = {}) {
     channelDeliveryOutbox,
     effectReceipts,
     reconciliationCases,
+    reconciliationWorker,
+    recentInteractions,
     learning,
     outputs,
     goals,
@@ -1055,6 +1074,8 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "GET" && url.pathname === "/api/syno/jobs") return { jobs: await runtime.host.list({ limit: 100 }) };
   if (method === "GET" && url.pathname === "/api/syno/notifications") return { notifications: await runtime.notifications.list({ limit: 100 }) };
   if (method === "GET" && url.pathname === "/api/syno/channels") return { channels: runtime.channels.status() };
+  if (method === "GET" && url.pathname === "/api/syno/recent-interactions") return runtime.recentInteractions.snapshot({ ownerKey: "local-user", channel: url.searchParams.get("channel") || undefined, threadKey: url.searchParams.get("thread") || "main" });
+  if (method === "GET" && url.pathname === "/api/syno/effect-cases") return { cases: (await runtime.reconciliationCases?.list({ ownerKey: "local-user", limit: 100 }) || []).map((item) => ({ caseId: item.caseId, toolName: item.toolName, status: item.status, attempts: item.attempts, nextReconcileAt: item.nextReconcileAt, lastErrorCode: item.lastErrorCode, ownerResolution: item.ownerResolution, systemResolution: item.systemResolution, createdAt: item.createdAt, updatedAt: item.updatedAt })) };
   if (method === "GET" && url.pathname === "/api/syno/provider") return runtime.credentials.status();
   if (method === "POST" && url.pathname === "/api/syno/provider") return runtime.credentials.save(await readBody(req));
   if (method === "GET" && url.pathname === "/api/syno/settings") return runtime.settingsRegistry.load();
