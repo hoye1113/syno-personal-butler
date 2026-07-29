@@ -14,8 +14,8 @@ reviewBaseline:
   reviewedAt: 2026-07-29
 
 implementation:
-  branch: codex/exec-p02-cancellable-scheduler
-  baseCommit: 5b12fd8
+  branch: codex/exec-p03-session-lifecycle
+  baseCommit: 41ebf1c
   headCommit: pending
 ```
 
@@ -23,7 +23,9 @@ implementation:
 
 已完成：PR-01 `codex/exec-p01-bootstrap-host`，`41a324d` → `5b12fd8`，Host Lock、Bootstrap HTTP、生命周期与 doctor 门禁通过。
 
-进行中：PR-02 `codex/exec-p02-cancellable-scheduler`，可取消 Session/Bridge Scheduler。
+已完成：PR-02 `codex/exec-p02-cancellable-scheduler`，`5b12fd8` → `41ebf1c`，可取消 Session/Bridge Scheduler 门禁通过。
+
+进行中：PR-03 `codex/exec-p03-session-lifecycle`，Binding mutation 与 Session 生命周期。
 
 后续每个 PR 必须从前一个已验收 PR 的实际 HEAD 建分支，并独立记录 `baseCommit/headCommit`。执行顺序：
 

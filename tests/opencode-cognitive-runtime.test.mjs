@@ -21,14 +21,23 @@ async function temporaryRoot(t) {
 
 function memoryBindings() {
   const records = new Map();
+  const leases = new Set();
   return {
     async active(ownerKey, threadKey) { return records.get(`${ownerKey}\0${threadKey}`) || null; },
+    async list() { return [...records.values()]; },
     async bind(record) {
-      const value = { ...record, active: true, lastActivityAt: new Date().toISOString() };
+      const value = { ...record, lifecycle: "available", lastActivityAt: new Date().toISOString() };
       records.set(`${record.ownerKey}\0${record.threadKey}`, value);
       return value;
     },
+    async acquire(ownerKey, threadKey) {
+      const binding = records.get(`${ownerKey}\0${threadKey}`);
+      if (!binding || leases.has(binding.openCodeSessionId)) return null;
+      leases.add(binding.openCodeSessionId);
+      return { binding, release: () => leases.delete(binding.openCodeSessionId) };
+    },
     async touch() {},
+    addOrphan() {},
   };
 }
 
@@ -186,10 +195,11 @@ test("OpenCodeCognitiveRuntime serializes concurrent messages for one session", 
 test("different Sessions run tool-free requests concurrently", async () => {
   const started = [];
   const releases = [];
+  let created = 0;
   const runtime = new OpenCodeCognitiveRuntime({
     bindings: memoryBindings(),
     client: {
-      async createSession(title) { return { id: title }; },
+      async createSession() { created += 1; return { id: `session-${created}` }; },
       async sendMessage(id) {
         started.push(id);
         await new Promise((resolve) => releases.push(resolve));
@@ -444,7 +454,7 @@ test("new conversation and retention cleanup use OpenCode session endpoints", as
 
   now = new Date("2026-09-01T00:00:00Z");
   const cleanup = await runtime.cleanupExpired();
-  assert.equal(cleanup.deleted, 2);
+  assert.equal(cleanup.deleted, 1);
   assert.equal(deleted.length, 2);
 });
 

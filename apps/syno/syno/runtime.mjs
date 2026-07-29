@@ -798,6 +798,8 @@ function createSynoRuntime(options = {}) {
       : await openCodeSupervisor.start();
     try {
       assertOpenCodeServerSecurity(await openCodeClient.securityStatus({ repoRoot: PATHS.repoRoot }));
+      const bindingRecovery = await openCodeCognitiveRuntime.recoverBindings();
+      await recordEvent("syno.opencode.bindings_recovered", bindingRecovery);
       return status;
     } catch (error) {
       await openCodeSupervisor.stop().catch(() => {});

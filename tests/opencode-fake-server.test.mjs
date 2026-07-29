@@ -14,6 +14,7 @@ test("Fake OpenCode Server exercises authenticated health, Session, message, abo
   assert.equal((await client.health()).healthy, true);
   const session = await client.createSession("Syno fake integration");
   assert.match(session.id, /^fake-session-/);
+  assert.equal((await client.getSession(session.id)).title, "Syno fake integration");
   assert.equal((await client.sendMessage(session.id, { parts: [{ type: "text", text: "hello" }] })).parts[0].text, "fake reply");
   assert.equal(await client.sendAsyncMessage(session.id, { parts: [{ type: "text", text: "background" }] }), null);
   assert.equal(await client.abortSession(session.id), true);

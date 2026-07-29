@@ -33,6 +33,7 @@ class FakeOpenCodeServer {
       const match = /^\/session\/([^/]+)(?:\/(message|prompt_async|abort))?$/.exec(url.pathname);
       const session = match ? this.sessions.get(decodeURIComponent(match[1])) : null;
       if (!session) return this.#json(response, { error: "not found" }, 404);
+      if (request.method === "GET" && !match[2]) return this.#json(response, session);
       if (request.method === "POST" && match[2] === "message") {
         session.messages.push(body);
         return this.#json(response, body.noReply ? { parts: [] } : { parts: [{ type: "text", text: "fake reply" }] });
