@@ -45,6 +45,9 @@ function validatePublicUrl(value) {
   if (url.username || url.password || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || isPrivateAddress(host)) {
     throw new Error("不允许收录本机或内网 URL");
   }
+  if ([...url.searchParams.keys()].some((key) => /^(?:access_token|api_key|token|secret|password)$/iu.test(key))) {
+    throw new Error("URL 查询参数包含凭据，禁止发送或收录");
+  }
   return url.toString();
 }
 
@@ -57,6 +60,18 @@ function classifyUrl(value) {
   if (/(^|\.)mp\.weixin\.qq\.com$/i.test(url.hostname)) return "wechat";
   if (/(^|\.)github\.com$/i.test(url.hostname) && /(?:^|\/)(?:readme|docs?|wiki|[^/]+\.md)(?:$|\/)/i.test(url.pathname)) return "github-doc";
   return "url";
+}
+
+function bilibiliSourceProfile(sourceUrl) {
+  const url = new URL(sourceUrl);
+  const opus = url.pathname.match(/^\/opus\/(\d+)\/?$/i);
+  const column = url.pathname.match(/^\/read\/cv(\d+)\/?$/i);
+  return {
+    ingestWorkflow: "bilibili_opus_ingest_v2",
+    primarySource: "column",
+    ...(opus ? { opusId: opus[1] } : {}),
+    ...(column ? { columnId: `cv${column[1]}` } : {}),
+  };
 }
 
 class IntakeService {
@@ -73,12 +88,22 @@ class IntakeService {
     if (kind === "url") {
       const sourceUrl = validatePublicUrl(payload.value);
       const sourceType = classifyUrl(sourceUrl);
-      const snapshot = await this.sourceFetcher(sourceUrl);
+      const snapshot = payload.browserSnapshot
+        ? {
+          url: String(payload.browserSnapshot.url || sourceUrl),
+          contentType: String(payload.browserSnapshot.contentType || "text/html"),
+          text: String(payload.browserSnapshot.text || "").slice(0, MAX_TEXT_BYTES),
+          truncated: payload.browserSnapshot.truncated === true,
+          method: "kimi_webbridge",
+        }
+        : await this.sourceFetcher(sourceUrl);
+      if (!snapshot.text.trim()) throw new Error("来源没有可读取正文");
       return {
         intent: "curate_note",
         sourceType,
         sourceUrl,
-        sourceSnapshot: { url: snapshot.url, contentType: snapshot.contentType, truncated: snapshot.truncated },
+        sourceSnapshot: { url: snapshot.url, contentType: snapshot.contentType, truncated: snapshot.truncated, ...(snapshot.method ? { method: snapshot.method } : {}) },
+        ...(sourceType === "bilibili-opus" ? { sourceProfile: bilibiliSourceProfile(sourceUrl) } : {}),
         content: snapshot.text,
         text: [
           sourceType === "bilibili-opus"
@@ -91,7 +116,7 @@ class IntakeService {
         ].join("\n\n"),
       };
     }
-    if (["text", "markdown"].includes(kind)) {
+    if (["text", "markdown", "personal"].includes(kind)) {
       let value = String(payload.value || "").trim();
       let rawBytes;
       if (!value && payload.base64) {
@@ -107,7 +132,7 @@ class IntakeService {
         sourceType: kind,
         content: value,
         ...(artifact ? { artifact } : {}),
-        text: `按 vault canonical Skill 收录以下${kind === "markdown" ? " Markdown" : "粘贴内容"}，先查重并生成关系说明：\n\n${value}`,
+        text: `按 vault canonical Skill 收录以下${kind === "markdown" ? " Markdown" : kind === "personal" ? "个人观点" : "粘贴内容"}，先查重并生成关系说明：\n\n${value}`,
       };
     }
     if (kind === "txt") {
@@ -199,4 +224,4 @@ class IntakeService {
   }
 }
 
-export { IntakeService, MAX_ATTACHMENT_BYTES, MAX_TEXT_BYTES, classifyUrl, extractDocxText, extractHtmlText, extractPdfText, validatePublicUrl };
+export { IntakeService, MAX_ATTACHMENT_BYTES, MAX_TEXT_BYTES, bilibiliSourceProfile, classifyUrl, extractDocxText, extractHtmlText, extractPdfText, validatePublicUrl };

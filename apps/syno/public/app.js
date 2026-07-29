@@ -1792,7 +1792,7 @@ async function submitPlannerSettings(event) {
       throw new Error(data.error || '保存目录设置失败');
     }
     if (queueApprovalIfNeeded(data)) {
-      elements.plannerSettingsHint.textContent = `设置变更已进入审批中心：${data.job.id}`;
+      elements.plannerSettingsHint.textContent = `设置变更需要澄清：${data.job.id}`;
       return;
     }
     state.settings = data.settings || payload;
@@ -2281,7 +2281,7 @@ async function handleCreateBrief(topic) {
 
 function queueApprovalIfNeeded(data) {
   if (!data?.requiresApproval || !data.job?.id) return false;
-  showToast(`任务 ${data.job.id} 已进入审批中心，批准后才会写入。`);
+  showToast(`任务 ${data.job.id} 需要澄清：请到“任务”选择处理方式。`);
   window.Syno?.show?.("jobs");
   return true;
 }

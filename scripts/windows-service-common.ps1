@@ -17,10 +17,14 @@ function Test-SynoOwnershipRecord($Ownership, $Process, $Details, [string]$Resol
   $actualPath = [IO.Path]::GetFullPath($Process.Path)
   $actualStartedAt = $Process.StartTime.ToUniversalTime().ToString("o")
   $recordedStartedAt = if ($Ownership.startedAt -is [DateTime]) { $Ownership.startedAt.ToUniversalTime().ToString("o") } else { [string]$Ownership.startedAt }
+  $relativeServerPath = $ServerPath.Substring($ResolvedRoot.Length).TrimStart('\', '/').Replace('\', '/')
+  $commandLine = [string]$Details.CommandLine
+  $commandMatches = $commandLine.IndexOf($ServerPath, [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+    $commandLine.Replace('\', '/').IndexOf($relativeServerPath, [StringComparison]::OrdinalIgnoreCase) -ge 0
   return $actualPath.Equals($ResolvedNode, [StringComparison]::OrdinalIgnoreCase) -and
     $Ownership.nodePath -eq $ResolvedNode -and $Ownership.serverPath -eq $ServerPath -and
     $Ownership.repoRoot -eq $ResolvedRoot -and $recordedStartedAt -eq $actualStartedAt -and
-    $Details.CommandLine.IndexOf($ServerPath, [StringComparison]::OrdinalIgnoreCase) -ge 0
+    $commandMatches
 }
 
 function Test-SynoWrapperProcess($Details, [string]$StartScript, [string]$RepoRoot, [string]$NodePath) {

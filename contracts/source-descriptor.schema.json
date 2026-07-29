@@ -15,6 +15,7 @@
   ],
   "properties": {
     "kind": { "enum": ["url", "file", "personal", "unknown", "platform"] },
+    "originalUrl": { "type": "string", "format": "uri" },
     "canonicalUrl": { "type": "string", "format": "uri" },
     "originalFilename": { "type": "string" },
     "contentSha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },

@@ -9,6 +9,7 @@ import {
   OPENCODE_MODELS,
   OpenCodeCognitiveRuntime,
   OpenCodeSessionBindingStore,
+  retryableFailure,
 } from "../apps/syno/syno/opencode-cognitive-runtime.mjs";
 import { assertCognitiveCapabilities } from "../apps/syno/syno/cognitive-runtime.mjs";
 
@@ -37,6 +38,12 @@ test("OpenCodeCognitiveRuntime declares the locked v2 capability contract", () =
   });
   assert.equal(assertCognitiveCapabilities(report).version, 2);
   assert.throws(() => assertCognitiveCapabilities({ ...report, directFileAccess: true }), /directFileAccess/);
+});
+
+test("an unavailable OpenCode process is a retryable provider outage", () => {
+  assert.equal(retryableFailure({ code: "OPENCODE_NOT_RUNNING" }), true);
+  assert.equal(retryableFailure({ code: "OPENCODE_EXITED" }), true);
+  assert.equal(retryableFailure({ code: "OPENCODE_START_TIMEOUT" }), true);
 });
 
 test("OpenCode server security gate fails closed on a callable builtin or missing MCP", () => {
@@ -80,6 +87,54 @@ test("OpenCode sessions follow the Owner across channels and persist only bindin
   const serialized = await fs.readFile(path.join(root, "bindings.json"), "utf8");
   assert.doesNotMatch(serialized, /第一条|第二条|收到/);
   assert.match(serialized, /session-1/);
+});
+
+test("OpenCode outbound guard blocks secrets before creating a session or calling the remote model", async (t) => {
+  const root = await temporaryRoot(t);
+  let calls = 0;
+  const runtime = new OpenCodeCognitiveRuntime({
+    bindings: new OpenCodeSessionBindingStore({ file: path.join(root, "bindings.json") }),
+    client: {
+      async createSession() { calls += 1; return { id: "must-not-exist" }; },
+      async sendMessage() { calls += 1; return { parts: [{ type: "text", text: "unsafe" }] }; },
+    },
+  });
+  await assert.rejects(
+    runtime.run({ text: `请记住 token=${"sk-" + "this-is-a-secret-value"}` }, { ownerKey: "owner", threadKey: "main" }),
+    (error) => error.code === "REMOTE_CONTENT_BLOCKED",
+  );
+  assert.equal(calls, 0);
+});
+
+test("OpenCode outbound guard also protects migration context and system events", async (t) => {
+  const root = await temporaryRoot(t);
+  let sends = 0;
+  const runtime = new OpenCodeCognitiveRuntime({
+    bindings: new OpenCodeSessionBindingStore({ file: path.join(root, "bindings.json") }),
+    migrationLoader: async () => ({ text: "Authorization: Bearer abcdefghijklmnop" }),
+    client: {
+      async createSession() { return { id: "session-guarded" }; },
+      async sendMessage() { sends += 1; return { parts: [] }; },
+    },
+  });
+  await assert.rejects(
+    runtime.run({ text: "普通问题" }, { ownerKey: "owner", threadKey: "main" }),
+    (error) => error.code === "REMOTE_CONTENT_BLOCKED",
+  );
+  assert.equal(sends, 0);
+
+  const cleanRuntime = new OpenCodeCognitiveRuntime({
+    bindings: new OpenCodeSessionBindingStore({ file: path.join(root, "events.json") }),
+    client: {
+      async createSession() { return { id: "session-events" }; },
+      async sendMessage() { sends += 1; return { parts: [] }; },
+    },
+  });
+  await assert.rejects(
+    cleanRuntime.appendSystemEvent({ ownerKey: "owner", text: "cookie=private-cookie-value" }),
+    (error) => error.code === "REMOTE_CONTENT_BLOCKED",
+  );
+  assert.equal(sends, 0);
 });
 
 test("OpenCodeCognitiveRuntime serializes concurrent messages for one session", async (t) => {
@@ -236,4 +291,96 @@ test("system events append to main without model reply or any tool authority", a
   assert.equal(messages[0].payload.tools.skill, false);
   assert.equal(messages[0].payload.tools.bash, false);
   assert.match(messages[0].payload.parts[0].text, /Syno system event/);
+});
+
+test("capture runs expose only the explicitly allowed Syno tools", async (t) => {
+  const root = await temporaryRoot(t);
+  let payload;
+  const tools = {
+    list() {
+      return [
+        { name: "syno_workflow_context" },
+        { name: "syno_knowledge_search" },
+        { name: "syno_jobs_submit" },
+      ];
+    },
+  };
+  const runtime = new OpenCodeCognitiveRuntime({
+    tools,
+    bindings: new OpenCodeSessionBindingStore({ file: path.join(root, "bindings.json") }),
+    client: {
+      async createSession() { return { id: "session-capture" }; },
+      async sendMessage(_id, body) {
+        payload = body;
+        return { parts: [{ type: "text", text: "{}" }] };
+      },
+    },
+  });
+  await runtime.run({ text: "capture" }, {
+    ownerKey: "owner",
+    threadKey: "capture:artifact-1",
+    allowedTools: ["syno_workflow_context", "syno_knowledge_search"],
+  });
+  assert.equal(payload.tools.syno_workflow_context, true);
+  assert.equal(payload.tools.syno_knowledge_search, true);
+  assert.equal(payload.tools.syno_jobs_submit, false);
+  assert.equal(payload.tools.skill, false);
+});
+
+test("OpenCode exposes browser tools only to an authorized capture Session and loads the project Skill", async (t) => {
+  const root = await temporaryRoot(t);
+  const payloads = [];
+  const tools = {
+    list() {
+      return [
+        { name: "syno_workflow_context" },
+        { name: "syno_browser_status" },
+        { name: "syno_browser_navigate" },
+        { name: "syno_browser_snapshot" },
+      ];
+    },
+    bindContext() { return () => {}; },
+  };
+  const runtime = new OpenCodeCognitiveRuntime({
+    tools,
+    bindings: new OpenCodeSessionBindingStore({ file: path.join(root, "bindings.json") }),
+    client: {
+      async createSession() { return { id: `session-${payloads.length + 1}` }; },
+      async sendMessage(_id, body) { payloads.push(body); return { parts: [{ type: "text", text: "抓取结果" }] }; },
+    },
+  });
+  await runtime.run({ text: "普通问题" }, { ownerKey: "owner", threadKey: "main" });
+  assert.equal(payloads[0].tools.syno_browser_snapshot, false);
+  await runtime.run({ text: "读取页面" }, {
+    ownerKey: "owner",
+    threadKey: "capture:artifact-1",
+    allowedTools: ["syno_browser_status", "syno_browser_navigate", "syno_browser_snapshot"],
+    browserWorkflowId: "workflow-1",
+    enableSkills: true,
+    system: "仅使用 syno-web-capture Skill 完成页面读取。",
+  });
+  assert.equal(payloads[1].tools.syno_browser_status, true);
+  assert.equal(payloads[1].tools.syno_browser_navigate, true);
+  assert.equal(payloads[1].tools.skill, true);
+  assert.equal(payloads[1].tools.syno_workflow_context, false);
+  assert.match(payloads[1].system, /syno-web-capture/);
+});
+
+test("capture sessions expire after seven days while main sessions retain thirty days", async (t) => {
+  const root = await temporaryRoot(t);
+  let now = new Date("2026-07-01T00:00:00Z");
+  const deleted = [];
+  const bindings = new OpenCodeSessionBindingStore({ file: path.join(root, "bindings.json"), clock: () => now });
+  await bindings.bind({ ownerKey: "owner", threadKey: "capture:artifact-1", openCodeSessionId: "capture-session" });
+  await bindings.bind({ ownerKey: "owner", threadKey: "main", openCodeSessionId: "main-session" });
+  now = new Date("2026-07-09T00:00:00Z");
+  const runtime = new OpenCodeCognitiveRuntime({
+    bindings,
+    clock: () => now,
+    client: { async deleteSession(id) { deleted.push(id); } },
+  });
+  const result = await runtime.cleanupExpired();
+  assert.equal(result.deleted, 1);
+  assert.deepEqual(deleted, ["capture-session"]);
+  assert.equal((await bindings.active("owner", "main")).openCodeSessionId, "main-session");
 });

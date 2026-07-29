@@ -19,7 +19,7 @@
         <button type="button" data-syno-panel="create"><span>创</span>Create</button>
       </div>
       <div class="syno-primary-foot">
-        <button type="button" data-syno-panel="jobs">审批中心</button>
+        <button type="button" data-syno-panel="jobs">任务</button>
         <button type="button" data-syno-panel="settings">设置</button>
       </div>
     </nav>
@@ -29,7 +29,7 @@
           <div class="hero-eyebrow-row">
             <p class="eyebrow">TODAY · 主动知识闭环</p>
             <div class="hero-actions">
-              <button class="ghost-btn" type="button" data-syno-panel="jobs">任务与审批</button>
+              <button class="ghost-btn" type="button" data-syno-panel="jobs">任务</button>
               <button class="ghost-btn" type="button" data-syno-panel="notifications">通知</button>
               <button class="ghost-btn mobile-settings-trigger" type="button" data-syno-panel="settings">连接设置</button>
               <button class="accent-btn" type="button" data-syno-panel="chat">交给赛诺</button>
@@ -563,15 +563,15 @@
             <select id="synoIntakeKind"><option value="url">URL / 单篇 B站 opus 或 cv</option><option value="text">粘贴文本</option><option value="markdown">Markdown</option><option value="txt">TXT / Markdown 文件（1 MB 内）</option><option value="pdf">PDF（10 MB 内）</option><option value="docx">DOCX（10 MB 内）</option><option value="html">HTML（1 MB 内）</option></select>
             <textarea id="synoIntakeValue" rows="4" placeholder="粘贴 URL、文本或 Markdown"></textarea>
             <input id="synoIntakeFile" type="file" accept="application/pdf,.pdf,text/plain,.txt,.md,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,text/html,.html,.htm" hidden />
-            <div class="syno-intake-actions"><small id="synoIntakeHint">收录会先进入审批中心，不会直接改知识库。</small><button id="synoIntakeSubmit" class="accent-btn" type="button">提交收录候选</button></div>
+            <div class="syno-intake-actions"><small id="synoIntakeHint">收录会查重并整理方案；遇到重复或歧义时会请你选择。</small><button id="synoIntakeSubmit" class="accent-btn" type="button">提交收录候选</button></div>
             <div id="synoIntakeProposal" class="syno-list" aria-live="polite"></div>
           </div>
         </details>
-        <details class="syno-intake syno-memory-box"><summary>长期记忆候选</summary><p>候选不会自动进入知识库；“提交晋升”仍会先进入审批，并展示最终 Markdown 差异。</p><div id="synoMemoryProposals" class="syno-list" aria-live="polite"></div></details>
+        <details class="syno-intake syno-memory-box"><summary>长期记忆候选</summary><p>候选不会自动进入知识库；“提交晋升”会展示最终 Markdown 差异供确认。</p><div id="synoMemoryProposals" class="syno-list" aria-live="polite"></div></details>
       </section>
       <section class="syno-pane" data-syno-pane="jobs" hidden>
         <div class="syno-pane-toolbar">
-          <p>写入任务会在这里等待审批，高风险任务需要两次确认。</p>
+          <p>写入任务默认自动执行并记录；只有收录冲突或触及源码根时才会暂停澄清。</p>
           <button id="synoJobsRefresh" class="ghost-btn" type="button">刷新</button>
         </div>
         <div id="synoJobs" class="syno-list" aria-live="polite"></div>
@@ -671,7 +671,7 @@
         <details id="synoWeixinSettings" class="setting-detail"><summary>微信连接</summary><section class="syno-channel-setup" aria-labelledby="synoWeixinTitle"><div><h3 id="synoWeixinTitle">微信 ClawBot 私聊</h3><p id="synoWeixinStatus">未连接。只允许扫码者本人，不启用群聊。</p></div><div class="syno-channel-actions"><button id="synoWeixinLogin" class="ghost-btn" type="button">获取二维码</button><button id="synoWeixinHome" class="ghost-btn" type="button">设为主渠道</button></div><img id="synoWeixinQr" class="syno-weixin-qr" alt="微信 iLink 登录二维码" hidden /></section></details>
         <details id="synoFeishuSettings" class="setting-detail"><summary>飞书连接</summary><section class="syno-channel-setup"><p>扫码注册并绑定本人账号。</p><p id="synoFeishuStatus">尚未注册。</p><div class="syno-job-actions"><button id="synoFeishuRegister" class="ghost-btn" type="button">开始注册</button><button id="synoFeishuConnect" class="accent-btn" type="button">连接</button><button id="synoFeishuDisconnect" class="ghost-btn" type="button">断开</button></div><div id="synoFeishuQr"></div></section></details>
         <details id="synoAutostartSettings" class="setting-detail"><summary>开机自动运行</summary><p id="synoWindowsServiceHint">检测 Windows 后台服务…</p><div class="syno-job-actions"><button id="synoWindowsInstall" class="accent-btn" type="button">开启</button><button id="synoWindowsUninstall" class="ghost-btn" type="button">关闭</button></div></details>
-        <details id="synoDataSettings" class="setting-detail"><summary>数据与备份</summary><p>知识保存在 vault，任务和审批保存在 ops；卸载开机任务不会删除它们。</p>
+        <details id="synoDataSettings" class="setting-detail"><summary>数据与备份</summary><p>知识保存在 vault，任务和事件保存在 ops；卸载开机任务不会删除它们。</p>
         <details class="setting-detail is-advanced"><summary>高级设置</summary>
           <p><strong>保留策略</strong>：对话 30 天；确认转录后的原始语音 7 天；失败载荷 30 天；未完成任务保留到终态。</p>
           <p><strong>诊断</strong>：服务仅监听 127.0.0.1:8888，凭据使用 Windows DPAPI 且不会回显。</p>
@@ -682,6 +682,12 @@
           <div class="syno-search-row"><label>安静开始<input id="synoQuietStart" type="time" required /></label><label>安静结束<input id="synoQuietEnd" type="time" required /></label></div>
           <label class="switch-line"><input id="synoReducedDensity" type="checkbox" /><span>紧凑显示</span></label>
           <button class="ghost-btn" type="submit">保存主动偏好</button><p id="synoPreferenceHint" class="form-hint" aria-live="polite"></p>
+        </form></details>
+        <details class="setting-detail"><summary>权限开关</summary><form id="synoPolicyForm" class="syno-stack-form">
+          <p class="form-hint">默认关闭。开启后管家可修改自身源码或装卸本机 Windows 服务，仍走隔离工作区与审计。</p>
+          <label class="switch-line"><input id="synoAllowSelfModify" type="checkbox" /><span>允许管家改自身源码（code_change）</span></label>
+          <label class="switch-line"><input id="synoAllowSystemControl" type="checkbox" /><span>允许装卸本机服务（system_control）</span></label>
+          <button class="ghost-btn" type="submit">保存权限开关</button><p id="synoPolicyHint" class="form-hint" aria-live="polite"></p>
         </form></details></details></details>
       </section>
       <footer id="synoChannelStatus" class="syno-channel-status">正在读取本地状态…</footer>

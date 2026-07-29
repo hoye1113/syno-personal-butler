@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import { isMocPath } from "./knowledge-path-policy.mjs";
 import { parseRecord, serializeRecord } from "./markdown-record.mjs";
 import { validateContractRecord } from "./schema-registry.mjs";
+import { APPROVED_TAGS, TAG_ALIASES } from "./canonical-tags.mjs";
 
 const execFileAsync = promisify(execFile);
 const CONTENT_ROOTS = ["00-Inbox", "01-Areas", "02-Resources", "03-Archive"];
@@ -15,23 +16,6 @@ const ATTACHMENT_ROOT = "99-System/Attachments";
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const MAX_ATTACHMENTS_BYTES = 50 * 1024 * 1024;
 const DENIED_SOURCE_NAMES = new Set([".git", ".obsidian", ".agents", ".claude", ".pytest_cache", ".syno-build", "__pycache__", "node_modules", "tests", "credentials", "credential", "secrets", "secret"]);
-const APPROVED_TAGS = new Set([
-  "ai_agent", "ai_coding", "ai_evaluation", "ai_safety", "ai_career", "ai_philosophy",
-  "article", "video_transcript", "podcast", "course", "moc", "notes", "zhihu", "wechat",
-  "bilibili", "youtube", "podcast_rss", "claude_code", "codex", "cursor", "devin", "chatgpt",
-  "claude", "openai", "anthropic", "harness_engineering", "loop_engineering", "memory", "multi_agent",
-  "context_engineering", "skills", "hooks", "mcp", "prompting", "fde", "web_clipping",
-  "content_creation", "text_refinement", "author", "loock_ai", "coding_agent", "chatbot", "column",
-  "interview", "nextjs", "frontend_agent_interview", "dialogue", "langgraphjs_tutorial",
-  "langgraphjs_quickstart", "ai_native", "lecture", "agent_architecture", "s_tier", "taste",
-]);
-const TAG_ALIASES = new Map([
-  ["langgraphjs-tutorial", "langgraphjs_tutorial"], ["langgraphjs-quickstart", "langgraphjs_quickstart"],
-  ["frontend-agent-interview", "frontend_agent_interview"], ["coding-agent", "coding_agent"],
-  ["哲学", "ai_philosophy"], ["自我认知", "ai_philosophy"], ["心理学", "ai_philosophy"],
-  ["职业规划", "ai_career"], ["招聘面试", "ai_career"],
-]);
-
 function sha256(value) { return crypto.createHash("sha256").update(value).digest("hex"); }
 function slash(value) { return String(value).replace(/\\/g, "/"); }
 function jsonLine(value) { return JSON.stringify(String(value)); }

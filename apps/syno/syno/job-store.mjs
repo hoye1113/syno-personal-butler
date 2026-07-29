@@ -11,7 +11,7 @@ const TRANSITIONS = Object.freeze({
   awaiting_approval: new Set(["running", "rejected", "canceled", "completed"]),
   running: new Set(["waiting_provider", "validating", "failed", "canceled"]),
   waiting_provider: new Set(["running", "canceled"]),
-  validating: new Set(["completed", "failed", "awaiting_approval", "canceled"]),
+  validating: new Set(["completed", "failed", "awaiting_approval", "canceled", "rejected"]),
   completed: new Set(),
   failed: new Set(),
   rejected: new Set(),
@@ -154,15 +154,10 @@ class JobStore {
 
   async approve(job, { channel = "web", senderId = "local-user", code = "" } = {}) {
     if (job.status !== "awaiting_approval") throw new Error("Job 当前不等待审批");
-    if (["weixin", "feishu"].includes(channel) && String(code).toUpperCase() !== job.approvalCode) {
-      const error = new Error("审批码无效");
-      error.code = "INVALID_APPROVAL_CODE";
-      throw error;
-    }
+    // trust-but-clarify：approve 的语义是"推进系统歧义澄清"。渠道（web/weixin/feishu）
+    // 同权限——已绑定 Owner 即可确认，不再要求六位审批码（与 web 一致）。
     job.approvalsReceived += 1;
     job.approvalActors = [...(job.approvalActors || []), `${channel}:${senderId}`];
-    // A double-approval job uses one approval to execute in the isolated worktree,
-    // then resets this counter and requires the second approval for the merge diff.
     const required = 1;
     await this.save(job);
     await this.event(job, "job.approved", { channel, senderId, count: job.approvalsReceived, required });
@@ -182,7 +177,7 @@ class JobStore {
     };
     await this.transition(job, "canceled", {
       revisionRequest,
-      error: { code: "PROPOSAL_REVISION_REQUESTED", message: "原审批已失效，等待修订方案产生新 Job" },
+      error: { code: "PROPOSAL_REVISION_REQUESTED", message: "原方案已失效，等待修订方案产生新 Job" },
     });
     await this.event(job, "job.modification_requested", { text: String(modification) });
     return job;

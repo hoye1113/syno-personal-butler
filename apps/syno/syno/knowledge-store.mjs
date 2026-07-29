@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { PATHS, relativeToRepo, resolveInside } from "./paths.mjs";
 import { frontmatterData } from "./validator.mjs";
+import { inspectRemoteContent } from "./sensitive-content.mjs";
 
 function plainText(markdown) {
   return String(markdown).replace(/^---[\s\S]*?---\s*/m, "").replace(/!\[.*?\]\(.*?\)/g, "")
@@ -64,12 +65,15 @@ class KnowledgeStore {
       const markdown = await fs.readFile(entry.file, "utf8"); const text = plainText(markdown); const frontmatter = frontmatterData(markdown);
       const title = titleOf(markdown, entry.file); const legacyTags = arrayValue(frontmatter.values.legacy_tags);
       const source = frontmatter.values.source_url || frontmatter.values.source || "";
+      const sourceDigest = frontmatter.values.source_content_sha256 || "";
+      const sourceFileDigest = frontmatter.values.source_file_sha256 || "";
       const stability = frontmatter.values.stability || frontmatter.values.stability_class || "";
       const date = frontmatter.values.updated || frontmatter.values.created || frontmatter.values.date || "";
       const privacy = String(frontmatter.values.privacy || "").toLocaleLowerCase("en-US");
       const sensitive = ["true", "yes"].includes(String(frontmatter.values.sensitive || frontmatter.values.private || "").toLocaleLowerCase("en-US"))
-        || ["private", "sensitive"].includes(privacy);
-      notes.push({ path: relativeToRepo(entry.file), title, excerpt: sensitive ? "" : text.slice(0, 280), tags: frontmatter.tags, legacyTags, source, stability, date, searchable: isContentNote(this.vaultRoot, entry.file), sensitive,
+        || ["private", "sensitive"].includes(privacy)
+        || !inspectRemoteContent(`${source}\n${markdown}`, { maxChars: Number.MAX_SAFE_INTEGER }).safe;
+      notes.push({ path: relativeToRepo(entry.file), title, excerpt: sensitive ? "" : text.slice(0, 280), tags: frontmatter.tags, legacyTags, source, sourceDigest, sourceFileDigest, stability, date, searchable: isContentNote(this.vaultRoot, entry.file), sensitive,
         knowledgeState: frontmatter.values.knowledge_state || "", linkStatus: frontmatter.values.link_status || "",
         qualityStatus: frontmatter.values.quality_status || (frontmatter.values.source || frontmatter.values.source_url ? "traceable" : "needs_source"),
         index: { title: tokens(title), tags: tokens(frontmatter.tags.join(" ")), legacyTags: tokens(legacyTags.join(" ")), body: sensitive ? [] : tokens(text), source: tokens(source) } });
@@ -101,9 +105,20 @@ class KnowledgeStore {
     return ranked.slice(0, Math.min(100, Number(limit) || 30)).map(({ note, score, reasons }) => ({ ...note, index: undefined, score, matchReasons: reasons }));
   }
   async read(relativePath) {
-    const candidate = resolveInside(PATHS.repoRoot, relativePath); const relative = relativeToRepo(candidate);
+    const relative = String(relativePath || "").replace(/\\/g, "/");
     if (!relative.startsWith("vault/") || !relative.endsWith(".md")) throw new Error("只允许读取 vault 内 Markdown");
-    const markdown = await fs.readFile(candidate, "utf8"); return { path: relative, title: titleOf(markdown, candidate), markdown };
+    const candidate = resolveInside(this.vaultRoot, relative.slice("vault/".length));
+    const markdown = await fs.readFile(candidate, "utf8");
+    return { path: relative, title: titleOf(markdown, candidate), markdown };
+  }
+  async findBySource({ canonicalUrl = "", contentSha256 = "" } = {}) {
+    await this.#ensureCurrent();
+    return (this.cache || [])
+      .filter((note) => note.searchable && (
+        (canonicalUrl && note.source === canonicalUrl)
+        || (contentSha256 && note.sourceFileDigest === contentSha256)
+      ))
+      .map(({ index, ...note }) => note);
   }
   async list({ searchable } = {}) {
     await this.#ensureCurrent();

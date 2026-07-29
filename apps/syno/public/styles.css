@@ -417,7 +417,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .syno-error { color: var(--danger); }
 .syno-empty { color: var(--muted); }
 
-/* 审批顾问建议卡片：管家先读懂，再给「这是什么 / 管家建议 / 理由」 */
+/* 收录澄清建议卡片：管家先读懂，再给「这是什么 / 管家建议 / 理由」 */
 .syno-job.is-awaiting_approval { border-color: color-mix(in oklch, var(--old-gold) 42%, var(--line)); }
 .syno-job.is-resolving { opacity: 0.6; pointer-events: none; border-style: dashed; transition: opacity .18s ease; }
 .syno-job.is-resolving .syno-job-actions { display: none; }

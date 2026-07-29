@@ -6,6 +6,13 @@
 
 > 当前执行状态以 `docs/TODO-EXECUTION-PLAN.md` 与根 `NEXT_SESSION.md` 为准；历史验收不替代 OpenCode R5 的真实模型、渠道和 Windows 恢复证据。
 
+## 当前交接状态（2026-07-28）
+
+- 当前 Goal 状态：`blocked`。
+- 阻塞是外部验收门槛，不是实现崩溃：需要主人完成真实微信/飞书消息、审批、跨渠道连续性、OpenCode/Workflow 重启恢复和下次 Windows 登录冷启动。
+- 本次同步为文档更新，不改变执行代码、原始 Obsidian 仓库、主人知识变更或运行事实源；不暂存、不提交、不 Push。
+- 恢复入口：完整读取 `NEXT_SESSION.md` 与 `docs/TODO-EXECUTION-PLAN.md`，收集主人实测记录后，再将 Goal 恢复为 active 并逐项修复失败项。
+
 ## 产品目标
 
 Syno 是 Windows 本地、单用户、主动式且可审计的知识闭环私人管家：
@@ -18,9 +25,10 @@ Syno 负责降低整理成本、维护知识库、发现学习缺口、安排复
 
 - 原知识库单向迁移已经完成，迁移管道、审批、GitGuard 和审计记录已落地。
 - OpenCode 重构固定起点为 `f0333f3`，实现提交为 `5890dad`。
-- R0–R4 的代码与自动化接缝已经完成；Windows 任务 XML 加固后的当前结果为 Node 375/375、vault 57/57、Repository verify 1359 files。
-- 主人已授权将全局 OpenCode 配置中的可用凭据一次性迁入 Syno DPAPI，产品不会自动读取全局 `auth.json`。当前产品尚未封板：真实模型提示注入、跨渠道计数、OpenCode 重启恢复和 Windows 登录恢复仍属 R5 门槛。
-- R6 删除旧实现严格未开始。
+- R0–R4 的已提交基线接缝已经完成。当前 HEAD 为 `f38ab18`，R4.1–R4.7 的稳定收录实现位于未提交工作树；P1 自动封闭、P2 三轴复审和 P3 自动门禁已完成，当前等待主人 P4 真实验收。
+- 主人已授权将全局 OpenCode 配置中的可用凭据一次性迁入 Syno DPAPI，产品不会自动读取全局 `auth.json`。当前产品尚未封板：真实模型提示注入、跨渠道计数、OpenCode 重启恢复和 Windows 登录恢复仍属 R5 门槛。Windows 任务的真实安装、状态与受控重启在本轮历史中已通过；本次复核（2026-07-28 约 22:26 CST）发现任务已回落至 `State=Ready`、未运行（`LastRunTime=2026-07-28 20:31:19`、`LastTaskResult=3221225786` 即 0xC000013A 控制中断退出）。下次登录冷启动尚未验收。
+- 主人初步实测确认微信对话可用，但暴露了自然语言会话控制与受限网页抓取缺口。浏览器整合采用项目级 `syno-web-capture` Skill 引导 OpenCode，并通过受限 `syno_browser_*` Tool Bridge 调用 Kimi WebBridge；Workflow、授权、审批和写入仍由 Syno 控制。当前后续阶段固定为：主人确认新增计划 → TODO 的 P4.0–P4.6 自动实现与复审 → P4.7 主人真实验收 → P5/R6 清理与最终封板。详细范围只维护在 TODO，本文不复制。
+- R6 删除旧实现严格未开始；主人真实验收是进入 R6 的必要条件。
 
 ## 迁移历史摘要
 
@@ -32,6 +40,7 @@ Syno 负责降低整理成本、维护知识库、发现学习缺口、安排复
 - 32 篇 LangGraph.js 教程由 `b79d2e5` 主动移除。
 - 4 个同路径冲突固定 keep-syno，只保留 Proposal；5 个敏感或缺失项固定排除，除非主人明确重新提交。
 - 两个相同 SHA-256 的 Anthropic 收录候选仍等待主人裁决，不得自动重复收录。
+- 当前运行态还保留本轮本地探针产生的两条待审批 Workflow（`workflow-6815e55b-910e-4471-b39d-127c88f4ce13`、`workflow-ff1a1323-53b6-46f4-ba60-a25c7578a581`）及三条失败可重试探针；不得将它们当作主人知识或自动批准/删除，详见 `NEXT_SESSION.md`。
 
 ## 不可变架构边界
 
@@ -84,4 +93,6 @@ Syno 负责降低整理成本、维护知识库、发现学习缺口、安排复
 
 ## 完成定义
 
-迁移与 OpenCode 自动化重构已完成，但私人管家尚未封板。只有 `docs/TODO-EXECUTION-PLAN.md` 的 R5 真实门槛和 R6 删除/最终验收全部通过，且原库未改变、当前分支未重置、远端未 Push，才能将全局 Goal 标记 complete。
+知识迁移已完成；OpenCode 基线与稳定收录的 P1–P3 自动门禁已完成。P4.0–P4.6 的自然语言交互、项目 Skill、受限浏览器兜底、自动回退、日志与 Doctor 已实现并通过 Node 454/454、vault 57/57、Repository verify 1396 files；Node 24 pinned DNS `lookup` 与 Kimi `/command` envelope 兼容性已修复，并用真实 OpenRouter 直抓、知乎 403 WebBridge 兜底复验。P4.7 的真实模型、微信/飞书、跨渠道审批和 Windows 登录恢复仍待主人验收，因此 Goal 当前为 `blocked`，私人管家尚未封板。只有 `docs/TODO-EXECUTION-PLAN.md` 的 P4.7、P5/R6 删除及最终验收全部通过，且原库未改变、当前分支未重置，才能将承接 Goal 标记 complete。Push 仍必须由主人另行明确授权。
+
+Windows 计划任务已完成真实安装、状态与受控重启：任务固定使用真实 Node 路径，受控重启验证时刻曾持续 `Running` 且 Host 健康，启动器脱敏日志已记录接管循环。本次复核（2026-07-28 约 22:26 CST）快照：任务当前 `State=Ready`、未运行，`LastRunTime=2026-07-28 20:31:19`、`LastTaskResult=3221225786`（0xC000013A 控制中断退出），8888 上存活的是更早（20:05:47）手动启动的 Host 进程而非活动任务实例。下次登录自动恢复仍待验收，当前 Host 存活不替代该门槛。

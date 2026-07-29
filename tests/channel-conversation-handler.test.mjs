@@ -38,6 +38,49 @@ test("ChannelConversationHandler receives URL before invoking the model and reco
   assert.deepEqual(proposed, ["artifact-1"]);
 });
 
+test("ChannelConversationHandler deterministically captures an embedded URL only with explicit intent", async () => {
+  const calls = [];
+  const model = [];
+  const handler = new ChannelConversationHandler({
+    runtime: { async run(request) { model.push(request.text); return { text: "ordinary" }; } },
+    core: {},
+    ingestWorkflows: {
+      async receive(payload, context) {
+        calls.push({ payload, context });
+        return { artifact: { id: "artifact-new" }, workflow: { id: "workflow-new" }, duplicate: false };
+      },
+    },
+    pendingDecisions: {},
+  });
+
+  assert.match((await handler.handle({ id: "capture-1", ownerKey: "owner", channel: "weixin", text: "请收录 https://example.com/a" })).text, /workflow-new/);
+  assert.equal(calls[0].payload.kind, "url");
+  assert.equal(model.length, 0);
+  assert.deepEqual(await handler.handle({ id: "chat-1", ownerKey: "owner", channel: "weixin", text: "解释 https://example.com/a 的观点" }), { text: "ordinary" });
+  assert.equal(model.length, 1);
+});
+
+test("ChannelConversationHandler supports local-only personal capture and deterministic status", async () => {
+  const calls = [];
+  const handler = new ChannelConversationHandler({
+    runtime: { async run() { throw new Error("model must not run"); } },
+    core: {},
+    ingestWorkflows: {
+      async receive(payload) {
+        calls.push(payload);
+        return { artifact: { id: "artifact-personal" }, workflow: { id: "workflow-personal" }, duplicate: false };
+      },
+      async listPending() { return [{ id: "workflow-personal", stage: "classifying" }]; },
+    },
+    pendingDecisions: {},
+  });
+
+  assert.match((await handler.handle({ id: "personal-1", ownerKey: "owner", channel: "feishu", text: "仅本地 收录我的想法：第一性原理" })).text, /workflow-personal/);
+  assert.equal(calls[0].kind, "personal");
+  assert.equal(calls[0].analysisMode, "local-only");
+  assert.match((await handler.handle({ ownerKey: "owner", channel: "feishu", text: "收录进度" })).text, /正在整理来源/);
+});
+
 test("ChannelConversationHandler resolves natural approval before OpenCode and binds it to Owner thread", async () => {
   const approvals = [];
   const handler = new ChannelConversationHandler({
@@ -65,7 +108,7 @@ test("ChannelConversationHandler resolves natural approval before OpenCode and b
   assert.equal(approvals[0].input.code, "ABC123");
 });
 
-test("ChannelConversationHandler verifies final approval against the authoritative current Job digest", async () => {
+test("ChannelConversationHandler verifies a bound diff digest against the authoritative current Job on confirmation", async () => {
   let digestResolver;
   const approvals = [];
   const handler = new ChannelConversationHandler({
@@ -83,7 +126,7 @@ test("ChannelConversationHandler verifies final approval against the authoritati
     ingest: {},
     pendingDecisions: {
       async parse(text, context) {
-        assert.equal(text, "确认应用 ABC123");
+        assert.equal(text, "可以");
         digestResolver = context.getDiffDigest;
         assert.equal(await digestResolver("job-20260728-87654321"), "digest-current");
         return {
@@ -101,7 +144,7 @@ test("ChannelConversationHandler verifies final approval against the authoritati
     ownerKey: "owner",
     senderId: "weixin-owner",
     channel: "weixin",
-    text: "确认应用 ABC123",
+    text: "可以",
     privateConversation: true,
   });
   assert.match(response.text, /已确认任务/);
@@ -121,6 +164,26 @@ test("ChannelConversationHandler supports deterministic new conversation without
   });
   assert.deepEqual(await handler.handle({ ownerKey: "owner", channel: "weixin", text: "/新对话" }), { text: "已开启新对话。" });
   assert.deepEqual(created, { ownerKey: "owner", threadKey: "main" });
+});
+
+test("ChannelConversationHandler supports natural-language new conversation and capability summary", async () => {
+  let created;
+  const handler = new ChannelConversationHandler({
+    runtime: {
+      async run() { throw new Error("not called"); },
+      async newConversation(context) { created = context; return { openCodeSessionId: "new-session" }; },
+      capabilities() { return { tools: ["syno_capture_start"] }; },
+      async health() { return { ready: true }; },
+    },
+    core: {},
+    ingestWorkflows: { async listPending() { return [{ id: "workflow-1" }]; } },
+    pendingDecisions: {},
+  });
+  assert.deepEqual(await handler.handle({ ownerKey: "owner", channel: "weixin", text: "重新开个对话" }), { text: "已开启新对话。" });
+  assert.deepEqual(created, { ownerKey: "owner", threadKey: "main" });
+  const capabilities = await handler.handle({ ownerKey: "owner", channel: "weixin", text: "你能做什么" });
+  assert.match(capabilities.text, /当前有 1 项收录/);
+  assert.doesNotMatch(capabilities.text, /syno_capture_start/);
 });
 
 test("ChannelConversationHandler releases a consumed decision when the authoritative action fails", async () => {
@@ -216,6 +279,38 @@ test("ChannelConversationHandler durably queues a chat when OpenCode is unavaila
   assert.equal(calls[0].context.ownerKey, "owner");
   assert.equal(calls[0].context.threadKey, "main");
   assert.equal(calls[0].context.messageId, "wx-offline");
+});
+
+test("ChannelConversationHandler journals workflow stages without persisting message text", async () => {
+  const events = [];
+  const handler = new ChannelConversationHandler({
+    runtime: {
+      async run() {
+        throw Object.assign(new Error("OpenCode 尚未运行"), { code: "OPENCODE_NOT_RUNNING" });
+      },
+    },
+    core: {},
+    ingest: {},
+    pendingDecisions: {},
+    journal: { async record(event, data, options) { events.push({ event, data, options }); } },
+  });
+
+  const response = await handler.handle({
+    id: "wx-log",
+    ownerKey: "owner",
+    senderId: "weixin-owner",
+    channel: "weixin",
+    text: "这段原文不能进入日志",
+  });
+
+  assert.match(response.text, /OpenCode 尚未运行/);
+  assert.deepEqual(events.map((item) => item.event), [
+    "channel.message.received",
+    "channel.runtime.requested",
+    "channel.message.failed",
+  ]);
+  assert.doesNotMatch(JSON.stringify(events), /这段原文不能进入日志/);
+  assert.equal(events.at(-1).data.error.code, "OPENCODE_NOT_RUNNING");
 });
 
 test("ChannelConversationHandler persists a modification as a revised ingest proposal and invalidates the old approval", async () => {

@@ -4,7 +4,7 @@
   const title = document.querySelector("#synoDrawerTitle");
   const panes = [...document.querySelectorAll("[data-syno-pane]")];
   const tabs = [...document.querySelectorAll("[data-syno-tab]")];
-  const labels = { knowledge: "知识", learn: "学习", create: "创作", jobs: "任务与审批", notifications: "通知", settings: "设置", chat: "问赛诺" };
+  const labels = { knowledge: "知识", learn: "学习", create: "创作", jobs: "任务", notifications: "通知", settings: "设置", chat: "问赛诺" };
   let active = "knowledge";
   let lastTrigger = null;
   let weixinLoginGeneration = 0;
@@ -215,7 +215,7 @@
   function showNoteEditor(note) {
     const reader = document.querySelector("#synoReader");
     const heading = node("h3", "", `编辑：${note.title}`);
-    const hint = node("p", "syno-edit-hint", "保存后会先生成 Markdown diff，并要求两次审批；这里不会直接覆盖原文。");
+    const hint = node("p", "syno-edit-hint", "保存后会生成 Markdown diff 并在隔离工作区应用；这里不会直接覆盖原文，可在“任务”查看差异审计。");
     const textarea = node("textarea", "syno-source-editor");
     textarea.value = note.markdown;
     textarea.rows = 24;
@@ -232,7 +232,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ path: note.path, markdown: textarea.value }),
         });
-        hint.textContent = `任务 ${result.job.id} 已进入审批中心。`;
+        hint.textContent = result.requiresApproval ? `任务 ${result.job.id} 需要澄清，请到“任务”选择。` : `任务 ${result.job.id} 已应用修改。`;
         select("jobs");
       } catch (error) {
         hint.textContent = error.message;
@@ -245,7 +245,7 @@
 
   function statusLabel(job) {
     const values = {
-      pending: "待执行", awaiting_approval: "等待审批", running: "执行中",
+      pending: "待执行", awaiting_approval: "等待澄清", running: "执行中",
       validating: "校验中", waiting_provider: "等待 Provider", completed: "已完成", failed: "失败", rejected: "已拒绝", canceled: "已取消",
     };
     return values[job.status] || job.status;
@@ -324,7 +324,7 @@
     }
   }
 
-  // 渲染审批顾问建议：三段（这是什么 / 管家建议 / 理由）+ 可选「注意」+ 离线徽标 + 原始信息折叠。
+  // 渲染收录澄清建议：三段（这是什么 / 管家建议 / 理由）+ 可选「注意」+ 离线徽标 + 原始信息折叠。
   function renderAdviceSlot(slot, advice) {
     slot.replaceChildren();
     if (!advice) {
@@ -365,7 +365,7 @@
     }
   }
 
-  // 懒加载：首次打开审批卡片时取管家建议并就地刷新（不动整张列表）。
+  // 懒加载：首次打开澄清卡片时取管家建议并就地刷新（不动整张列表）。
   async function loadAdvice(job, slot, actions) {
     try {
       const { advice } = await api(`/api/syno/jobs/${encodeURIComponent(job.id)}/advice`);
@@ -508,7 +508,7 @@
       });
       const message = result.error?.message
         || (result.requiresApproval
-          ? `任务 ${result.job.id} 已进入审批中心。批准后才会写入。`
+          ? `任务 ${result.job.id} 需要澄清：收录遇到重复或歧义，请到“任务”选择处理方式。`
           : result.job?.result?.text || `任务 ${result.job?.id || ""} 已完成。`);
       addMessage(message, result.error ? "error" : "syno");
     } catch (error) {
@@ -632,7 +632,7 @@
           for (const item of actions.querySelectorAll("button")) item.disabled = true;
           try {
             const result = await api(`/api/syno/intake/${encodeURIComponent(id)}/apply`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision: { action } }) });
-            document.querySelector("#synoIntakeHint").textContent = `任务 ${result.job.id} 已进入审批中心。`;
+            document.querySelector("#synoIntakeHint").textContent = `任务 ${result.job.id} 已提交，正在处理。`;
             select("jobs");
           } catch (error) {
             card.append(node("p", "syno-error", error.message));
@@ -726,7 +726,7 @@
         rawOutput: document.querySelector("#synoLearningArtifact").value.trim(),
         misconceptions: document.querySelector("#synoLearningMisconceptions").value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean),
       }) });
-      hint.textContent = result.requiresApproval ? `任务 ${result.job.id} 等待审批。` : "学习证据已记录，复习时间已更新。";
+      hint.textContent = result.requiresApproval ? `任务 ${result.job.id} 需要澄清，请到“任务”选择。` : "学习证据已记录，复习时间已更新。";
       await loadDueReviews();
     } catch (error) { hint.textContent = error.message; }
   }
@@ -748,7 +748,7 @@
     event.preventDefault(); const hint = document.querySelector("#synoOutputHint"); hint.textContent = "正在建立机会…";
     try {
       const result = await api("/api/syno/outputs/opportunities", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: document.querySelector("#synoOutputTitle").value.trim(), reason: document.querySelector("#synoOutputReason").value.trim(), format: document.querySelector("#synoOutputFormat").value, priority: 70 }) });
-      hint.textContent = result.requiresApproval ? `任务 ${result.job.id} 等待审批。` : "输出机会已建立。";
+      hint.textContent = result.requiresApproval ? `任务 ${result.job.id} 需要澄清，请到“任务”选择。` : "输出机会已建立。";
     } catch (error) { hint.textContent = error.message; }
   }
 
@@ -783,7 +783,7 @@
             if (needsFeedback && feedback.length < 5) { feedbackField.focus(); card.append(node("p", "syno-error", "请先记录至少 5 个字符的发布反馈。")); return; }
             try {
               const result = await api(`/api/syno/outputs/opportunities/${encodeURIComponent(opportunity.id)}/progress`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, userOutput, feedback }) });
-              document.querySelector("#synoOutputHint").textContent = `任务 ${result.job.id} 已进入审批中心。`;
+              document.querySelector("#synoOutputHint").textContent = `任务 ${result.job.id} 已提交，正在处理。`;
               select("jobs");
             } catch (error) { card.append(node("p", "syno-error", error.message)); }
           }); actions.append(button);
@@ -804,6 +804,11 @@
       document.querySelector("#synoQuietEnd").value = values["notifications.quietHours"]?.end || "07:30";
       document.querySelector("#synoReducedDensity").checked = values["ui.preferences"]?.reducedDensity === true;
       document.body.classList.toggle("syno-reduced-density", values["ui.preferences"]?.reducedDensity === true);
+      // 权限开关（默认关）：code_change / system_control 的 D4 开启通道，状态可见。
+      const allowSelfModify = document.querySelector("#synoAllowSelfModify");
+      const allowSystemControl = document.querySelector("#synoAllowSystemControl");
+      if (allowSelfModify) allowSelfModify.checked = values["policy.allowSelfModify"] === true;
+      if (allowSystemControl) allowSystemControl.checked = values["policy.allowSystemControl"] === true;
       const primary = document.querySelector(".syno-primary-links");
       for (const key of values["ui.displayOrder"] || []) {
         const button = primary?.querySelector(`[data-scroll-target="${key}"], [data-syno-panel="${key}"]`);
@@ -826,6 +831,18 @@
     } catch (error) { hint.textContent = error.message; }
   }
 
+  async function savePolicy(event) {
+    event.preventDefault(); const hint = document.querySelector("#synoPolicyHint");
+    const changes = [
+      ["policy.allowSelfModify", document.querySelector("#synoAllowSelfModify")?.checked === true],
+      ["policy.allowSystemControl", document.querySelector("#synoAllowSystemControl")?.checked === true],
+    ];
+    try {
+      for (const [key, value] of changes) await api("/api/syno/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, value, confirmed: true }) });
+      hint.textContent = "权限开关已保存并生效。"; await loadPreferences();
+    } catch (error) { hint.textContent = error.message; }
+  }
+
   async function loadProviderStatus() {
     const hint = document.querySelector("#synoProviderHint");
     try {
@@ -834,7 +851,7 @@
       const healthy = status.supervisor?.healthy === true;
       const lastModel = status.cognitive?.lastAttempts?.slice(-1)[0]?.modelId;
       hint.textContent = !configured
-        ? "需要配置 OpenCode Zen Token；本地收录回执、审批解析、搜索与提醒仍可使用。"
+        ? "需要配置 OpenCode Zen Token；本地收录回执、澄清解析、搜索与提醒仍可使用。"
         : healthy ? `OpenCode 1.18.2 正常运行${lastModel ? `；最近模型 ${lastModel}` : ""}。` : `Token 已加密保存；AI 内核状态：${status.supervisor?.state || "未就绪"}。`;
       setSettingStatus("#synoSettingAi", healthy ? "已连接" : configured ? "需重启" : "未连接", healthy);
       setupState.ai = configured && healthy;
@@ -854,7 +871,7 @@
 
   async function restartOpenCode() {
     const hint = document.querySelector("#synoProviderHint");
-    if (!window.confirm("重启 OpenCode AI 内核？本地收录、审批和提醒不会停止，进行中的自由对话会短暂等待。")) return;
+    if (!window.confirm("重启 OpenCode AI 内核？本地收录、任务和提醒不会停止，进行中的自由对话会短暂等待。")) return;
     hint.textContent = "正在重启 OpenCode AI 内核…";
     try {
       await api("/api/syno/opencode/restart", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
@@ -983,6 +1000,7 @@
   document.querySelector("#synoProviderForm")?.addEventListener("submit", saveProvider);
   document.querySelector("#synoOpenCodeRestart")?.addEventListener("click", restartOpenCode);
   document.querySelector("#synoPreferenceForm")?.addEventListener("submit", savePreferences);
+  document.querySelector("#synoPolicyForm")?.addEventListener("submit", savePolicy);
   document.querySelector("#synoFeishuRegister")?.addEventListener("click", () => feishuAction("register/start"));
   document.querySelector("#synoFeishuConnect")?.addEventListener("click", () => feishuAction("connect"));
   document.querySelector("#synoFeishuDisconnect")?.addEventListener("click", () => feishuAction("disconnect"));

@@ -22,6 +22,7 @@ function buildSourceDescriptor({ payload = {}, prepared = {}, channel = "web", m
     const canonicalUrl = canonicalizeUrl(rawUrl);
     return {
       kind: "url",
+      originalUrl: String(rawUrl),
       canonicalUrl,
       publisher: prepared.publisher || new URL(canonicalUrl).hostname,
       observedAt: now,
@@ -37,9 +38,11 @@ function buildSourceDescriptor({ payload = {}, prepared = {}, channel = "web", m
     };
   }
   const personal = payload.sourceKind === "personal" || payload.personal === true;
-  const filename = payload.filename || payload.originalFilename;
+  const filename = payload.filename || payload.originalFilename || payload.name;
   if (filename || ["markdown", "txt", "pdf", "docx", "html", "file"].includes(payload.kind)) {
-    const content = Buffer.isBuffer(payload.value) ? payload.value : Buffer.from(String(payload.value || ""));
+    const content = payload.base64
+      ? Buffer.from(String(payload.base64), "base64")
+      : Buffer.isBuffer(payload.value) ? payload.value : Buffer.from(String(payload.value || ""));
     return {
       kind: "file",
       originalFilename: String(filename || "unnamed"),
@@ -50,7 +53,7 @@ function buildSourceDescriptor({ payload = {}, prepared = {}, channel = "web", m
       ...(messageId ? { platformMessageId: messageId } : {}),
       sourceTier: "secondary",
       reliability: "unverified",
-      userSuppliedSource: Boolean(payload.userSuppliedSource),
+      userSuppliedSource: payload.userSuppliedSource !== false,
       verificationStatus: "unverified",
     };
   }

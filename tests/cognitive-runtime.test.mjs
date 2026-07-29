@@ -94,7 +94,13 @@ test("Hermes can create only an approval Job and cannot turn a direct write into
   const host = new AgentHost({
     store: new JobStore({ opsRoot }),
     executor: new FakeExecutor(),
-    gitGuard: { async changedPaths() { return []; }, async commitPaths() { return { committed: false }; } },
+    gitGuard: {
+      async changedPaths() { return []; },
+      async changes() { return []; },
+      async commitPaths() { return { committed: false }; },
+      async prepareWorktree(id) { return { branch: `syno/job/${id}`, directory: path.join(PATHS.runtimeRoot, "hermes-worktree"), base: "base-1" }; },
+      async removeWorktree() {},
+    },
   });
   const tools = new ToolRegistry([
     {
@@ -122,8 +128,10 @@ test("Hermes can create only an approval Job and cannot turn a direct write into
     },
   };
   const result = await new HermesCognitiveRuntime({ bridge, tools, fixedModelId: "fixed-model" }).run({ text: "create" });
-  assert.equal(result.proposal.status, "awaiting_approval");
-  assert.equal(result.proposal.requiresApproval, true);
+  // trust-but-clarify：jobs.submit 走 Policy 后写入默认自动执行（approval 恒为 none），不再 awaiting_approval。
+  assert.equal(result.proposal.status, "completed");
+  assert.equal(result.proposal.requiresApproval, false);
+  // 但直写工具（knowledge.write，无 approvalBoundary）仍被工具沙箱拒绝——不可绕过 Job 入口建立权威。
   assert.equal(result.directWriteCode, "TOOL_APPROVAL_REQUIRED");
   assert.equal((await host.list()).length, 1);
 });

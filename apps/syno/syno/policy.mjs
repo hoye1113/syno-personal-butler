@@ -56,7 +56,11 @@ function inferIntent(request = {}) {
 
 function evaluate(request = {}, context = {}) {
   const intent = inferIntent(request);
-  const developmentMode = context.developmentMode === true;
+  // trust-but-clarify：所有写入默认自动执行（approval 恒为 none）。唯一闸门是两
+  // 个安全开关（默认关）：allowSelfModify（管家改自身源码）/ allowSystemControl
+  //（本机生命周期控制）。收录的"冲突澄清"由收录层按系统歧义单独触发，不经此字段。
+  const allowSelfModify = context.allowSelfModify === true;
+  const allowSystemControl = context.allowSystemControl === true;
   const highRisk = HIGH_RISK_INTENTS.has(intent);
   const localControl = LOCAL_CONTROL_INTENTS.has(intent);
   const writes = WRITE_INTENTS.has(intent);
@@ -69,11 +73,11 @@ function evaluate(request = {}, context = {}) {
       : writes
         ? "syno-ops"
         : "syno-read";
-  const trustedAutomation = context.trustedAutomation === true && intent === "create_report";
-  const approval = highRisk ? "double" : localControl || (writes && !trustedAutomation) ? "single" : "none";
+  const approval = "none";
   const risk = highRisk ? "high" : localControl || writes ? "low" : "read";
   const executor = "cognitive-runtime";
-  const denied = intent === "code_change" && !developmentMode;
+  const denied = (intent === "code_change" && !allowSelfModify)
+    || (intent === "system_control" && !allowSystemControl);
   return Object.freeze({
     intent,
     profile,
@@ -81,21 +85,23 @@ function evaluate(request = {}, context = {}) {
     risk,
     executor,
     allowedRoots: PROFILE_ROOTS[profile],
-    // Every fact-source write is transactional. The actual diff decides whether
-    // it may auto-merge or must pause for a second approval.
+    // Every fact-source write is transactional: it runs in an isolated worktree
+    // and merges only after validators pass. Conflict clarification (ingest) and
+    // source-root boundary rejection (agent-host) pause or block outside Policy.
     needsWorktree: writes,
-    autoCommit: false,
     validators: ["changed-paths", ...(writes ? ["ops-contracts"] : []), ...(profile === "syno-curate" ? ["markdown", "vault-contract"] : [])],
     allowed: !denied,
     reason: denied
-      ? "开发模式默认关闭，拒绝由 Syno 修改自身代码"
-      : localControl
-        ? "本机生命周期控制需要主人显式确认并写入审计事件"
+      ? intent === "code_change"
+        ? "代码自改开关默认关闭：拒绝修改管家自身源码。如需放开，请在设置中将 policy.allowSelfModify 置为 true"
+        : "系统控制开关默认关闭：拒绝本机生命周期操作。如需放开，请在设置中将 policy.allowSystemControl 置为 true"
       : highRisk
-        ? "命中确定性高风险意图，需要隔离工作区与双审批"
-      : writes
-        ? "请求会修改长期事实源，需要一次审批"
-        : "只读请求可直接执行",
+        ? "高风险意图默认自动执行（已隔离工作区）；收录冲突或源码越界时单独处理"
+        : localControl
+          ? "本机生命周期控制已显式允许，自动执行并记录审计事件"
+          : writes
+            ? "写入请求默认自动执行（已隔离工作区）；收录冲突时暂停澄清"
+            : "只读请求可直接执行",
   });
 }
 

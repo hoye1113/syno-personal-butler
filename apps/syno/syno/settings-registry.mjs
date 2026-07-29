@@ -5,7 +5,7 @@ import { PATHS } from "./paths.mjs";
 
 const GROUPS = Object.freeze({
   agentAdjustable: Object.freeze(["notifications.cadence", "notifications.quietHours", "learning.dailyReviewCount", "ui.displayOrder", "ui.preferences"]),
-  confirmationRequired: Object.freeze(["provider.modelId", "budget", "channels", "calendar", "ownerAllowlist", "retention", "actions.allowlist", "context.thresholds"]),
+  confirmationRequired: Object.freeze(["provider.modelId", "budget", "channels", "calendar", "ownerAllowlist", "retention", "actions.allowlist", "context.thresholds", "policy.allowSelfModify", "policy.allowSystemControl"]),
   immutable: Object.freeze(["provider.baseUrl", "provider.token", "policy", "allowedRoots", "toolRegistry", "approvals", "security", "source", "contracts"]),
 });
 
@@ -16,9 +16,13 @@ const DEFAULT_VALUES = Object.freeze({
   "ui.displayOrder": Object.freeze(["today", "capture", "knowledge", "learn", "create"]),
   "ui.preferences": Object.freeze({ reducedDensity: false }),
   "context.thresholds": null,
+  // trust-but-clarify 安全开关：默认关。仅用户（带 confirmed）可翻；Agent 永不可改。
+  "policy.allowSelfModify": false,
+  "policy.allowSystemControl": false,
 });
 
 function validateValue(key, value) {
+  if ((key === "policy.allowSelfModify" || key === "policy.allowSystemControl") && typeof value !== "boolean") throw new Error(`${key} 必须为布尔值`);
   if (key === "notifications.cadence" && !["minimal", "balanced", "active"].includes(value)) throw new Error("通知节奏无效");
   if (key === "notifications.quietHours") {
     const valid = (item) => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(item || "");

@@ -45,6 +45,7 @@ test("OpenCode doctor reports credential presence without loading or printing th
       async status() { return { configured: true, provider: "opencode" }; },
       async loadToken() { throw new Error("doctor must not decrypt the token"); },
     },
+    browserCapture: { async health() { return { available: true, daemonVersion: "1.11.3", extensionVersion: "1.11.3" }; } },
     repoRoot: path.resolve("."),
   });
 

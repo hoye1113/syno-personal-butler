@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/ingest-workflow.schema.json",
+  "title": "IngestWorkflow",
+  "type": "object",
+  "required": [
+    "id",
+    "artifactId",
+    "ownerKey",
+    "originChannel",
+    "threadKey",
+    "platformMessageId",
+    "sourceType",
+    "analysisMode",
+    "stage",
+    "sourceDigest",
+    "attempts",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "id": { "type": "string", "pattern": "^workflow-[a-zA-Z0-9-]+$" },
+    "artifactId": { "type": "string", "minLength": 1 },
+    "ownerKey": { "type": "string", "minLength": 1 },
+    "originChannel": { "type": "string", "minLength": 1 },
+    "threadKey": { "type": "string", "minLength": 1 },
+    "platformMessageId": { "type": "string" },
+    "sourceType": { "enum": ["url", "wechat", "bilibili-opus", "github-doc", "text", "markdown", "txt", "pdf", "docx", "html", "personal"] },
+    "analysisMode": { "enum": ["remote", "local-only"] },
+    "stage": {
+      "enum": [
+        "received", "extracting", "classifying", "proposed", "awaiting_decision",
+        "approved", "executing", "validating", "committed", "indexed", "reported",
+        "failed_retryable", "failed_terminal", "rejected", "superseded"
+      ]
+    },
+    "candidateId": { "type": "string" },
+    "proposalId": { "type": "string" },
+    "jobId": { "type": "string" },
+    "pendingAction": { "enum": ["reject"] },
+    "rulesDigest": { "type": "string" },
+    "sourceDigest": { "type": "string", "minLength": 1 },
+    "proposalDigest": { "type": "string" },
+    "fetchMethod": { "enum": ["direct_http", "kimi_webbridge", "local_only"] },
+    "fallbackReason": { "type": "string" },
+    "requestedUrl": { "type": "string" },
+    "finalUrl": { "type": "string" },
+    "browserSessionId": { "type": "string" },
+    "browserExpiresAt": { "type": "string", "format": "date-time" },
+    "browserStatus": { "enum": ["authorized", "running", "completed", "interaction_required", "unavailable", "failed"] },
+    "idempotencyKey": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "sourceIdentityKey": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "deliveryTarget": {
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string" },
+        "toUserId": { "type": "string" },
+        "replyTo": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "attempts": {
+      "type": "object",
+      "required": ["prepare"],
+      "properties": { "prepare": { "type": "integer", "minimum": 0 } },
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "lastError": {
+      "type": "object",
+      "required": ["code", "message", "retryable"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "retryable": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "nextRetryAt": { "type": "string", "format": "date-time" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "terminalAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

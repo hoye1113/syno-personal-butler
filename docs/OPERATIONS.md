@@ -47,11 +47,27 @@ pnpm state:archive -- restore D:\Backups\syno-state-20260717
 
 ## 故障检查顺序
 
-1. 查看 Provider/渠道状态页，不读取或回显 secret。
-2. 查看 Job 状态、事件和脱敏错误码。
-3. 运行配置、契约和仓库验证。
-4. 运行针对性测试后再跑完整测试。
-5. 生成 `BugReport` 或 `ImprovementProposal`；不要让 Agent 修改源码绕过故障。
+1. 查看 `%LOCALAPPDATA%\Syno\logs\syno-runtime-YYYY-MM-DD.jsonl` 的最新脱敏事件。
+2. 查看 Provider/渠道状态页，不读取或回显 secret。
+3. 查看 Job 状态、事件和脱敏错误码。
+4. 运行配置、契约和仓库验证。
+5. 运行针对性测试后再跑完整测试。
+6. 生成 `BugReport` 或 `ImprovementProposal`；不要让 Agent 修改源码绕过故障。
+
+运行日志按天写入 JSONL，默认保留 14 天，覆盖 Syno 初始化、OpenCode
+配置/进程/健康/退出、渠道启动，以及消息的附件、审批、收录和 Runtime
+阶段。日志只记录渠道、消息 ID、Artifact/Job/Run ID、状态和脱敏错误，不保存
+主人对话正文；`Token`、`Authorization`、Cookie、密码、API Key 和带凭据 URL
+会在落盘前递归脱敏。
+
+查看当天最后 80 条：
+
+```powershell
+$log = Get-ChildItem "$env:LOCALAPPDATA\Syno\logs\syno-runtime-*.jsonl" |
+  Sort-Object LastWriteTime |
+  Select-Object -Last 1
+Get-Content -LiteralPath $log.FullName -Tail 80
+```
 
 渠道健康 probe 可以在 Worker 运行时直接执行。它优先读取 `http://127.0.0.1:<PORT>/api/syno/channels` 的脱敏状态，返回 `source: running_worker`；仅在本机服务不可达时才启动独立 Adapter。这样不会与微信进程锁竞争，也不会为飞书重复建立长连接。
 
@@ -71,3 +87,52 @@ lark-cli version
 - 发布前逐项执行 `docs/CUTOVER-CHECKLIST.md`，结果写入 `docs/FINAL-ACCEPTANCE.md`。
 - 任何真实 Provider、微信或飞书门槛未通过时，只能继续本地隔离运行，不得宣称完成最终切换。
 - 已知限制统一维护在 `docs/KNOWN-LIMITATIONS.md`；修复后必须附对应测试或真实验收证据再移除。
+
+## 主人实测验收
+
+Codex 完成 `docs/TODO-EXECUTION-PLAN.md` 的 P1–P3，并明确交付“自动门禁通过”证据后，再由主人执行本节。自动测试未通过时不要开始真实数据验收。
+
+### 当前交付状态（2026-07-28）
+
+- P1 收录自动封闭：完成。Outbox 租约/幂等、来源适配、DLP、规则 supersede、回执与拒绝恢复均已测试。
+- P2 三轴复审：完成。Standards、Spec、Security 最终均为 P0 0、P1 0。
+- P3 自动门禁：主工作树 Node 433/433、vault pytest 57/57、Repository verify 1382 files、`git diff --check` 通过；fresh clone Node 433/433、vault 57/57、Repository verify 1378 files 通过。
+- 本轮未把真实浏览器页面、真实免费模型、Windows Task Scheduler 登录恢复、微信/飞书设备行为写成已通过。Playwright CLI/4329 本地页面受到当前 Codex 浏览器安全策略拒绝，真实页面验收移交主人 P4。Windows 任务的真实安装、状态与受控重启已有证据，但下次登录冷启动仍需主人确认。
+- 当前工作树未提交；主人两项知识变更未被覆盖、未暂存；未 Push。
+
+启动与诊断：
+
+```powershell
+pnpm opencode:doctor
+pnpm start
+pnpm opencode:status
+pnpm windows:status
+```
+
+主人验收清单：
+
+1. 微信发送一个 Markdown 文件，飞书发送一个 PDF，再发送一个纯 URL。
+2. 分别发送“帮我收录这个 URL”和一次带“仅本地”的内容。
+3. 查询“刚才的文件怎么样了”和“待我确认的收录”，确认不依赖模型也能返回持久状态。
+4. 修改一次 Proposal，完成三次普通审批和一次冲突双审批。
+5. 在 Proposal 生成前重启服务；另一次在 PendingDecision 形成后重启，确认状态和审批仍可恢复。
+6. 从微信发起，在飞书查询或确认，验证同一 Owner 的跨渠道连续性。
+7. 累计完成 30 条跨渠道消息、10 组多轮追问和 5 次 ToolRegistry 调用。
+8. 对已收录知识做一次 teach-back，确认“已收录”不会自动提高掌握度，只有主人证据会推进学习状态。
+9. 已执行真实 Windows 任务安装、状态和受控重启；仍需在下次登录后确认 Syno Host、OpenCode 子进程和未完成 Workflow 共同恢复。
+
+每项至少记录：
+
+```text
+时间：
+渠道：
+输入类型：
+Artifact / Workflow / Job ID：
+期望结果：
+实际结果：
+是否通过：
+相关日志 event：
+截图或补充：
+```
+
+任一失败项都应保留 ID 与日志，回到自动修复阶段；不要重复审批、手工改 vault 或删除失败状态来制造通过结果。全部通过并由主人明确确认后，才允许规划 R6 清理旧运行时。

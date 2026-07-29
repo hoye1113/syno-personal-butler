@@ -12,16 +12,23 @@ function isSystemPath(value) {
     || /^ops\/events\/\d{4}\/\d{2}\/event-[^/]+\.md$/.test(normalized);
 }
 
-function diffRequiresApproval(decision, changes = []) {
-  if (decision.risk === "high") return true;
+// trust-but-clarify 的 diff 评估：不再"推回审批"，而是二态——audit（记审计后继续合并）
+// 或 reject（源码根越界硬拒绝，全开后唯一保留的硬拒绝）。
+function diffAssessment(decision, changes = []) {
   const sensitiveRoots = ["apps/", "contracts/", "config/", "scripts/", "tests/"];
-  return changes.some((change) => change.kind !== "added"
-    || sensitiveRoots.some((root) => change.path.startsWith(root))
-    || isMocPath(change.path));
+  // D3：非 code_change 却触及源码根 = 模型 scope creep。要改源码须用显式 code_change（受开关控制）。
+  const touchesSourceRoot = changes.some((change) => sensitiveRoots.some((root) => change.path.startsWith(root)));
+  if (touchesSourceRoot && decision.intent !== "code_change") {
+    return { level: "reject", reason: "实际 diff 触及管家源码根（apps/contracts/config/scripts/tests），需用显式 code_change 意图（受开关控制）才可修改" };
+  }
+  // 历史"高风险"信号（high risk / 非 added / MOC）不再阻断，只记审计。
+  const notable = decision.risk === "high"
+    || changes.some((change) => change.kind !== "added" || isMocPath(change.path));
+  return { level: "audit", reason: notable ? "diff 修改既有事实/MOC/高风险路径，已记审计后自动合并" : "additive merge" };
 }
 
 class AgentHost {
-  constructor({ store, executor, gitGuard, policy = evaluate, validator = validateRepositoryChange, onCommitted = async () => {}, processLockRoot } = {}) {
+  constructor({ store, executor, gitGuard, policy = evaluate, validator = validateRepositoryChange, onCommitted = async () => {}, processLockRoot, settingsRegistry = null } = {}) {
     if (!store || !executor || !gitGuard) throw new Error("AgentHost 缺少必要 Adapter");
     this.store = store;
     this.executor = executor;
@@ -29,23 +36,40 @@ class AgentHost {
     this.policy = policy;
     this.validator = validator;
     this.onCommitted = onCommitted;
+    this.settingsRegistry = settingsRegistry;
     this.activeRuns = new Map();
     this.jobLocks = new Map();
     this.mergeTail = Promise.resolve();
     this.processLockRoot = processLockRoot || path.join(path.dirname(store?.payloadRoot || PATHS.stateRoot), "locks", "jobs");
   }
 
+  // trust-but-clarify：把两个安全开关从 SettingsRegistry 读出注入 Policy context。
+  // 仅当调用方未显式提供时才回填（显式值优先，便于测试与一次性放权）。开关默认关，
+  // 读不到时按 false 处理（拒绝改源码/系统控制）。
+  async #policyContext(context = {}) {
+    if (!this.settingsRegistry) return context;
+    const merged = { ...context };
+    if (merged.allowSelfModify === undefined) {
+      merged.allowSelfModify = await this.settingsRegistry.get("policy.allowSelfModify") === true;
+    }
+    if (merged.allowSystemControl === undefined) {
+      merged.allowSystemControl = await this.settingsRegistry.get("policy.allowSystemControl") === true;
+    }
+    return merged;
+  }
+
   async receive(request, context = {}) {
-    const decision = this.policy(request, context);
+    const mergedContext = await this.#policyContext(context);
+    const decision = this.policy(request, mergedContext);
     const job = await this.store.create({
       request,
       decision,
-      channel: context.channel || "web",
-      senderId: context.senderId || "local-user",
-      ownerKey: context.ownerKey || "local-user",
-      threadKey: context.threadKey || "main",
-      conversationId: context.conversationId || "",
-      requestKey: context.messageId ? `${context.channel || "web"}:${context.senderId || "local-user"}:${context.messageId}` : "",
+      channel: mergedContext.channel || "web",
+      senderId: mergedContext.senderId || "local-user",
+      ownerKey: mergedContext.ownerKey || "local-user",
+      threadKey: mergedContext.threadKey || "main",
+      conversationId: mergedContext.conversationId || "",
+      requestKey: mergedContext.messageId ? `${mergedContext.channel || "web"}:${mergedContext.senderId || "local-user"}:${mergedContext.messageId}` : "",
     });
     if (job.deduplicated) {
       return { job, deduplicated: true, requiresApproval: job.status === "awaiting_approval" };
@@ -53,6 +77,13 @@ class AgentHost {
     if (decision.allowed === false) {
       await this.#commitSystemRecords(job, `syno: reject denied ${job.id}`).catch(() => {});
       return { job, error: job.error };
+    }
+    // 系统歧义（收录撞重复/多方案/信息不足）才回到人在环：暂停执行、等待澄清。
+    // 这与审批无关——approval 恒为 none；澄清后由 approve() 推进 #execute。
+    if (job.status === "pending" && mergedContext.awaitClarification === true) {
+      await this.store.transition(job, "awaiting_approval", { phase: "clarification" });
+      await this.#commitSystemRecords(job, `syno: await clarification ${job.id}`).catch(() => {});
+      return { job, requiresApproval: true };
     }
     if (job.status === "pending") return this.#execute(job);
     return { job, requiresApproval: true };
@@ -259,24 +290,23 @@ class AgentHost {
         }
         const pinned = await this.gitGuard.pinWorktree(job.worktree);
         job.worktree = { ...job.worktree, commit: pinned.commit, diffHash: pinned.diffHash };
-        const actualHighRisk = diffRequiresApproval(job.decision, pinned.changes);
-        if (actualHighRisk) {
-          job.risk = "high";
-          job.approval = "double";
-          job.decision = { ...job.decision, risk: "high", approval: "double", reason: "实际 diff 修改了既有事实或敏感路径，需要第二次审批" };
-          await this.store.transition(job, "awaiting_approval", {
-            phase: "merge",
-            approvalsReceived: 0,
-            result: { ...execution, validation, commit, preview: pinned.preview, diffHash: pinned.diffHash, changes: pinned.changes },
+        const assessment = diffAssessment(job.decision, pinned.changes);
+        if (assessment.level === "reject") {
+          // D3：源码根越界硬拒绝。不合并，清理 worktree，记审计，落到 rejected。
+          const rejectCleanup = await this.#cleanupWorktree(job);
+          await this.store.transition(job, "rejected", {
+            error: { code: "DIFF_SOURCE_ROOT_REJECTED", message: assessment.reason },
+            result: { ...execution, validation, commit, preview: pinned.preview, diffHash: pinned.diffHash, changes: pinned.changes, cleanup: rejectCleanup, assessment },
           });
-          await this.#commitSystemRecords(job, `syno: await merge approval ${job.id}`);
-          return { job, requiresApproval: true, diff: pinned.preview };
+          await this.#commitSystemRecords(job, `syno: reject source-root ${job.id}`);
+          return { job, error: job.error };
         }
 
-        await this.#commitSystemRecords(job, `syno: approve additive merge ${job.id}`);
+        // audit：记审计（含 diffHash 完整性指纹），worktree commit/merge 照常推进。
+        await this.#commitSystemRecords(job, `syno: audit merge ${job.id} [${assessment.reason}]`);
         const merge = await this.#serializeMerge(() => this.gitGuard.mergeWorktree(job.worktree));
         const cleanup = await this.#cleanupWorktree(job);
-        const result = { ...execution, validation, commit, merge, cleanup, preview: pinned.preview };
+        const result = { ...execution, validation, commit, merge, cleanup, preview: pinned.preview, assessment, diffHash: pinned.diffHash };
         const sideEffects = await this.#runCommittedSideEffects(job, { result, merge, execution });
         await this.store.transition(job, "completed", { result: { ...result, sideEffects } });
         await this.#commitSystemRecords(job, `syno: complete ${job.id}`);
@@ -451,4 +481,4 @@ class AgentHost {
   }
 }
 
-export { AgentHost, diffRequiresApproval, isSystemPath };
+export { AgentHost, diffAssessment, isSystemPath };

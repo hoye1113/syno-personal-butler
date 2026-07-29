@@ -6,6 +6,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { PATHS } from "./paths.mjs";
+import { RuntimeJournal } from "./runtime-journal.mjs";
 
 const execFileAsync = promisify(execFile);
 const LOCKED_OPENCODE_VERSION = "1.18.2";
@@ -209,6 +210,7 @@ class OpenCodeSupervisor {
     tokenLoader,
     bridgeOrigin,
     bridgeToken,
+    journal = new RuntimeJournal(),
     healthAttempts = 30,
     healthDelayMs = 250,
   } = {}) {
@@ -224,6 +226,7 @@ class OpenCodeSupervisor {
     this.tokenLoader = tokenLoader;
     this.bridgeOrigin = bridgeOrigin;
     this.bridgeToken = bridgeToken;
+    this.journal = journal;
     this.healthAttempts = healthAttempts;
     this.healthDelayMs = healthDelayMs;
     this.port = DEFAULT_OPENCODE_PORT;
@@ -232,18 +235,30 @@ class OpenCodeSupervisor {
     this.installation = null;
     this.lastError = null;
     this.stopping = false;
+    this.expectedExitPids = new Set();
+  }
+
+  #record(event, data = {}, options) {
+    return this.journal.record(event, data, options).catch(() => null);
   }
 
   async configure() {
-    const candidates = this.executable ? [this.executable] : await discoverOpenCodeCandidates();
-    this.installation = await resolveOpenCodeBinary({ candidates, versionOf: this.versionOf });
-    await fs.mkdir(this.localRoot, { recursive: true });
-    await fs.writeFile(path.join(this.localRoot, "installation.json"), JSON.stringify({
-      executable: this.installation.executable,
-      version: this.installation.version,
-      configuredAt: new Date().toISOString(),
-    }, null, 2), { encoding: "utf8", mode: 0o600 });
-    return this.status();
+    await this.#record("opencode.configure.requested");
+    try {
+      const candidates = this.executable ? [this.executable] : await discoverOpenCodeCandidates();
+      this.installation = await resolveOpenCodeBinary({ candidates, versionOf: this.versionOf });
+      await fs.mkdir(this.localRoot, { recursive: true });
+      await fs.writeFile(path.join(this.localRoot, "installation.json"), JSON.stringify({
+        executable: this.installation.executable,
+        version: this.installation.version,
+        configuredAt: new Date().toISOString(),
+      }, null, 2), { encoding: "utf8", mode: 0o600 });
+      await this.#record("opencode.configure.completed", { version: this.installation.version });
+      return this.status();
+    } catch (error) {
+      await this.#record("opencode.configure.failed", { error }, { level: "error" });
+      throw error;
+    }
   }
 
   status() {
@@ -286,7 +301,12 @@ class OpenCodeSupervisor {
 
   async start() {
     if (this.child && this.child.exitCode === null) return this.status();
-    if (await this.portProbe()) throw runtimeError("OPENCODE_PORT_OCCUPIED", `端口 ${this.port} 已被未知进程占用`);
+    await this.#record("opencode.start.requested", { port: this.port });
+    if (await this.portProbe()) {
+      const error = runtimeError("OPENCODE_PORT_OCCUPIED", `端口 ${this.port} 已被未知进程占用`);
+      await this.#record("opencode.start.failed", { error }, { level: "error" });
+      throw error;
+    }
     if (!this.installation) await this.configure();
     this.password = this.randomSecret();
     const token = this.tokenLoader ? await this.tokenLoader() : "";
@@ -306,33 +326,52 @@ class OpenCodeSupervisor {
     };
     await Promise.all([env.XDG_DATA_HOME, env.XDG_CONFIG_HOME, env.XDG_CACHE_HOME, isolatedWorkspace].map((directory) => fs.mkdir(directory, { recursive: true })));
     const args = ["serve", "--pure", "--hostname", "127.0.0.1", "--port", String(this.port), "--log-level", "ERROR"];
-    this.child = this.spawnImpl(this.installation.executable, args, {
-      cwd: isolatedWorkspace,
-      env,
-      windowsHide: true,
-      detached: process.platform !== "win32",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    try {
+      this.child = this.spawnImpl(this.installation.executable, args, {
+        cwd: isolatedWorkspace,
+        env,
+        windowsHide: true,
+        detached: process.platform !== "win32",
+        // OpenCode/provider output may contain prompts or secrets. Persist only
+        // structured lifecycle metadata emitted by the Supervisor itself.
+        stdio: ["ignore", "ignore", "ignore"],
+      });
+    } catch (error) {
+      this.lastError = error;
+      await this.#record("opencode.spawn.failed", { error }, { level: "error" });
+      throw error;
+    }
     this.lastError = null;
-    this.child.once("error", (error) => { this.lastError = error; });
-    this.child.once("exit", (code, signal) => {
-      if (!this.stopping && code !== 0) this.lastError ||= runtimeError("OPENCODE_EXITED", `OpenCode 已退出（code=${code}, signal=${signal || "none"}）`);
+    const childPid = this.child.pid;
+    this.child.once("error", (error) => {
+      this.lastError = error;
+      void this.#record("opencode.child.error", { pid: childPid, error }, { level: "error" });
     });
-    this.child.stdout?.resume?.();
-    this.child.stderr?.resume?.();
+    this.child.once("exit", (code, signal) => {
+      const expected = this.stopping || this.expectedExitPids.delete(childPid);
+      if (!expected && code !== 0) this.lastError ||= runtimeError("OPENCODE_EXITED", `OpenCode 已退出（code=${code}, signal=${signal || "none"}）`);
+      void this.#record("opencode.child.exit", { pid: childPid, code, signal, expected }, { level: expected || code === 0 ? "info" : "error" });
+    });
+    await this.#record("opencode.child.spawned", { pid: childPid, port: this.port, version: this.installation.version });
     for (let attempt = 0; attempt < this.healthAttempts; attempt += 1) {
       const report = await this.health();
-      if (report.healthy) return this.status();
+      if (report.healthy) {
+        await this.#record("opencode.start.completed", { pid: this.child.pid, port: this.port, attempt: attempt + 1 });
+        return this.status();
+      }
       if (this.child.exitCode !== null) break;
       if (this.healthDelayMs) await new Promise((resolve) => setTimeout(resolve, this.healthDelayMs));
     }
     const failure = this.lastError || runtimeError("OPENCODE_START_TIMEOUT", "OpenCode 启动后未通过健康检查");
+    await this.#record("opencode.start.failed", { pid: this.child?.pid, error: failure }, { level: "error" });
     await this.stop().catch(() => {});
     throw failure;
   }
 
   async stop() {
     const owned = this.child;
+    if (owned?.pid && owned.exitCode === null) this.expectedExitPids.add(owned.pid);
+    await this.#record("opencode.stop.requested", { pid: owned?.pid || null });
     this.child = null;
     this.password = "";
     this.stopping = true;
@@ -341,6 +380,7 @@ class OpenCodeSupervisor {
     } finally {
       this.stopping = false;
     }
+    await this.#record("opencode.stop.completed", { pid: owned?.pid || null });
     return { ...this.status(), state: "stopped", ready: false, pid: null };
   }
 

@@ -16,6 +16,7 @@ test("intake accepts public URLs and only a single Bilibili opus/cv", () => {
   assert.throws(() => validatePublicUrl("http://127.0.0.1/private"), /内网/);
   assert.throws(() => validatePublicUrl("http://172.20.1.2/private"), /内网/);
   assert.throws(() => validatePublicUrl("http://[::1]/private"), /内网/);
+  assert.throws(() => validatePublicUrl("https://example.com/article?access_token=must-not-leak"), /包含凭据/);
   assert.equal(isPrivateAddress("100.64.0.1"), true);
 });
 
@@ -35,6 +36,19 @@ test("URL intake embeds only controlled readable source text", async () => {
   assert.match(request.text, /<untrusted-source>\n\nReadable article/);
   assert.equal(request.sourceSnapshot.contentType, "text/html");
   assert.equal(extractReadableText("<main>Hello<script>attack()</script><p>World</p></main>", "text/html"), "Hello\nWorld");
+});
+
+test("URL intake accepts a locally supplied WebBridge snapshot without calling direct HTTP", async () => {
+  let directCalls = 0;
+  const service = new IntakeService({ sourceFetcher: async () => { directCalls += 1; throw new Error("must not fetch"); } });
+  const request = await service.prepare({
+    kind: "url",
+    value: "https://example.com/article",
+    browserSnapshot: { url: "https://example.com/article", text: "浏览器读取的正文", contentType: "text/html" },
+  });
+  assert.equal(directCalls, 0);
+  assert.equal(request.sourceSnapshot.method, "kimi_webbridge");
+  assert.equal(request.content, "浏览器读取的正文");
 });
 
 test("PDF intake validates magic bytes and size before quarantine", async (t) => {
@@ -67,4 +81,20 @@ test("markdown and unknown kind reject empty or unsupported input", async () => 
   await assert.rejects(service.prepare({ kind: "markdown", value: "" }), /收录内容不能为空/);
   await assert.rejects(service.prepare({ kind: "markdown", value: "   " }), /收录内容不能为空/);
   await assert.rejects(service.prepare({ kind: "epub" }), /不支持的收录类型/);
+});
+
+test("HTML intake strips executable markup and preserves a traceable file identity", async () => {
+  const service = new IntakeService();
+  const html = Buffer.from("<main><h1>Agent note</h1><script>steal()</script><p>Useful body</p></main>");
+  const prepared = await service.prepare({
+    kind: "html",
+    name: "../captured page.html",
+    base64: html.toString("base64"),
+  });
+  assert.equal(prepared.sourceType, "html");
+  assert.equal(prepared.artifact.id, "captured page.html");
+  assert.match(prepared.content, /Agent note/);
+  assert.match(prepared.content, /Useful body/);
+  assert.doesNotMatch(prepared.content, /steal/);
+  assert.match(prepared.text, /<untrusted-source>/);
 });

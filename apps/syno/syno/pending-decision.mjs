@@ -6,7 +6,15 @@ import { PATHS } from "./paths.mjs";
 
 const DEFAULT_DECISION_TTL_MS = 24 * 60 * 60 * 1_000;
 const DECISION_RESERVATION_TTL_MS = 5 * 60 * 1_000;
+// trust-but-clarify：这些回复只用于"系统歧义澄清"（收录撞重复/多方案/信息不足），
+// 不再承载审批/双审批语义。SIMPLE_APPROVAL 即"按当前方案执行"。
 const SIMPLE_APPROVAL = new Set(["确认", "同意", "收录", "可以"]);
+const OPTION_REPLIES = new Map([
+  ["新建笔记", "create"],
+  ["分开保存", "keep-separate"],
+  ["追加来源", "append-source"],
+  ["仅关联", "link-only"],
+]);
 
 function decisionError(code, message) {
   return Object.assign(new Error(message), { code });
@@ -22,10 +30,9 @@ async function atomicJson(file, value) {
 function isDecisionReply(text) {
   const normalized = String(text || "").trim();
   return SIMPLE_APPROVAL.has(normalized)
+    || OPTION_REPLIES.has(normalized)
     || /^(?:确认|拒绝)\s+\d+$/u.test(normalized)
-    || /^修改：.+$/u.test(normalized)
-    || normalized === "确认生成差异"
-    || /^确认应用\s+[A-F0-9]{6}$/iu.test(normalized);
+    || /^修改：.+$/u.test(normalized);
 }
 
 class PendingDecisionStore {
@@ -66,12 +73,19 @@ class PendingDecisionStore {
   async add(input) {
     return this.#mutate(async (decisions) => {
       const now = this.clock();
+      const existing = decisions.find((item) =>
+        !item.consumedAt
+        && item.jobId === String(input.jobId)
+        && item.ownerKey === String(input.ownerKey)
+        && item.threadKey === String(input.threadKey || "main")
+        && item.phase === String(input.phase || "execution"));
+      if (existing) return existing;
       const record = {
         id: `decision-${randomUUID().slice(0, 8)}`,
         jobId: String(input.jobId),
         ownerKey: String(input.ownerKey),
         threadKey: String(input.threadKey || "main"),
-        kind: input.kind === "double" ? "double" : "single",
+        kind: "single",
         phase: String(input.phase || "execution"),
         summary: String(input.summary || ""),
         options: Array.isArray(input.options) ? input.options : [],
@@ -120,26 +134,15 @@ class PendingDecisionStore {
       } else if (available.length === 1) {
         selected = available[0];
       } else {
-        const explicit = /^确认应用\s+([A-F0-9]{6})$/iu.exec(normalized);
-        if (explicit) selected = available.find((item) => item.approvalCode === explicit[1].toUpperCase());
-        if (!selected) throw decisionError("PENDING_DECISION_AMBIGUOUS", "存在多个待确认事项，请使用“确认 2”或明确审批码");
+        throw decisionError("PENDING_DECISION_AMBIGUOUS", "存在多个待确认事项，请使用“确认 2”指明");
       }
       if (new Date(selected.expiresAt).getTime() <= this.clock().getTime()) {
         throw decisionError("PENDING_DECISION_EXPIRED", "待确认事项已过期");
       }
-      if (normalized === "确认生成差异" && (selected.kind !== "double" || selected.phase !== "execution")) {
-        throw decisionError("PENDING_DECISION_PHASE_INVALID", "当前事项不处于生成差异阶段");
-      }
-      const final = /^确认应用\s+([A-F0-9]{6})$/iu.exec(normalized);
-      if (selected.kind === "double" && selected.phase === "execution" && normalized !== "确认生成差异") {
-        throw decisionError("PENDING_DECISION_PHASE_INVALID", "高风险任务只能回复“确认生成差异”进入第一阶段");
-      }
-      if (selected.kind === "double" && selected.phase === "merge" && !final) {
-        throw decisionError("PENDING_DECISION_PHASE_INVALID", "高风险差异只能使用“确认应用 六位码”完成第二阶段");
-      }
-      if (final) {
-        if (selected.kind !== "double" || selected.phase !== "merge") throw decisionError("PENDING_DECISION_PHASE_INVALID", "当前事项不处于应用差异阶段");
-        if (final[1].toUpperCase() !== selected.approvalCode) throw decisionError("PENDING_DECISION_CODE_INVALID", "审批码无效");
+      // D2 防伪：仅当该澄清事项绑定了差异指纹时，确认前核对权威 diff 未变。当前收录冲突
+      // 澄清在执行前暂停（digest 为空→跳过）；保留此校验是为了任何会预先生成差异摘要的
+      // 澄清流仍受防伪保护。
+      if (selected.diffDigest) {
         const authoritativeDigest = typeof getDiffDigest === "function"
           ? await getDiffDigest(selected.jobId)
           : diffDigest;
@@ -148,12 +151,17 @@ class PendingDecisionStore {
         }
       }
       const modification = /^修改：(.*)$/u.exec(normalized);
-      const action = modification ? "modify" : numbered?.[1] === "拒绝" ? "reject" : "approve";
+      const option = OPTION_REPLIES.get(normalized);
+      if (option && !selected.options.includes(option)) {
+        throw decisionError("PENDING_DECISION_OPTION_INVALID", "当前方案不支持该处理方式");
+      }
+      const action = option ? "select" : modification ? "modify" : numbered?.[1] === "拒绝" ? "reject" : "approve";
       selected.reservedAt = this.clock().toISOString();
       return {
         action,
         decision: { ...selected },
         code: selected.approvalCode,
+        ...(option ? { option } : {}),
         ...(modification ? { modification: modification[1].trim() } : {}),
       };
     });

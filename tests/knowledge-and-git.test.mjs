@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 
 import { GitGuard, parsePorcelainZ } from "../apps/syno/syno/git-guard.mjs";
 import { KnowledgeStore } from "../apps/syno/syno/knowledge-store.mjs";
+import { readKnowledgeSnippet } from "../apps/syno/syno/runtime.mjs";
 
 const exec = promisify(execFile);
 
@@ -47,6 +48,21 @@ test("knowledge index never stores a sensitive note excerpt", async (t) => {
   assert.equal(results[0].sensitive, true);
   assert.equal(results[0].excerpt, "");
   assert.doesNotMatch(await fs.readFile(indexFile, "utf8"), /绝不|发送|正文/);
+});
+
+test("knowledge search and snippets block an unlabelled secret-bearing note", async (t) => {
+  const testRoot = path.join(path.resolve(import.meta.dirname, ".."), ".runtime", "tests");
+  await fs.mkdir(testRoot, { recursive: true });
+  const root = await fs.mkdtemp(path.join(testRoot, "syno-unlabelled-secret-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const indexFile = path.join(root, "index.json");
+  await fs.writeFile(path.join(root, "secret.md"), "---\ntitle: Provider Setup\nsource: local\n---\napi_key = must-not-leak-123456", "utf8");
+  const knowledge = new KnowledgeStore({ vaultRoot: root, indexFile });
+  const results = await knowledge.search("Provider Setup");
+  assert.equal(results[0].sensitive, true);
+  assert.equal(results[0].excerpt, "");
+  assert.doesNotMatch(await fs.readFile(indexFile, "utf8"), /must-not-leak/);
+  await assert.rejects(readKnowledgeSnippet(knowledge, "vault/secret.md"), { code: "KNOWLEDGE_SENSITIVE_DENIED" });
 });
 
 test("knowledge index finds Chinese concepts and hides system noise by default", async (t) => {

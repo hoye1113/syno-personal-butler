@@ -32,6 +32,9 @@ const OPERATION_INTENTS = Object.freeze({
 });
 
 function intentForOperation(operation, payload = {}) {
+  if (operation === "ingest.apply" && ["append-source", "link-only"].includes(payload.decision?.action)) {
+    return "overwrite_note";
+  }
   if (operation === "topics.disposition") {
     return payload.action === "归档" ? "move" : "overwrite_note";
   }

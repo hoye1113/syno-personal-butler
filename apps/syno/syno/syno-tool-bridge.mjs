@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { inspectRemoteContent } from "./sensitive-content.mjs";
 
 function bridgeError(code, message) {
   return Object.assign(new Error(message), { code });
@@ -14,14 +15,19 @@ function bridgeName(toolName) {
   return toolName.replaceAll(".", "_").replaceAll("-", "_");
 }
 
+function normalizeAllowedToolName(name) {
+  const value = String(name);
+  return value.startsWith("syno_") ? value.slice("syno_".length) : value;
+}
+
 const BRIDGE_TOOL_NAMES = new Set([
   "workflow.context",
   "knowledge.search",
   "knowledge.read_snippet",
   "today.read",
-  "capture.receive",
+  "capture.start",
   "capture.status",
-  "capture.prepare",
+  "capture.list_pending",
   "learning.due",
   "learning.teach_back",
   "learning.submit",
@@ -32,6 +38,11 @@ const BRIDGE_TOOL_NAMES = new Set([
   "jobs.list",
   "jobs.submit",
   "settings.adjust",
+  "browser.status",
+  "browser.navigate",
+  "browser.snapshot",
+  "browser.list_tabs",
+  "browser.close_session",
 ]);
 
 class SynoToolBridge {
@@ -56,6 +67,9 @@ class SynoToolBridge {
       threadKey: String(context.threadKey || "main"),
       channel: String(context.channel || "opencode"),
       messageId: String(context.messageId || context.runId || ""),
+      allowedTools: new Set((context.allowedTools || []).map(normalizeAllowedToolName)),
+      ...(context.browserWorkflowId ? { browserWorkflowId: String(context.browserWorkflowId) } : {}),
+      ...(context.browserCloseAuthorized === true ? { browserCloseAuthorized: true } : {}),
     });
     return () => { this.activeContext = null; };
   }
@@ -109,6 +123,12 @@ class SynoToolBridge {
       };
     }
     const active = this.activeContext;
+    if (!active.allowedTools.has(name)) {
+      return {
+        ...response,
+        error: { code: -32003, message: "SYNO_BRIDGE_TOOL_NOT_ALLOWED: 本次运行未授权该工具" },
+      };
+    }
     const idempotencyKey = definition.retry === "idempotent" && active.messageId
       ? `${active.ownerKey}\0${active.threadKey}\0${active.messageId}\0${name}\0${JSON.stringify(request.params?.arguments || {})}`
       : "";
@@ -125,16 +145,23 @@ class SynoToolBridge {
       const result = await this.tools.execute(definition.name, toolArguments, {
         channel: active.channel,
         ownerId: active.ownerKey,
+        threadKey: active.threadKey,
         conversationId: requestIdentity,
+        ...(active.browserWorkflowId ? { browserWorkflowId: active.browserWorkflowId } : {}),
+        ...(active.browserCloseAuthorized ? { browserCloseAuthorized: true } : {}),
         allowJobSubmission: true,
         allowAgentSettings: true,
         allowWrites: false,
       });
+      const serializedResult = JSON.stringify(result);
+      if (!inspectRemoteContent(serializedResult).safe) {
+        throw bridgeError("REMOTE_TOOL_RESULT_BLOCKED", "工具结果可能包含凭据或敏感信息，已阻止发送到远程模型");
+      }
       await this.onResult({ tool: definition, result, ...active });
       const success = {
         ...response,
         result: {
-          content: [{ type: "text", text: JSON.stringify(result) }],
+          content: [{ type: "text", text: serializedResult }],
           structuredContent: result,
           isError: false,
         },
@@ -146,11 +173,15 @@ class SynoToolBridge {
       return success;
     } catch (error) {
       const invalid = ["TOOL_INPUT_INVALID", "TOOL_NOT_ALLOWED"].includes(error.code);
-      if (invalid) return { ...response, error: { code: invalid ? -32602 : -32000, message: error.message } };
+      const rawError = `${error.code || "TOOL_FAILED"}: ${error.message}`;
+      const safeError = inspectRemoteContent(rawError).safe
+        ? rawError
+        : "REMOTE_TOOL_ERROR_REDACTED: 工具执行失败，详细错误仅保留本机";
+      if (invalid) return { ...response, error: { code: invalid ? -32602 : -32000, message: safeError } };
       return {
         ...response,
         result: {
-          content: [{ type: "text", text: `${error.code || "TOOL_FAILED"}: ${error.message}` }],
+          content: [{ type: "text", text: safeError }],
           isError: true,
         },
       };
@@ -158,4 +189,4 @@ class SynoToolBridge {
   }
 }
 
-export { BRIDGE_TOOL_NAMES, SynoToolBridge, bridgeName };
+export { BRIDGE_TOOL_NAMES, SynoToolBridge, bridgeName, normalizeAllowedToolName };

@@ -1,19 +1,22 @@
 import { promises as fs } from "node:fs";
+import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 
 import { OpenCodeCredentialStore } from "../apps/syno/syno/opencode-credential-store.mjs";
+import { BrowserCaptureAdapter } from "../apps/syno/syno/browser-capture-adapter.mjs";
 import { discoverOpenCodeCandidates, LOCKED_OPENCODE_VERSION, resolveOpenCodeBinary } from "../apps/syno/syno/opencode-supervisor.mjs";
 import { DEFAULT_WEB_PORT, PATHS } from "../apps/syno/syno/paths.mjs";
 
-const REQUIRED_SKILLS = ["capture", "knowledge", "learn", "review", "create", "maintain"];
+const REQUIRED_SKILLS = ["capture", "knowledge", "learn", "review", "create", "maintain", "web-capture"];
 
 async function doctor({
   candidates,
   versionOf,
   credentials = new OpenCodeCredentialStore(),
   repoRoot = PATHS.repoRoot,
+  browserCapture = new BrowserCaptureAdapter(),
 } = {}) {
   const checks = [];
   let installation;
@@ -31,6 +34,29 @@ async function doctor({
     try { await fs.access(file); } catch { missing.push(path.relative(repoRoot, file)); }
   }
   checks.push({ name: "project-agent-skills", ok: missing.length === 0, missing });
+  const globalSkillFile = path.join(process.env.USERPROFILE || "", ".config", "opencode", "skills", "kimi-webbridge", "SKILL.md");
+  const projectWebCaptureFile = path.join(repoRoot, ".opencode", "skills", "syno-web-capture", "SKILL.md");
+  const projectWebCapture = await fs.readFile(projectWebCaptureFile, "utf8").catch(() => "");
+  const declaredUpstreamDigest = /x-syno-upstream-digest:\s*([a-f0-9]{64})/iu.exec(projectWebCapture)?.[1]?.toLowerCase() || "";
+  let upstreamSkill = { present: false, reviewRequired: false };
+  try {
+    const content = await fs.readFile(globalSkillFile);
+    upstreamSkill = {
+      present: true,
+      digest: createHash("sha256").update(content).digest("hex"),
+    };
+    upstreamSkill.reviewRequired = !declaredUpstreamDigest || upstreamSkill.digest !== declaredUpstreamDigest;
+  } catch {}
+  checks.push({ name: "kimi-webbridge-upstream", ok: true, ...upstreamSkill });
+  const browserHealth = await browserCapture.health().catch((error) => ({ available: false, error: { code: error.code || "BROWSER_DAEMON_UNAVAILABLE", message: error.message } }));
+  checks.push({
+    name: "kimi-webbridge-runtime",
+    ok: browserHealth.available === true,
+    available: browserHealth.available === true,
+    ...(browserHealth.daemonVersion ? { daemonVersion: browserHealth.daemonVersion } : {}),
+    ...(browserHealth.extensionVersion ? { extensionVersion: browserHealth.extensionVersion } : {}),
+    ...(browserHealth.error ? { error: browserHealth.error } : {}),
+  });
   const credentialStatus = await credentials.status();
   checks.push({ name: "zen-credential", ok: credentialStatus.configured, configured: credentialStatus.configured });
   checks.push({ name: "security", ok: true, loopbackOnly: true, builtinsDenied: true, dynamicMcp: false, autoUpdate: false });

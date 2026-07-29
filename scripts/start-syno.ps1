@@ -15,8 +15,31 @@ if (-not (Test-Path -LiteralPath $server -PathType Leaf)) { throw "Syno Host ent
 $runtimeRoot = Join-Path $resolvedRoot ".runtime"
 $pidFile = Join-Path $runtimeRoot "syno-host.pid"
 New-Item -ItemType Directory -Path $runtimeRoot -Force | Out-Null
+$logBase = if ([string]::IsNullOrWhiteSpace([string]$env:LOCALAPPDATA)) { $runtimeRoot } else { $env:LOCALAPPDATA }
+$logRoot = Join-Path $logBase "Syno\logs"
+New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
+$logPath = Join-Path $logRoot ("windows-task-{0}.jsonl" -f (Get-Date -Format "yyyy-MM-dd"))
+
+function Write-SynoLauncherLog([string]$Event, $Fields = @{}) {
+  try {
+    $record = [ordered]@{ ts = [DateTime]::UtcNow.ToString("o"); event = $Event; repoFingerprint = $repoFingerprint }
+    foreach ($entry in $Fields.GetEnumerator()) { $record[$entry.Key] = $entry.Value }
+    ($record | ConvertTo-Json -Compress -Depth 5) | Add-Content -LiteralPath $logPath -Encoding UTF8
+  } catch { }
+}
+
+trap {
+  if (Get-Command Write-SynoLauncherLog -ErrorAction SilentlyContinue) {
+    Write-SynoLauncherLog "launcher.failed" @{ message = $_.Exception.Message }
+  }
+  throw
+}
+
 $serverPath = [IO.Path]::GetFullPath($server)
+$relativeServerPath = $serverPath.Substring($resolvedRoot.Length).TrimStart('\', '/').Replace('\', '/')
 $repoFingerprint = Get-SynoRepoFingerprint $resolvedRoot
+
+Write-SynoLauncherLog "launcher.started" @{ nodePath = $resolvedNode; serverPath = $serverPath; sessionId = ([Diagnostics.Process]::GetCurrentProcess().SessionId) }
 
 function Write-HostOwnership($Process, [string]$Mode) {
   $record = [ordered]@{
@@ -37,12 +60,24 @@ function Adopt-HealthyHost {
   $listener = Get-NetTCPConnection -LocalAddress "127.0.0.1" -LocalPort $synoPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
   if (-not $listener) { throw "Syno health responded but no loopback listener was found" }
   $process = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
-  $details = Get-CimInstance Win32_Process -Filter "ProcessId = $($listener.OwningProcess)" -ErrorAction SilentlyContinue
-  if (-not $process -or -not $details -or
-      -not ([IO.Path]::GetFullPath($process.Path)).Equals($resolvedNode, [StringComparison]::OrdinalIgnoreCase) -or
-      $details.CommandLine.IndexOf($serverPath, [StringComparison]::OrdinalIgnoreCase) -lt 0) {
+  $details = try { Get-CimInstance Win32_Process -Filter "ProcessId = $($listener.OwningProcess)" -ErrorAction Stop } catch { $null }
+  $processPath = if ($process -and $process.Path) { [IO.Path]::GetFullPath($process.Path) } else { "" }
+  $processName = if ($processPath) { [IO.Path]::GetFileName($processPath) } else { "" }
+  $sameSession = $process -and $process.SessionId -eq ([Diagnostics.Process]::GetCurrentProcess().SessionId)
+  $commandLine = [string]$details.CommandLine
+  $commandMatches = -not $details -or [string]::IsNullOrWhiteSpace($commandLine) -or
+    $commandLine.IndexOf($serverPath, [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+    $commandLine.Replace('\', '/').IndexOf($relativeServerPath, [StringComparison]::OrdinalIgnoreCase) -ge 0
+  # A manually started Syno Host may use a different absolute Node installation
+  # than the one pinned into the task.  Health already proves the repository
+  # fingerprint; accept any same-session node.exe and retain the command-line
+  # check when WMI is available.  This also works for restricted Task Scheduler
+  # contexts where Win32_Process details are inaccessible.
+  if (-not $process -or -not $sameSession -or $processName -notmatch "(?i)^node(?:\.exe)?$" -or -not $commandMatches) {
+    Write-SynoLauncherLog "launcher.adopt_rejected" @{ listenerPid = $listener.OwningProcess; processName = $processName; processSession = if ($process) { $process.SessionId } else { $null }; sameSession = $sameSession; commandMatches = $commandMatches; detailsAvailable = [bool]$details }
     throw "Healthy loopback service is not the configured Syno Host"
   }
+  Write-SynoLauncherLog "launcher.adopted" @{ listenerPid = $listener.OwningProcess; processName = $processName; processSession = $process.SessionId; sameSession = $sameSession; detailsAvailable = [bool]$details }
   Write-HostOwnership $process "adopted"
 }
 
@@ -58,6 +93,7 @@ while ($true) {
     $health = Invoke-RestMethod -Uri "http://127.0.0.1:$synoPort/api/syno/health" -Method Get -TimeoutSec 2
   } catch { break }
   if (-not (Test-SynoHealthResponse $health $repoFingerprint)) { throw "Port $synoPort is occupied by an unknown service" }
+  Write-SynoLauncherLog "launcher.health_ok" @{ listenerPid = (Get-NetTCPConnection -LocalAddress "127.0.0.1" -LocalPort $synoPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess }
   Adopt-HealthyHost
   Start-Sleep -Seconds 5
 }

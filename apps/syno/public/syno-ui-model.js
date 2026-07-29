@@ -27,7 +27,7 @@
     return INTENT_LABELS[intent] || intent || "任务";
   }
 
-  // 待审批任务的动作按钮：标签随拟执行的结果而变（收录/丢弃/批准合并），
+  // 待澄清任务的动作按钮：标签随拟执行的结果而变（收录/丢弃/批准合并），
   // 而非千篇一律的「批准/拒绝」。建议结果尚未就绪时返回空数组（等待管家读取后再填）。
   function adviceButtons(job) {
     const advice = job?.advice;

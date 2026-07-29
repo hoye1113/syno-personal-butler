@@ -17,12 +17,30 @@ async function artifactToIntakePayload(artifact, { quarantineRoot = path.join(PA
   if (Number.isFinite(Number(artifact.size)) && Number(artifact.size) !== bytes.length) throw new Error("附件隔离后的大小发生变化");
   const name = path.basename(file);
   if (artifact.mime === "application/pdf") return { kind: "pdf", name, title: name, base64: bytes.toString("base64") };
+  if (artifact.mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") return { kind: "docx", name, title: name, base64: bytes.toString("base64") };
+  if (artifact.mime === "text/html") return { kind: "html", name, title: name, base64: bytes.toString("base64") };
+  if (artifact.mime === "text/markdown" || (artifact.mime === "text/plain" && /\.(?:md|markdown)$/iu.test(name))) {
+    return { kind: "markdown", name, title: name, base64: bytes.toString("base64") };
+  }
   if (artifact.mime === "text/plain") return { kind: "txt", name, title: name, base64: bytes.toString("base64") };
   throw new Error(`当前收录流程暂不支持 ${artifact.mime || "未知"} 附件`);
 }
 
-function createWeixinMessageHandler({ core, ingest, conversationRouter, quarantineRoot = path.join(PATHS.runtimeRoot, "quarantine", "weixin") } = {}) {
+function createWeixinMessageHandler({
+  core,
+  ingest,
+  conversationRouter,
+  quarantineRoot = path.join(PATHS.runtimeRoot, "quarantine", "weixin"),
+  onBackgroundError = (error) => console.error("[syno] legacy Weixin ingest proposal failed:", error?.message || error),
+} = {}) {
   if (!core || !ingest || !conversationRouter) throw new Error("微信消息处理器缺少 Core、IngestService 或 ConversationRouter");
+  const scheduleProposal = (artifactId) => queueMicrotask(async () => {
+    try {
+      await ingest.propose(artifactId);
+    } catch (error) {
+      await onBackgroundError(error, { artifactId, channel: "weixin" });
+    }
+  });
   return async (message) => {
     try {
       const approval = parseWeixinApproval(message.text);
@@ -34,8 +52,8 @@ function createWeixinMessageHandler({ core, ingest, conversationRouter, quaranti
         });
         return {
           text: result.requiresApproval
-            ? `任务 ${result.job.id} 仍等待审批`
-            : `任务 ${result.job.id} 已批准并进入 ${result.job.status}`,
+            ? `任务 ${result.job.id} 仍需确认`
+            : `任务 ${result.job.id} 已确认并进入 ${result.job.status}`,
         };
       }
 
@@ -48,7 +66,7 @@ function createWeixinMessageHandler({ core, ingest, conversationRouter, quaranti
             const payload = await artifactToIntakePayload(artifact, { quarantineRoot });
             const receipt = await ingest.receive(payload, { channel: "weixin", ownerId: message.senderId });
             receipts.push(receipt);
-            ingest.propose(receipt.artifact.id).catch(() => {});
+            scheduleProposal(receipt.artifact.id);
           } catch (error) {
             rejected.push(error.message);
           }
@@ -63,7 +81,7 @@ function createWeixinMessageHandler({ core, ingest, conversationRouter, quaranti
       const trimmed = String(message.text || "").trim();
       if (/^https?:\/\/\S+$/i.test(trimmed)) {
         const receipt = await ingest.receive({ kind: "url", value: trimmed }, { channel: "weixin", ownerId: message.senderId });
-        ingest.propose(receipt.artifact.id).catch(() => {});
+        scheduleProposal(receipt.artifact.id);
         return { text: `已接收，Artifact ID：${receipt.artifact.id}。正在后台查重并生成收录方案。` };
       }
       const conversationId = await conversationRouter.resolve({ ownerKey: "local-user" });
@@ -73,7 +91,7 @@ function createWeixinMessageHandler({ core, ingest, conversationRouter, quaranti
         messageId: message.id,
         conversationId,
       });
-      return { text: result.error?.message || (result.requiresApproval ? `任务 ${result.job.id} 等待审批，审批码 ${result.job.approvalCode}` : result.job?.result?.text || `任务 ${result.job?.id || ""} 已处理`) };
+      return { text: result.error?.message || (result.requiresApproval ? `任务 ${result.job.id} 需要确认，请按提示回复` : result.job?.result?.text || `任务 ${result.job?.id || ""} 已处理`) };
     } catch (error) {
       return { text: `未能处理：${error.message}` };
     }

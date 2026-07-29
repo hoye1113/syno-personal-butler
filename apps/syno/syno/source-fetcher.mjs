@@ -53,7 +53,13 @@ function requestOnce(url, address, { timeoutMs = 15_000, maxBytes = MAX_SOURCE_B
         "user-agent": "Syno/1.0 (+localhost personal knowledge intake)",
       },
       lookup(_hostname, _options, callback) {
-        callback(null, address.address, address.family);
+        // Node 24 may request an `all` lookup when auto-selecting IPv4/IPv6.
+        // Return the pinned record in the shape that the caller requested;
+        // returning a scalar for an `all` lookup makes Node read
+        // `address.address` from a string character and fail with
+        // ERR_INVALID_IP_ADDRESS.
+        if (_options?.all) callback(null, [address]);
+        else callback(null, address.address, address.family);
       },
     }, (response) => {
       const chunks = [];
@@ -135,5 +141,6 @@ export {
   extractReadableText,
   fetchSourceText,
   isPrivateAddress,
+  requestOnce,
   resolvePublicAddress,
 };

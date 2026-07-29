@@ -14,6 +14,7 @@ import { buildOperationRequest } from "./syno/operation-registry.mjs";
 import { GitGuard } from "./syno/git-guard.mjs";
 import { assertJsonMutation, assertSameOriginMutation, securityHeaders } from "./syno/http-security.mjs";
 import { DEFAULT_WEB_PORT, PATHS, resolveInside } from "./syno/paths.mjs";
+import { requiresSynoReady } from "./syno/server-readiness.mjs";
 import { validateContractRecord } from "./syno/schema-registry.mjs";
 import {
   getPlannerConfigPath,
@@ -120,7 +121,7 @@ const httpServer = createServer(async (req, res) => {
     if (url.pathname.startsWith("/api/")) assertLocalRequest(req);
 
     if (url.pathname.startsWith("/api/syno/")) {
-      await synoReady;
+      if (requiresSynoReady(url.pathname)) await synoReady;
       if (url.pathname.startsWith("/api/syno/windows-service") || ["/api/syno/opencode/restart", "/api/syno/opencode/credential"].includes(url.pathname)) {
         assertJsonMutation(req);
         assertSameOriginMutation(req);

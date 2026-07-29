@@ -8,9 +8,9 @@ import { promisify } from "node:util";
 
 import { buildClaudeArgs, runProcess } from "../apps/syno/syno/executors.mjs";
 import { assertJsonMutation, assertSameOriginMutation, securityHeaders } from "../apps/syno/syno/http-security.mjs";
-import { assertRegisteredOperation, buildOperationRequest } from "../apps/syno/syno/operation-registry.mjs";
+import { assertRegisteredOperation, buildOperationRequest, intentForOperation } from "../apps/syno/syno/operation-registry.mjs";
 import { OutputService } from "../apps/syno/syno/output-service.mjs";
-import { buildOpenCodeMigrationContext, routeSynoApi } from "../apps/syno/syno/runtime.mjs";
+import { buildOpenCodeMigrationContext, remoteSafeJobSummary, routeSynoApi } from "../apps/syno/syno/runtime.mjs";
 import { ConversationStore } from "../apps/syno/syno/conversation-store.mjs";
 import { validateValue } from "../apps/syno/syno/settings-registry.mjs";
 import { backupState, restoreState, verifyArchive } from "../apps/syno/syno/state-archive.mjs";
@@ -34,6 +34,31 @@ test("legacy conversation migration excludes tool output, private turns, and sec
   assert.match(migrated, /继续讨论 Tool Loop/);
   assert.doesNotMatch(migrated, /完整本地知识|本地绝密|这是私密内容|super-secret-value|abcdefghijklmnop/);
   assert.match(migrated, /REDACTED_SECRET/);
+});
+
+test("remote Job summaries exclude requests, approval codes, diff previews, and raw errors", () => {
+  const summary = remoteSafeJobSummary({
+    id: "job-1",
+    intent: "ingest",
+    status: "awaiting_approval",
+    risk: "high",
+    phase: "merge",
+    changedPaths: ["vault/00-Inbox/note.md"],
+    request: { content: "token=private-value" },
+    approvalCode: "ABC123",
+    result: { preview: "diff --git\n+private body", summary: "安全摘要" },
+    error: { message: "provider echoed private body" },
+  });
+  assert.deepEqual(summary, {
+    id: "job-1",
+    intent: "ingest",
+    status: "awaiting_approval",
+    risk: "high",
+    phase: "merge",
+    changedPaths: ["vault/00-Inbox/note.md"],
+    summary: "安全摘要",
+  });
+  assert.doesNotMatch(JSON.stringify(summary), /private|ABC123|diff --git|token=/);
 });
 
 test("public Job API rejects Policy fields and maps only server-owned modes", async () => {
@@ -155,6 +180,13 @@ test("Windows service Web API exposes only fixed status, install and uninstall a
   await routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/windows-service/uninstall"), readBody);
   assert.deepEqual(calls, [["status"], ["mutate", "install", "web", "local-user"], ["mutate", "uninstall", "web", "local-user"]]);
   await assert.rejects(routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/windows-service/restart"), readBody), /未知 Syno API/);
+});
+
+test("an ingest action that mutates an existing note is deterministically high risk", () => {
+  assert.equal(intentForOperation("ingest.apply", { decision: { action: "create" } }), "curate_note");
+  assert.equal(intentForOperation("ingest.apply", { decision: { action: "keep-separate" } }), "curate_note");
+  assert.equal(intentForOperation("ingest.apply", { decision: { action: "append-source" } }), "overwrite_note");
+  assert.equal(intentForOperation("ingest.apply", { decision: { action: "link-only" } }), "overwrite_note");
 });
 
 test("OpenCode Web API exposes redacted status, fixed restart, credential save, and authenticated MCP only", async () => {

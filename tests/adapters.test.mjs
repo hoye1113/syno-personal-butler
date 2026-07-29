@@ -680,7 +680,7 @@ test("Weixin quarantined Markdown returns an Artifact receipt without creating a
   });
   assert.match(response.text, /Artifact ID：artifact-attachment-one/);
   assert.equal(received.length, 1);
-  assert.equal(received[0].payload.kind, "txt");
+  assert.equal(received[0].payload.kind, "markdown");
   assert.equal(received[0].payload.name, "guide.md");
   assert.equal(received[0].payload.title, "guide.md");
   assert.equal(Buffer.from(received[0].payload.base64, "base64").toString("utf8"), "# Agent guide\n\nUntrusted attachment body.\n");

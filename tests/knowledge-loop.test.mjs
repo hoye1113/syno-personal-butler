@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { IngestService } from "../apps/syno/syno/ingest-service.mjs";
+import { IngestService, isAllowedIngestPath, proposalAllowsWriteJob } from "../apps/syno/syno/ingest-service.mjs";
 import { ClaimEvidenceService } from "../apps/syno/syno/claim-evidence-service.mjs";
 import { GoalService } from "../apps/syno/syno/goal-service.mjs";
 import { LearningService, calibrationFor, reviewIntervalDays } from "../apps/syno/syno/learning-service.mjs";
@@ -13,6 +13,7 @@ import { TodayService } from "../apps/syno/syno/today-service.mjs";
 import { ConversationRouter } from "../apps/syno/syno/conversation-router.mjs";
 import { SignalSourceRegistry } from "../apps/syno/syno/signal-source-registry.mjs";
 import { KnowledgeMaintenanceSource } from "../apps/syno/syno/knowledge-maintenance-source.mjs";
+import { validateVaultContract } from "../apps/syno/syno/validator.mjs";
 
 test("ConversationRouter keeps one owner conversation across channels and explicit threads", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-conversation-router-"));
@@ -50,10 +51,134 @@ test("ingest returns an immediate Artifact then builds an additive proposal", as
   await fs.writeFile(legacyStateFile, JSON.stringify(legacyState), "utf8");
   const applied = await service.apply(receipt.artifact.id, { workspace: root, decision: { action: "create" } });
   assert.equal(applied.applied, true);
-  assert.match(await fs.readFile(path.join(root, applied.path), "utf8"), /factual_status: unverified/);
+  assert.equal(applied.completionStatus, "incomplete");
+  const note = await fs.readFile(path.join(root, applied.path), "utf8");
+  assert.match(note, /factual_status: unverified/);
+  assert.match(note, /^tags: \["notes"\]$/m);
+  assert.match(note, /^created: 2026-07-17$/m);
+  assert.match(note, /^source: /m);
+  assert.match(note, /^description: /m);
+  assert.match(note, /^link_status: orphan$/m);
+  await fs.mkdir(path.join(root, "config"), { recursive: true });
+  await fs.copyFile(path.resolve("config/vault-contract.json"), path.join(root, "config", "vault-contract.json"));
+  await validateVaultContract(root, [applied.path], { intent: "curate_note" });
   assert.equal(applied.lifecycle.proposal.status, "applied");
   assert.equal(applied.lifecycle.candidate.status, "accepted");
   assert.equal(applied.lifecycle.artifact.status, "accepted");
+});
+
+test("Bilibili ingest requires and renders the canonical v2 source profile", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-bilibili-v2-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const service = new IngestService({
+    stateRoot: path.join(root, "state"),
+    knowledge: { async search() { return []; }, async findBySource() { return []; } },
+    intake: {
+      async prepare() {
+        return {
+          sourceType: "bilibili-opus",
+          sourceUrl: "https://www.bilibili.com/opus/123456",
+          content: "专栏正文",
+          sourceProfile: { opusId: "123456" },
+        };
+      },
+    },
+    clock: () => new Date("2026-07-28T08:00:00.000Z"),
+  });
+  const receipt = await service.receive({ kind: "url", value: "https://www.bilibili.com/opus/123456" });
+  await service.propose(receipt.artifact.id);
+  await assert.rejects(
+    service.apply(receipt.artifact.id, { workspace: root, decision: { action: "create" } }),
+    { code: "INGEST_BILIBILI_PROFILE_INCOMPLETE" },
+  );
+  await service.enrichProposal(receipt.artifact.id, {
+    quality: { status: "accepted", reasons: [] },
+    materialTier: "S",
+    sourceProfile: {
+      sourceTier: "C1",
+      sourceForm: "lecture",
+      contentForm: "dialogue",
+      dialogueFidelity: "reconstructed",
+      questionSource: "editorial",
+      voiceBasis: "attributed_paraphrase",
+      factualStatus: "partial",
+      factualReviewed: "2026-07-28",
+      verificationScope: "column_only",
+      verificationBasis: ["column"],
+    },
+    canonicalBody: [
+      "> 人物、主题、核心问题和阅读导航。",
+      "## 开场",
+      "## 01 为什么需要这个机制",
+      "**编者问：** 为什么？\n\n**专栏整理：** 因为需要证据。",
+      "## 02 如何落地",
+      "**编者问：** 如何做？\n\n**专栏整理：** 从最小闭环开始。",
+      "## 03 有什么取舍",
+      "**编者问：** 边界是什么？\n\n**专栏整理：** 不把摘要当掌握。",
+      "## 限制与边界",
+      "只核对了专栏内容，未核对外部原页。",
+      "## 知识连接",
+      "当前为 orphan，等待真实关联。",
+      "## 来源说明",
+      "依据 B 站专栏 column 整理。",
+    ].join("\n\n"),
+    unresolved: [],
+  });
+  const applied = await service.apply(receipt.artifact.id, { workspace: root, decision: { action: "create" } });
+  const note = await fs.readFile(path.join(root, applied.path), "utf8");
+  assert.match(note, /^ingest_workflow: bilibili_opus_ingest_v2$/m);
+  assert.match(note, /^source_type: bilibili_opus$/m);
+  assert.match(note, /^opus_id: "123456"$/m);
+  assert.match(note, /^content_form: dialogue$/m);
+  assert.match(note, /^question_source: editorial$/m);
+  assert.match(note, /^verification_scope: column_only$/m);
+  assert.match(note, /^## 03 有什么取舍$/m);
+  assert.equal(applied.completionStatus, "incomplete");
+  const state = await service.status(receipt.artifact.id);
+  assert.equal(state.proposal.sourceReport.status, "incomplete");
+  assert.equal(state.proposal.sourceReport.checks.semanticReview, false);
+  assert.deepEqual(state.proposal.sourceReport.sourcesRead, ["column"]);
+});
+
+test("a quality-rejected proposal cannot create a write Job", () => {
+  assert.equal(proposalAllowsWriteJob({ quality: { status: "rejected" } }), false);
+  assert.equal(proposalAllowsWriteJob({ quality: { status: "limited" } }), true);
+});
+
+test("model-proposed ingest paths cannot target canonical system rules", () => {
+  assert.equal(isAllowedIngestPath("vault/02-Resources/AI and Agents/note.md"), true);
+  assert.equal(isAllowedIngestPath("vault/99-System/Skills/forged.md"), false);
+  assert.equal(isAllowedIngestPath("vault/AGENTS.md"), false);
+  assert.equal(isAllowedIngestPath("vault/00-Inbox/../../99-System/forged.md"), false);
+});
+
+test("ingest drops model-proposed relations whose target note cannot be resolved", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-relation-target-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const existing = "vault/02-Resources/existing.md";
+  await fs.mkdir(path.join(root, "vault", "02-Resources"), { recursive: true });
+  await fs.writeFile(path.join(root, existing), "# Existing", "utf8");
+  const service = new IngestService({
+    stateRoot: path.join(root, "state"),
+    knowledge: {
+      async search() { return [{ path: existing, title: "Existing", excerpt: "现有笔记摘要", sensitive: false }]; },
+      async read(target) {
+        if (target !== existing) throw Object.assign(new Error("missing"), { code: "ENOENT" });
+        return { path: target };
+      },
+    },
+    intake: { async prepare(payload) { return { sourceType: "text", content: payload.value }; } },
+  });
+  const receipt = await service.receive({ kind: "text", value: "relation material" });
+  await service.propose(receipt.artifact.id);
+  const { proposal } = await service.enrichProposal(receipt.artifact.id, {
+    relations: [
+      { type: "supports", target: existing, reason: "可验证目标" },
+      { type: "supports", target: "vault/02-Resources/invented.md", reason: "幻觉目标" },
+      { type: "supports", target: "../../outside.md", reason: "逃逸目标" },
+    ],
+  });
+  assert.deepEqual(proposal.relations, [{ type: "supports", target: existing, reason: "可验证目标" }]);
 });
 
 test("ingest preserves SourceDescriptor through receipt, proposal, and completion", async (t) => {
@@ -89,7 +214,9 @@ test("ingest preserves SourceDescriptor through receipt, proposal, and completio
   assert.equal(prepared.proposal.sourceDescriptor.reliability, "traceable");
   const completed = await service.apply(receipt.artifact.id, { workspace: root, decision: { action: "create" } });
   assert.equal(completed.source.verificationStatus, "partial");
-  assert.match(await fs.readFile(path.join(root, completed.path), "utf8"), /source_verification: partial/);
+  const note = await fs.readFile(path.join(root, completed.path), "utf8");
+  assert.match(note, /source_verification: partial/);
+  assert.match(note, /^source: "https:\/\/example\.com\/post\?id=7"$/m);
 });
 
 test("ingest persists a revision as a new proposal without applying the old decision", async (t) => {
@@ -108,6 +235,32 @@ test("ingest persists a revision as a new proposal without applying the old deci
   assert.equal(revised.proposal.previousProposalId, original.proposal.id);
   assert.equal(revised.proposal.revisionRequest, "标题改成更适合小白的表述");
   assert.equal((await service.status(receipt.artifact.id)).proposal.id, revised.proposal.id);
+});
+
+test("ingest detects a changed snapshot from the same canonical source", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-source-update-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const service = new IngestService({
+    stateRoot: path.join(root, "state"),
+    knowledge: {
+      async search() { return []; },
+      async findBySource({ canonicalUrl }) {
+        assert.equal(canonicalUrl, "https://example.com/article");
+        return [{ path: "vault/02-Resources/article.md", sourceDigest: "a".repeat(64) }];
+      },
+    },
+    intake: {
+      async prepare(payload) {
+        return { sourceType: "url", sourceUrl: payload.value, content: "updated content" };
+      },
+    },
+  });
+  const receipt = await service.receive({ kind: "url", value: "https://example.com/article?utm_source=wechat" });
+  const { proposal } = await service.propose(receipt.artifact.id);
+  assert.equal(proposal.duplicateAssessment.sameSource, true);
+  assert.equal(proposal.duplicateAssessment.updateStatus, "changed");
+  assert.deepEqual(proposal.duplicateAssessment.matches, ["vault/02-Resources/article.md"]);
+  assert.equal(proposal.risk, "merge");
 });
 
 test("dedupe matches force merge review instead of silent overwrite", async (t) => {

@@ -136,7 +136,8 @@ test("Windows lifecycle mutations are canonical audited operations", async (t) =
     jobs,
   });
 
-  const result = await control.mutate("install", { channel: "web", senderId: "local-user" });
+  // trust-but-clarify：system_control 受 allowSystemControl 开关控制（默认关）；开启后显式允许、自动执行。
+  const result = await control.mutate("install", { channel: "web", senderId: "local-user", allowSystemControl: true });
   assert.equal(result.installed, true);
   assert.match(result.jobId, /^job-/);
   const job = await jobs.get(result.jobId);
@@ -153,11 +154,27 @@ test("failed Windows lifecycle mutations leave a terminal audited Job", async (t
   const jobs = new JobStore({ opsRoot: path.join(tempRoot, "ops"), payloadRoot: path.join(tempRoot, "payloads") });
   const control = new WindowsServiceControl({ manager: { async install() { throw new Error("Task Scheduler unavailable"); } }, jobs });
 
-  await assert.rejects(control.mutate("install", { channel: "web", senderId: "local-user" }), /Task Scheduler unavailable/);
+  await assert.rejects(control.mutate("install", { channel: "web", senderId: "local-user", allowSystemControl: true }), /Task Scheduler unavailable/);
   const [job] = await jobs.list();
   assert.equal(job.status, "failed");
   assert.equal(job.error.code, "WINDOWS_SERVICE_FAILED");
   assert.match(job.error.message, /Task Scheduler unavailable/);
+});
+
+test("Windows lifecycle mutations refuse with an actionable hint when the system-control switch is off", async (t) => {
+  await fs.mkdir(path.join(root, ".runtime"), { recursive: true });
+  const tempRoot = await fs.mkdtemp(path.join(root, ".runtime", "syno-windows-denied-"));
+  t.after(() => fs.rm(tempRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }));
+  const jobs = new JobStore({ opsRoot: path.join(tempRoot, "ops"), payloadRoot: path.join(tempRoot, "payloads") });
+  const control = new WindowsServiceControl({
+    manager: { async install() { throw new Error("manager must not run while denied"); }, async uninstall() { throw new Error("manager must not run while denied"); } },
+    jobs,
+  });
+  // 开关默认关（不传 allowSystemControl）→ 拒绝并给出 D4 可操作提示；manager 绝不被调用。
+  await assert.rejects(control.mutate("install", { channel: "web", senderId: "local-user" }), /系统控制开关默认关闭/);
+  const [denied] = await jobs.list();
+  assert.equal(denied.status, "rejected");
+  assert.equal(denied.error.code, "POLICY_DENIED");
 });
 
 test("WindowsServiceManager pins the repository, Node and management script", async () => {
@@ -229,6 +246,7 @@ test("Windows task restart and uninstall own the exact Node child through a PID 
   assert.match(manager, /Restore-SynoTask[\s\S]*Wait-SynoTaskReady/, "a running task restored after failure must pass health readiness again");
   assert.doesNotMatch(manager, /try \{ Stop-SynoHost \} catch \{ \}/, "replacement cleanup failures must not be swallowed");
   assert.match(manager, /function Stop-SynoWrappers[\s\S]*Get-CimInstance Win32_Process[\s\S]*Test-SynoWrapperProcess/);
+  assert.match(launcher, /same-session node\.exe[\s\S]*Win32_Process details are inaccessible/);
   assert.match(manager, /"Uninstall"[\s\S]*KeepHostRunning[\s\S]*Stop-SynoWrappers/, "Web uninstall must retire task wrappers without killing the Host");
   const installStart = manager.indexOf('"Install"');
   const rollbackTry = manager.indexOf("    try {", installStart);
@@ -256,6 +274,14 @@ test("Windows task resolves a command shim to the real Node executable", { skip:
   const result = JSON.parse(stdout.trim().split(/\r?\n/).at(-1));
   assert.match(result.taskDefinition.arguments, new RegExp(process.execPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.doesNotMatch(result.taskDefinition.arguments, /node\.cmd/);
+});
+
+test("Windows task never persists a mise Node shim as the launcher target", async () => {
+  const manager = await fs.readFile(path.join(root, "scripts", "manage-windows-task.ps1"), "utf8");
+  assert.match(manager, /function Resolve-SynoNodePath/);
+  assert.match(manager, /mise shim/);
+  assert.match(manager, /which node/);
+  assert.match(manager, /must resolve to a real node\.exe/);
 });
 
 test("Windows service common policy rejects unknown health and stale PID ownership", { skip: process.platform !== "win32" }, async () => {

@@ -223,10 +223,11 @@ test("apply refuses an ops audit parent redirected through a junction", async (t
 test("migration submit API exposes only pinned content and integration Jobs", async () => {
   const content = buildOperationRequest("vault.migration.content", { id: "migration-20260720-deadbeef", phase: "content" });
   const integration = buildOperationRequest("vault.migration.integration", { id: "migration-20260720-deadbeef", phase: "integration" });
-  assert.equal(evaluate(content).approval, "single");
+  // trust-but-clarify：迁移内容/集成都默认自动执行（approval 恒为 none）。
+  assert.equal(evaluate(content).approval, "none");
   assert.equal(evaluate(content).intent, "migrate_note");
   assert.equal(evaluate(content).profile, "syno-curate");
-  assert.equal(evaluate(integration).approval, "double");
+  assert.equal(evaluate(integration).approval, "none");
   assert.equal(evaluate(integration).intent, "migrate_integrate");
   const calls = [];
   const runtime = {

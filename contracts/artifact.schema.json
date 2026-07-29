@@ -6,7 +6,7 @@
   "required": ["id", "kind", "path", "created", "isolated", "sourceDescriptor"],
   "properties": {
     "id": { "type": "string" },
-    "kind": { "enum": ["url", "wechat", "text", "markdown", "txt", "pdf", "docx", "html", "image", "voice", "file", "bilibili-opus", "github-doc"] },
+    "kind": { "enum": ["url", "wechat", "text", "markdown", "txt", "pdf", "docx", "html", "personal", "image", "voice", "file", "bilibili-opus", "github-doc"] },
     "path": { "type": "string" },
     "created": { "type": "string", "format": "date-time" },
     "isolated": { "type": "boolean" },

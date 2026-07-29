@@ -1,12 +1,13 @@
-// 审批顾问：为 awaiting_approval 的收录类 Job 生成「这是什么 / 管家建议 / 理由」。
+// 收录澄清顾问：trust-but-clarify 下，awaiting_approval 仅由"系统歧义"（收录撞重复/多方案/
+// 信息不足）触发。为这类 Job 生成「这是什么 / 管家说明 / 理由」，帮主人在冲突选项间决策。
 //
 // 设计：确定性底座（读取 artifact 真实字段：标题/来源/路径/查重命中）+ LLM 增强
 // （用管家口吻产出自然语言理由）。LLM 失败/离线 → 回退确定性底座（via:"fallback"），
-// 保证审批卡片永不为空，符合「Provider 离线时本地继续」。
+// 保证澄清卡片永不为空，符合「Provider 离线时本地继续」。
 //
 // 约束：不创建 Job、不动 git、不起 tool-loop；固定单一 Provider（漂移由 ProviderClient 拒绝），
-// 无模型 fallback；建议始终对齐提交方意图（create→建议收录、reject→建议丢弃），
-// 仅在内容信号冲突时填 caveat（去重命中 create、唯一内容 reject），管家不越权改判动作。
+// 无模型 fallback；说明始终对齐提交方意图，仅在内容信号冲突时填 caveat（去重命中、唯一内容
+// 却要丢弃等），管家不越权改判动作——reject 永远是主人的可选项。
 
 const ACTION_LABELS = Object.freeze({
   create: "收录",
@@ -17,7 +18,7 @@ const ACTION_LABELS = Object.freeze({
 });
 
 const ADVISOR_SYSTEM =
-  "你是 Syno 收录顾问。主人正在审批一篇待处理的笔记。请用不超过 100 字客观说明：这是什么内容、覆盖了什么、来源与质量如何、对个人知识管理是否有价值。只描述和评价内容本身；不要建议批准或拒绝，也不要建议改用其他动作（批准与否由主人和确定性规则决定）。语气克制、可靠、温暖，用大白话。只输出一段话，不要改写主人原文，不要使用列表符号或标题。";
+  "你是 Syno 收录澄清顾问。主人正在确认一篇需要澄清的收录候选（可能撞重复、多方案或信息不足）。请用不超过 100 字客观说明：这是什么内容、覆盖了什么、来源与质量如何、对个人知识管理是否有价值。只描述和评价内容本身；不要替主人决定收录或丢弃，也不要建议改用其他动作（如何处理由主人决定）。语气克制、可靠、温暖，用大白话。只输出一段话，不要改写主人原文，不要使用列表符号或标题。";
 
 function actionLabel(action) {
   return ACTION_LABELS[action] || "处理";
@@ -51,12 +52,12 @@ function wordCountLabel(count) {
 function minimalAdvice(job) {
   const operation = job?.request?.operation || "";
   const intent = job?.intent || operation || "操作";
-  const whatIsIt = operation === "ingest.apply" ? "一篇待审批的收录候选。" : `一个待审批的${intent}任务。`;
+  const whatIsIt = operation === "ingest.apply" ? "一篇待确认的收录候选（存在需要澄清的冲突）。" : `一个待确认的${intent}任务。`;
   return {
     whatIsIt,
     recommendation: "approve",
     recommendationLabel: "请主人审阅后确认",
-    reason: job?.decision?.reason || "请求需要主人确认。",
+    reason: job?.decision?.reason || "请求需要主人确认如何处理。",
     caveat: "",
     detail: { operation },
     generatedAt: null,
@@ -128,8 +129,8 @@ class ApprovalAdvisor {
     return {
       whatIsIt: `《${title}》${sourcePart}正文约 ${wordCountLabel(wordCount)}。`,
       recommendation: "approve",
-      recommendationLabel: `建议批准${actionLabel(action)}`,
-      fallbackReason: job?.decision?.reason || "内容已就绪，等待主人确认。",
+      recommendationLabel: `可确认${actionLabel(action)}`,
+      fallbackReason: job?.decision?.reason || "内容已就绪，等待主人确认如何处理。",
       caveat: this.#caveat(action, art),
       detail: {
         operation: "ingest.apply",

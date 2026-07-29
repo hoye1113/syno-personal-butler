@@ -16,6 +16,23 @@ async function setup(t) {
   };
 }
 
+test("republishing the same Job reuses one pending decision", async (t) => {
+  const { store } = await setup(t);
+  const input = {
+    jobId: "job-20260728-stable",
+    ownerKey: "owner",
+    threadKey: "main",
+    kind: "single",
+    phase: "execution",
+    summary: "收录方案",
+    approvalCode: "ABC123",
+  };
+  const first = await store.add(input);
+  const replay = await store.add(input);
+  assert.equal(replay.id, first.id);
+  assert.equal((await store.list({ ownerKey: "owner", threadKey: "main" })).length, 1);
+});
+
 test("one bound low-risk decision accepts natural confirmation and rejects cross-owner replay", async (t) => {
   const { store } = await setup(t);
   const decision = await store.add({
@@ -49,32 +66,19 @@ test("multiple pending decisions require an index or explicit code", async (t) =
   assert.equal(first.decision.jobId, "job-20260728-11111111");
 });
 
-test("double approval binds diff generation and final digest confirmation to one thread", async (t) => {
+test("a clarification decision bound to a diff digest verifies the authoritative digest before confirming", async (t) => {
   const { store } = await setup(t);
   const decision = await store.add({
     jobId: "job-20260728-12345678",
     ownerKey: "owner",
     threadKey: "main",
-    kind: "double",
-    phase: "execution",
-    summary: "覆盖已有笔记",
+    summary: "覆盖已有笔记（带差异指纹）",
+    diffDigest: "digest-v1",
     approvalCode: "ABC123",
   });
-  await assert.rejects(
-    store.parse("可以", { ownerKey: "owner", threadKey: "main" }),
-    (error) => error.code === "PENDING_DECISION_PHASE_INVALID",
-  );
-  const first = await store.parse("确认生成差异", { ownerKey: "owner", threadKey: "main" });
-  assert.equal(first.action, "approve");
-  assert.equal(first.decision.id, decision.id);
-
-  await store.update(decision.id, { phase: "merge", diffDigest: "digest-v1", approvalCode: "DEF456", consumedAt: null, reservedAt: null });
-  await assert.rejects(
-    store.parse("确认 1", { ownerKey: "owner", threadKey: "main" }),
-    (error) => error.code === "PENDING_DECISION_PHASE_INVALID",
-  );
-  await assert.rejects(store.parse("确认应用 ABC123", { ownerKey: "owner", threadKey: "main" }), (error) => error.code === "PENDING_DECISION_CODE_INVALID");
-  const final = await store.parse("确认应用 DEF456", {
+  assert.equal(decision.kind, "single");
+  // 权威摘要一致 → 允许确认（getDiffDigest 优先于静态 diffDigest）
+  const ok = await store.parse("可以", {
     ownerKey: "owner",
     threadKey: "main",
     getDiffDigest: async (jobId) => {
@@ -82,11 +86,18 @@ test("double approval binds diff generation and final digest confirmation to one
       return "digest-v1";
     },
   });
-  assert.equal(final.action, "approve");
+  assert.equal(ok.action, "approve");
+  assert.equal(ok.decision.id, decision.id);
+  // 权威摘要变化 → 拒绝（防伪：diff 变了必须重新确认）
+  await store.update(decision.id, { reservedAt: null });
   await assert.rejects(
-    store.parse("确认应用 DEF456", { ownerKey: "owner", threadKey: "other", diffDigest: "digest-v1" }),
-    (error) => ["PENDING_DECISION_NOT_FOUND", "PENDING_DECISION_REPLAYED"].includes(error.code),
+    store.parse("可以", { ownerKey: "owner", threadKey: "main", getDiffDigest: async () => "digest-v2" }),
+    (error) => error.code === "PENDING_DECISION_DIGEST_CHANGED",
   );
+  // 未绑定 digest 的澄清事项不触发防伪校验，直接确认
+  await store.update(decision.id, { reservedAt: null, diffDigest: null });
+  const unbound = await store.parse("可以", { ownerKey: "owner", threadKey: "main" });
+  assert.equal(unbound.action, "approve");
 });
 
 test("expired decisions and changed diff digests fail closed", async (t) => {
@@ -95,20 +106,20 @@ test("expired decisions and changed diff digests fail closed", async (t) => {
     jobId: "job-20260728-12345678",
     ownerKey: "owner",
     threadKey: "main",
-    kind: "double",
-    phase: "merge",
-    summary: "merge",
+    summary: "带指纹的澄清",
     diffDigest: "digest-v1",
     approvalCode: "ABC123",
     ttlMs: 1_000,
   });
+  // 摘要变化 → 拒绝
   await assert.rejects(
-    store.parse("确认应用 ABC123", { ownerKey: "owner", threadKey: "main", diffDigest: "digest-v2" }),
+    store.parse("可以", { ownerKey: "owner", threadKey: "main", getDiffDigest: async () => "digest-v2" }),
     (error) => error.code === "PENDING_DECISION_DIGEST_CHANGED",
   );
   advance(2_000);
+  // 过期 → 拒绝（过期检查先于摘要检查）
   await assert.rejects(
-    store.parse("确认应用 ABC123", { ownerKey: "owner", threadKey: "main", diffDigest: decision.diffDigest }),
+    store.parse("可以", { ownerKey: "owner", threadKey: "main", getDiffDigest: async () => decision.diffDigest }),
     (error) => error.code === "PENDING_DECISION_EXPIRED",
   );
 });
@@ -136,4 +147,44 @@ test("an interrupted approval reservation becomes available again without permit
     store.parse("可以", { ownerKey: "owner", threadKey: "main" }),
     (error) => error.code === "PENDING_DECISION_REPLAYED",
   );
+});
+
+test("an ingest decision accepts only a declared human-readable proposal option", async (t) => {
+  const { store } = await setup(t);
+  await store.add({
+    jobId: "job-20260728-options",
+    ownerKey: "owner",
+    threadKey: "main",
+    kind: "single",
+    summary: "处理重复来源",
+    options: ["keep-separate", "append-source", "link-only", "reject"],
+    approvalCode: "ABC123",
+  });
+  const selected = await store.parse("仅关联", { ownerKey: "owner", threadKey: "main" });
+  assert.equal(selected.action, "select");
+  assert.equal(selected.option, "link-only");
+  await store.update(selected.decision.id, { reservedAt: null });
+  await assert.rejects(
+    store.parse("覆盖原文", { ownerKey: "owner", threadKey: "main" }),
+    (error) => error.code === "PENDING_DECISION_NOT_A_REPLY",
+  );
+});
+
+test("replaying proposal publication reuses the same active PendingDecision", async (t) => {
+  const { store } = await setup(t);
+  const input = {
+    jobId: "job-20260728-idempotent",
+    ownerKey: "owner",
+    threadKey: "main",
+    kind: "single",
+    phase: "execution",
+    summary: "同一收录方案",
+    options: ["create", "reject"],
+    approvalCode: "ABC123",
+    artifactId: "artifact-1",
+  };
+  const first = await store.add(input);
+  const replay = await store.add(input);
+  assert.equal(replay.id, first.id);
+  assert.equal((await store.list({ ownerKey: "owner", threadKey: "main" })).length, 1);
 });

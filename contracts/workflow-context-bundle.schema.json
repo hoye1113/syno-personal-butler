@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/workflow-context-bundle.schema.json",
+  "title": "WorkflowContextBundle",
+  "type": "object",
+  "required": [
+    "workflowVersion", "rulesDigest", "sourceType", "stage", "requiredFields",
+    "allowedRelations", "constraints", "qualityChecks", "outputSchema",
+    "canonicalSources", "budget", "instructions"
+  ],
+  "properties": {
+    "workflowVersion": { "type": "string" },
+    "rulesDigest": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "sourceType": { "type": "string" },
+    "stage": { "type": "string" },
+    "requiredFields": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "allowedRelations": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "constraints": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "qualityChecks": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "outputSchema": { "type": "object" },
+    "canonicalSources": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "budget": {
+      "type": "object",
+      "required": ["rules", "knowledge", "source", "output"],
+      "properties": {
+        "rules": { "type": "number" },
+        "knowledge": { "type": "number" },
+        "source": { "type": "number" },
+        "output": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "instructions": { "type": "string" },
+    "sourceDigest": { "type": "string" },
+    "knowledgeIndexVersion": { "type": "string" }
+  },
+  "additionalProperties": false
+}

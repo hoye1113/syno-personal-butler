@@ -8,13 +8,17 @@ const root = path.resolve(import.meta.dirname, "..");
 test("Web shell exposes the five knowledge-loop areas and always-reachable approvals", async () => {
   const html = await fs.readFile(path.join(root, "apps", "syno", "public", "index.html"), "utf8");
   for (const area of ["Today", "Capture", "Knowledge", "Learn", "Create"]) assert.match(html, new RegExp(`>${area}<`));
-  assert.match(html, /data-syno-panel="jobs">审批中心/);
+  assert.match(html, /data-syno-panel="jobs">任务/);
   assert.match(html, /id="synoProviderForm"/);
   assert.match(html, /id="synoLearningForm"/);
   assert.match(html, /id="synoOutputForm"/);
   assert.match(html, /id="synoIntakeProposal"/);
   assert.match(html, /id="synoOutputOpportunities"/);
   assert.match(html, /id="synoPreferenceForm"/);
+  // trust-but-clarify：code_change / system_control 的 D4 开启通道（权限开关）在设置中可见。
+  assert.match(html, /id="synoPolicyForm"/);
+  assert.match(html, /id="synoAllowSelfModify"/);
+  assert.match(html, /id="synoAllowSystemControl"/);
   assert.match(html, /id="synoLearningArtifact"[^>]*minlength="20"/);
   assert.doesNotMatch(html, /value="conversation-outline"/);
   assert.match(html, /class="ghost-btn mobile-settings-trigger"[^>]*data-syno-panel="settings">连接设置</);
@@ -39,7 +43,7 @@ test("Today and settings disclose the daily decision before technical configurat
   assert.match(html, /<details[^>]*id="synoWeixinSettings"[\s\S]*id="synoWeixinLogin"/);
   assert.match(html, /id="synoWorkspaceSettings"[^>]*hidden/);
   assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
-  assert.match(html, /data-syno-panel="jobs">审批中心/);
+  assert.match(html, /data-syno-panel="jobs">任务/);
   assert.ok(html.indexOf('id="synoKnowledgeQuery"') < html.indexOf('class="syno-intake"'), "Knowledge search should be first");
   assert.match(html, /<details[^>]*id="synoLearningDetails"[\s\S]*id="synoLearningForm"/);
   assert.ok(html.indexOf('id="synoOutputOpportunities"') < html.indexOf('id="synoOutputForm"'), "Create opportunity should precede creation forms");

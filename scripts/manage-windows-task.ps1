@@ -16,14 +16,36 @@ $synoPort = if ($env:PORT) { [int]$env:PORT } else { 8888 }
 $webUrl = "http://127.0.0.1:$synoPort/"
 $healthUrl = "http://127.0.0.1:$synoPort/api/syno/health"
 $resolvedRoot = [IO.Path]::GetFullPath($RepoRoot)
-if (-not $NodePath) { $NodePath = (Get-Command node -ErrorAction Stop).Source }
-$nodeExtension = [IO.Path]::GetExtension($NodePath)
-if ($nodeExtension -in @(".cmd", ".bat")) {
-  $reportedNodePath = (& $NodePath -p "process.execPath" | Select-Object -Last 1)
-  if (-not $reportedNodePath) { throw "Node shim did not report process.execPath" }
-  $NodePath = $reportedNodePath.Trim()
+
+function Resolve-SynoNodePath([string]$Candidate) {
+  if (-not $Candidate) { $Candidate = (Get-Command node -ErrorAction Stop).Source }
+  $candidatePath = [IO.Path]::GetFullPath($Candidate)
+  if (-not (Test-Path -LiteralPath $candidatePath -PathType Leaf)) { throw "Node executable not found: $candidatePath" }
+  $candidateName = [IO.Path]::GetFileName($candidatePath)
+  $isMiseShim = $candidatePath -match "(?i)[\\/]mise[\\/]shims[\\/]" -and $candidateName -match "(?i)^node(?:\.exe|\.cmd|\.bat)?$"
+  $extension = [IO.Path]::GetExtension($candidatePath)
+  if ($extension -in @(".cmd", ".bat")) {
+    $reportedNodePath = (& $candidatePath -p "process.execPath" | Select-Object -Last 1)
+    if (-not $reportedNodePath) { throw "Node shim did not report process.execPath" }
+    $candidatePath = [IO.Path]::GetFullPath($reportedNodePath.Trim())
+    $candidateName = [IO.Path]::GetFileName($candidatePath)
+    $isMiseShim = $candidatePath -match "(?i)[\\/]mise[\\/]shims[\\/]" -and $candidateName -match "(?i)^node(?:\.exe)?$"
+  }
+  if ($isMiseShim) {
+    $mise = Get-Command mise -ErrorAction SilentlyContinue
+    if (-not $mise) { throw "NodePath resolves to a mise shim; install-time mise is required to resolve the real node.exe" }
+    $reportedNodePath = (& $mise.Source which node 2>$null | Select-Object -Last 1)
+    if (-not $reportedNodePath) { throw "mise did not resolve node to a real executable" }
+    $candidatePath = [IO.Path]::GetFullPath($reportedNodePath.Trim())
+  }
+  if ([IO.Path]::GetFileName($candidatePath) -notmatch "(?i)^node\.exe$" -or $candidatePath -match "(?i)[\\/]mise[\\/]shims[\\/]") {
+    throw "NodePath must resolve to a real node.exe, not a shim: $candidatePath"
+  }
+  if (-not (Test-Path -LiteralPath $candidatePath -PathType Leaf)) { throw "Node executable not found: $candidatePath" }
+  return $candidatePath
 }
-$resolvedNode = [IO.Path]::GetFullPath($NodePath)
+
+$resolvedNode = Resolve-SynoNodePath $NodePath
 $commonScript = Join-Path $PSScriptRoot "windows-service-common.ps1"
 . $commonScript
 $taskXmlModule = Join-Path $PSScriptRoot "Syno.WindowsTaskXml.psm1"
@@ -38,6 +60,11 @@ $repoFingerprint = Get-SynoRepoFingerprint $resolvedRoot
 function Get-TaskOrNull([string]$Name) {
   return Get-ScheduledTask -TaskName $Name -ErrorAction SilentlyContinue
 }
+
+# Windows Task Scheduler may serialize the trigger as the account name but the
+# principal as the account SID.  Both identify the same current Owner and must
+# be accepted by the protected XML contract.
+$currentUserSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 
 function Get-SynoStatus {
   $task = Get-TaskOrNull $taskName
@@ -79,7 +106,7 @@ function Test-SynoTaskDefinition($Task) {
     $action.WorkingDirectory -eq $resolvedRoot -and
     $trigger.CimClass.CimClassName -eq "MSFT_TaskLogonTrigger" -and $trigger.Enabled -eq $true -and
     ($trigger.UserId -eq $definition.user -or $trigger.UserId -eq $expectedUser) -and
-    ($principal.UserId -eq $definition.user -or $principal.UserId -eq $expectedUser) -and
+    ($principal.UserId -eq $definition.user -or $principal.UserId -eq $expectedUser -or $principal.UserId -eq $currentUserSid) -and
     [int]$principal.LogonType -eq 3 -and [int]$principal.RunLevel -eq 0 -and
     $settings.Hidden -eq $true -and [int]$settings.MultipleInstances -eq 2 -and
     $settings.StartWhenAvailable -eq $true -and $settings.RestartCount -eq 999 -and
@@ -188,7 +215,7 @@ switch ($Action) {
     if (-not (Test-Path -LiteralPath $resolvedNode -PathType Leaf)) { throw "Node executable not found: $resolvedNode" }
     if (-not (Test-Path -LiteralPath $startScript -PathType Leaf)) { throw "Syno launcher not found: $startScript" }
     $existing = Get-TaskOrNull $taskName
-    $allowedUsers = @($definition.user, $definition.user.Split("\")[-1])
+    $allowedUsers = @($definition.user, $definition.user.Split("\")[-1], $currentUserSid)
     $existingXml = if ($existing) { Export-ScheduledTask -TaskName $taskName } else { $null }
     $existingXmlValid = $false
     if ($existingXml) {

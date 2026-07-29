@@ -3,8 +3,10 @@ import { EventEmitter } from "node:events";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { PassThrough } from "node:stream";
 import test from "node:test";
 
+import { RuntimeJournal } from "../apps/syno/syno/runtime-journal.mjs";
 import {
   discoverOpenCodeCandidates,
   LOCKED_OPENCODE_VERSION,
@@ -129,6 +131,7 @@ test("OpenCodeSupervisor owns one child, authenticates health, and only stops it
     versionOf: async () => "1.18.2",
     spawnImpl,
     fetchImpl,
+    portProbe: async () => false,
     killTree: async (pid) => killed.push(pid),
     randomSecret: () => "runtime-secret",
     tokenLoader: async () => "zen-secret",
@@ -174,4 +177,83 @@ test("OpenCodeSupervisor refuses an occupied port that is not its authenticated 
   });
 
   await assert.rejects(supervisor.start(), (error) => error.code === "OPENCODE_PORT_OCCUPIED");
+});
+
+test("OpenCodeSupervisor never persists child output and records only the structured exit cause", async (t) => {
+  const root = await temporaryRoot(t);
+  const executable = path.join(root, "node_modules", "opencode-ai", "bin", "opencode.exe");
+  const logRoot = path.join(root, "logs");
+  await fs.mkdir(path.dirname(executable), { recursive: true });
+  await fs.writeFile(executable, "real");
+  const child = new EventEmitter();
+  child.pid = 4343;
+  child.exitCode = null;
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  const supervisor = new OpenCodeSupervisor({
+    localRoot: root,
+    repoRoot: root,
+    executable,
+    versionOf: async () => "1.18.2",
+    spawnImpl: () => {
+      queueMicrotask(() => {
+        child.stderr.write("fatal: Authorization: Bearer must-not-leak\n");
+        child.exitCode = 1;
+        child.emit("exit", 1, null);
+      });
+      return child;
+    },
+    fetchImpl: async () => { throw new Error("not ready"); },
+    portProbe: async () => false,
+    killTree: async () => {},
+    journal: new RuntimeJournal({ root: logRoot, now: () => new Date("2026-07-28T06:00:00.000Z") }),
+    healthAttempts: 2,
+    healthDelayMs: 0,
+  });
+
+  await assert.rejects(supervisor.start(), (error) => error.code === "OPENCODE_EXITED");
+  const log = await fs.readFile(path.join(logRoot, "syno-runtime-2026-07-28.jsonl"), "utf8");
+  assert.doesNotMatch(log, /opencode\.child\.stderr/);
+  assert.match(log, /opencode\.child\.exit/);
+  assert.match(log, /opencode\.start\.failed/);
+  assert.doesNotMatch(log, /must-not-leak/);
+});
+
+test("OpenCodeSupervisor records a delayed owned stop exit as informational", async (t) => {
+  const root = await temporaryRoot(t);
+  const executable = path.join(root, "node_modules", "opencode-ai", "bin", "opencode.exe");
+  await fs.mkdir(path.dirname(executable), { recursive: true });
+  await fs.writeFile(executable, "real");
+  const entries = [];
+  const child = new EventEmitter();
+  child.pid = 4444;
+  child.exitCode = null;
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  const supervisor = new OpenCodeSupervisor({
+    localRoot: root,
+    repoRoot: root,
+    executable,
+    versionOf: async () => "1.18.2",
+    spawnImpl: () => child,
+    fetchImpl: async () => ({ ok: true, async json() { return { healthy: true, version: "1.18.2" }; } }),
+    portProbe: async () => false,
+    killTree: async () => {
+      setTimeout(() => {
+        child.exitCode = 1;
+        child.emit("exit", 1, null);
+      }, 0);
+    },
+    journal: { async record(event, data, options) { entries.push({ event, data, options }); } },
+    healthAttempts: 1,
+  });
+
+  await supervisor.start();
+  await supervisor.stop();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  assert.equal(supervisor.status().lastError, null);
+  const exit = entries.find((entry) => entry.event === "opencode.child.exit");
+  assert.equal(exit.options.level, "info");
+  assert.equal(exit.data.expected, true);
 });

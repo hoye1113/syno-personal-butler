@@ -7,6 +7,7 @@ import { parseRecord, writeRecord } from "./markdown-record.mjs";
 import { PATHS } from "./paths.mjs";
 import { validateContractRecord } from "./schema-registry.mjs";
 import { buildSourceDescriptor } from "./source-descriptor.mjs";
+import { classifyTags } from "./canonical-tags.mjs";
 
 function slug(value) {
   return String(value || "capture").toLocaleLowerCase("zh-CN").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 60) || "capture";
@@ -20,6 +21,157 @@ function titleFromPrepared(prepared, payload) {
   }
   const raw = String(payload.value || "").replace(/^---[\s\S]*?---\s*/m, "");
   return raw.split(/\r?\n/).map((line) => line.replace(/^#+\s*/, "").trim()).find(Boolean)?.slice(0, 80) || "待整理收录";
+}
+
+function objectDigest(value) {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+const RELATION_LABELS = Object.freeze({
+  supports: "支持",
+  extends: "补充",
+  contradicts: "反驳",
+  limits: "限制",
+  depends_on: "依赖",
+  applies_to: "应用于",
+  example_of: "示例",
+});
+const BILIBILI_PROFILE_FIELDS = Object.freeze([
+  "sourceTier", "sourceForm", "contentForm", "dialogueFidelity",
+  "questionSource", "voiceBasis", "factualStatus", "factualReviewed",
+  "verificationScope", "verificationBasis",
+]);
+
+function completeBilibiliProfile(proposal, { requireCanonical = true } = {}) {
+  if (proposal.sourceType !== "bilibili-opus") return null;
+  const profile = proposal.sourceProfile || {};
+  const missing = BILIBILI_PROFILE_FIELDS.filter((field) =>
+    profile[field] === undefined || profile[field] === "" || (Array.isArray(profile[field]) && !profile[field].length));
+  if (missing.length) {
+    throw Object.assign(new Error(`B站 v2 来源画像不完整：${missing.join(", ")}`), {
+      code: "INGEST_BILIBILI_PROFILE_INCOMPLETE",
+      missing,
+    });
+  }
+  if (profile.verificationScope !== "column_only"
+    || profile.factualStatus === "verified"
+    || profile.verificationBasis.length !== 1
+    || profile.verificationBasis[0] !== "column") {
+    throw Object.assign(new Error("B站专栏适配器只读取 column，禁止声明外部原页核验或 verified"), {
+      code: "INGEST_BILIBILI_VERIFICATION_OVERCLAIM",
+    });
+  }
+  if (requireCanonical && (!proposal.canonicalBody || !proposal.sourceReport)) {
+    throw Object.assign(new Error("B站 v2 缺少 canonical body 或完成报告"), {
+      code: "INGEST_BILIBILI_CANONICAL_INCOMPLETE",
+    });
+  }
+  return {
+    ...profile,
+    ingestWorkflow: "bilibili_opus_ingest_v2",
+    primarySource: "column",
+  };
+}
+
+function buildBilibiliReport({ proposal, profile, canonicalBody, sourceText }) {
+  const body = String(canonicalBody || "").trim();
+  const questionCount = (body.match(/^##\s+\d{2}\b/gmu) || []).length;
+  const checks = {
+    duplicate: proposal.duplicateAssessment?.updateStatus !== "unknown",
+    sourceCompleteness: Boolean(profile.opusId || profile.columnId),
+    provenance: profile.verificationScope === "column_only"
+      && profile.factualStatus !== "verified"
+      && profile.verificationBasis.length === 1
+      && profile.verificationBasis[0] === "column",
+    retentionCoverage: body.length > 0 && body.length <= Math.max(String(sourceText || "").length * 2, 2_000),
+    dialoguePlan: proposal.materialTier === "S" && profile.sourceForm === "lecture"
+      ? profile.contentForm === "dialogue" && profile.dialogueFidelity === "reconstructed"
+        && profile.questionSource === "editorial" && questionCount >= 3 && questionCount <= 6
+      : profile.contentForm === "lecture"
+        ? profile.dialogueFidelity === "none" && profile.questionSource === "none"
+      : questionCount >= 3 && questionCount <= 6,
+    voiceIntegrity: profile.contentForm === "lecture"
+      || /\*\*(?:编者问|现场提问|观众提问|专栏整理|[^*\n]{1,40})[：:]\*\*/u.test(body),
+    numericContext: !/\d/u.test(String(sourceText || "")) || /(?:数字|数据|比例|时间|版本|约|大约|截至)/u.test(body),
+    constraintsPreserved: /##\s+限制与边界/u.test(body),
+    relationQuality: /##\s+知识连接/u.test(body),
+    discussionReadiness: /^##\s+/mu.test(body),
+    frontmatter: true,
+    wikilinks: true,
+    semanticReview: false,
+  };
+  const unresolved = [...new Set(proposal.unresolved || [])];
+  return {
+    workflow: "bilibili_opus_ingest_v2",
+    sourceId: { opus: profile.opusId || "", column: profile.columnId || "", bv: profile.bv || "" },
+    route: {
+      sourceTier: profile.sourceTier, materialTier: proposal.materialTier,
+      sourceForm: profile.sourceForm, contentForm: profile.contentForm,
+      dialogueFidelity: profile.dialogueFidelity, questionSource: profile.questionSource,
+      voiceBasis: profile.voiceBasis,
+    },
+    targetPath: proposal.suggestedPath,
+    sourcesRead: ["column"],
+    sourcesSkipped: ["images", "transcript", "recastory", "original_page"],
+    retention: {
+      totalUnits: String(sourceText || "").length,
+      retained: body.length,
+      removed: Math.max(0, String(sourceText || "").length - body.length),
+      unresolved: unresolved.length,
+    },
+    relatedNotes: (proposal.relations || []).map((item) => item.target),
+    conceptCandidates: proposal.canonicalTags || [],
+    mocUpdates: proposal.mocChanges || [],
+    checks,
+    unresolved,
+    status: Object.values(checks).every(Boolean) && unresolved.length === 0 ? "complete" : "incomplete",
+  };
+}
+
+function renderBilibiliFrontmatter(profile, materialTier) {
+  if (!profile) return "";
+  const scalar = (key, value) => value ? `${key}: ${JSON.stringify(value)}\n` : "";
+  return [
+    "ingest_workflow: bilibili_opus_ingest_v2\n",
+    "source_type: bilibili_opus\n",
+    scalar("opus_id", profile.opusId),
+    scalar("column_id", profile.columnId),
+    scalar("bv", profile.bv),
+    scalar("video_url", profile.videoUrl),
+    scalar("uploader", profile.uploader),
+    "primary_source: column\n",
+    `source_tier: ${profile.sourceTier}\n`,
+    `material_tier: ${materialTier}\n`,
+    `source_form: ${profile.sourceForm}\n`,
+    `content_form: ${profile.contentForm}\n`,
+    `dialogue_fidelity: ${profile.dialogueFidelity}\n`,
+    `question_source: ${profile.questionSource}\n`,
+    `voice_basis: ${profile.voiceBasis}\n`,
+    `factual_status: ${profile.factualStatus}\n`,
+    `factual_reviewed: ${profile.factualReviewed}\n`,
+    `verification_scope: ${profile.verificationScope}\n`,
+    `verification_basis: ${JSON.stringify(profile.verificationBasis)}\n`,
+  ].join("");
+}
+
+function noteLink(target) {
+  return String(target || "").replace(/^vault\//, "").replace(/\.md$/u, "");
+}
+
+function renderRelations(relations = []) {
+  if (!relations.length) return "当前标记为 orphan，等待后续渐进关联。";
+  return relations.map((item) =>
+    `- ${RELATION_LABELS[item.type] || item.type}：[[${noteLink(item.target)}]] — ${String(item.reason).trim()}`,
+  ).join("\n");
+}
+
+function proposalAllowsWriteJob(proposal = {}) {
+  return proposal.quality?.status !== "rejected";
+}
+
+function isAllowedIngestPath(value) {
+  return /^vault\/(?:00-Inbox|01-Areas|02-Resources|03-Archive)\/(?!.*(?:^|\/)\.\.(?:\/|$))[\p{L}\p{N} _./&()-]+\.md$/u
+    .test(String(value || ""));
 }
 
 async function atomicJson(file, value) {
@@ -52,6 +204,29 @@ class IngestService {
     return { artifact: record, proposalPending: true };
   }
 
+  async applyBrowserSnapshot(id, snapshot = {}) {
+    const stateFile = path.join(this.stateRoot, `${id}.json`);
+    const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
+    if (state.payload?.kind !== "url") throw Object.assign(new Error("只有 URL 收录可以使用浏览器正文"), { code: "INGEST_BROWSER_SOURCE_INVALID" });
+    const text = String(snapshot.content || snapshot.text || "").trim();
+    if (!text) throw Object.assign(new Error("浏览器没有返回可读取正文"), { code: "INGEST_BROWSER_CONTENT_EMPTY" });
+    if (Buffer.byteLength(text, "utf8") > 2 * 1024 * 1024) throw Object.assign(new Error("浏览器正文超过 2 MB 限制"), { code: "INGEST_BROWSER_CONTENT_TOO_LARGE" });
+    const browserSnapshot = {
+      url: String(snapshot.finalUrl || snapshot.url || state.payload.value || ""),
+      contentType: String(snapshot.contentType || "text/html"),
+      text: text.slice(0, 100_000),
+      truncated: text.length > 100_000,
+      method: "kimi_webbridge",
+      contentDigest: String(snapshot.contentDigest || ""),
+    };
+    await atomicJson(stateFile, { ...state, browserSnapshot, browserCapture: {
+      status: "completed",
+      finalUrl: browserSnapshot.url,
+      contentDigest: browserSnapshot.contentDigest,
+    } });
+    return browserSnapshot;
+  }
+
   async propose(id) {
     const stateFile = path.join(this.stateRoot, `${id}.json`);
     const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
@@ -59,21 +234,54 @@ class IngestService {
       return { candidate: state.candidate, proposal: state.proposal };
     }
     try {
-      const prepared = await this.intake.prepare(state.payload);
+      const prepared = await this.intake.prepare(state.browserSnapshot
+        ? { ...state.payload, browserSnapshot: state.browserSnapshot }
+        : state.payload);
     const title = titleFromPrepared(prepared, state.payload);
-    const matches = await this.knowledge.search(title, { limit: 5 });
+    const titleMatches = await this.knowledge.search(title, { limit: 5 });
     const now = this.clock().toISOString();
     const candidate = {
       id: `candidate-${randomUUID().slice(0, 8)}`, artifactId: id, title, summary: String(prepared.content || prepared.text || "").slice(0, 280),
-      status: "proposed", confidence: matches.length ? 0.65 : 0.8, dedupeMatches: matches.map((item) => item.path), created: now,
+      status: "proposed", confidence: titleMatches.length ? 0.65 : 0.8, dedupeMatches: titleMatches.map((item) => item.path), created: now,
     };
-    const proposal = {
+    const sourceDescriptor = buildSourceDescriptor({ payload: state.payload, prepared, channel: state.channel, messageId: state.messageId, now: state.created });
+    const sourceDigest = createHash("sha256").update(String(prepared.content || prepared.text || "")).digest("hex");
+    const sourceMatches = typeof this.knowledge.findBySource === "function"
+      ? await this.knowledge.findBySource({
+        canonicalUrl: sourceDescriptor.canonicalUrl,
+        contentSha256: sourceDescriptor.contentSha256,
+      })
+      : [];
+    const matches = [...new Map([...sourceMatches, ...titleMatches].map((item) => [item.path, item])).values()];
+    candidate.confidence = matches.length ? 0.65 : 0.8;
+    candidate.dedupeMatches = matches.map((item) => item.path);
+    const priorDigest = sourceMatches.find((item) => item.sourceDigest)?.sourceDigest || "";
+    const updateStatus = !sourceMatches.length ? "new" : !priorDigest ? "unknown" : priorDigest === sourceDigest ? "same" : "changed";
+    const proposalBase = {
       id: `ingest-${randomUUID().slice(0, 8)}`, candidateId: candidate.id, status: "proposed",
       suggestedPath: `vault/00-Inbox/${slug(title)}-${id.slice(-8)}.md`, suggestedTags: [],
       suggestedLinks: matches.slice(0, 3).map((item) => item.path), risk: matches.length ? "merge" : "additive", created: now,
-      sourceDescriptor: buildSourceDescriptor({ payload: state.payload, prepared, channel: state.channel, messageId: state.messageId, now: state.created }),
+      sourceDescriptor,
+      sourceType: String(prepared.sourceType || state.payload.kind || "text"),
+      ...(prepared.sourceProfile ? { sourceProfile: prepared.sourceProfile } : {}),
+      quality: { status: "pending", reasons: [] },
+      materialTier: "unrated",
+      canonicalTags: [],
+      duplicateAssessment: { matches: matches.map((item) => item.path), sameSource: sourceMatches.length > 0, updateStatus },
+      relations: [],
+      mocChanges: [],
+      claimCandidates: [],
+      evidenceCandidates: [],
+      unresolved: [
+        ...(matches.length ? ["需要主人决定与相似知识的关系"] : []),
+        ...(sourceDescriptor.verificationStatus === "verified" ? [] : ["来源或内容尚未完成事实核验"]),
+      ],
+      validators: ["source-traceability", "duplicate", "frontmatter", "vault-contract"],
+      sourceDigest,
       ...(matches[0] ? { existingNoteRef: matches[0].path } : {}),
     };
+    const proposal = { ...proposalBase, proposalDigest: objectDigest(proposalBase) };
+    await validateContractRecord("ingest-proposal", proposal);
     await atomicJson(stateFile, { ...state, status: "proposed", prepared, candidate, proposal });
     return { candidate, proposal };
     } catch (error) {
@@ -89,7 +297,7 @@ class IngestService {
     const revision = String(revisionRequest || "").trim();
     if (!revision) throw Object.assign(new Error("修改要求不能为空"), { code: "INGEST_REVISION_REQUIRED" });
     const now = this.clock().toISOString();
-    const proposal = {
+    const proposalBase = {
       ...state.proposal,
       id: `ingest-${randomUUID().slice(0, 8)}`,
       status: "proposed",
@@ -97,8 +305,84 @@ class IngestService {
       revisionRequest: revision,
       created: now,
     };
+    delete proposalBase.proposalDigest;
+    const proposal = { ...proposalBase, proposalDigest: objectDigest(proposalBase) };
     await validateContractRecord("ingest-proposal", proposal);
     await atomicJson(stateFile, { ...state, status: "proposed", proposal, revisedAt: now });
+    return { candidate: state.candidate, proposal };
+  }
+
+  async enrichProposal(id, analysis = {}, { rulesDigest = "" } = {}) {
+    const stateFile = path.join(this.stateRoot, `${id}.json`);
+    const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
+    if (!state.proposal) throw Object.assign(new Error("收录方案尚未生成"), { code: "INGEST_PROPOSAL_MISSING" });
+    const allowedRelations = new Set(["supports", "extends", "contradicts", "limits", "depends_on", "applies_to", "example_of"]);
+    const relationInputs = Array.isArray(analysis.relations) ? analysis.relations : state.proposal.relations;
+    const allowedRelationTargets = new Set(state.candidate?.dedupeMatches || []);
+    const relations = [];
+    for (const item of relationInputs) {
+      if (!allowedRelations.has(item?.type) || !item.target || !item.reason) continue;
+      const target = String(item.target);
+      if (!target.startsWith("vault/") || !allowedRelationTargets.has(target)) continue;
+      try {
+        await this.knowledge.read(target);
+        relations.push({ type: item.type, target, reason: String(item.reason) });
+      } catch {
+        // A relation is accepted only when Syno can resolve the target note.
+      }
+    }
+    const suggestedPath = typeof analysis.suggestedPath === "string"
+      && isAllowedIngestPath(analysis.suggestedPath)
+      ? analysis.suggestedPath
+      : state.proposal.suggestedPath;
+    const tags = classifyTags(Array.isArray(analysis.canonicalTags) ? analysis.canonicalTags : state.proposal.canonicalTags);
+    const mocChanges = Array.isArray(analysis.mocChanges) ? analysis.mocChanges : state.proposal.mocChanges;
+    const unresolved = [
+      ...(Array.isArray(analysis.unresolved) ? analysis.unresolved.map(String) : state.proposal.unresolved),
+      ...tags.candidates.map((tag) => `新标签候选（需双审批）：${tag}`),
+    ];
+    const proposalBase = {
+      ...state.proposal,
+      suggestedPath,
+      quality: analysis.quality && ["accepted", "limited", "rejected"].includes(analysis.quality.status)
+        ? { status: analysis.quality.status, reasons: (analysis.quality.reasons || []).map(String) }
+        : state.proposal.quality,
+      materialTier: ["S", "A", "B"].includes(analysis.materialTier) ? analysis.materialTier : state.proposal.materialTier,
+      canonicalTags: tags.approved,
+      suggestedTags: tags.approved,
+      relations,
+      mocChanges,
+      claimCandidates: Array.isArray(analysis.claimCandidates) ? analysis.claimCandidates : state.proposal.claimCandidates,
+      evidenceCandidates: Array.isArray(analysis.evidenceCandidates) ? analysis.evidenceCandidates : state.proposal.evidenceCandidates,
+      ...(state.proposal.sourceType === "bilibili-opus" ? {
+        sourceProfile: {
+          ...(state.proposal.sourceProfile || {}),
+          ...(analysis.sourceProfile || {}),
+          ingestWorkflow: "bilibili_opus_ingest_v2",
+          primarySource: "column",
+        },
+        ...(typeof analysis.canonicalBody === "string" && analysis.canonicalBody.trim()
+          ? { canonicalBody: analysis.canonicalBody.trim() }
+          : {}),
+      } : {}),
+      unresolved: [...new Set(unresolved)],
+      validators: Array.isArray(analysis.validators) ? [...new Set(analysis.validators.map(String))] : state.proposal.validators,
+      risk: mocChanges.length ? "high" : state.proposal.risk,
+      ...(rulesDigest ? { rulesDigest } : {}),
+    };
+    if (proposalBase.sourceType === "bilibili-opus" && proposalBase.canonicalBody) {
+      const profile = completeBilibiliProfile(proposalBase, { requireCanonical: false });
+      proposalBase.sourceReport = buildBilibiliReport({
+        proposal: proposalBase,
+        profile,
+        canonicalBody: proposalBase.canonicalBody,
+        sourceText: state.prepared?.content || state.prepared?.text || "",
+      });
+    }
+    delete proposalBase.proposalDigest;
+    const proposal = { ...proposalBase, proposalDigest: objectDigest(proposalBase) };
+    await validateContractRecord("ingest-proposal", proposal);
+    await atomicJson(stateFile, { ...state, proposal, status: "proposed", analyzedAt: this.clock().toISOString() });
     return { candidate: state.candidate, proposal };
   }
 
@@ -123,6 +407,11 @@ class IngestService {
     const candidate = state.candidate || {};
     const proposal = state.proposal || {};
     const payload = state.payload || {};
+    const relationCandidates = candidate.title && typeof this.knowledge.search === "function"
+      ? (await this.knowledge.search(candidate.title, { limit: 5 }))
+        .filter((item) => item.path && item.excerpt && item.sensitive !== true)
+        .map((item) => ({ path: item.path, title: item.title, excerpt: String(item.excerpt).slice(0, 800) }))
+      : [];
     return {
       id,
       title: candidate.title,
@@ -133,6 +422,7 @@ class IngestService {
       existingRef: proposal.existingNoteRef,
       risk: proposal.risk,
       dedupeMatches: Array.isArray(candidate.dedupeMatches) ? candidate.dedupeMatches : [],
+      relationCandidates,
       status: state.status,
     };
   }
@@ -162,10 +452,24 @@ class IngestService {
       : new Set(["append-source", "link-only", "keep-separate", "reject"]);
     if (!allowed.has(action)) throw Object.assign(new Error(`收录决策 ${action} 不适用于 ${state.proposal.risk} 方案`), { code: "INGEST_DECISION_INVALID" });
     const relative = action === "append-source" || action === "link-only" ? state.proposal.existingNoteRef : state.proposal.suggestedPath;
+    if ((action === "create" || action === "keep-separate") && !isAllowedIngestPath(relative)) {
+      throw Object.assign(new Error(`收录目标不在允许的知识目录：${relative}`), { code: "INGEST_TARGET_PATH_DENIED" });
+    }
     const target = relative ? path.join(workspace, relative) : null;
     const descriptor = state.proposal.sourceDescriptor || state.artifact?.sourceDescriptor || buildSourceDescriptor({ payload: state.payload, prepared: state.prepared, channel: state.channel, messageId: state.messageId, now: state.created });
-    const source = descriptor.canonicalUrl ? `source_url: ${JSON.stringify(descriptor.canonicalUrl)}\n` : "";
-    const content = `---\ntitle: ${JSON.stringify(state.candidate.title)}\nknowledge_state: captured\nfactual_status: unverified\nsource_kind: ${descriptor.kind}\nsource_tier: ${descriptor.sourceTier}\nsource_reliability: ${descriptor.reliability}\nsource_verification: ${descriptor.verificationStatus}\n${source}---\n\n# ${state.candidate.title}\n\n${state.prepared.content || state.prepared.text}\n\n## 关系状态\n\n${state.proposal.suggestedLinks.length ? state.proposal.suggestedLinks.map((item) => `- 候选关联：[[${item.replace(/^vault\//, "").replace(/\.md$/, "")}]]`).join("\n") : "当前标记为 orphan，等待后续渐进关联。"}\n`;
+    const sourceUrl = descriptor.canonicalUrl ? `source_url: ${JSON.stringify(descriptor.canonicalUrl)}\n` : "";
+    const sourceDigest = state.proposal.sourceDigest ? `source_content_sha256: ${state.proposal.sourceDigest}\n` : "";
+    const sourceFileDigest = descriptor.contentSha256 ? `source_file_sha256: ${descriptor.contentSha256}\n` : "";
+    const canonicalTags = state.proposal.canonicalTags?.length ? state.proposal.canonicalTags : ["notes"];
+    const relations = state.proposal.relations || [];
+    const bilibiliProfile = completeBilibiliProfile(state.proposal);
+    const sourceRef = descriptor.canonicalUrl || descriptor.originalFilename || descriptor.kind || "unknown";
+    const description = String(state.candidate.summary || state.candidate.title).replace(/\s+/gu, " ").trim().slice(0, 180);
+    const factualStatus = bilibiliProfile?.factualStatus || (descriptor.verificationStatus === "verified" ? "partial" : "unverified");
+    const specialized = renderBilibiliFrontmatter(bilibiliProfile, state.proposal.materialTier);
+    const genericSource = bilibiliProfile ? "" : `factual_status: ${factualStatus}\n`;
+    const noteBody = bilibiliProfile ? state.proposal.canonicalBody : (state.prepared.content || state.prepared.text);
+    const content = `---\ntitle: ${JSON.stringify(state.candidate.title)}\ntags: ${JSON.stringify(canonicalTags)}\ncreated: ${String(state.created).slice(0, 10)}\nsource: ${JSON.stringify(sourceRef)}\ndescription: ${JSON.stringify(description)}\nknowledge_state: captured\nlink_status: ${relations.length ? "connected" : "orphan"}\n${genericSource}${specialized}source_kind: ${descriptor.kind}\nsource_reliability: ${descriptor.reliability}\nsource_verification: ${descriptor.verificationStatus}\n${sourceUrl}${sourceDigest}${sourceFileDigest}---\n\n# ${state.candidate.title}\n\n${noteBody}\n\n## 关系状态\n\n${renderRelations(relations)}\n`;
     const changedPaths = [];
     if (action === "create" || action === "keep-separate") {
       try { await fs.access(target); throw Object.assign(new Error("目标笔记已存在，需要重新查重"), { code: "INGEST_TARGET_EXISTS" }); } catch (error) { if (error.code !== "ENOENT") throw error; }
@@ -183,6 +487,11 @@ class IngestService {
 
     const lifecycle = await this.#writeLifecycle(state, { workspace, action, applied: action !== "reject" });
     changedPaths.push(...lifecycle.changedPaths);
+    const completionStatus = state.proposal.quality?.status === "accepted"
+      && !(state.proposal.unresolved || []).length
+      && (!bilibiliProfile || state.proposal.sourceReport?.status === "complete")
+      ? "complete"
+      : "incomplete";
     return {
       artifactId: id,
       applied: action !== "reject",
@@ -190,12 +499,19 @@ class IngestService {
       path: relative || "",
       source: descriptor,
       duplicateOrRelations: {
-        matches: state.candidate.dedupeMatches || [],
-        suggestedLinks: state.proposal.suggestedLinks || [],
+        ...state.proposal.duplicateAssessment,
+        relations: state.proposal.relations || [],
       },
-      candidates: { claimRefs: [], evidenceRefs: [] },
-      unverifiedIssues: descriptor.verificationStatus === "verified" ? [] : ["来源或内容尚未通过事实核验"],
+      candidates: {
+        claims: state.proposal.claimCandidates || [],
+        evidence: state.proposal.evidenceCandidates || [],
+      },
+      unverifiedIssues: [
+        ...(descriptor.verificationStatus === "verified" ? [] : ["来源或内容尚未通过事实核验"]),
+        ...(state.proposal.unresolved || []),
+      ],
       knowledgeState: "captured",
+      completionStatus,
       lifecycle,
       changedPaths: [...new Set(changedPaths)],
     };
@@ -250,4 +566,4 @@ class IngestService {
   }
 }
 
-export { IngestService, slug, titleFromPrepared };
+export { IngestService, isAllowedIngestPath, proposalAllowsWriteJob, slug, titleFromPrepared };

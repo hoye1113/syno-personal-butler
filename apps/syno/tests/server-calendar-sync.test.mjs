@@ -163,13 +163,9 @@ async function startFixtureServer(t, fixture, extraEnv = {}, { executable = proc
 async function queueAndApprove(port, pathname, body) {
   const queued = await requestJson(port, pathname, body);
   assert.equal(queued.statusCode, 200);
-  assert.equal(queued.body.requiresApproval, true);
-  const approved = await requestJson(port, `/api/syno/jobs/${encodeURIComponent(queued.body.job.id)}/approve`, {});
-  assert.equal(approved.body.job.status, "awaiting_approval", JSON.stringify(approved.body));
-  assert.equal(approved.body.job.phase, "merge");
-  const merged = await requestJson(port, `/api/syno/jobs/${encodeURIComponent(queued.body.job.id)}/approve`, {});
-  assert.equal(merged.body.job.status, "completed", JSON.stringify(merged.body));
-  return merged;
+  // trust-but-clarify：日历同步是写入操作，默认自动执行并完成（approval 恒为 none，不再二次审批合并）。
+  assert.equal(queued.body.job.status, "completed", JSON.stringify(queued.body));
+  return queued;
 }
 
 async function runGit(cwd, args) {

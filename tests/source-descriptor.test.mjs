@@ -12,6 +12,7 @@ test("SourceDescriptor preserves URL provenance and canonicalizes tracking param
     messageId: "wx-1",
     now: "2026-07-28T08:00:00.000Z",
   });
+  assert.equal(descriptor.originalUrl, "https://Example.com/article?utm_source=wechat&id=7");
   assert.equal(descriptor.canonicalUrl, "https://example.com/article?id=7");
   assert.equal(descriptor.publisher, "example.com");
   assert.equal(descriptor.captureChannel, "weixin");
@@ -74,6 +75,19 @@ test("Artifact and IngestProposal validate embedded SourceDescriptor fields", as
     suggestedPath: "vault/00-Inbox/example.md",
     suggestedTags: [],
     suggestedLinks: [],
+    sourceType: "text",
+    quality: { status: "pending", reasons: [] },
+    materialTier: "unrated",
+    canonicalTags: [],
+    duplicateAssessment: { matches: [], sameSource: false, updateStatus: "new" },
+    relations: [],
+    mocChanges: [],
+    claimCandidates: [],
+    evidenceCandidates: [],
+    unresolved: ["尚未核验"],
+    validators: ["source-traceability"],
+    sourceDigest: "a".repeat(64),
+    proposalDigest: "b".repeat(64),
     risk: "additive",
     created: "2026-07-28T08:00:00.000Z",
     sourceDescriptor,

@@ -14,7 +14,7 @@ test("Markdown records round-trip without a database", () => {
   assert.deepEqual(parseRecord(serializeRecord(input)), input);
 });
 
-test("AgentHost enforces no-approval, single-approval and isolated merge states", async (t) => {
+test("AgentHost auto-executes read and write intents and audits high-risk diffs", async (t) => {
   const opsRoot = path.join(PATHS.runtimeRoot, "tests", `jobs-${Date.now()}`);
   t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
   const store = new JobStore({ opsRoot });
@@ -38,39 +38,38 @@ test("AgentHost enforces no-approval, single-approval and isolated merge states"
   });
   assert.equal(host.processLockRoot.startsWith(path.dirname(opsRoot)), true);
 
+  // 只读直接完成
   const read = await host.receive({ intent: "search", text: "查找知识" });
   assert.equal(read.job.status, "completed");
 
-  const idea = await host.receive({ intent: "create_content_idea", text: "创建选题" });
-  assert.equal(idea.job.status, "awaiting_approval");
+  // 普通写入默认自动执行（approval:none，不再 awaiting_approval）
   currentChanges = [{ status: "??", path: "ops/content/new.md", kind: "added" }];
-  const ideaDone = await host.approve(idea.job.id);
-  assert.equal(ideaDone.job.status, "completed");
+  const idea = await host.receive({ intent: "create_content_idea", text: "创建选题" });
+  assert.equal(idea.job.approval, "none");
+  assert.equal(idea.job.status, "completed");
 
-  const high = await host.receive({ intent: "delete", text: "删除一篇笔记" });
-  assert.equal(high.job.approval, "double");
+  // 高风险（delete）也默认自动执行：实际 diff 修改既有事实 → 仅审计后合并，不再二次审批
   currentChanges = [{ status: "D", path: "vault/old.md", kind: "existing" }];
-  const mergeWait = await host.approve(high.job.id);
-  assert.equal(mergeWait.job.phase, "merge", JSON.stringify(mergeWait));
-  assert.equal(mergeWait.job.status, "awaiting_approval");
-  const merged = await host.approve(high.job.id);
-  assert.equal(merged.job.status, "completed");
+  const high = await host.receive({ intent: "delete", text: "删除一篇笔记" });
+  assert.equal(high.job.approval, "none");
+  assert.equal(high.job.status, "completed");
   assert.equal(git.merges.length, 2);
   assert.equal(git.removals.length, 2);
 });
 
-test("bound channel approval accepts high-risk phases only with the exact decision code", async (t) => {
+test("bound channel clarification no longer requires a six-digit code across channels", async (t) => {
   const opsRoot = path.join(PATHS.runtimeRoot, "tests", `weixin-approval-${Date.now()}`);
   t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
   const store = new JobStore({ opsRoot });
-  const decision = { intent: "delete", profile: "syno-curate", approval: "double", risk: "high", allowedRoots: ["vault"], needsWorktree: true };
+  // 直接造一个 awaiting_approval 的澄清 Job（模拟系统歧义暂停；approval 字段保留兼容）
+  const decision = { intent: "delete", profile: "syno-curate", approval: "single", risk: "high", allowed: true, allowedRoots: ["vault"], needsWorktree: true };
   const job = await store.create({ request: { text: "delete" }, decision, channel: "weixin", senderId: "owner" });
-  await assert.rejects(store.approve(job, { channel: "weixin", senderId: "owner", code: "BAD999" }), (error) => error.code === "INVALID_APPROVAL_CODE");
-  const approved = await store.approve(job, { channel: "weixin", senderId: "owner", code: job.approvalCode });
+  // trust-but-clarify：weixin/feishu 与 web 同权限，已绑定 Owner 即可确认，不再校验六位码
+  const approved = await store.approve(job, { channel: "weixin", senderId: "owner", code: "BAD999" });
   assert.equal(approved.ready, true);
 });
 
-test("high-risk failures remove their isolated worktree", async (t) => {
+test("failed auto-executed jobs remove their isolated worktree", async (t) => {
   const opsRoot = path.join(PATHS.runtimeRoot, "tests", `cleanup-${Date.now()}`);
   t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
   const store = new JobStore({ opsRoot });
@@ -83,8 +82,8 @@ test("high-risk failures remove their isolated worktree", async (t) => {
   };
   const executor = { async submit() { throw new Error("forced failure"); }, inspect() { return null; }, cancel() { return false; } };
   const host = new AgentHost({ store, executor, gitGuard: git });
-  const queued = await host.receive({ intent: "delete", text: "delete" });
-  const failed = await host.approve(queued.job.id);
+  // delete 默认自动执行：receive 即触发 #execute，失败时清理 worktree
+  const failed = await host.receive({ intent: "delete", text: "delete" });
   assert.equal(failed.job.status, "failed");
   assert.equal(failed.job.cleanup.removed, true);
   assert.equal(removals.length, 1);
@@ -100,10 +99,12 @@ test("reject and cancel persist their terminal audit records", async (t) => {
     async commitPaths(paths, message) { commits.push({ paths, message }); return { committed: true }; },
   };
   const host = new AgentHost({ store, executor: new FakeExecutor(), gitGuard: git });
-  const rejected = await host.receive({ intent: "create_action", text: "one" });
-  await host.reject(rejected.job.id, "no");
-  const canceled = await host.receive({ intent: "create_action", text: "two" });
-  await host.cancel(canceled.job.id);
+  // 写入现在自动执行，故直接用 store.create 造 awaiting_approval 澄清 Job 来测 reject/cancel
+  const decision = { intent: "curate_note", profile: "syno-curate", approval: "single", risk: "low", allowed: true, allowedRoots: ["vault", "ops"], needsWorktree: true };
+  const rejected = await store.create({ request: { text: "one" }, decision });
+  await host.reject(rejected.id, "no");
+  const canceled = await store.create({ request: { text: "two" }, decision });
+  await host.cancel(canceled.id);
   assert.equal(commits.length, 2);
   assert.match(commits[0].message, /reject/);
   assert.match(commits[1].message, /cancel/);
@@ -114,8 +115,10 @@ test("running jobs publish runId early enough to be canceled safely", async (t) 
   t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
   const store = new JobStore({ opsRoot });
   let rejectRun;
+  let capturedJobId;
   const executor = {
-    async submit(_job, options) {
+    async submit(job, options) {
+      capturedJobId = job.id;
       await options.onStart("run-cancel-me");
       return new Promise((_resolve, reject) => { rejectRun = reject; });
     },
@@ -133,13 +136,13 @@ test("running jobs publish runId early enough to be canceled safely", async (t) 
     async removeWorktree() {},
   };
   const host = new AgentHost({ store, executor, gitGuard: git });
-  const queued = await host.receive({ intent: "create_action", text: "cancel me" });
-  const running = host.approve(queued.job.id);
+  // create_action 默认自动执行：receive 即触发 #execute（不 await，让它在后台运行）
+  const running = host.receive({ intent: "create_action", text: "cancel me" });
   for (let index = 0; index < 50; index += 1) {
-    if ((await host.inspect(queued.job.id))?.runId) break;
+    if (capturedJobId && (await host.inspect(capturedJobId))?.runId) break;
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
-  const canceled = await host.cancel(queued.job.id);
+  const canceled = await host.cancel(capturedJobId);
   assert.equal(canceled.job.status, "canceled");
   assert.equal((await running).job.status, "canceled");
 });
