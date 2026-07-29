@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
+import { CancellableKeyedScheduler, SchedulerCancellationError } from "./cancellable-keyed-scheduler.mjs";
 import { PATHS } from "./paths.mjs";
 import { inspectRemoteContent } from "./sensitive-content.mjs";
 
@@ -235,6 +236,8 @@ class OpenCodeCognitiveRuntime {
     models = OPENCODE_MODELS,
     clock = () => new Date(),
     retentionMs = DEFAULT_RETENTION_MS,
+    sessionScheduler = new CancellableKeyedScheduler({ name: "session" }),
+    bridgeScheduler = new CancellableKeyedScheduler({ name: "bridge" }),
   } = {}) {
     if (!client || !bindings) throw new Error("OpenCodeCognitiveRuntime 缺少 HTTP Client 或 Session Binding Store");
     this.client = client;
@@ -244,8 +247,9 @@ class OpenCodeCognitiveRuntime {
     this.models = Object.freeze([...models]);
     this.clock = clock;
     this.retentionMs = retentionMs;
+    this.sessionScheduler = sessionScheduler;
+    this.bridgeScheduler = bridgeScheduler;
     this.runs = new Map();
-    this.queues = new Map();
     this.lastAttempts = [];
   }
 
@@ -277,14 +281,49 @@ class OpenCodeCognitiveRuntime {
 
   inspect(runId) {
     const run = this.runs.get(runId);
-    return run ? { ...run, controller: undefined } : null;
+    if (!run) return null;
+    const {
+      controller: _controller,
+      sessionTicket: _sessionTicket,
+      bridgeTicket: _bridgeTicket,
+      abortPromise: _abortPromise,
+      onEvent: _onEvent,
+      ...publicRun
+    } = run;
+    return publicRun;
   }
 
   cancel(runId) {
     const run = this.runs.get(runId);
-    if (!run || run.status !== "running") return false;
-    run.controller.abort();
-    if (run.sessionId) this.client.abortSession(run.sessionId).catch(() => {});
+    if (!run || ["completed", "failed", "canceled", "cancel_unknown"].includes(run.status)) return false;
+    run.controller.abort(new SchedulerCancellationError());
+    if (run.status === "queued") {
+      run.sessionTicket?.cancel(new SchedulerCancellationError());
+      run.status = "canceled";
+      return true;
+    }
+    if (run.status === "waiting_bridge") {
+      run.bridgeTicket?.cancel(new SchedulerCancellationError());
+      run.status = "canceled";
+      return true;
+    }
+    if (!run.sessionId) {
+      run.status = "canceled";
+      return true;
+    }
+    if (!run.abortPromise) {
+      run.abortPromise = this.client.abortSession(run.sessionId)
+        .then(() => {
+          run.abortConfirmed = true;
+          run.status = "canceled";
+        })
+        .catch((error) => {
+          run.abortConfirmed = false;
+          run.status = "cancel_unknown";
+          run.abortError = { code: failureCode(error), message: error.message };
+          this.sessionScheduler.block(run.sessionKey, "OpenCode abort 未确认");
+        });
+    }
     return true;
   }
 
@@ -320,7 +359,7 @@ class OpenCodeCognitiveRuntime {
 
   async appendSystemEvent({ ownerKey, threadKey = "main", text }) {
     const safeText = assertRemoteSafe(text);
-    const serializationKey = typeof this.tools?.bindContext === "function" ? "__syno_bridge__" : `${ownerKey}\0${threadKey}`;
+    const serializationKey = `${ownerKey}\0${threadKey}`;
     return this.#serialized(serializationKey, async () => {
       const binding = await this.#session(ownerKey, threadKey);
       const disabledTools = Object.fromEntries([...DENIED_OPENCODE_TOOLS, "skill", ...this.capabilities().tools].map((name) => [name, false]));
@@ -338,32 +377,45 @@ class OpenCodeCognitiveRuntime {
   }
 
   async #serialized(key, operation) {
-    const previous = this.queues.get(key) || Promise.resolve();
-    const current = previous.catch(() => {}).then(operation);
-    this.queues.set(key, current);
-    try {
-      return await current;
-    } finally {
-      if (this.queues.get(key) === current) this.queues.delete(key);
-    }
+    return this.sessionScheduler.enqueue(key, operation).promise;
   }
 
   async run(request, context = {}) {
     const safeRequestText = assertRemoteSafe(request.text || request.message || "");
     const ownerKey = String(context.ownerKey || context.ownerId || "local-user");
     const threadKey = String(context.threadKey || (context.proactive ? "proactive" : "main"));
-    const serializationKey = typeof this.tools?.bindContext === "function" ? "__syno_bridge__" : `${ownerKey}\0${threadKey}`;
-    return this.#serialized(serializationKey, async () => {
+    const sessionKey = `${ownerKey}\0${threadKey}`;
+    const runId = `opencode-run-${randomUUID()}`;
+    const controller = new AbortController();
+    const run = {
+      runId,
+      status: "queued",
+      controller,
+      sessionKey,
+      sessionId: null,
+      abortConfirmed: null,
+      sessionTicket: null,
+      bridgeTicket: null,
+      abortPromise: null,
+      onEvent: context.onEvent,
+    };
+    this.runs.set(runId, run);
+    await context.onStart?.(runId);
+    if (context.signal) {
+      if (context.signal.aborted) this.cancel(runId);
+      else context.signal.addEventListener("abort", () => this.cancel(runId), { once: true });
+    }
+    if (controller.signal.aborted) {
+      run.status = "canceled";
+      throw new SchedulerCancellationError();
+    }
+
+    const sessionTicket = this.sessionScheduler.enqueue(sessionKey, async () => {
+      if (controller.signal.aborted) throw new SchedulerCancellationError();
+      run.status = "claimed";
       const binding = await this.#session(ownerKey, threadKey);
-      const runId = `opencode-run-${randomUUID()}`;
-      const controller = new AbortController();
-      if (context.signal) {
-        if (context.signal.aborted) controller.abort(context.signal.reason);
-        else context.signal.addEventListener("abort", () => controller.abort(context.signal.reason), { once: true });
-      }
-      this.runs.set(runId, { status: "running", controller, sessionId: binding.openCodeSessionId });
-      await context.onStart?.(runId);
-      context.onEvent?.({ runId, type: "run.started", at: this.clock().toISOString(), data: { adapter: "opencode-cli-server", sessionId: binding.openCodeSessionId } });
+      run.sessionId = binding.openCodeSessionId;
+      if (controller.signal.aborted) throw new SchedulerCancellationError();
       const attempts = [];
       const availableTools = this.capabilities().tools;
       const requestedTools = Array.isArray(context.allowedTools) ? new Set(context.allowedTools) : null;
@@ -379,66 +431,108 @@ class OpenCodeCognitiveRuntime {
         ["skill", skillEnabled],
         ...allowedTools.map((name) => [name, true]),
       ]);
-      let lastError;
-      for (const qualifiedModel of this.models) {
-        const modelID = qualifiedModel.replace(/^opencode\//, "");
-        const started = Date.now();
-        const effectVersion = this.tools?.effectVersion?.() ?? 0;
-        const releaseContext = this.tools?.bindContext?.({
-          ownerKey,
-          threadKey,
-          channel: context.channel,
-          messageId: context.messageId,
-          runId,
-          allowedTools,
-          ...(context.browserWorkflowId ? { browserWorkflowId: context.browserWorkflowId } : {}),
-          ...(context.browserCloseAuthorized === true ? { browserCloseAuthorized: true } : {}),
-        });
-        try {
-          const response = await this.client.sendMessage(binding.openCodeSessionId, {
-            agent: "syno",
-            model: { providerID: "opencode", modelID },
-            tools: requestTools,
-            ...(context.system ? { system: assertRemoteSafe(context.system) } : {}),
-            parts: [{ type: "text", text: safeRequestText }],
-          }, { signal: controller.signal });
-          const text = responseText(response);
-          if (!text) throw Object.assign(new Error("OpenCode 返回空响应"), { code: "OPENCODE_EMPTY_RESPONSE" });
-          attempts.push({ modelId: qualifiedModel, elapsedMs: Date.now() - started, status: "completed" });
-          this.lastAttempts = attempts;
-          await this.bindings.touch(binding.openCodeSessionId);
-          const result = { runId, executor: "opencode-cli-server", conversationId: binding.openCodeSessionId, text, attempts, response };
-          this.runs.set(runId, { status: "completed", result });
-          context.onEvent?.({ runId, type: "run.completed", at: this.clock().toISOString(), data: { conversationId: binding.openCodeSessionId, modelId: qualifiedModel } });
-          return result;
-        } catch (error) {
-          lastError = error;
-          if ((this.tools?.effectVersion?.() ?? effectVersion) > effectVersion) error.irreversibleEffect = true;
-          attempts.push({ modelId: qualifiedModel, elapsedMs: Date.now() - started, status: "failed", failureCode: failureCode(error) });
-          if (error?.irreversibleEffect === true || !retryableFailure(error) || controller.signal.aborted) break;
-          // The HTTP request may have timed out while OpenCode is still producing
-          // tool calls. Confirm server-side cancellation before another model gets
-          // a fresh bridge context, otherwise a late call could be misattributed.
-          await this.client.abortSession(binding.openCodeSessionId).catch((abortError) => {
-            error.retryable = false;
-            error.abortFailure = abortError?.message || "abort failed";
+      const executeModels = async () => {
+        if (controller.signal.aborted) throw new SchedulerCancellationError();
+        run.status = "running";
+        context.onEvent?.({ runId, type: "run.started", at: this.clock().toISOString(), data: { adapter: "opencode-cli-server", sessionId: binding.openCodeSessionId } });
+        let lastError;
+        for (const qualifiedModel of this.models) {
+          const modelID = qualifiedModel.replace(/^opencode\//, "");
+          const started = Date.now();
+          const effectVersion = this.tools?.effectVersion?.() ?? 0;
+          const releaseContext = this.tools?.bindContext?.({
+            ownerKey,
+            threadKey,
+            channel: context.channel,
+            messageId: context.messageId,
+            runId,
+            allowedTools,
+            ...(context.browserWorkflowId ? { browserWorkflowId: context.browserWorkflowId } : {}),
+            ...(context.browserCloseAuthorized === true ? { browserCloseAuthorized: true } : {}),
           });
-          if (error.retryable === false) break;
-        } finally {
-          releaseContext?.();
+          try {
+            const response = await this.client.sendMessage(binding.openCodeSessionId, {
+              agent: "syno",
+              model: { providerID: "opencode", modelID },
+              tools: requestTools,
+              ...(context.system ? { system: assertRemoteSafe(context.system) } : {}),
+              parts: [{ type: "text", text: safeRequestText }],
+            }, { signal: controller.signal });
+            if (controller.signal.aborted) throw new SchedulerCancellationError();
+            const text = responseText(response);
+            if (!text) throw Object.assign(new Error("OpenCode 返回空响应"), { code: "OPENCODE_EMPTY_RESPONSE" });
+            attempts.push({ modelId: qualifiedModel, elapsedMs: Date.now() - started, status: "completed" });
+            this.lastAttempts = attempts;
+            await this.bindings.touch(binding.openCodeSessionId);
+            const result = { runId, executor: "opencode-cli-server", conversationId: binding.openCodeSessionId, text, attempts, response };
+            run.status = "completed";
+            run.result = result;
+            context.onEvent?.({ runId, type: "run.completed", at: this.clock().toISOString(), data: { conversationId: binding.openCodeSessionId, modelId: qualifiedModel } });
+            return result;
+          } catch (error) {
+            lastError = error;
+            if ((this.tools?.effectVersion?.() ?? effectVersion) > effectVersion) error.irreversibleEffect = true;
+            attempts.push({ modelId: qualifiedModel, elapsedMs: Date.now() - started, status: "failed", failureCode: failureCode(error) });
+            if (controller.signal.aborted) {
+              await run.abortPromise;
+              if (run.status === "cancel_unknown") {
+                throw Object.assign(new Error("OpenCode abort 状态未知，Session 已冻结"), {
+                  code: "OPENCODE_ABORT_UNKNOWN",
+                });
+              }
+              run.status = "canceled";
+              context.onEvent?.({ runId, type: "run.canceled", at: this.clock().toISOString(), data: { abortConfirmed: run.abortConfirmed } });
+              throw new SchedulerCancellationError();
+            }
+            if (error?.irreversibleEffect === true || !retryableFailure(error)) break;
+            // 只有服务端确认停止当前 Attempt，才允许固定模型链继续 fallback。
+            try {
+              await this.client.abortSession(binding.openCodeSessionId);
+            } catch (abortError) {
+              error.retryable = false;
+              error.abortFailure = abortError?.message || "abort failed";
+              run.status = "cancel_unknown";
+              run.abortConfirmed = false;
+              this.sessionScheduler.block(sessionKey, "fallback abort 未确认");
+            }
+            if (error.retryable === false) break;
+          } finally {
+            releaseContext?.();
+          }
         }
-      }
-      const exhausted = Object.assign(new Error("OpenCode 模型尝试全部失败"), {
-        code: "OPENCODE_ATTEMPTS_EXHAUSTED",
-        retryable: retryableFailure(lastError),
-        attempts,
-        cause: lastError,
-      });
-      this.lastAttempts = attempts;
-      this.runs.set(runId, { status: "failed", error: { code: exhausted.code, attempts } });
-      context.onEvent?.({ runId, type: "run.failed", at: this.clock().toISOString(), data: { code: exhausted.code, attempts } });
-      throw exhausted;
+        const unknown = run.status === "cancel_unknown";
+        const exhausted = Object.assign(new Error(unknown ? "OpenCode Session 状态未知" : "OpenCode 模型尝试全部失败"), {
+          code: unknown ? "OPENCODE_ABORT_UNKNOWN" : "OPENCODE_ATTEMPTS_EXHAUSTED",
+          retryable: unknown ? false : retryableFailure(lastError),
+          attempts,
+          cause: lastError,
+        });
+        this.lastAttempts = attempts;
+        if (!unknown) run.status = "failed";
+        run.error = { code: exhausted.code, attempts };
+        context.onEvent?.({ runId, type: "run.failed", at: this.clock().toISOString(), data: { code: exhausted.code, attempts } });
+        throw exhausted;
+      };
+
+      if (!allowedTools.length) return executeModels();
+      run.status = "waiting_bridge";
+      const bridgeTicket = this.bridgeScheduler.enqueue("syno-tool-bridge", executeModels);
+      run.bridgeTicket = bridgeTicket;
+      return bridgeTicket.promise;
     });
+    run.sessionTicket = sessionTicket;
+    try {
+      return await sessionTicket.promise;
+    } catch (error) {
+      if (error?.code === "SCHEDULER_CANCELED") {
+        run.status = "canceled";
+        context.onEvent?.({ runId, type: "run.canceled", at: this.clock().toISOString(), data: { abortConfirmed: run.abortConfirmed } });
+      } else if (error?.code === "SCHEDULER_KEY_BLOCKED") {
+        run.status = "cancel_unknown";
+        run.error = { code: error.code };
+      }
+      throw error;
+    }
   }
 
   async cleanupExpired() {

@@ -14,14 +14,16 @@ reviewBaseline:
   reviewedAt: 2026-07-29
 
 implementation:
-  branch: codex/exec-p01-bootstrap-host
-  baseCommit: 41a324d
+  branch: codex/exec-p02-cancellable-scheduler
+  baseCommit: 5b12fd8
   headCommit: pending
 ```
 
 已完成：PR-00 `codex/exec-p00-contracts`，`567f23d` → `41a324d`，文档、ADR 与迁移策略门禁通过。
 
-进行中：PR-01 `codex/exec-p01-bootstrap-host`，Host Lock、Bootstrap HTTP、生命周期与 doctor。
+已完成：PR-01 `codex/exec-p01-bootstrap-host`，`41a324d` → `5b12fd8`，Host Lock、Bootstrap HTTP、生命周期与 doctor 门禁通过。
+
+进行中：PR-02 `codex/exec-p02-cancellable-scheduler`，可取消 Session/Bridge Scheduler。
 
 后续每个 PR 必须从前一个已验收 PR 的实际 HEAD 建分支，并独立记录 `baseCommit/headCommit`。执行顺序：
 

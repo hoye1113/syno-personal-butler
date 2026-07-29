@@ -19,6 +19,27 @@ async function temporaryRoot(t) {
   return root;
 }
 
+function memoryBindings() {
+  const records = new Map();
+  return {
+    async active(ownerKey, threadKey) { return records.get(`${ownerKey}\0${threadKey}`) || null; },
+    async bind(record) {
+      const value = { ...record, active: true, lastActivityAt: new Date().toISOString() };
+      records.set(`${record.ownerKey}\0${record.threadKey}`, value);
+      return value;
+    },
+    async touch() {},
+  };
+}
+
+function bridgeTools() {
+  return {
+    list: () => [{ name: "knowledge.search" }],
+    bindContext: () => () => {},
+    effectVersion: () => 0,
+  };
+}
+
 test("OpenCodeCognitiveRuntime declares the locked v2 capability contract", () => {
   const runtime = new OpenCodeCognitiveRuntime({ client: {}, bindings: {} });
   const report = runtime.capabilities();
@@ -160,6 +181,158 @@ test("OpenCodeCognitiveRuntime serializes concurrent messages for one session", 
   releaseFirst();
   await Promise.all([first, second]);
   assert.deepEqual(order, ["start:one", "end:one", "start:two", "end:two"]);
+});
+
+test("different Sessions run tool-free requests concurrently", async () => {
+  const started = [];
+  const releases = [];
+  const runtime = new OpenCodeCognitiveRuntime({
+    bindings: memoryBindings(),
+    client: {
+      async createSession(title) { return { id: title }; },
+      async sendMessage(id) {
+        started.push(id);
+        await new Promise((resolve) => releases.push(resolve));
+        return { parts: [{ type: "text", text: "ok" }] };
+      },
+    },
+    tools: bridgeTools(),
+  });
+  const first = runtime.run({ text: "one" }, { ownerKey: "one", threadKey: "main", allowedTools: [] });
+  const second = runtime.run({ text: "two" }, { ownerKey: "two", threadKey: "main", allowedTools: [] });
+  while (started.length < 2) await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(started.length, 2);
+  releases.splice(0).forEach((release) => release());
+  await Promise.all([first, second]);
+});
+
+test("Bridge requests serialize globally while a waiting Bridge does not block another Session's tool-free request", async () => {
+  const started = [];
+  let releaseBridge;
+  const runtime = new OpenCodeCognitiveRuntime({
+    bindings: memoryBindings(),
+    client: {
+      async createSession(title) { return { id: title }; },
+      async sendMessage(id) {
+        started.push(id);
+        if (id === "Syno bridge-one") await new Promise((resolve) => { releaseBridge = resolve; });
+        return { parts: [{ type: "text", text: "ok" }] };
+      },
+    },
+    tools: bridgeTools(),
+  });
+  const first = runtime.run({ text: "one" }, {
+    ownerKey: "owner",
+    threadKey: "bridge-one",
+    allowedTools: ["syno_knowledge_search"],
+  });
+  while (!releaseBridge) await new Promise((resolve) => setImmediate(resolve));
+  const waiting = runtime.run({ text: "two" }, {
+    ownerKey: "owner",
+    threadKey: "bridge-two",
+    allowedTools: ["syno_knowledge_search"],
+  });
+  const toolFree = runtime.run({ text: "three" }, {
+    ownerKey: "owner",
+    threadKey: "plain",
+    allowedTools: [],
+  });
+  while (!started.includes("Syno plain")) await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(started, ["Syno bridge-one", "Syno plain"]);
+  releaseBridge();
+  await Promise.all([first, waiting, toolFree]);
+  assert.deepEqual(started, ["Syno bridge-one", "Syno plain", "Syno bridge-two"]);
+});
+
+test("queued and waiting_bridge cancellation never call OpenCode", async () => {
+  const sends = [];
+  let releaseSession;
+  let releaseBridge;
+  const runtime = new OpenCodeCognitiveRuntime({
+    bindings: memoryBindings(),
+    client: {
+      async createSession(title) { return { id: title }; },
+      async sendMessage(id) {
+        sends.push(id);
+        if (id === "Syno same") await new Promise((resolve) => { releaseSession = resolve; });
+        if (id === "Syno bridge-owner") await new Promise((resolve) => { releaseBridge = resolve; });
+        return { parts: [{ type: "text", text: "ok" }] };
+      },
+    },
+    tools: bridgeTools(),
+  });
+
+  const first = runtime.run({ text: "one" }, { ownerKey: "owner", threadKey: "same", allowedTools: [] });
+  while (!releaseSession) await new Promise((resolve) => setImmediate(resolve));
+  let queuedRunId;
+  const queued = runtime.run({ text: "two" }, {
+    ownerKey: "owner",
+    threadKey: "same",
+    allowedTools: [],
+    onStart: (runId) => { queuedRunId = runId; },
+  });
+  while (!queuedRunId) await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(runtime.cancel(queuedRunId), true);
+  await assert.rejects(queued, { code: "SCHEDULER_CANCELED" });
+  releaseSession();
+  await first;
+
+  const bridgeOwner = runtime.run({ text: "bridge one" }, {
+    ownerKey: "owner",
+    threadKey: "bridge-owner",
+    allowedTools: ["syno_knowledge_search"],
+  });
+  while (!releaseBridge) await new Promise((resolve) => setImmediate(resolve));
+  let waitingRunId;
+  const waiting = runtime.run({ text: "bridge two" }, {
+    ownerKey: "owner",
+    threadKey: "bridge-waiter",
+    allowedTools: ["syno_knowledge_search"],
+    onStart: (runId) => { waitingRunId = runId; },
+  });
+  while (!waitingRunId || runtime.inspect(waitingRunId)?.status !== "waiting_bridge") {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  assert.equal(runtime.cancel(waitingRunId), true);
+  await assert.rejects(waiting, { code: "SCHEDULER_CANCELED" });
+  assert.deepEqual(sends, ["Syno same", "Syno bridge-owner"]);
+  releaseBridge();
+  await bridgeOwner;
+});
+
+test("abort unknown freezes the Session and rejects subsequent writes", async () => {
+  let runningRunId;
+  let sends = 0;
+  const runtime = new OpenCodeCognitiveRuntime({
+    bindings: memoryBindings(),
+    client: {
+      async createSession() { return { id: "session-unknown" }; },
+      async sendMessage(_id, _payload, { signal }) {
+        sends += 1;
+        return new Promise((_resolve, reject) => signal.addEventListener("abort", () => {
+          reject(Object.assign(new Error("aborted locally"), { code: "ABORT_ERR" }));
+        }, { once: true }));
+      },
+      async abortSession() { throw Object.assign(new Error("ack lost"), { code: "ECONNRESET" }); },
+    },
+  });
+  const active = runtime.run({ text: "one" }, {
+    ownerKey: "owner",
+    threadKey: "main",
+    allowedTools: [],
+    onStart: (runId) => { runningRunId = runId; },
+  });
+  while (!runningRunId || runtime.inspect(runningRunId)?.status !== "running") {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  assert.equal(runtime.cancel(runningRunId), true);
+  await assert.rejects(active, { code: "OPENCODE_ABORT_UNKNOWN" });
+  assert.equal(runtime.inspect(runningRunId).status, "cancel_unknown");
+  await assert.rejects(
+    runtime.run({ text: "two" }, { ownerKey: "owner", threadKey: "main", allowedTools: [] }),
+    { code: "SCHEDULER_KEY_BLOCKED" },
+  );
+  assert.equal(sends, 1);
 });
 
 test("OpenCode model fallback is deterministic and stops after an irreversible tool effect", async (t) => {
