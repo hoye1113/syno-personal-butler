@@ -1,6 +1,10 @@
 import { promises as fs } from "node:fs";
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 function processIsAlive(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
@@ -16,7 +20,19 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function inspectProcessLock(file) {
+async function readWindowsProcessStart(pid) {
+  if (process.platform !== "win32") return null;
+  const script = `$p=Get-Process -Id ${Number(pid)} -ErrorAction SilentlyContinue; if($p){$p.StartTime.ToUniversalTime().ToString('o')}`;
+  try {
+    const result = await execFileAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true, timeout: 2_000 });
+    const value = String(result.stdout || "").trim();
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+async function inspectProcessLock(file, { verifyIdentity = false } = {}) {
   const resolved = path.resolve(file);
   let owner;
   try {
@@ -26,8 +42,54 @@ async function inspectProcessLock(file) {
     return { status: "identity_unknown", owner: null };
   }
   if (!Number.isInteger(owner?.pid) || owner.pid <= 0) return { status: "identity_unknown", owner: null };
+  const alive = processIsAlive(owner.pid);
+  if (!alive) return {
+    status: "stale",
+    owner: {
+      pid: owner.pid,
+      instanceId: owner.instanceId || null,
+      processStartedAt: owner.processStartedAt || null,
+      repoFingerprint: owner.repoFingerprint || null,
+      entrypoint: owner.entrypoint || null,
+    },
+  };
+  if (verifyIdentity && owner.processStartedAt) {
+    const actualStartedAt = await readWindowsProcessStart(owner.pid);
+    if (actualStartedAt === "") return {
+      status: "stale",
+      owner: {
+        pid: owner.pid,
+        instanceId: owner.instanceId || null,
+        processStartedAt: owner.processStartedAt || null,
+        repoFingerprint: owner.repoFingerprint || null,
+        entrypoint: owner.entrypoint || null,
+      },
+    };
+    if (actualStartedAt === null) return {
+      status: "identity_unknown",
+      owner: {
+        pid: owner.pid,
+        instanceId: owner.instanceId || null,
+        processStartedAt: owner.processStartedAt || null,
+        repoFingerprint: owner.repoFingerprint || null,
+        entrypoint: owner.entrypoint || null,
+      },
+    };
+    const expectedMs = Date.parse(owner.processStartedAt);
+    const actualMs = Date.parse(actualStartedAt);
+    if (!Number.isFinite(expectedMs) || !Number.isFinite(actualMs) || Math.abs(expectedMs - actualMs) > 10_000) return {
+      status: "stale",
+      owner: {
+        pid: owner.pid,
+        instanceId: owner.instanceId || null,
+        processStartedAt: owner.processStartedAt || null,
+        repoFingerprint: owner.repoFingerprint || null,
+        entrypoint: owner.entrypoint || null,
+      },
+    };
+  }
   return {
-    status: processIsAlive(owner.pid) ? "running" : "stale",
+    status: "running",
     owner: {
       pid: owner.pid,
       instanceId: owner.instanceId || null,
@@ -39,7 +101,7 @@ async function inspectProcessLock(file) {
 }
 
 async function removeConfirmedStaleProcessLock(file) {
-  const inspection = await inspectProcessLock(file);
+  const inspection = await inspectProcessLock(file, { verifyIdentity: true });
   if (inspection.status !== "stale") return { ...inspection, removed: false };
   await fs.rm(path.resolve(file), { force: true });
   return { ...inspection, status: "stale_removed", removed: true };
@@ -86,32 +148,31 @@ class ProcessFileLock {
         };
       } catch (error) {
         if (error.code !== "EEXIST") throw error;
-        let owner = null;
-        try { owner = JSON.parse(await fs.readFile(this.file, "utf8")); } catch {}
-        if (!Number.isInteger(owner?.pid) || owner.pid <= 0) {
-          if (this.failFast) {
+        if (this.failFast) {
+          const inspection = await inspectProcessLock(this.file, { verifyIdentity: true });
+          if (inspection.status === "stale") {
+            await fs.rm(this.file, { force: true }).catch(() => {});
+            continue;
+          }
+          if (inspection.status === "identity_unknown") {
             const unknown = new Error(`跨进程锁身份无法确认：${path.basename(this.file)}`);
             unknown.code = "PROCESS_LOCK_IDENTITY_UNKNOWN";
             throw unknown;
           }
+          const held = new Error(`跨进程锁已由运行中的实例持有：${path.basename(this.file)}`);
+          held.code = "PROCESS_LOCK_HELD";
+          held.owner = inspection.owner;
+          throw held;
+        }
+        let owner = null;
+        try { owner = JSON.parse(await fs.readFile(this.file, "utf8")); } catch {}
+        if (!Number.isInteger(owner?.pid) || owner.pid <= 0) {
           await fs.rm(this.file, { force: true }).catch(() => {});
           continue;
         }
         if (!processIsAlive(owner.pid)) {
           await fs.rm(this.file, { force: true }).catch(() => {});
           continue;
-        }
-        if (this.failFast) {
-          const held = new Error(`跨进程锁已由运行中的实例持有：${path.basename(this.file)}`);
-          held.code = "PROCESS_LOCK_HELD";
-          held.owner = {
-            pid: owner.pid,
-            instanceId: owner.instanceId || null,
-            processStartedAt: owner.processStartedAt || null,
-            repoFingerprint: owner.repoFingerprint || null,
-            entrypoint: owner.entrypoint || null,
-          };
-          throw held;
         }
         await delay(this.pollMs);
       }

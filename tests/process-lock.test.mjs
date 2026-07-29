@@ -51,6 +51,17 @@ test("ProcessFileLock removes a confirmed stale owner", async (t) => {
   await assert.rejects(fs.stat(file), { code: "ENOENT" });
 });
 
+test("Windows fail-fast locking rejects a PID-reused owner by process start identity", { skip: process.platform !== "win32" }, async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-process-lock-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const file = path.join(root, "host.lock");
+  await fs.writeFile(file, `${JSON.stringify({ pid: process.pid, instanceId: "old", processStartedAt: "2000-01-01T00:00:00.000Z" })}\n`);
+  const lock = new ProcessFileLock({ file, failFast: true, metadata: { instanceId: "fresh" } });
+  const lease = await lock.acquire();
+  assert.equal(JSON.parse(await fs.readFile(file, "utf8")).instanceId, "fresh");
+  await lease.release();
+});
+
 test("host-style fail-fast locking and doctor fail closed on unknown identity", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-process-lock-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
