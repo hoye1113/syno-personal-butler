@@ -1,26 +1,26 @@
 {
   "version": 1,
   "runAt": "2026-07-29T20:24:00+08:00",
-  "commit": "80e60a6",
+  "commit": "d24f492",
   "branch": "codex/exec-p10-r6-seal",
   "automated": {
-    "nodeTests": { "passed": 520, "failed": 0 },
+    "nodeTests": { "passed": 521, "failed": 0 },
     "repositoryVerifyFiles": 1463,
     "activeDocumentationFiles": 7,
     "vaultPython311Unittest": { "passed": 57, "failed": 0 },
     "gitDiffCheck": "passed"
   },
   "freshClone": {
-    "status": "not_rerun_after_code_commit",
-    "lastVerifiedCommit": "749cdd8ae6d87ca703dfb2839ae50efb1892cbbe",
-    "nodeTests": { "passed": 516, "failed": 0 },
-    "repositoryVerifyFiles": 1454,
+    "status": "verified",
+    "lastVerifiedCommit": "d24f4921a787ca55058b007f3ad50b86790b8ed6",
+    "nodeTests": { "passed": 521, "failed": 0 },
+    "repositoryVerifyFiles": 1461,
     "activeDocumentationFiles": 7,
     "vaultPython311Unittest": { "passed": 57, "failed": 0 },
     "worktree": "clean"
   },
   "runtimeReadOnly": {
-    "opencode": { "version": "1.18.2", "ready": true, "healthy": true, "provider": "opencode", "providerFallback": false },
+    "opencode": { "version": "1.18.2", "ready": true, "healthy": true, "provider": "opencode", "providerFallback": false, "sessionRecovery": { "readMessages": "unsupported_by_client", "fork": "unsupported_by_client", "clone": "unsupported_by_client", "strategy": "retain_current_session", "conservativeFallback": "clean_and_abort_confirmed_only" } },
     "weixin": { "ok": true, "configured": true, "ownerBound": true, "connected": true, "source": "running_worker" },
     "feishu": { "ok": true, "configured": true, "ownerBound": true, "connected": true, "source": "running_worker" },
     "windowsTask": { "installed": true, "running": true, "startup": "at_logon", "legacyTaskDetected": false },
