@@ -61,6 +61,9 @@ import { WorkflowOutbox } from "./workflow-outbox.mjs";
 import { AcceptedRequestStore } from "./accepted-request-store.mjs";
 import { AcceptedRequestRecoveryWorker } from "./accepted-request-recovery.mjs";
 import { ChannelDeliveryOutbox } from "./channel-delivery-outbox.mjs";
+import { EffectReceiptStore } from "./effect-receipt-store.mjs";
+import { EffectReconciliationCaseStore } from "./effect-reconciliation-case-store.mjs";
+import { EffectReconciliationWorker } from "./effect-reconciliation-worker.mjs";
 import { mergeCaptureAnalyses, splitSourceText } from "./capture-analysis.mjs";
 import { artifactToIntakePayload, createWeixinMessageHandler, parseWeixinApproval } from "./weixin-message-handler.mjs";
 
@@ -208,6 +211,19 @@ function createSynoRuntime(options = {}) {
     ? (options.acceptedRecovery || new AcceptedRequestRecoveryWorker({ store: acceptedRequests }))
     : null;
   const channelDeliveryOutbox = options.channelDeliveryOutbox || (process.env.NODE_ENV === "test" ? null : new ChannelDeliveryOutbox());
+  const effectReceipts = options.effectReceipts || (process.env.NODE_ENV === "test" ? null : new EffectReceiptStore());
+  const reconciliationCases = options.reconciliationCases || (process.env.NODE_ENV === "test" ? null : new EffectReconciliationCaseStore());
+  const reconciliationWorker = reconciliationCases
+    ? (options.reconciliationWorker || new EffectReconciliationWorker({
+      store: reconciliationCases,
+      reconcileReadOnly: options.reconcileEffect || (async (candidate) => {
+        const receipt = await effectReceipts?.get(candidate.toolInvocationKey);
+        return receipt?.status === "committed"
+          ? { resolved: true, result: "confirmed_committed", details: { receiptId: receipt.receiptId } }
+          : { resolved: false, errorCode: "AUTHORITATIVE_EFFECT_NOT_COMMITTED" };
+      }),
+    }))
+    : null;
   const ingestWorkflows = options.ingestWorkflows || new IngestWorkflowCoordinator({ ingest, contextCompiler: workflowContextCompiler });
   const learning = options.learning || new LearningService();
   const outputs = options.outputs || new OutputService();
@@ -387,6 +403,9 @@ function createSynoRuntime(options = {}) {
   const toolBridge = options.toolBridge || new SynoToolBridge({
     tools,
     token: bridgeToken,
+    effectReceipts,
+    reconciliationCases,
+    reconciliationWorker,
     isRuntimeReady: () => lifecycleState === "ready",
     onResult: async ({ tool, result, ownerKey, threadKey }) => {
       if (!result?.requiresApproval || !result.id) return;
@@ -758,6 +777,7 @@ function createSynoRuntime(options = {}) {
   let channelRecoveryTimer = null;
   let providerRecoveryTimer = null;
   let workflowOutboxTimer = null;
+  let reconciliationTimer = null;
   let openCodeRecoveryPromise = null;
   async function recoverOpenCode() {
     if (runtimeMode !== "opencode" || componentState.openCode !== "degraded") return;
@@ -833,6 +853,8 @@ function createSynoRuntime(options = {}) {
     acceptedRequests,
     acceptedRecovery,
     channelDeliveryOutbox,
+    effectReceipts,
+    reconciliationCases,
     learning,
     outputs,
     goals,
@@ -893,6 +915,7 @@ function createSynoRuntime(options = {}) {
         if (lifecycleState === "stopping") throw Object.assign(new Error("Syno Runtime 正在停止"), { code: "RUNTIME_STOPPING" });
         componentState.store = "ready";
         await recordEvent("syno.host.recovered");
+        reconciliationWorker?.start();
         if (runtimeMode === "opencode") {
           try {
             await startOpenCodeSecurely();
@@ -937,6 +960,7 @@ function createSynoRuntime(options = {}) {
         workflowOutboxTimer = setInterval(() => drainWorkflowOutbox().catch((error) =>
           recordEvent("ingest.outbox.drain_failed", { error }, { level: "error" }).catch(() => {}),
         ), 15_000);
+        reconciliationTimer = setInterval(() => reconciliationWorker?.runOnce().catch(() => {}), 60_000);
         await recordEvent("syno.initialize.completed", { worker, runtimeMode, state: lifecycleState });
         return core.snapshot();
       })().catch(async (error) => {
@@ -960,6 +984,9 @@ function createSynoRuntime(options = {}) {
         providerRecoveryTimer = null;
         if (workflowOutboxTimer) clearInterval(workflowOutboxTimer);
         workflowOutboxTimer = null;
+        if (reconciliationTimer) clearInterval(reconciliationTimer);
+        reconciliationTimer = null;
+        await reconciliationWorker?.stop().catch(() => {});
         await channels.stop().catch(() => {});
         await openCodeSupervisor.stop().catch(() => {});
         await recordEvent("syno.shutdown.completed");

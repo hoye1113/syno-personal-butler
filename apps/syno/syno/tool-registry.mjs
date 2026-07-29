@@ -58,6 +58,11 @@ class ToolRegistry {
     if (outputErrors.length) {
       const error = new Error(`工具 ${name} 输出无效：${outputErrors.join("；")}`);
       error.code = "TOOL_OUTPUT_INVALID";
+      error.effectOutput = output;
+      error.effectReceipt = {
+        directEffect: { status: tool.risk === "read" ? "no_effect" : "committed", type: name, sourceId: output?.id || output?.job?.id || null },
+        businessOutcome: { status: "unknown" },
+      };
       throw error;
     }
     return output;
