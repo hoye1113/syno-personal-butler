@@ -61,6 +61,7 @@ import { WorkflowOutbox } from "./workflow-outbox.mjs";
 import { AcceptedRequestStore } from "./accepted-request-store.mjs";
 import { AcceptedRequestRecoveryWorker } from "./accepted-request-recovery.mjs";
 import { ChannelDeliveryOutbox } from "./channel-delivery-outbox.mjs";
+import { MobileDeliveryMode } from "./mobile-delivery-mode.mjs";
 import { EffectReceiptStore } from "./effect-receipt-store.mjs";
 import { EffectReconciliationCaseStore } from "./effect-reconciliation-case-store.mjs";
 import { EffectReconciliationWorker } from "./effect-reconciliation-worker.mjs";
@@ -214,6 +215,9 @@ function createSynoRuntime(options = {}) {
     ? (options.acceptedRecovery || new AcceptedRequestRecoveryWorker({ store: acceptedRequests }))
     : null;
   const channelDeliveryOutbox = options.channelDeliveryOutbox || (process.env.NODE_ENV === "test" ? null : new ChannelDeliveryOutbox());
+  const mobileDeliveryMode = options.mobileDeliveryMode instanceof MobileDeliveryMode
+    ? options.mobileDeliveryMode
+    : new MobileDeliveryMode({ mode: options.mobileDeliveryMode || "legacy" });
   const effectReceipts = options.effectReceipts || (process.env.NODE_ENV === "test" ? null : new EffectReceiptStore());
   const reconciliationCases = options.reconciliationCases || (process.env.NODE_ENV === "test" ? null : new EffectReconciliationCaseStore());
   const reconciliationWorker = reconciliationCases
@@ -642,7 +646,13 @@ function createSynoRuntime(options = {}) {
     browserCapture,
     acceptedRequests,
     recentInteractions,
+    channelDeliveryOutbox,
+    mobileDeliveryMode,
+    wakeDelivery: () => drainChannelDeliveryOutbox().catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })),
   });
+  if (acceptedRecovery && typeof channelConversationHandler.processAcceptedRequest === "function") {
+    acceptedRecovery.processRequest = (request) => channelConversationHandler.processAcceptedRequest(request);
+  }
   ingestWorkflows.configure?.({
     browserCapture,
     browserRuntime: cognitiveRuntime,
@@ -837,6 +847,7 @@ function createSynoRuntime(options = {}) {
   let channelRecoveryTimer = null;
   let providerRecoveryTimer = null;
   let workflowOutboxTimer = null;
+  let channelDeliveryOutboxTimer = null;
   let reconciliationTimer = null;
   let openCodeRecoveryPromise = null;
   async function recoverOpenCode() {
@@ -881,6 +892,26 @@ function createSynoRuntime(options = {}) {
       return results[event.targetChannel] || { delivered: false, reason: "channel_missing" };
     });
   }
+  async function drainChannelDeliveryOutbox() {
+    if (!channelDeliveryOutbox || !channels) return { skipped: true };
+    return channelDeliveryOutbox.deliverDue(async (payload, event) => {
+      const results = await channels.send({
+        ...payload,
+        ...(event.deliveryTarget || {}),
+        eventId: event.eventId,
+        deliveryKey: event.deliveryKey,
+      }, [event.targetChannel]);
+      const result = results[event.targetChannel] || { delivered: false, reason: "channel_missing" };
+      if (result.delivered === true && event.sourceType === "accepted_request" && acceptedRequests) {
+        if (["final", "decision", "recovery"].includes(event.responseKind)) {
+          await acceptedRequests.update(event.sourceId, { status: "delivered", finalEventId: event.eventId, claim: null }).catch(() => {});
+        } else if (event.responseKind === "ack") {
+          await acceptedRequests.update(event.sourceId, { ackEventId: event.eventId }).catch(() => {});
+        }
+      }
+      return result;
+    });
+  }
   async function startOpenCodeSecurely({ restart = false } = {}) {
     const status = restart
       ? await openCodeSupervisor.restart()
@@ -913,6 +944,7 @@ function createSynoRuntime(options = {}) {
     acceptedRequests,
     acceptedRecovery,
     channelDeliveryOutbox,
+    mobileDeliveryMode,
     effectReceipts,
     reconciliationCases,
     reconciliationWorker,
@@ -1001,6 +1033,11 @@ function createSynoRuntime(options = {}) {
             refreshLifecycleState();
             await recordEvent("syno.channels.started");
             await drainWorkflowOutbox();
+            await drainChannelDeliveryOutbox();
+            if (mobileDeliveryMode.is("v2")) {
+              await acceptedRecovery?.runOnce().catch((error) => recordEvent("accepted_request.recovery_failed", { error }, { level: "error" }));
+              acceptedRecovery?.start();
+            }
           })
           .catch(async (error) => {
             if (lifecycleState === "stopping") return;
@@ -1023,6 +1060,10 @@ function createSynoRuntime(options = {}) {
         workflowOutboxTimer = setInterval(() => drainWorkflowOutbox().catch((error) =>
           recordEvent("ingest.outbox.drain_failed", { error }, { level: "error" }).catch(() => {}),
         ), 15_000);
+        channelDeliveryOutboxTimer = setInterval(() => drainChannelDeliveryOutbox().catch((error) =>
+          recordEvent("channel.outbox.drain_failed", { error }, { level: "error" }).catch(() => {}),
+        ), 1_000);
+        channelDeliveryOutboxTimer.unref?.();
         reconciliationTimer = setInterval(() => reconciliationWorker?.runOnce().catch(() => {}), 60_000);
         await recordEvent("syno.initialize.completed", { worker, runtimeMode, state: lifecycleState });
         return core.snapshot();
@@ -1047,8 +1088,11 @@ function createSynoRuntime(options = {}) {
         providerRecoveryTimer = null;
         if (workflowOutboxTimer) clearInterval(workflowOutboxTimer);
         workflowOutboxTimer = null;
+        if (channelDeliveryOutboxTimer) clearInterval(channelDeliveryOutboxTimer);
+        channelDeliveryOutboxTimer = null;
         if (reconciliationTimer) clearInterval(reconciliationTimer);
         reconciliationTimer = null;
+        await acceptedRecovery?.stop().catch(() => {});
         await reconciliationWorker?.stop().catch(() => {});
         await channels.stop().catch(() => {});
         await openCodeSupervisor.stop().catch(() => {});
@@ -1118,6 +1162,13 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "GET" && url.pathname === "/api/syno/jobs") return { jobs: await runtime.host.list({ limit: 100 }) };
   if (method === "GET" && url.pathname === "/api/syno/notifications") return { notifications: await runtime.notifications.list({ limit: 100 }) };
   if (method === "GET" && url.pathname === "/api/syno/channels") return { channels: runtime.channels.status() };
+  if (method === "GET" && url.pathname === "/api/syno/mobile-delivery") return {
+    ...runtime.mobileDeliveryMode.snapshot(),
+    outbox: runtime.channelDeliveryOutbox ? {
+      pending: (await runtime.channelDeliveryOutbox.list({ status: "pending", limit: 1000 })).length,
+      unknown: (await runtime.channelDeliveryOutbox.list({ status: "delivery_unknown", limit: 1000 })).length,
+    } : null,
+  };
   if (method === "GET" && url.pathname === "/api/syno/recent-interactions") return runtime.recentInteractions.snapshot({ ownerKey: "local-user", channel: url.searchParams.get("channel") || undefined, threadKey: url.searchParams.get("thread") || "main" });
   if (method === "GET" && url.pathname === "/api/syno/effect-cases") return { cases: (await runtime.reconciliationCases?.list({ ownerKey: "local-user", limit: 100 }) || []).map((item) => ({ caseId: item.caseId, toolName: item.toolName, status: item.status, attempts: item.attempts, nextReconcileAt: item.nextReconcileAt, lastErrorCode: item.lastErrorCode, ownerResolution: item.ownerResolution, systemResolution: item.systemResolution, createdAt: item.createdAt, updatedAt: item.updatedAt })) };
   if (method === "GET" && url.pathname === "/api/syno/provider") return runtime.credentials.status();

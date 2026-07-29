@@ -25,7 +25,7 @@ implementation:
 
 已完成：PR-02 `codex/exec-p02-cancellable-scheduler`，`5b12fd8` → `41ebf1c`，可取消 Session/Bridge Scheduler 门禁通过。
 
-已完成自动实现：PR-04A0～PR-09，包含 AcceptedRequest、ChannelDeliveryOutbox、Effect Receipt/Unknown、移动 Decision、Session fallback、Ephemeral Capture、持久 Chunk 和调度门控；各阶段实际 HEAD 与测试证据见 `NEXT_SESSION.md` 与 `ops/acceptance/`。
+已完成自动实现：PR-04A0～PR-09，包含 AcceptedRequest、ChannelDeliveryOutbox、Effect Receipt/Unknown、移动 Decision、Session fallback、Ephemeral Capture、持久 Chunk 和调度门控；PR-04A/04B 另已接入受门控的 `legacy/shadow/v2` runtime seam，但默认仍保持 legacy 用户可见路径。各阶段实际 HEAD 与测试证据见 `NEXT_SESSION.md` 与 `ops/acceptance/`。
 
 进行中：PR-10 `codex/exec-p10-r6-seal`，只读 R6 readiness 与 Owner 验收模板；真实 Owner 验收、移动生产切换和 Legacy 清理仍未开始。
 

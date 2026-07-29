@@ -26,7 +26,7 @@ function workflowStatusText(workflow) {
 }
 
 class ChannelConversationHandler {
-  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions } = {}) {
+  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelDeliveryOutbox, mobileDeliveryMode, wakeDelivery } = {}) {
     if (!runtime || !core || (!ingest && !ingestWorkflows) || !pendingDecisions) throw new Error("ChannelConversationHandler 缺少 Runtime、Core、IngestWorkflow 或 PendingDecision Store");
     this.runtime = runtime;
     this.core = core;
@@ -40,6 +40,9 @@ class ChannelConversationHandler {
     this.browserCapture = browserCapture;
     this.acceptedRequests = acceptedRequests;
     this.recentInteractions = recentInteractions;
+    this.channelDeliveryOutbox = channelDeliveryOutbox;
+    this.mobileDeliveryMode = mobileDeliveryMode;
+    this.wakeDelivery = wakeDelivery;
   }
 
   #record(event, data = {}, options) {
@@ -79,6 +82,118 @@ class ChannelConversationHandler {
     return receipt;
   }
 
+  #deliveryTarget(message) {
+    return message.channel === "feishu"
+      ? { chatId: String(message.chatId || ""), replyTo: String(message.id || "") }
+      : message.channel === "weixin"
+        ? { toUserId: String(message.senderId || ""), contextToken: String(message.contextToken || "") }
+        : null;
+  }
+
+  async #persistAccepted(message, trace, text) {
+    if (!this.acceptedRequests || !trace.messageId) return null;
+    const attachmentRefs = Array.isArray(message.artifacts)
+      ? message.artifacts.map((artifact) => ({
+        id: String(artifact.id || artifact.artifactId || artifact.path || artifact.sha256 || ""),
+        kind: String(artifact.kind || "file"),
+      })).filter((artifact) => artifact.id)
+      : [];
+    try {
+      const accepted = await this.acceptedRequests.accept({
+        ownerKey: trace.ownerKey,
+        originChannel: trace.channel,
+        platformMessageId: trace.messageId,
+        messageDedupKey: message.messageDedupKey,
+        threadKey: trace.threadKey,
+        payloadKind: attachmentRefs.length ? "message_with_attachments" : "text",
+        payload: { text, attachments: attachmentRefs },
+        deliveryTarget: this.#deliveryTarget(message),
+      });
+      await this.#record("accepted_request.shadow_persisted", { ...trace, created: accepted.created === true });
+      return accepted;
+    } catch (error) {
+      await this.#record("accepted_request.shadow_failed", {
+        ...trace,
+        error: { code: error.code || "ACCEPTED_REQUEST_SHADOW_FAILED", message: error.message },
+      }, { level: "error" });
+      throw error;
+    }
+  }
+
+  async #runV2(request, message) {
+    const response = await this.handle({ ...message, __synoV2Worker: true });
+    const text = String(response?.text || "Syno 已处理，但没有生成可显示的文本。");
+    const deliveryTarget = request.payload?.deliveryTarget || this.#deliveryTarget(message);
+    const final = await this.channelDeliveryOutbox.enqueue({
+      sourceType: "accepted_request",
+      sourceId: request.requestId,
+      ownerKey: request.ownerKey,
+      targetChannel: request.originChannel,
+      deliveryTargetRef: deliveryTarget,
+      responseKind: "final",
+      businessVersion: 1,
+      payload: { text },
+      deliveryKey: `${request.requestId}:final:v1`,
+    });
+    await this.acceptedRequests.update(request.requestId, {
+      status: "final_pending",
+      route: { kind: "mobile", mode: "v2" },
+      finalEventId: final.event.eventId,
+      claim: null,
+    });
+    this.wakeDelivery?.();
+    return { status: "final_pending", finalEventId: final.event.eventId };
+  }
+
+  async processAcceptedRequest(request) {
+    if (!request?.requestId || !request.payload) throw new Error("AcceptedRequest 恢复载荷不完整");
+    if (!this.channelDeliveryOutbox || !this.acceptedRequests) return { status: "waiting_provider", lastErrorCode: "MOBILE_V2_STORE_UNAVAILABLE" };
+    const deliveryTarget = request.payload.deliveryTarget || {};
+    const message = {
+      channel: request.originChannel,
+      id: request.platformMessageId,
+      ownerKey: request.ownerKey,
+      threadKey: request.threadKey,
+      text: String(request.payload.text || ""),
+      senderId: deliveryTarget.toUserId || request.ownerKey,
+      contextToken: deliveryTarget.contextToken,
+      chatId: deliveryTarget.chatId,
+      privateConversation: true,
+    };
+    return this.#runV2(request, message);
+  }
+
+  async #handleV2(message, trace, text) {
+    if (!this.acceptedRequests || !this.channelDeliveryOutbox) {
+      throw Object.assign(new Error("移动 v2 需要 AcceptedRequest 与 ChannelDeliveryOutbox"), { code: "MOBILE_V2_UNAVAILABLE" });
+    }
+    const accepted = await this.#persistAccepted(message, trace, text);
+    const request = accepted.request;
+    const target = request.payload?.deliveryTarget || this.#deliveryTarget(message);
+    const ack = await this.channelDeliveryOutbox.enqueue({
+      sourceType: "accepted_request",
+      sourceId: request.requestId,
+      ownerKey: request.ownerKey,
+      targetChannel: request.originChannel,
+      deliveryTargetRef: target,
+      responseKind: "ack",
+      payload: { text: "已接收，正在处理。" },
+      deliveryKey: `${request.requestId}:ack:v1`,
+    });
+    await this.acceptedRequests.update(request.requestId, {
+      ackEventId: ack.event.eventId,
+      route: { kind: "mobile", mode: "v2" },
+    });
+    if (accepted.created) queueMicrotask(() => this.#runV2(request, message).catch(async (error) => {
+      await this.#record("accepted_request.v2_failed", {
+        requestId: request.requestId,
+        error: { code: error.code || "MOBILE_V2_PROCESS_FAILED", message: error.message },
+      }, { level: "error" });
+    }));
+    this.wakeDelivery?.();
+    return { deferredDelivery: true, requestId: request.requestId };
+  }
+
   async handle(message) {
     const trace = {
       channel: String(message.channel || "unknown"),
@@ -86,42 +201,23 @@ class ChannelConversationHandler {
       ownerKey: String(message.ownerKey || "local-user"),
       threadKey: String(message.threadKey || "main"),
     };
+    const text = String(message.text || "").trim();
+    if (!message.__synoV2Worker && this.mobileDeliveryMode?.is?.("v2")) {
+      try {
+        return await this.#handleV2(message, trace, text);
+      } catch (error) {
+        await this.#record("channel.message.failed", {
+          ...trace,
+          error: { code: error.code || "CHANNEL_MESSAGE_FAILED", message: error.message },
+        }, { level: "error" });
+        return { text: `未能接收：${error.message}` };
+      }
+    }
     try {
       const ownerKey = String(message.ownerKey || "local-user");
       const threadKey = String(message.threadKey || "main");
-      const text = String(message.text || "").trim();
       const localOnly = /(?:^|\s)仅本地(?:\s|$)/u.test(text);
-      if (this.acceptedRequests && trace.messageId) {
-        const attachmentRefs = Array.isArray(message.artifacts)
-          ? message.artifacts.map((artifact) => ({
-            id: String(artifact.id || artifact.artifactId || artifact.path || artifact.sha256 || ""),
-            kind: String(artifact.kind || "file"),
-          })).filter((artifact) => artifact.id)
-          : [];
-        const deliveryTarget = message.channel === "feishu"
-          ? { chatId: String(message.chatId || ""), replyTo: trace.messageId }
-          : message.channel === "weixin"
-            ? { toUserId: String(message.senderId || ""), contextToken: String(message.contextToken || "") }
-            : null;
-        try {
-          await this.acceptedRequests.accept({
-            ownerKey: trace.ownerKey,
-            originChannel: trace.channel,
-            platformMessageId: trace.messageId,
-            messageDedupKey: message.messageDedupKey,
-            threadKey: trace.threadKey,
-            payloadKind: attachmentRefs.length ? "message_with_attachments" : "text",
-            payload: { text, attachments: attachmentRefs },
-            deliveryTarget,
-          });
-          await this.#record("accepted_request.shadow_persisted", { ...trace });
-        } catch (error) {
-          await this.#record("accepted_request.shadow_failed", {
-            ...trace,
-            error: { code: error.code || "ACCEPTED_REQUEST_SHADOW_FAILED", message: error.message },
-          }, { level: "error" });
-        }
-      }
+      if (!message.__synoV2Worker && this.acceptedRequests && trace.messageId) await this.#persistAccepted(message, trace, text);
       await this.#record("channel.message.received", {
         ...trace,
         hasAttachments: Array.isArray(message.artifacts) && message.artifacts.length > 0,

@@ -534,6 +534,10 @@ class WeixinIlinkAdapter {
     }
     if (!message.text && !artifacts.length) { await this.#markProcessed(message.id); return; }
     const response = await this.onMessage({ channel: "weixin", ...message, artifacts, privateConversation: true });
+    if (response?.deferredDelivery === true) {
+      await this.#markProcessed(message.id);
+      return { delivered: true, deferred: true, requestId: response.requestId || null };
+    }
     const delivery = await this.send({ toUserId: message.senderId, contextToken: message.contextToken, text: response?.text || response?.job?.result?.text || "任务已记录，请在 Syno 查看状态。" });
     if (!delivery.delivered) throw new Error(`微信回复未送达：${delivery.reason || "unknown"}`);
     await this.#markProcessed(message.id);

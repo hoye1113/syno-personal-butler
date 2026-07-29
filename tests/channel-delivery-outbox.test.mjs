@@ -43,6 +43,25 @@ test("ChannelDeliveryOutbox atomically deduplicates identity and encrypts payloa
   assert.equal((await outbox.get(first.event.eventId, { includePayload: true })).payload.text, "PRIVATE FINAL");
 });
 
+test("ChannelDeliveryOutbox restores the encrypted delivery target only at delivery time", async (t) => {
+  const { root, outbox, clockState } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const event = await outbox.enqueue({
+    ...base,
+    responseKind: "final",
+    deliveryKey: "target-1",
+    deliveryTargetRef: { toUserId: "owner", contextToken: "ctx" },
+    payload: { text: "TARGETED" },
+    dueAt: clockState.now.toISOString(),
+  });
+  const delivered = [];
+  await outbox.deliverDue(async (payload, record) => {
+    delivered.push({ payload, target: record.deliveryTarget });
+    return { delivered: true };
+  });
+  assert.deepEqual(delivered, [{ payload: { text: "TARGETED" }, target: { toUserId: "owner", contextToken: "ctx" } }]);
+});
+
 test("ACK and progress receive timing defaults while final supersedes unsent noise", async (t) => {
   const { root, outbox, clockState } = await fixture();
   t.after(() => fs.rm(root, { recursive: true, force: true }));

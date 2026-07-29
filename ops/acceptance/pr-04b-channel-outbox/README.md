@@ -7,15 +7,15 @@
 - implementation base：`ad187cb`
 - branch：`codex/exec-p04b-channel-outbox`
 - 本阶段实现统一 v2 ChannelDeliveryOutbox、DPAPI payload、ACK/Progress/Final 时序、版本顺序、supersede、退避和 delivery identity conflict。
-- 移动生产回复链仍未切换；legacy 发送继续作为唯一用户可见路径，Outbox 当前只可被显式调用。
+- 已补齐受门控的 `legacy/shadow/v2` runtime 接缝：v2 可由测试显式启用，AcceptedRequest、ACK、Final 和重启 Recovery 共用 Outbox；默认仍是 `legacy`，因此未改变 Owner 当前用户可见路径。
 
 ## 自动门禁
 
 | 门禁 | 结果 |
 | --- | --- |
-| 定向适配器与 Outbox 测试 | 38/38 passed |
-| Node 全量测试 | 495/495 passed |
-| `pnpm verify` | passed；1433 files，active docs 7 |
+| 定向适配器与 Outbox 测试 | 39/39 passed |
+| Node 全量测试 | 519/519 passed |
+| `pnpm verify` | passed；1460 files，active docs 7 |
 | Python 3.11 Vault unittest | 57/57 passed |
 | `git diff --check` | passed |
 
@@ -29,7 +29,7 @@
 
 - Owner 检查点 A（微信/飞书 TEST 消息可见条数、顺序、重复）仍未收到手机端结果。
 - Owner 检查点 B（ACK/Progress/Final、原渠道恢复和受控 Host 重启）尚未执行。
-- 因此本记录不构成 PR-04A/04B 联合切换批准，未执行 ingress 冻结或 `legacy → shadow → v2` 切换。
+- 因此本记录不构成 PR-04A/04B 联合切换批准，未执行 ingress 冻结或 `legacy → shadow → v2` 切换；当前 runtime mode 仍为 `legacy`。
 
 ## 证据边界
 

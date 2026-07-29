@@ -176,10 +176,11 @@ class ChannelDeliveryOutbox {
     if (!includePayload) return record;
     const encrypted = await fs.readFile(payloadFile(this.payloadRoot, record.payloadRef), "utf8");
     const payload = JSON.parse(await this.unprotect(encrypted));
+    const deliveryTarget = payload.deliveryTargetRef || null;
     const body = { ...payload };
     delete body.deliveryTargetRef;
     if (digest(body) !== record.payloadDigest) throw Object.assign(new Error("ChannelDeliveryOutbox payload digest 不匹配"), { code: "DELIVERY_PAYLOAD_TAMPERED" });
-    return { ...record, payload };
+    return { ...record, payload: body, deliveryTarget };
   }
 
   async list({ sourceId, status, dueBefore, limit = 100 } = {}) {
@@ -246,7 +247,7 @@ class ChannelDeliveryOutbox {
         const claimed = await this.processLock.run(() => this.#updateUnlocked(candidate.eventId, { status: "claimed", claim: lease, attempts: Number(candidate.attempts || 0) + 1 }));
         const payload = await this.get(candidate.eventId, { includePayload: true });
         let result;
-        try { result = await send(payload.payload, claimed); }
+        try { result = await send(payload.payload, { ...claimed, deliveryTarget: payload.deliveryTarget }); }
         catch (error) {
           result = error?.deliveryUnknown === true ? { deliveryUnknown: true, reason: error.code || "DELIVERY_UNKNOWN" } : { retryable: error?.retryable !== false, reason: error.code || "DELIVERY_FAILED" };
         }

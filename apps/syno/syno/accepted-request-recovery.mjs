@@ -29,7 +29,7 @@ class AcceptedRequestRecoveryWorker {
       try {
         const request = await this.store.get(candidate.requestId, { includePayload: true });
         const result = await this.processRequest(request);
-        const status = ["waiting_provider", "failed_retryable", "failed_terminal", "canceled", "delivered"].includes(result?.status)
+        const status = ["waiting_provider", "failed_retryable", "failed_terminal", "canceled", "delivered", "final_pending"].includes(result?.status)
           ? result.status
           : "waiting_provider";
         await this.store.update(candidate.requestId, {
