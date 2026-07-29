@@ -16,7 +16,7 @@ reviewBaseline:
 implementation:
   branch: codex/exec-p10-r6-seal
   baseCommit: f9d9206
-  headCommit: c5fe5dd7c913f789a7f93c33e0f40e19c5395b8c
+  headCommit: 80e60a6
 ```
 
 已完成：PR-00 `codex/exec-p00-contracts`，`567f23d` → `41a324d`，文档、ADR 与迁移策略门禁通过。
@@ -52,7 +52,7 @@ implementation:
 
 - P4.0–P4.6 的实现、自动测试、三轴复审和 Windows 任务安装/受控重启已完成。
 - 当前 Goal 状态为 active：PR-10 readiness 已实现，但 Owner 手机、真实渠道、Windows 冷启动和 Legacy 清理门槛仍未完成；不能用 Fake、探针或单元测试替代。
-- 最近证据（2026-07-29 20:14 CST）：Node 519/519、Repository verify 1462 files、active docs 7、`git diff --check` 通过；Host health/readiness 200/ready，`/api/syno/mobile-delivery` 返回 `mode=legacy` 且 Outbox pending/unknown 均为 0；OpenCode 1.18.2 healthy，微信/飞书 live probe 均 connected。
+- 最近证据（2026-07-29 20:24 CST）：Node 520/520、Repository verify 1463 files、active docs 7、`git diff --check` 通过；Host health/readiness 200/ready，`/api/syno/mobile-delivery` 返回 `mode=legacy`，5 条历史 shadow AcceptedRequest 仍为 accepted，Outbox/Unknown 均为空；OpenCode 1.18.2 healthy，微信/飞书 live probe 均 connected。
 - Windows `Syno` 计划任务在本轮授权 Restart 后为 `Running`，`legacyTaskDetected=false`，Host 已由任务托管并加载当前提交；Windows 下次登录冷启动仍未由 Owner 亲自执行，不能把当前 Running 代替冷启动验收。
 - 工作树当前干净；本轮没有暂存或修改两项主人知识变更，也没有 Push。
 - 不得批准或删除本轮探针留下的待审批/失败 Workflow；其 ID 与处理边界记录在 `NEXT_SESSION.md`。
