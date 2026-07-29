@@ -29,7 +29,9 @@
 
 ```powershell
 pnpm test
-python -m pytest vault/tests
+cd vault
+python -m unittest discover -s tests -v
+cd ..
 pnpm verify
 ```
 

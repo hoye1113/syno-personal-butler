@@ -18,7 +18,7 @@ pnpm start
 ## 核心约束
 
 - Markdown 是唯一长期事实源；索引和数据库都是可重建缓存。
-- 产品只启用原生 `ToolLoopAgent` 这一种 `CognitiveRuntime`，使用单一固定 Provider 与 Model ID；不会切换模型、Provider 或静默回退到另一个 Agent。
+- 产品只启用 `OpenCodeCognitiveRuntime`；Syno 按固定三模型链确定性尝试，绝不自动切换 Provider、Runtime 或升级到另一个 Agent。
 - 固定版本 Hermes 已因越出唯一 Chat Completions Provider 表面而淘汰，不接触真实 Token，也不是可选运行时。
 - 读取可直接执行；任何写入先形成 Job，并在隔离 worktree 中产生可审计差异。
 - 删除、覆盖、移动、新 MOC、新 tag 与代码修改在隔离工作区自动执行，并产生可审计差异。
@@ -31,13 +31,13 @@ pnpm start
 - Afu 收件箱 → 选题卡 → Content Brief → Markdown/飞书排期。
 - 知识库搜索、全文阅读和低显著度原文编辑入口，无需 Obsidian。
 - 任务、待决策项、通知、学习证据、输出机会和“问赛诺”工作抽屉。
-- 08:30 晨报、22:00 晚间复盘、周日 20:00 周报；Worker 可独立于浏览器运行。
+- 08:30 晨报、22:00 晚间复盘、周日 20:00 周报；单一 Syno Host 独立于浏览器运行。
 - 可选微信 iLink 私聊渠道。二维码兼容探针与完整限制见 [docs/WEIXIN-ANDROID-PROBE.md](docs/WEIXIN-ANDROID-PROBE.md)。
 
-Windows 登录启动 Worker：
+Windows 登录启动 Syno Host：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/install-windows-task.ps1
+pnpm windows:install
 ```
 
-完整设计见 [架构](docs/ARCHITECTURE.md)、[权限策略](docs/POLICY.md)、[运维与恢复](docs/OPERATIONS.md)、[切换清单](docs/CUTOVER-CHECKLIST.md) 和 [已知限制](docs/KNOWN-LIMITATIONS.md)。
+完整设计见 [架构](docs/ARCHITECTURE.md)、[权限策略](docs/POLICY.md)、[执行语义 ADR](docs/adr/0003-execution-semantics.md)、[移动交付 ADR](docs/adr/0004-mobile-delivery-contract.md)、[运维与恢复](docs/OPERATIONS.md)、[切换清单](docs/CUTOVER-CHECKLIST.md) 和 [已知限制](docs/KNOWN-LIMITATIONS.md)。

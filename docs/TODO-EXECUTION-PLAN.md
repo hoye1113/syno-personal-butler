@@ -1,10 +1,42 @@
-# Syno 转换为 OpenCode CLI Agent：权威执行计划
+# Syno 执行语义与移动可靠交付：权威执行计划
 
-更新日期：2026-07-28（Asia/Shanghai）
+更新日期：2026-07-29（Asia/Shanghai）
 
-本文是当前唯一详细执行入口。旧的知识闭环 P0–P5 计划已归档到
-`docs/archive/TODO-EXECUTION-PLAN-2026-07-21.md`；长期产品目标和迁移历史仍见
-`docs/HANDOFF-EXECUTION-PLAN.md`。
+本文是当前唯一详细执行入口。OpenCode P4 历史、知识闭环 P0–P5 和既有验收记录继续保留在本文后续章节与 `docs/archive/`，但不得覆盖本节的新执行顺序。
+
+## 0. 新执行计划（review baseline `567f23d`）
+
+```yaml
+reviewBaseline:
+  repository: hoye1113/syno-personal-butler
+  branch: main
+  commit: 567f23d2d9b423a98d0e88868c6cc2eb3859d16f
+  reviewedAt: 2026-07-29
+
+implementation:
+  branch: codex/exec-p00-contracts
+  baseCommit: 567f23d2d9b423a98d0e88868c6cc2eb3859d16f
+  headCommit: pending
+```
+
+后续每个 PR 必须从前一个已验收 PR 的实际 HEAD 建分支，并独立记录 `baseCommit/headCommit`。执行顺序：
+
+1. PR-00：文档、ADR、基线和迁移策略。
+2. PR-01～PR-03：Host Bootstrap、可取消双层 Scheduler、Binding/Session 生命周期。
+3. PR-04A0～PR-04D：真实身份能力验证、AcceptedRequest、ChannelDeliveryOutbox、原子 Effect Receipt、Unknown Case。
+4. PR-05～PR-06：移动状态、原渠道可靠交付和 Decision 消歧。
+5. PR-07～PR-09：OpenCode Session 安全与 Capture。
+6. PR-10：真实 Owner 验收、Schema 封板和 Legacy 清理。
+
+硬门禁：
+
+- 微信/飞书用户可见 ACK 前，请求和最小 DPAPI 加密恢复载荷必须进入 `%LOCALAPPDATA%\Syno\state`。
+- 同一 OpenCode Session 只有一个 writer；Session Scheduler → Session Lease → Bridge Scheduler 的顺序不可反转。
+- Direct Effect `unknown` 只允许只读 reconcile，不允许重复写。
+- 最终结果默认回到原始渠道；跨渠道 fallback 默认关闭。
+- 自动测试、探针、真实运行和 Owner 验收不能互相替代。
+
+详细不可变边界见 ADR 0003–0005。PR-00～PR-03 完整回归和真实本机门禁通过前，不进入移动生产路径切换。
 
 ## 当前执行状态（2026-07-28）
 

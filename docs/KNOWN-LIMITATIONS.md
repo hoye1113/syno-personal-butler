@@ -5,6 +5,7 @@
 ## 发布门槛状态
 
 - 当前 Goal 状态为 `blocked`：P4.0–P4.6 已完成，P4.7 的真实渠道、自动执行与澄清、跨渠道连续性、重启恢复和下次 Windows 登录冷启动仍需主人验收；不得把自动测试、探针或当前任务 Running 状态表述为封板。
+- `567f23d` 是执行语义与移动可靠交付计划的审查基线，不是所有后续 PR 的永久父提交。当前实现尚未提供 ACK 前持久化、通用 ChannelDeliveryOutbox、Effect Receipt 或 Unknown Case Store；这些能力必须按 ADR 0003–0005 和 TODO 的新批次门禁交付，不能从文档目标推断为已实现。
 
 - token-cloud 固定模型五轮真实工具调用、故障持久等待和同模型恢复已通过，不再是发布门槛。
 - 微信 iLink 已完成扫码、Owner 绑定、4/4 连续回复、故障恢复和 durable seen ID 跨重启；主人直发真实 MD 收到 Artifact 回执，后台形成 Proposal 且未写入 vault。

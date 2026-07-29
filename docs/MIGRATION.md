@@ -20,7 +20,7 @@
 4. 将待迁移内容复制到仓库外的暂存目录，排除 `.obsidian/`、缓存、临时文件和凭据。
 5. 在暂存副本上运行知识契约与来源审计；不合格项形成待处理清单，不直接污染 `vault/`。
 6. 在隔离工作区自动执行把合格的新增笔记导入 `vault/`。覆盖、移动、合并、新 tag 和新 MOC 继续逐项产生可审计差异，整理冲突时暂停澄清。
-7. 运行 `python -m pytest vault/tests`、`pnpm test` 和 `pnpm verify`，记录 Git commit 与结果。
+7. 在 `vault/` 下运行 `python -m unittest discover -s tests -v`，并在仓库根运行 `pnpm test` 和 `pnpm verify`，记录 Git commit 与结果。
 8. 将 Syno 配置指向仓库内 `vault/`，保持原始知识库只读；此后不反向写回。
 
 当前已跟踪的 `vault/` 是经过上述边界建立的知识快照；原始 Obsidian 仓库仍是独立只读来源，不属于 Syno 运行目录。

@@ -1,4 +1,13 @@
-# Syno OpenCode 重构交接（2026-07-28）
+# Syno 执行语义与移动可靠交付交接（2026-07-29）
+
+## 当前实施入口
+
+- 审查基线：`567f23d2d9b423a98d0e88868c6cc2eb3859d16f`。
+- 当前实施分支：`codex/exec-p00-contracts`。
+- 新计划按 PR-00～PR-10 分批门控；当前只进入 PR-00，未把后续目标表述为已实现。
+- 微信、飞书是主要日常入口；ACK 前持久化、原渠道最终交付、ChannelDeliveryOutbox、Effect Receipt 和 Unknown Case Store 仍是待实现能力。
+- PR-00～PR-03 自动与真实本机门禁通过前，不进入移动投递切换；Owner 真实微信/飞书和 Windows 下次登录验收仍保留为 R6 独立门槛。
+- 执行语义见 `docs/adr/0003-execution-semantics.md`，移动交付见 `docs/adr/0004-mobile-delivery-contract.md`，迁移规则见 `docs/adr/0005-schema-migration-policy.md`。
 
 ## 当前 Goal 状态
 

@@ -21,7 +21,7 @@ Web / Weixin / Feishu / Scheduler
  ToolRegistry ── schema / risk / permission / retry / version
         │
         ▼
- SynoCore / AgentHost ── Policy / Job lifecycle / approval
+   SynoCore / AgentHost ── Policy / Job lifecycle / ambiguity decision
         │
         ▼
  Validator / GitGuard ── isolated diff / exact commit / pinned merge
@@ -59,12 +59,13 @@ External integrations are true external dependencies. Their transports are injec
 
 ## Transaction boundary
 
-Every write runs in a dedicated `syno/job/<job-id>` branch and worktree. After execution, Syno classifies the real Git diff instead of trusting the request label:
+Every repository write runs in a dedicated `syno/job/<job-id>` branch and worktree. After execution, Syno classifies the real Git diff instead of trusting the request label:
 
-1. Pure additive, non-sensitive diffs may merge after the initial approval.
-2. Modification, deletion, rename or sensitive-path diffs pause with a Markdown preview and require a second approval from the bound Owner's private channel or Web.
-3. The approval records both the candidate commit SHA and diff hash. GitGuard refuses a changed branch and merges only that pinned SHA.
-4. Deferred effects such as Feishu calendar calls run only after the approved Markdown merge; their result is reconciled back into Markdown.
+1. Explicit, policy-allowed writes execute automatically in an isolated worktree.
+2. Duplicate content, multiple valid destinations or insufficient information pause as a `PendingDecision`; risk alone does not recreate an approval gate.
+3. Source-root scope creep, disabled self-modification and disabled system control fail closed.
+4. GitGuard records the candidate commit SHA and diff hash, refuses a changed branch and merges only the validated SHA.
+5. Deferred effects such as Feishu calendar calls run only after the validated Markdown merge; their result is reconciled back into Markdown.
 
 Job files and immutable events are the recovery log. Per-job locks serialize state transitions and atomically lease `waiting_provider` retries, while request keys make retried channel messages idempotent.
 
@@ -72,9 +73,12 @@ Job files and immutable events are the recovery log. Per-job locks serialize sta
 
 - Repository truth: `vault/`, `ops/`, `config/`, `contracts/`.
 - Rebuildable cache: `.runtime/`.
-- Secrets and iLink session state: `%LOCALAPPDATA%\Syno\credentials` and `%LOCALAPPDATA%\Syno\state`.
+- Secrets: `%LOCALAPPDATA%\Syno\credentials`.
+- Durable local execution state, channel delivery and encrypted recovery payloads: `%LOCALAPPDATA%\Syno\state`.
 - All write worktrees: `.worktrees/syno-job-<id>`.
 
 OpenCode conversation bindings expire after 30 days; confirmed raw voice remains 7 days, failed payloads 30 days, and unfinished jobs remain until terminal state. Model outage never switches provider or runtime: deterministic local features continue and LLM jobs remain durable for retry.
 
-The Worker product path is `SignalEngine → PriorityEngine → ProactiveOrchestrator → CognitiveRuntime`.
+The single-Host proactive path is `SignalEngine → PriorityEngine → ProactiveOrchestrator → CognitiveRuntime`.
+
+微信与飞书是主要日常入口。用户可见 ACK 只能在请求进入可恢复事实源后发送；最终结果默认回到原始渠道。Web 是配置、诊断、桌面接管和完整审计入口，不是普通对话、写入或歧义决策的必经界面。完整边界见 ADR 0003–0005。
