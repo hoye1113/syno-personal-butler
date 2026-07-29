@@ -29,5 +29,5 @@
     "r6Readiness": { "ready": false, "blockers": ["OWNER_ACCEPTANCE_PENDING"] }
   },
   "ownerAcceptance": "pending_owner",
-  "notes": "不包含消息正文、凭据、Token、Cookie、PID 或本机敏感路径；当前提交主仓 Node 523/523、fresh clone Node 523/523，主仓 verify 1463 文件、fresh clone verify 1461 文件，Python 3.11 Vault unittest 均 57/57，工作区干净。Host 重启后计划任务 Running、health/readiness ready、微信/飞书 connected；Host lock 通过 Windows 进程启动时间身份核验。真实 Owner 渠道消息、手机操作、Windows 冷启动/注销重登及 v2 切换仍未验收。"
+  "notes": "不包含消息正文、凭据、Token、Cookie、PID 或本机敏感路径；当前提交主仓 Node 523/523、fresh clone Node 523/523，主仓 verify 1464 文件、fresh clone verify 1461 文件，Python 3.11 Vault unittest 均 57/57，工作区干净。Host 重启后计划任务 Running、health/readiness ready、微信/飞书 connected；Host lock 通过 Windows 进程启动时间身份核验。真实 Owner 渠道消息、手机操作、Windows 冷启动/注销重登及 v2 切换仍未验收。"
 }
