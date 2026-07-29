@@ -1,16 +1,18 @@
 {
   "version": 1,
-  "runAt": "2026-07-29T00:00:00+08:00",
-  "commit": "749cdd8ae6d87ca703dfb2839ae50efb1892cbbe",
+  "runAt": "2026-07-29T20:05:58+08:00",
+  "commit": "62ad13da171a849ab571458fc2fa08ca61710c28",
   "branch": "codex/exec-p10-r6-seal",
   "automated": {
-    "nodeTests": { "passed": 516, "failed": 0 },
-    "repositoryVerifyFiles": 1458,
+    "nodeTests": { "passed": 519, "failed": 0 },
+    "repositoryVerifyFiles": 1460,
     "activeDocumentationFiles": 7,
     "vaultPython311Unittest": { "passed": 57, "failed": 0 },
     "gitDiffCheck": "passed"
   },
   "freshClone": {
+    "status": "not_rerun_after_code_commit",
+    "lastVerifiedCommit": "749cdd8ae6d87ca703dfb2839ae50efb1892cbbe",
     "nodeTests": { "passed": 516, "failed": 0 },
     "repositoryVerifyFiles": 1454,
     "activeDocumentationFiles": 7,
@@ -22,8 +24,9 @@
     "weixin": { "ok": true, "configured": true, "ownerBound": true, "connected": true, "source": "running_worker" },
     "feishu": { "ok": true, "configured": true, "ownerBound": true, "connected": true, "source": "running_worker" },
     "windowsTask": { "installed": false, "running": false, "startup": "at_logon", "legacyTaskDetected": false },
+    "mobileDelivery": { "mode": "legacy", "v2Cutover": "owner_acceptance_ingress_freeze_and_legacy_drain_required" },
     "r6Readiness": { "ready": false, "blockers": ["OWNER_ACCEPTANCE_PENDING"] }
   },
   "ownerAcceptance": "pending_owner",
-  "notes": "不包含消息正文、凭据、Token、Cookie、PID 或本机敏感路径；真实 Owner 渠道、手机操作与 Windows 冷启动尚未验收。"
+  "notes": "不包含消息正文、凭据、Token、Cookie、PID 或本机敏感路径；真实 Owner 渠道、手机操作与 Windows 冷启动尚未验收。本轮 Python 3.11 解释器启动被 Windows 拒绝，保留上一轮 57/57 证据，不将本轮解释器失败计为 Vault 测试通过。"
 }
