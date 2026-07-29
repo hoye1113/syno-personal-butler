@@ -4,6 +4,12 @@ const SESSION_STATE_KNOWN = Object.freeze({
   DIRTY: "dirty",
 });
 
+const SESSION_RECOVERY_STRATEGY = Object.freeze({
+  ATTEMPT_SESSION: "attempt_session",
+  CONTROLLED_MESSAGE_COPY: "controlled_message_copy",
+  RETAIN_CURRENT_SESSION: "retain_current_session",
+});
+
 function normalizeSessionState(value) {
   return Object.values(SESSION_STATE_KNOWN).includes(value)
     ? value
@@ -41,19 +47,31 @@ function filterControlledMessages(messages) {
 }
 
 function inspectSessionRecoveryCapabilities(client) {
+  const readMessages = typeof client?.readMessages === "function" ? "client_seam_only" : "unsupported_by_client";
+  const fork = typeof client?.forkSession === "function" ? "client_seam_only" : "unsupported_by_client";
+  const clone = typeof client?.cloneSession === "function" ? "client_seam_only" : "unsupported_by_client";
   return Object.freeze({
-    readMessages: typeof client?.readMessages === "function" ? "verified_by_client" : "unsupported_by_client",
-    fork: typeof client?.forkSession === "function" ? "verified_by_client" : "unsupported_by_client",
-    clone: typeof client?.cloneSession === "function" ? "verified_by_client" : "unsupported_by_client",
+    readMessages,
+    fork,
+    clone,
+    strategy: selectSessionRecoveryStrategy({ readMessages, fork, clone }),
     conservativeFallback: "clean_and_abort_confirmed_only",
   });
 }
 
+function selectSessionRecoveryStrategy({ readMessages, fork, clone } = {}) {
+  if (fork === "verified" || clone === "verified") return SESSION_RECOVERY_STRATEGY.ATTEMPT_SESSION;
+  if (readMessages === "verified") return SESSION_RECOVERY_STRATEGY.CONTROLLED_MESSAGE_COPY;
+  return SESSION_RECOVERY_STRATEGY.RETAIN_CURRENT_SESSION;
+}
+
 export {
   SESSION_STATE_KNOWN,
+  SESSION_RECOVERY_STRATEGY,
   canFallbackAfterAttempt,
   filterControlledMessages,
   inspectSessionRecoveryCapabilities,
   normalizeSessionState,
   sessionStateAfterFailure,
+  selectSessionRecoveryStrategy,
 };

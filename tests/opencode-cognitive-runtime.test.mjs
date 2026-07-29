@@ -13,11 +13,13 @@ import {
 } from "../apps/syno/syno/opencode-cognitive-runtime.mjs";
 import {
   SESSION_STATE_KNOWN,
+  SESSION_RECOVERY_STRATEGY,
   canFallbackAfterAttempt,
   filterControlledMessages,
   inspectSessionRecoveryCapabilities,
   normalizeSessionState,
   sessionStateAfterFailure,
+  selectSessionRecoveryStrategy,
 } from "../apps/syno/syno/opencode-session-safety.mjs";
 import { assertCognitiveCapabilities } from "../apps/syno/syno/cognitive-runtime.mjs";
 
@@ -69,8 +71,12 @@ test("Session fallback safety is fail-closed and controlled-message copy strips 
     readMessages: "unsupported_by_client",
     fork: "unsupported_by_client",
     clone: "unsupported_by_client",
+    strategy: SESSION_RECOVERY_STRATEGY.RETAIN_CURRENT_SESSION,
     conservativeFallback: "clean_and_abort_confirmed_only",
   });
+  assert.equal(selectSessionRecoveryStrategy({ fork: "verified" }), SESSION_RECOVERY_STRATEGY.ATTEMPT_SESSION);
+  assert.equal(selectSessionRecoveryStrategy({ readMessages: "verified" }), SESSION_RECOVERY_STRATEGY.CONTROLLED_MESSAGE_COPY);
+  assert.equal(selectSessionRecoveryStrategy({ fork: "unknown", readMessages: "unknown" }), SESSION_RECOVERY_STRATEGY.RETAIN_CURRENT_SESSION);
 });
 
 function bridgeTools() {
@@ -96,6 +102,7 @@ test("OpenCodeCognitiveRuntime declares the locked v2 capability contract", () =
       readMessages: "unsupported_by_client",
       fork: "unsupported_by_client",
       clone: "unsupported_by_client",
+      strategy: "retain_current_session",
       conservativeFallback: "clean_and_abort_confirmed_only",
     },
     directFileAccess: false,
