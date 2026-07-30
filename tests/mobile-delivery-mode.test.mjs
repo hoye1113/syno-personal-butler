@@ -118,5 +118,6 @@ test("mobile delivery diagnostics expose only aggregate AcceptedRequest, Outbox 
     acceptedRequests: { total: 2, byStatus: { accepted: 1, delivered: 1 } },
     outbox: { total: 2, byStatus: { pending: 1, delivery_unknown: 1 } },
     unknownCases: { total: 1, byStatus: { open: 1 } },
+    proactive: { eligibleSignals: 0, pendingBundles: 0, deliveryUnknown: 0, homeChannel: null, homeTargetAvailable: false, lastDeliveredAt: null },
   });
 });

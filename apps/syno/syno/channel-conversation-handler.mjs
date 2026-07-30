@@ -26,7 +26,7 @@ function workflowStatusText(workflow) {
 }
 
 class ChannelConversationHandler {
-  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelDeliveryOutbox, mobileDeliveryMode, wakeDelivery } = {}) {
+  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery } = {}) {
     if (!runtime || !core || (!ingest && !ingestWorkflows) || !pendingDecisions) throw new Error("ChannelConversationHandler 缺少 Runtime、Core、IngestWorkflow 或 PendingDecision Store");
     this.runtime = runtime;
     this.core = core;
@@ -42,6 +42,7 @@ class ChannelConversationHandler {
     this.recentInteractions = recentInteractions;
     this.channelDeliveryOutbox = channelDeliveryOutbox;
     this.mobileDeliveryMode = mobileDeliveryMode;
+    this.ownerChannelTargets = ownerChannelTargets;
     this.wakeDelivery = wakeDelivery;
   }
 
@@ -109,6 +110,21 @@ class ChannelConversationHandler {
         payload: { text, attachments: attachmentRefs },
         deliveryTarget: this.#deliveryTarget(message),
       });
+      const deliveryTarget = this.#deliveryTarget(message);
+      if (deliveryTarget && this.ownerChannelTargets?.set) {
+        try {
+          await this.ownerChannelTargets.set(trace.ownerKey, trace.channel, deliveryTarget);
+          await this.channelDeliveryOutbox?.wakeTarget?.(trace.ownerKey, trace.channel);
+          await this.wakeDelivery?.();
+        } catch (error) {
+          await this.#record("proactive.target_unavailable", {
+            ownerKey: trace.ownerKey,
+            channel: trace.channel,
+            status: "target_persist_failed",
+            error: { code: error.code || "CHANNEL_TARGET_PERSIST_FAILED" },
+          }, { level: "error" });
+        }
+      }
       await this.#record("accepted_request.shadow_persisted", { ...trace, created: accepted.created === true });
       return accepted;
     } catch (error) {

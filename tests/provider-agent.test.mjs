@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { ConversationStore } from "../apps/syno/syno/conversation-store.mjs";
+import { ChannelDeliveryOutbox } from "../apps/syno/syno/channel-delivery-outbox.mjs";
 import { executeDomainOperation } from "../apps/syno/syno/domain-operations.mjs";
 import { PriorityEngine } from "../apps/syno/syno/priority-engine.mjs";
 import { ProactiveOrchestrator, isQuietTime, localMessage } from "../apps/syno/syno/proactive-orchestrator.mjs";
@@ -225,9 +226,8 @@ test("Signal and Priority engines are deterministic and notification-bounded", (
   assert.deepEqual(priority.allocate(20), { digest: 12, ingest: 5, maintenance: 3 });
   const signal = new SignalEngine({ schedule: { morningHour: 8, eveningHour: 20, weeklyDay: 0, maxDailyNotifications: 3 } });
   const now = new Date("2026-07-19T21:00:00+08:00");
-  assert.equal(signal.collect({ now, notificationsToday: 2, highValueEvents: [{ id: "e1" }] }).length, 2); // daily slice 1 + weekly 独立 1
-  // 日常配额满时仍返回 weekly（周度复盘独立于日常配额）
-  assert.deepEqual(signal.collect({ now, notificationsToday: 3 }), [{ kind: "weekly", key: "weekly:2026-07-19" }]);
+  assert.equal(signal.collect({ now, notificationsToday: 2, highValueEvents: [{ id: "e1" }] }).length, 4); // event + morning + evening + weekly 合并为一个 Bundle
+  assert.deepEqual(signal.collect({ now, notificationsToday: 3 }), []);
   assert.match(localDateKey(now), /^2026-07-/);
 });
 
@@ -242,9 +242,22 @@ test("ProactiveOrchestrator drives the single Agent but keeps local fallback and
   } };
   const today = { async snapshot() { return { priorities: [{ title: "复习 Tool Loop" }], allocation: { digest: 6, ingest: 3, maintenance: 1 } }; } };
   const channels = { async send(message) { messages.push(message); return { web: { delivered: true } }; } };
+  const outbox = new ChannelDeliveryOutbox({
+    root: path.join(root, "outbox"),
+    payloadRoot: path.join(root, "payloads"),
+    lockFile: path.join(root, "outbox.lock"),
+    protect: async (value) => value,
+    unprotect: async (value) => value,
+  });
   const conversations = { async prune() { return []; } };
-  const proactive = new ProactiveOrchestrator({
+  let proactive;
+  proactive = new ProactiveOrchestrator({
     host, today, channels, conversations,
+    channelDeliveryOutbox: outbox,
+    wakeDelivery: () => outbox.deliverDue(
+      async (payload, event) => (await channels.send(payload, [event.targetChannel]))[event.targetChannel],
+      { onDelivered: (event) => proactive.markBundleDelivered(event.sourceId, event.eventId) },
+    ),
     signalEngine: new SignalEngine({ schedule: { morningHour: 8, eveningHour: 20, weeklyDay: 0, maxDailyNotifications: 1 } }),
     stateFile: path.join(root, "state.json"), quietHours: { start: "23:00", end: "07:00" },
   });
@@ -285,17 +298,30 @@ test("ProactiveOrchestrator uses a separate OpenCode proactive session and appen
   assert.match(calls[1][3], /先复习 Tool Bridge/);
 });
 
-test("ProactiveOrchestrator weekly signal calls maintenance.weeklySummary and targets all channels", async (t) => {
+test("ProactiveOrchestrator weekly signal calls maintenance.weeklySummary and targets only the Home Channel", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-proactive-weekly-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const sends = [];
   const host = { async receive() { return { job: { id: "job-w", status: "waiting_provider" } }; } };
   const today = { async snapshot() { return { priorities: [], allocation: { digest: 1, ingest: 1, maintenance: 1 } }; } };
   const channels = { async send(message, targets) { sends.push({ message, targets }); return { web: { delivered: true } }; } };
+  const outbox = new ChannelDeliveryOutbox({
+    root: path.join(root, "outbox"),
+    payloadRoot: path.join(root, "payloads"),
+    lockFile: path.join(root, "outbox.lock"),
+    protect: async (value) => value,
+    unprotect: async (value) => value,
+  });
   const conversations = { async prune() { return []; } };
   const maintenance = { async weeklySummary() { return { generatedAt: "x", totalOrphans: 5, topics: [{ topic: "01-Areas", count: 3, items: [] }, { topic: "02-Resources", count: 2, items: [] }] }; } };
-  const proactive = new ProactiveOrchestrator({
+  let proactive;
+  proactive = new ProactiveOrchestrator({
     host, today, channels, conversations, maintenance,
+    channelDeliveryOutbox: outbox,
+    wakeDelivery: () => outbox.deliverDue(
+      async (payload, event) => (await channels.send(payload, [event.targetChannel]))[event.targetChannel],
+      { onDelivered: (event) => proactive.markBundleDelivered(event.sourceId, event.eventId) },
+    ),
     signalEngine: new SignalEngine({ schedule: { morningHour: 8, eveningHour: 20, weeklyDay: 0, maxDailyNotifications: 3 } }),
     stateFile: path.join(root, "state.json"), quietHours: { start: "23:00", end: "07:00" },
   });
@@ -305,24 +331,31 @@ test("ProactiveOrchestrator weekly signal calls maintenance.weeklySummary and ta
   assert.ok(weeklySend, "weekly signal should be sent");
   assert.match(weeklySend.message.body, /5 篇孤岛/);
   assert.match(weeklySend.message.body, /01-Areas/);
-  assert.deepEqual(weeklySend.targets, ["web", "windows", "weixin", "feishu"]);
+  assert.deepEqual(weeklySend.targets, ["web"]);
   assert.ok(weeklySend.message.text.includes(weeklySend.message.title), "message should carry self-contained text for weixin/feishu");
 });
 
-test("weekly signal is independent of the daily notification budget", () => {
+test("weekly uses an ISO-week identity and shares the Bundle notification budget", () => {
   const signal = new SignalEngine({ schedule: { morningHour: 8, eveningHour: 20, weeklyDay: 0, maxDailyNotifications: 2 } });
   const sunday = new Date("2026-07-19T09:00:00+08:00"); // 周日早晨
   const morning = signal.collect({ now: sunday, notificationsToday: 0, maxDailyNotifications: 2 });
-  assert.ok(morning.some((s) => s.kind === "weekly"), "weekly fires on Sunday morning");
+  assert.ok(morning.some((s) => s.key === "weekly:2026-W29"), "weekly fires once for the ISO week");
   assert.ok(morning.some((s) => s.kind === "morning"), "morning also fires");
-  // 晚上日常配额已用 1（morning）；weekly 不占配额，evening 仍可触发（修复 weekly 挤掉 evening 的 bug）
+  // morning + weekly 同 tick 合并为一个 Bundle，因此这里只消耗一次预算。
   const evening = signal.collect({
     now: new Date("2026-07-19T21:00:00+08:00"),
-    lastRuns: { morning: "2026-07-19", weekly: "2026-07-19" },
+    lastRuns: { "morning:2026-07-19": "2026-07-19", "weekly:2026-W29": "2026-07-19" },
     notificationsToday: 1,
     maxDailyNotifications: 2,
   });
-  assert.ok(evening.some((s) => s.kind === "evening"), "evening still fires because weekly did not consume daily budget");
+  assert.deepEqual(evening, [{ kind: "evening", key: "evening:2026-07-19" }]);
+  assert.deepEqual(signal.collect({ now: sunday, notificationsToday: 2, maxDailyNotifications: 2 }), []);
+  assert.deepEqual(signal.collect({
+    now: new Date("2026-07-19T21:00:00+08:00"),
+    lastRuns: { morning: "2026-07-19", evening: "2026-07-19", weekly: "2026-07-19" },
+    notificationsToday: 0,
+    maxDailyNotifications: 2,
+  }), [], "v1 cadence keys remain readable during the migration window");
 });
 
 test("localMessage daily fallback uses allocation.ingest (not capture) and carries text", () => {

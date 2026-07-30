@@ -8,7 +8,7 @@ import { runDpapi } from "./provider-credential-store.mjs";
 
 const CHANNEL_DELIVERY_OUTBOX_VERSION = 2;
 const DELIVERY_STATUSES = new Set(["pending", "claimed", "delivered", "failed_retryable", "failed_terminal", "delivery_unknown", "superseded"]);
-const RESPONSE_KINDS = new Set(["ack", "progress", "decision", "final", "recovery"]);
+const RESPONSE_KINDS = new Set(["ack", "progress", "decision", "final", "recovery", "proactive"]);
 
 function canonicalize(value) {
   if (Array.isArray(value)) return value.map(canonicalize);
@@ -147,6 +147,10 @@ class ChannelDeliveryOutbox {
         dueAt: dueAt || this.#defaultDueAt(responseKind, now, records, sourceId),
         attempts: 0,
         claim: null,
+        projectionAttempts: 0,
+        projectedAt: null,
+        nextProjectionAt: null,
+        projectionErrorCode: null,
         supersedesEventId: supersedesEventId || null,
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
@@ -191,6 +195,28 @@ class ChannelDeliveryOutbox {
       && (!dueBefore || new Date(item.dueAt).getTime() <= dueMs)).slice(0, Math.max(1, Number(limit) || 100));
   }
 
+  async wakeTarget(ownerKey, targetChannel, { now = this.clock() } = {}) {
+    if (!ownerKey || !targetChannel) return 0;
+    return this.processLock.run(async () => {
+      const records = await this.#listUnlocked();
+      const blocked = records.filter((item) =>
+        item.sourceType === "proactive_bundle"
+        && item.ownerKey === ownerKey
+        && item.targetChannel === targetChannel
+        && item.status === "failed_retryable"
+        && ["CHANNEL_TARGET_MISSING", "CHANNEL_TARGET_UNAVAILABLE"].includes(item.lastErrorCode));
+      for (const record of blocked) {
+        await this.#updateUnlocked(record.eventId, {
+          status: "pending",
+          dueAt: new Date(now).toISOString(),
+          nextAttemptAt: null,
+          lastErrorCode: null,
+        });
+      }
+      return blocked.length;
+    });
+  }
+
   async #claimLease(id, now) {
     await this.#ensureRoots();
     const file = leaseFile(this.root, id);
@@ -228,14 +254,43 @@ class ChannelDeliveryOutbox {
       && ["pending", "claimed", "delivery_unknown", "failed_retryable"].includes(item.status));
   }
 
-  async deliverDue(send, { now = this.clock(), limit = 100 } = {}) {
+  async deliverDue(send, { now = this.clock(), limit = 100, onDelivered, onDeliveryUnknown } = {}) {
     if (typeof send !== "function") throw new Error("ChannelDeliveryOutbox.deliverDue 需要发送函数");
     const max = Math.max(1, Number(limit) || 100);
-    const report = { scanned: 0, delivered: 0, retryable: 0, terminal: 0, unknown: 0, superseded: 0 };
+    const report = { scanned: 0, delivered: 0, retryable: 0, terminal: 0, unknown: 0, superseded: 0, projected: 0, projectionFailed: 0 };
     while (report.scanned < max) {
       const records = await this.#listUnlocked();
+      const projection = typeof onDelivered === "function"
+        ? records
+          .filter((item) => item.status === "delivered" && !item.projectedAt
+            && new Date(item.nextProjectionAt || 0).getTime() <= new Date(now).getTime())
+          .sort((a, b) => String(a.deliveredAt || a.updatedAt).localeCompare(String(b.deliveredAt || b.updatedAt)))[0]
+        : null;
+      if (projection) {
+        report.scanned += 1;
+        const projectionAttempts = Number(projection.projectionAttempts || 0) + 1;
+        try {
+          await onDelivered(projection);
+          await this.processLock.run(() => this.#updateUnlocked(projection.eventId, {
+            projectionAttempts,
+            projectedAt: this.clock().toISOString(),
+            nextProjectionAt: null,
+            projectionErrorCode: null,
+          }));
+          report.projected += 1;
+        } catch (error) {
+          await this.processLock.run(() => this.#updateUnlocked(projection.eventId, {
+            projectionAttempts,
+            nextProjectionAt: new Date(this.clock().getTime() + backoff(projectionAttempts, this.retryBaseMs)).toISOString(),
+            projectionErrorCode: error?.code || "DELIVERY_PROJECTION_FAILED",
+          }));
+          report.projectionFailed += 1;
+        }
+        continue;
+      }
       const candidate = records
-        .filter((item) => ["pending", "delivery_unknown", "failed_retryable"].includes(item.status)
+        .filter((item) => (["pending", "delivery_unknown", "failed_retryable"].includes(item.status)
+            || (item.status === "claimed" && new Date(item.claim?.leaseExpiresAt || 0).getTime() <= new Date(now).getTime()))
           && new Date(item.nextAttemptAt || item.dueAt).getTime() <= new Date(now).getTime()
           && !this.#blockedByEarlier(item, records))
         .sort((a, b) => Number(a.responseVersion) - Number(b.responseVersion) || String(a.createdAt).localeCompare(String(b.createdAt)))[0];
@@ -255,7 +310,8 @@ class ChannelDeliveryOutbox {
           await this.processLock.run(() => this.#updateUnlocked(candidate.eventId, { status: "delivered", claim: null, deliveredAt: this.clock().toISOString() }));
           report.delivered += 1;
         } else if (result?.deliveryUnknown === true) {
-          await this.processLock.run(() => this.#updateUnlocked(candidate.eventId, { status: "delivery_unknown", claim: null, nextAttemptAt: new Date(this.clock().getTime() + backoff(claimed.attempts, this.retryBaseMs)).toISOString(), lastErrorCode: result.reason || "DELIVERY_UNKNOWN" }));
+          const unknown = await this.processLock.run(() => this.#updateUnlocked(candidate.eventId, { status: "delivery_unknown", claim: null, nextAttemptAt: new Date(this.clock().getTime() + backoff(claimed.attempts, this.retryBaseMs)).toISOString(), lastErrorCode: result.reason || "DELIVERY_UNKNOWN" }));
+          await onDeliveryUnknown?.(unknown);
           report.unknown += 1;
         } else if (result?.retryable !== false) {
           await this.processLock.run(() => this.#updateUnlocked(candidate.eventId, { status: "failed_retryable", claim: null, dueAt: new Date(this.clock().getTime() + backoff(claimed.attempts, this.retryBaseMs)).toISOString(), lastErrorCode: result?.reason || "DELIVERY_RETRYABLE" }));

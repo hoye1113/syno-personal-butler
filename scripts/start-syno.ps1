@@ -8,6 +8,8 @@ $resolvedRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 $resolvedNode = (Resolve-Path -LiteralPath $NodePath).Path
 $commonScript = Join-Path $PSScriptRoot "windows-service-common.ps1"
 . $commonScript
+$logPolicyScript = Join-Path $PSScriptRoot "syno-launcher-log-policy.ps1"
+. $logPolicyScript
 # Canonical web port: mirror apps/syno/syno/paths.mjs DEFAULT_WEB_PORT (PORT env overrides).
 $synoPort = if ($env:PORT) { [int]$env:PORT } else { 8888 }
 $server = Join-Path $resolvedRoot "apps\syno\server.mjs"
@@ -19,12 +21,20 @@ $logBase = if ([string]::IsNullOrWhiteSpace([string]$env:LOCALAPPDATA)) { $runti
 $logRoot = Join-Path $logBase "Syno\logs"
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
 $logPath = Join-Path $logRoot ("windows-task-{0}.jsonl" -f (Get-Date -Format "yyyy-MM-dd"))
+$script:synoLogPath = $logPath
+$script:launcherLogPolicyState = New-SynoLauncherLogPolicyState
+Get-ChildItem -LiteralPath $logRoot -Filter "windows-task-*.jsonl" -File -ErrorAction SilentlyContinue |
+  Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-14) } |
+  Remove-Item -Force -ErrorAction SilentlyContinue
 
 function Write-SynoLauncherLog([string]$Event, $Fields = @{}) {
   try {
+    if (-not (Test-SynoLauncherLogDue -State $script:launcherLogPolicyState -Event $Event -Now ([DateTime]::UtcNow))) { return }
+    $currentLogPath = Join-Path $logRoot ("windows-task-{0}.jsonl" -f (Get-Date -Format "yyyy-MM-dd"))
+    if ($script:synoLogPath -ne $currentLogPath) { $script:synoLogPath = $currentLogPath }
     $record = [ordered]@{ ts = [DateTime]::UtcNow.ToString("o"); event = $Event; repoFingerprint = $repoFingerprint }
     foreach ($entry in $Fields.GetEnumerator()) { $record[$entry.Key] = $entry.Value }
-    ($record | ConvertTo-Json -Compress -Depth 5) | Add-Content -LiteralPath $logPath -Encoding UTF8
+    ($record | ConvertTo-Json -Compress -Depth 5) | Add-Content -LiteralPath $script:synoLogPath -Encoding UTF8
   } catch { }
 }
 

@@ -247,6 +247,9 @@ test("Windows task restart and uninstall own the exact Node child through a PID 
   assert.doesNotMatch(manager, /try \{ Stop-SynoHost \} catch \{ \}/, "replacement cleanup failures must not be swallowed");
   assert.match(manager, /function Stop-SynoWrappers[\s\S]*Get-CimInstance Win32_Process[\s\S]*Test-SynoWrapperProcess/);
   assert.match(launcher, /same-session node\.exe[\s\S]*Win32_Process details are inaccessible/);
+  assert.match(launcher, /syno-launcher-log-policy\.ps1/);
+  assert.match(launcher, /Test-SynoLauncherLogDue/);
+  assert.match(launcher, /AddDays\(-14\)/);
   assert.match(manager, /"Uninstall"[\s\S]*KeepHostRunning[\s\S]*Stop-SynoWrappers/, "Web uninstall must retire task wrappers without killing the Host");
   const installStart = manager.indexOf('"Install"');
   const rollbackTry = manager.indexOf("    try {", installStart);
@@ -289,6 +292,30 @@ test("Windows service common policy rejects unknown health and stale PID ownersh
   const command = `. '${common}'; $repo='C:\\Syno'; $node='C:\\Node\\node.exe'; $server='C:\\Syno\\apps\\syno\\server.mjs'; $fp=Get-SynoRepoFingerprint $repo; $good=[pscustomobject]@{ok=$true;product='syno-personal-butler';protocolVersion=2;repoFingerprint=$fp}; $legacy=[pscustomobject]@{ok=$true;product='syno-personal-butler';protocolVersion=1;repoFingerprint=$fp}; $unknown=[pscustomobject]@{ok=$true}; $started=[datetime]'2026-07-20T00:00:00Z'; $process=[pscustomobject]@{Path=$node;StartTime=$started}; $details=[pscustomobject]@{CommandLine='node C:\\Syno\\apps\\syno\\server.mjs'}; $owned=[pscustomobject]@{version=1;nodePath=$node;serverPath=$server;repoRoot=$repo;startedAt=$started.ToUniversalTime().ToString('o')}; $stale=[pscustomobject]@{version=1;nodePath=$node;serverPath=$server;repoRoot=$repo;startedAt='2026-07-19T00:00:00.0000000Z'}; [ordered]@{goodHealth=(Test-SynoHealthResponse $good $fp);legacyHealth=(Test-SynoHealthResponse $legacy $fp);unknownHealth=(Test-SynoHealthResponse $unknown $fp);owned=(Test-SynoOwnershipRecord $owned $process $details $node $server $repo);stale=(Test-SynoOwnershipRecord $stale $process $details $node $server $repo)} | ConvertTo-Json -Compress`;
   const { stdout } = await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], { windowsHide: true });
   assert.deepEqual(JSON.parse(stdout.trim()), { goodHealth: true, legacyHealth: false, unknownHealth: false, owned: true, stale: false });
+});
+
+test("launcher log policy caps healthy five-second polling to hourly heartbeats without hiding failures", { skip: process.platform !== "win32" }, async () => {
+  const policyPath = path.join(root, "scripts", "syno-launcher-log-policy.ps1").replaceAll("'", "''");
+  const script = [
+    `. '${policyPath}'`,
+    "$state = New-SynoLauncherLogPolicyState",
+    "$start = [DateTime]'2026-07-30T00:00:00Z'",
+    "$health = 0",
+    "$adopted = 0",
+    "$failed = 0",
+    "for ($seconds = 0; $seconds -lt 86400; $seconds += 5) {",
+    "  $now = $start.AddSeconds($seconds)",
+    "  if (Test-SynoLauncherLogDue -State $state -Event 'launcher.health_ok' -Now $now) { $health++ }",
+    "  if (Test-SynoLauncherLogDue -State $state -Event 'launcher.adopted' -Now $now) { $adopted++ }",
+    "  if (Test-SynoLauncherLogDue -State $state -Event 'launcher.failed' -Now $now) { $failed++ }",
+    "}",
+    "[ordered]@{ health = $health; adopted = $adopted; failed = $failed } | ConvertTo-Json -Compress",
+  ].join("; ");
+  const result = JSON.parse(await runPowerShell(script));
+
+  assert.equal(result.health, 24);
+  assert.equal(result.adopted, 24);
+  assert.equal(result.failed, 17_280);
 });
 
 test("Windows service common policy recognizes only this repository's launcher wrapper", { skip: process.platform !== "win32" }, async () => {

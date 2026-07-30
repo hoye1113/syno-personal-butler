@@ -62,6 +62,7 @@ import { AcceptedRequestStore } from "./accepted-request-store.mjs";
 import { AcceptedRequestRecoveryWorker } from "./accepted-request-recovery.mjs";
 import { ChannelDeliveryOutbox } from "./channel-delivery-outbox.mjs";
 import { MobileDeliveryMode } from "./mobile-delivery-mode.mjs";
+import { OwnerChannelTargetStore } from "./proactive-reliability.mjs";
 import { EffectReceiptStore } from "./effect-receipt-store.mjs";
 import { EffectReconciliationCaseStore } from "./effect-reconciliation-case-store.mjs";
 import { EffectReconciliationWorker } from "./effect-reconciliation-worker.mjs";
@@ -215,6 +216,7 @@ function createSynoRuntime(options = {}) {
     ? (options.acceptedRecovery || new AcceptedRequestRecoveryWorker({ store: acceptedRequests }))
     : null;
   const channelDeliveryOutbox = options.channelDeliveryOutbox || (process.env.NODE_ENV === "test" ? null : new ChannelDeliveryOutbox());
+  const ownerChannelTargets = options.ownerChannelTargets || (process.env.NODE_ENV === "test" ? null : new OwnerChannelTargetStore());
   const mobileDeliveryMode = options.mobileDeliveryMode instanceof MobileDeliveryMode
     ? options.mobileDeliveryMode
     : new MobileDeliveryMode({ mode: options.mobileDeliveryMode || "legacy" });
@@ -647,6 +649,7 @@ function createSynoRuntime(options = {}) {
     acceptedRequests,
     recentInteractions,
     channelDeliveryOutbox,
+    ownerChannelTargets,
     mobileDeliveryMode,
     wakeDelivery: () => drainChannelDeliveryOutbox().catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })),
   });
@@ -842,7 +845,7 @@ function createSynoRuntime(options = {}) {
   reports = new ReportService({ host, knowledge, notifications, channels, gitGuard });
   const today = options.today || new TodayService({ goals, learning, host, settingsRegistry, signalSources, planner });
   core = new SynoCore({ host, knowledge, notifications, channels, reports, today });
-  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance: knowledgeMaintenance });
+  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance: knowledgeMaintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery: () => drainChannelDeliveryOutbox().catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })), recordEvent });
   const approvalAdvisor = options.approvalAdvisor || new ApprovalAdvisor({ provider, ingest });
   let channelRecoveryTimer = null;
   let providerRecoveryTimer = null;
@@ -895,21 +898,65 @@ function createSynoRuntime(options = {}) {
   async function drainChannelDeliveryOutbox() {
     if (!channelDeliveryOutbox || !channels) return { skipped: true };
     return channelDeliveryOutbox.deliverDue(async (payload, event) => {
+      let persistedTarget = null;
+      if (event.sourceType === "proactive_bundle") {
+        try {
+          persistedTarget = await ownerChannelTargets?.get?.(event.ownerKey, event.targetChannel) || null;
+        } catch (error) {
+          await recordEvent("proactive.target_unavailable", {
+            bundleId: event.sourceId,
+            signalCount: Array.isArray(payload.signalVersions) ? payload.signalVersions.length : 0,
+            channel: event.targetChannel,
+            outboxEventId: event.eventId,
+            status: "target_decrypt_failed",
+            error,
+          }, { level: "error" });
+          return { retryable: true, reason: "CHANNEL_TARGET_UNAVAILABLE" };
+        }
+        if (["weixin", "feishu"].includes(event.targetChannel) && !persistedTarget) {
+          await recordEvent("proactive.target_unavailable", {
+            bundleId: event.sourceId,
+            signalCount: Array.isArray(payload.signalVersions) ? payload.signalVersions.length : 0,
+            channel: event.targetChannel,
+            outboxEventId: event.eventId,
+            status: "target_missing",
+          });
+          return { retryable: true, reason: "CHANNEL_TARGET_MISSING" };
+        }
+      }
       const results = await channels.send({
         ...payload,
-        ...(event.deliveryTarget || {}),
+        ...(event.sourceType === "proactive_bundle" ? (persistedTarget || {}) : (event.deliveryTarget || {})),
         eventId: event.eventId,
         deliveryKey: event.deliveryKey,
       }, [event.targetChannel]);
-      const result = results[event.targetChannel] || { delivered: false, reason: "channel_missing" };
-      if (result.delivered === true && event.sourceType === "accepted_request" && acceptedRequests) {
-        if (["final", "decision", "recovery"].includes(event.responseKind)) {
-          await acceptedRequests.update(event.sourceId, { status: "delivered", finalEventId: event.eventId, claim: null }).catch(() => {});
-        } else if (event.responseKind === "ack") {
-          await acceptedRequests.update(event.sourceId, { ackEventId: event.eventId }).catch(() => {});
+      return results[event.targetChannel] || { delivered: false, reason: "channel_missing" };
+    }, {
+      onDelivered: async (event) => {
+        if (event.sourceType === "accepted_request" && acceptedRequests) {
+          if (["final", "decision", "recovery"].includes(event.responseKind)) {
+            await acceptedRequests.update(event.sourceId, { status: "delivered", finalEventId: event.eventId, claim: null });
+          } else if (event.responseKind === "ack") {
+            await acceptedRequests.update(event.sourceId, { ackEventId: event.eventId });
+          }
+        } else if (event.sourceType === "proactive_bundle") {
+          await proactive.markBundleDelivered(event.sourceId, event.eventId);
         }
-      }
-      return result;
+      },
+      onDeliveryUnknown: async (event) => {
+        if (event.sourceType !== "proactive_bundle") return;
+        await notifications?.updateDeliveryStatus?.(event.deliveryKey, {
+          status: "delivery_unknown",
+          outboxEventId: event.eventId,
+        });
+        await recordEvent("proactive.bundle.delivery_unknown", {
+          bundleId: event.sourceId,
+          signalCount: 0,
+          channel: event.targetChannel,
+          outboxEventId: event.eventId,
+          status: event.status,
+        }, { level: "warning" });
+      },
     });
   }
   async function startOpenCodeSecurely({ restart = false } = {}) {
@@ -944,6 +991,7 @@ function createSynoRuntime(options = {}) {
     acceptedRequests,
     acceptedRecovery,
     channelDeliveryOutbox,
+    ownerChannelTargets,
     mobileDeliveryMode,
     effectReceipts,
     reconciliationCases,
@@ -1193,6 +1241,7 @@ async function routeSynoApi(runtime, req, url, readBody) {
       acceptedRequests: { total: accepted.length, byStatus: aggregate(accepted) },
       outbox: { total: outbox.length, byStatus: aggregate(outbox) },
       unknownCases: { total: unknownCases.length, byStatus: aggregate(unknownCases) },
+      proactive: await runtime.proactive?.getDiagnostics?.() || { eligibleSignals: 0, pendingBundles: 0, deliveryUnknown: 0, homeChannel: null, homeTargetAvailable: false, lastDeliveredAt: null },
     };
   }
   if (method === "GET" && url.pathname === "/api/syno/recent-interactions") return runtime.recentInteractions.snapshot({ ownerKey: "local-user", channel: url.searchParams.get("channel") || undefined, threadKey: url.searchParams.get("thread") || "main" });

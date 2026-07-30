@@ -22,12 +22,18 @@ test("ChannelConversationHandler routes ordinary cross-channel messages to one O
 test("ChannelConversationHandler shadow-persists mobile text before model execution without changing reply flow", async () => {
   const accepted = [];
   const runs = [];
+  const targets = [];
+  const targetWakeups = [];
+  let wakes = 0;
   const handler = new ChannelConversationHandler({
     runtime: { async run(request) { runs.push(request); return { text: "shadow-reply" }; } },
     core: {},
     ingest: {},
     pendingDecisions: {},
     acceptedRequests: { async accept(input) { accepted.push(input); return { created: true, request: { requestId: "request-1" } }; } },
+    ownerChannelTargets: { async set(ownerKey, channel, target) { targets.push({ ownerKey, channel, target }); } },
+    channelDeliveryOutbox: { async wakeTarget(ownerKey, channel) { targetWakeups.push({ ownerKey, channel }); } },
+    wakeDelivery: async () => { wakes += 1; },
   });
   const response = await handler.handle({
     id: "wx-shadow-1",
@@ -44,6 +50,9 @@ test("ChannelConversationHandler shadow-persists mobile text before model execut
   assert.equal(accepted[0].platformMessageId, "wx-shadow-1");
   assert.deepEqual(accepted[0].payload, { text: "移动 shadow 测试", attachments: [] });
   assert.deepEqual(accepted[0].deliveryTarget, { toUserId: "owner", contextToken: "context-token" });
+  assert.deepEqual(targets, [{ ownerKey: "owner", channel: "weixin", target: { toUserId: "owner", contextToken: "context-token" } }]);
+  assert.deepEqual(targetWakeups, [{ ownerKey: "owner", channel: "weixin" }]);
+  assert.equal(wakes, 1);
 });
 
 test("ChannelConversationHandler receives URL before invoking the model and records source message identity", async () => {

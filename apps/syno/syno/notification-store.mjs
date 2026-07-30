@@ -40,6 +40,26 @@ class NotificationStore {
     }
     return records.sort((a, b) => b.created.localeCompare(a.created));
   }
+
+  async updateDeliveryStatus(idempotencyKey, { status, outboxEventId } = {}) {
+    const key = String(idempotencyKey || "");
+    const allowed = new Set(["pending", "delivered", "delivery_unknown", "failed_retryable", "failed_terminal"]);
+    if (!key || !allowed.has(status) || !/^[A-Za-z0-9._:-]{1,200}$/.test(String(outboxEventId || ""))) {
+      throw Object.assign(new Error("通知投递状态参数非法"), { code: "NOTIFICATION_DELIVERY_STATUS_INVALID" });
+    }
+    const id = `notice-${createHash("sha256").update(key).digest("hex").slice(0, 12)}`;
+    const root = path.join(this.runtimeRoot, "notifications");
+    for (const file of await walkRecords(root)) {
+      if (path.basename(file) !== `${id}.md`) continue;
+      const record = await readRecord(file);
+      record.data = { ...(record.data || {}), idempotencyKey: key, outboxEventId: String(outboxEventId), status };
+      await writeRecord(file, record, { title: record.title, summaryKeys: ["id", "level", "source", "read", "created"] });
+      record.recordPath = null;
+      record.statePath = `local-state://notifications/${path.relative(root, file).replace(/\\/g, "/")}`;
+      return record;
+    }
+    return null;
+  }
 }
 
 export { NotificationStore };
