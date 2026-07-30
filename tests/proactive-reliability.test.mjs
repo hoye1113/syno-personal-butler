@@ -16,7 +16,7 @@ async function tempState(t, prefix) {
   return path.join(root, "proactive.json");
 }
 
-function makeProactive(t, { messages, homeChannel = "weixin", signalSources, agentText, signalEngine, eventsLog, notifications } = {}) {
+function makeProactive(t, { messages, homeChannel = "weixin", signalSources, agentText, signalEngine, eventsLog, notifications, onSignalsDelivered } = {}) {
   return tempState(t, "syno-proactive-reliability-").then((stateFile) => {
     const root = path.dirname(stateFile);
     const channels = {
@@ -39,6 +39,7 @@ function makeProactive(t, { messages, homeChannel = "weixin", signalSources, age
       channelDeliveryOutbox: outbox,
       notifications,
       recordEvent: eventsLog ? async (name, data) => eventsLog.push({ name, data }) : undefined,
+      onSignalsDelivered,
       wakeDelivery: () => outbox.deliverDue(
         async (payload, event) => (await channels.send(payload, [event.targetChannel]))[event.targetChannel],
         { onDelivered: (event) => proactive.markBundleDelivered(event.sourceId, event.eventId) },
@@ -912,4 +913,34 @@ test("replaying an already delivered controlled run does not reauthorize or rede
   assert.equal(wakes, 1);
   const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
   assert.equal(Object.keys(state.pendingBundles).length, 0);
+});
+
+test("bundle delivery fires onSignalsDelivered once with the bundle signalVersions", async (t) => {
+  const messages = [];
+  const delivered = [];
+  const proactive = await makeProactive(t, {
+    messages,
+    onSignalsDelivered: (identities) => { delivered.push(identities); },
+  });
+  const event = { id: "review-due:workflow-1", kind: "review-due", title: "复习「note」", priority: 85, ref: { workflowId: "workflow-1", knowledgeRef: "vault/x/note.md", dueAt: "2026-07-29T00:00:00.000Z" } };
+  await proactive.tick({ now: new Date("2026-07-30T08:30:00+08:00"), highValueEvents: [event] });
+  assert.equal(messages.length, 1);
+  assert.equal(delivered.length, 1);
+  assert.equal(delivered[0].length, 1);
+  assert.equal(delivered[0][0].subjectKey, "review-due:workflow-1");
+  assert.ok(delivered[0][0].businessVersion);
+});
+
+test("a failing onSignalsDelivered callback does not affect delivery or state", async (t) => {
+  const messages = [];
+  const proactive = await makeProactive(t, {
+    messages,
+    onSignalsDelivered: () => { throw new Error("boom"); },
+  });
+  const event = { id: "review-due:workflow-2", kind: "review-due", title: "复习「other」", priority: 85, ref: { workflowId: "workflow-2", knowledgeRef: "vault/x/other.md", dueAt: "2026-07-29T00:00:00.000Z" } };
+  await proactive.tick({ now: new Date("2026-07-30T08:30:00+08:00"), highValueEvents: [event] });
+  assert.equal(messages.length, 1);
+  // 同步抛错被吞掉：delivered 事实与 state 保存不受影响，同一信号不会重推
+  await proactive.tick({ now: new Date("2026-07-30T08:35:00+08:00"), highValueEvents: [event] });
+  assert.equal(messages.length, 1);
 });

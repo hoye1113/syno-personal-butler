@@ -22,6 +22,17 @@ test("ChannelIntentRouter recognizes capability, status, continuation, and brows
   assert.equal(router.classify("请关闭收录标签").kind, "close_capture_tabs");
 });
 
+test("ChannelIntentRouter recognizes skip_review without catching other skip/cancel phrases", () => {
+  const router = new ChannelIntentRouter();
+  assert.equal(router.classify("跳过复习").kind, "skip_review");
+  assert.equal(router.classify("取消这次复习").kind, "skip_review");
+  assert.equal(router.classify("暂不复习吧").kind, "skip_review");
+  // 负例：跳过/取消的对象不是复习，必须回落普通对话
+  assert.equal(router.classify("跳过这个收录").kind, "normal_conversation");
+  assert.equal(router.classify("取消刚才").kind, "normal_conversation");
+  assert.equal(router.classify("我打算跳过复习章节直接看结论").kind, "normal_conversation");
+});
+
 test("CapabilityPresenter gives a human summary without exposing internal tool identifiers", () => {
   const presenter = new CapabilityPresenter();
   const result = presenter.describe({

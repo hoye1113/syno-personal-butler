@@ -41,6 +41,7 @@ import { ProviderClient } from "./provider-client.mjs";
 import { ProviderCredentialStore } from "./provider-credential-store.mjs";
 import { ProactiveOrchestrator } from "./proactive-orchestrator.mjs";
 import { ReportService } from "./reports.mjs";
+import { ReviewReminderSource } from "./review-reminder-source.mjs";
 import { RuntimeJournal } from "./runtime-journal.mjs";
 import { validateValue } from "./schema-registry.mjs";
 import { SettingsRegistry } from "./settings-registry.mjs";
@@ -290,8 +291,9 @@ function createSynoRuntime(options = {}) {
   const profile = options.profile || new KnowledgeProfileService({ knowledge, maintenance: knowledgeMaintenance, claims, learning });
   const planner = options.planner || new PlannerService({ knowledge, goals, learning, claims, ingest, maintenance: knowledgeMaintenance, outputs });
   const postIngestCandidates = options.postIngestCandidates || new PostIngestCandidateStore();
+  const reviewReminders = options.reviewReminders || new ReviewReminderSource({ candidates: postIngestCandidates });
   const migration = options.migration || new VaultMigrationService({ repoRoot: PATHS.repoRoot, runtimeRoot: path.join(PATHS.runtimeRoot, "migrations") });
-  const signalSources = options.signalSources || new SignalSourceRegistry({ claims, ingest, outputs, maintenance: knowledgeMaintenance });
+  const signalSources = options.signalSources || new SignalSourceRegistry({ claims, ingest, outputs, maintenance: knowledgeMaintenance, reviewReminders });
   let host;
   let core;
   const tools = options.tools || new ToolRegistry([
@@ -650,6 +652,14 @@ function createSynoRuntime(options = {}) {
       if (job.request?.operation === "ingest.apply-batch") {
         for (const item of execution?.operationResult?.results || []) await ingest.markApplied(item.artifactId, item);
       }
+      // 首教完成钩子：学习证据 committed → 关闭该 knowledgeRef 的复习候选（done）并把学习候选推进到 "learning"。
+      // 只读内存中的 operationResult，不碰文件；候选管首教前，之后由 LearningState.nextReviewAt 全权驱动。
+      if (job.request?.operation === "learning.evidence.record" && execution?.operationResult?.evidence?.knowledgeRef) {
+        await postIngestCandidates.completeReviewByKnowledgeRef(execution.operationResult.evidence.knowledgeRef, {
+          evidenceId: execution.operationResult.evidence.id,
+          jobId: job.id,
+        });
+      }
       if (changedPaths.some((item) => item.startsWith("vault/"))) knowledge.invalidate();
       if (job.request?.operation === "reports.create") {
         const report = execution?.operationResult;
@@ -697,6 +707,7 @@ function createSynoRuntime(options = {}) {
     ownerChannelTargets,
     mobileDeliveryMode,
     wakeDelivery: () => drainChannelDeliveryOutbox().catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })),
+    reviewReminders,
   });
   if (acceptedRecovery && typeof channelConversationHandler.processAcceptedRequest === "function") {
     acceptedRecovery.processRequest = (request) => channelConversationHandler.processAcceptedRequest(request);
@@ -890,7 +901,7 @@ function createSynoRuntime(options = {}) {
   reports = new ReportService({ host, knowledge, notifications, channels, gitGuard });
   const today = options.today || new TodayService({ goals, learning, host, settingsRegistry, signalSources, planner });
   core = new SynoCore({ host, knowledge, notifications, channels, reports, today });
-  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance: knowledgeMaintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery: (deliveryOptions) => drainChannelDeliveryOutbox(deliveryOptions).catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })), recordEvent });
+  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance: knowledgeMaintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery: (deliveryOptions) => drainChannelDeliveryOutbox(deliveryOptions).catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })), recordEvent, onSignalsDelivered: (identities) => reviewReminders.acknowledgeDelivered(identities) });
   const approvalAdvisor = options.approvalAdvisor || new ApprovalAdvisor({ provider, ingest });
   let channelRecoveryTimer = null;
   let providerRecoveryTimer = null;
@@ -1073,6 +1084,7 @@ function createSynoRuntime(options = {}) {
     profile,
     planner,
     postIngestCandidates,
+    reviewReminders,
     migration,
     today,
     notifications,

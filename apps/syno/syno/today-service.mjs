@@ -31,6 +31,7 @@ const SIGNAL_KIND_TO_ACTION = Object.freeze({
   "ingest-pending": "ingest",
   "output-opportunity": "output-opportunity",
   "knowledge-maintenance": "knowledge-maintenance",
+  "review-due": "review",
 });
 
 function jobTitle(job) {

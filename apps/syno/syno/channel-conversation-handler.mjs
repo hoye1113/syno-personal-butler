@@ -25,8 +25,22 @@ function workflowStatusText(workflow) {
   return WORKFLOW_STATUS_LABELS[workflow.stage] || workflow.stage;
 }
 
+// teach-back 软引导（纯函数，可单测）：有活跃复习时把"现在处于复习窗口"注入会话。
+// 条件式指令——模型自己判断本条是否是主人原创讲解；不是则正常回答，不强行判分。
+function buildTeachBackPriming(activeReviews) {
+  const items = activeReviews.slice(0, 3)
+    .map((review, index) => `${index + 1}. 「${review.title}」（knowledgeRef: ${review.knowledgeRef}）`)
+    .join("\n");
+  return [
+    "以下新收录正在等待主人用自己的话讲解（teach-back 复习窗口）：",
+    items,
+    "若主人本条消息是在用自己的话原创讲解其中某条（≥20字），调用 learning.submit（knowledgeRef=对应条目, inputMode='teach-back', assistedLevel='none', isReview=true, rawOutput=主人原文, rubric 四维 0-1, selfAssessment 按语气推断、不明确用 'mostly'），并用一两句反馈判分结果与下次复习日期。",
+    "若只是普通对话则正常回答，不要强行判分。主人可随时说「跳过复习」取消本次提醒。",
+  ].join("\n");
+}
+
 class ChannelConversationHandler {
-  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery } = {}) {
+  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery, reviewReminders = null } = {}) {
     if (!runtime || !core || (!ingest && !ingestWorkflows) || !pendingDecisions) throw new Error("ChannelConversationHandler 缺少 Runtime、Core、IngestWorkflow 或 PendingDecision Store");
     this.runtime = runtime;
     this.core = core;
@@ -44,6 +58,7 @@ class ChannelConversationHandler {
     this.mobileDeliveryMode = mobileDeliveryMode;
     this.ownerChannelTargets = ownerChannelTargets;
     this.wakeDelivery = wakeDelivery;
+    this.reviewReminders = reviewReminders;
   }
 
   #record(event, data = {}, options) {
@@ -429,6 +444,14 @@ class ChannelConversationHandler {
           ).join("\n"),
         };
       }
+      // 「跳过复习」确定性出口：直接 dismiss 最近一条活跃复习，全程不过模型。
+      // reviewReminders 为空时（未装配）不拦截，行为与现状一致（回落普通对话）。
+      if (intent.kind === "skip_review" && this.reviewReminders) {
+        const skipped = await this.reviewReminders.dismissLatest({ now: new Date() });
+        if (!skipped) return { text: "当前没有等待你复习的新收录。" };
+        await this.#record("channel.review.dismissed", { ...trace, workflowId: skipped.workflowId, knowledgeRef: skipped.knowledgeRef });
+        return { text: `已跳过「${skipped.title}」的复习提醒，它会留在复习曲线里，之后仍会到期。` };
+      }
       const urls = [...text.matchAll(/https?:\/\/[^\s]+/gi)].map((item) => item[0].replace(/[，。；、]+$/u, ""));
       const explicitCapture = /(?:收录|保存到知识库|记下来)/u.test(text);
       if (/^https?:\/\/\S+$/i.test(text) || (explicitCapture && urls.length)) {
@@ -454,6 +477,19 @@ class ChannelConversationHandler {
           ...(localOnly ? { analysisMode: "local-only" } : {}),
         }, { ...message, ownerKey });
         return { text: `已接收个人想法，收录编号：${receipt.workflow?.id || receipt.artifact.id}。` };
+      }
+      // teach-back 门（所有确定性协议之后、runtime.run 正前方）：
+      // 有真实送达且 72h 内的活跃复习时，先把复习窗口软引导注入会话，再照常进模型。
+      // 门只加上下文、不改写主人原文，模型保留退出路径；引导失败退化为普通对话。
+      const activeReviews = this.reviewReminders
+        ? await this.reviewReminders.active({ now: new Date() }).catch(() => [])
+        : [];
+      if (activeReviews.length) {
+        try {
+          await this.runtime.appendSystemEvent?.({ ownerKey, threadKey, text: buildTeachBackPriming(activeReviews) });
+        } catch (error) {
+          await this.#record("channel.teach_back.priming_failed", { ...trace, errorCode: error.code || "TEACH_BACK_PRIMING_FAILED" });
+        }
       }
       try {
         await this.#record("channel.runtime.requested", { ...trace });
@@ -492,4 +528,4 @@ class ChannelConversationHandler {
   }
 }
 
-export { ChannelConversationHandler };
+export { ChannelConversationHandler, buildTeachBackPriming };

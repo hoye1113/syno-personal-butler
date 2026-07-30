@@ -104,10 +104,10 @@ function prioritiesBody(snapshot) {
 }
 
 class ProactiveOrchestrator {
-  constructor({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery, recordEvent, signalEngine = new SignalEngine(), stateFile = path.join(PATHS.stateRoot, "proactive.json"), stateLock, clock = () => new Date(), quietHours = DEFAULT_QUIET_HOURS } = {}) {
+  constructor({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery, recordEvent, onSignalsDelivered = null, signalEngine = new SignalEngine(), stateFile = path.join(PATHS.stateRoot, "proactive.json"), stateLock, clock = () => new Date(), quietHours = DEFAULT_QUIET_HOURS } = {}) {
     if (!host || !today || !channels) throw new Error("ProactiveOrchestrator 缺少 host、today 或 channels");
     this.host = host; this.today = today; this.channels = channels; this.conversations = conversations; this.cognitiveRuntime = cognitiveRuntime;
-    this.settingsRegistry = settingsRegistry; this.signalSources = signalSources; this.maintenance = maintenance; this.channelDeliveryOutbox = channelDeliveryOutbox; this.notifications = notifications; this.ownerChannelTargets = ownerChannelTargets; this.wakeDelivery = wakeDelivery; this.recordEvent = recordEvent; this.signalEngine = signalEngine; this.stateFile = stateFile; this.stateLock = stateLock || new ProcessFileLock({ file: `${stateFile}.lock`, timeoutMs: 30_000 }); this.clock = clock; this.quietHours = quietHours; this.timer = null; this.startGeneration = 0;
+    this.settingsRegistry = settingsRegistry; this.signalSources = signalSources; this.maintenance = maintenance; this.channelDeliveryOutbox = channelDeliveryOutbox; this.notifications = notifications; this.ownerChannelTargets = ownerChannelTargets; this.wakeDelivery = wakeDelivery; this.recordEvent = recordEvent; this.onSignalsDelivered = onSignalsDelivered; this.signalEngine = signalEngine; this.stateFile = stateFile; this.stateLock = stateLock || new ProcessFileLock({ file: `${stateFile}.lock`, timeoutMs: 30_000 }); this.clock = clock; this.quietHours = quietHours; this.timer = null; this.startGeneration = 0;
   }
 
   async load({ prepareMigration = true } = {}) {
@@ -344,6 +344,11 @@ class ProactiveOrchestrator {
       for (const item of pending.signalKinds || []) if (item.subjectKey === identity.subjectKey) state.lastRuns[item.key || item.kind] = localDateKey(now);
     }
     delete state.pendingBundles[bundleId];
+    // 送达确认回调（fire-and-forget）：复习提醒等下游在此刻才把候选标为 presented。
+    // 异常绝不冒泡（同步抛错与异步拒绝都吞掉）——不影响 delivered 事实与 state 保存。
+    try {
+      this.onSignalsDelivered?.(pending.signalVersions)?.catch?.(() => {});
+    } catch {}
     return true;
   }
 

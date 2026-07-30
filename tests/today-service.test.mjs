@@ -153,6 +153,7 @@ test("snapshot maps each signal kind to its canonical area and intent", async ()
         { id: "s-ingest", kind: "ingest-pending", title: "收录", ref: { id: "a-1" }, priority: 40 },
         { id: "s-output", kind: "output-opportunity", title: "输出", ref: { id: "o-1" }, priority: 40 },
         { id: "s-maint", kind: "knowledge-maintenance", title: "维护", ref: { id: "m-1" }, priority: 40 },
+        { id: "s-review", kind: "review-due", title: "复习「note」", ref: { id: "review-due:workflow-1" }, priority: 40 },
       ];
     },
   };
@@ -173,4 +174,6 @@ test("snapshot maps each signal kind to its canonical area and intent", async ()
   assert.equal(byKind.get("output-opportunity").intent, "continue-output");
   assert.equal(byKind.get("knowledge-maintenance").area, "knowledge");
   assert.equal(byKind.get("knowledge-maintenance").intent, "review-maintenance");
+  assert.equal(byKind.get("review").area, "learn");
+  assert.equal(byKind.get("review").intent, "start-review");
 });

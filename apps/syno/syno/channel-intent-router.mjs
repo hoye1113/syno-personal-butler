@@ -5,6 +5,7 @@ const INTENTS = Object.freeze([
   "list_pending_capture",
   "continue_browser_capture",
   "close_capture_tabs",
+  "skip_review",
   "normal_conversation",
 ]);
 
@@ -42,6 +43,10 @@ class ChannelIntentRouter {
     }
     if (/^(?:请)?\s*(?:关闭|清理)(?:刚才|这个|收录)?\s*(?:的)?\s*(?:浏览器)?标签(?:页)?(?:吧|呢)?$/u.test(text)) {
       return { kind: "close_capture_tabs", confidence: 1, text };
+    }
+    // 只认"复习"收尾的跳过；「跳过这个收录」「取消刚才」等负例不命中（回落到各自协议）
+    if (/^(?:跳过|取消|暂不)(?:这次|本次|这个)?(?:的)?复习(?:吧|呢)?$/u.test(text)) {
+      return { kind: "skip_review", confidence: 1, text };
     }
     return { kind: "normal_conversation", confidence: 1, text };
   }

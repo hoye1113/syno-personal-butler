@@ -389,3 +389,140 @@ test("ChannelConversationHandler persists a modification as a revised ingest pro
   assert.equal(updates[0].id, "decision-1");
   assert.ok(updates[0].patch.consumedAt);
 });
+
+test("teach-back gate primes the session before runtime.run when reviews are active", async () => {
+  const events = [];
+  const runs = [];
+  const handler = new ChannelConversationHandler({
+    runtime: {
+      async run(request) { runs.push(request.text); return { text: "判分回复" }; },
+      async appendSystemEvent(event) { events.push(event); },
+    },
+    core: {},
+    ingest: {},
+    pendingDecisions: {},
+    reviewReminders: {
+      async active() { return [{ workflowId: "workflow-1", knowledgeRef: "vault/x/note.md", title: "note", presentedAt: "2026-07-29T08:00:00.000Z" }]; },
+    },
+  });
+  const response = await handler.handle({ id: "wx-tb-1", ownerKey: "owner", channel: "weixin", text: "这篇讲的是上下文工程的核心是把信息分层" });
+  assert.deepEqual(response, { text: "判分回复" });
+  assert.equal(events.length, 1);
+  assert.equal(events[0].ownerKey, "owner");
+  assert.equal(events[0].threadKey, "main");
+  assert.match(events[0].text, /note/);
+  assert.match(events[0].text, /vault\/x\/note\.md/);
+  assert.match(events[0].text, /learning\.submit/);
+  assert.deepEqual(runs, ["这篇讲的是上下文工程的核心是把信息分层"]);
+});
+
+test("teach-back gate stays silent without active reviews and tolerates priming failure", async () => {
+  const events = [];
+  const runs = [];
+  const quiet = new ChannelConversationHandler({
+    runtime: {
+      async run(request) { runs.push(request.text); return { text: "ordinary" }; },
+      async appendSystemEvent(event) { events.push(event); },
+    },
+    core: {},
+    ingest: {},
+    pendingDecisions: {},
+    reviewReminders: { async active() { return []; } },
+  });
+  assert.deepEqual(await quiet.handle({ id: "wx-tb-2", ownerKey: "owner", channel: "weixin", text: "随便聊聊" }), { text: "ordinary" });
+  assert.equal(events.length, 0);
+  assert.deepEqual(runs, ["随便聊聊"]);
+
+  // 引导失败（如 assertRemoteSafe 命中）退化为普通对话，不影响 runtime.run
+  const failing = new ChannelConversationHandler({
+    runtime: {
+      async run() { return { text: "fallback-reply" }; },
+      async appendSystemEvent() { const error = new Error("blocked"); error.code = "REMOTE_CONTENT_BLOCKED"; throw error; },
+    },
+    core: {},
+    ingest: {},
+    pendingDecisions: {},
+    reviewReminders: { async active() { return [{ workflowId: "workflow-1", knowledgeRef: "vault/x/note.md", title: "note" }]; } },
+  });
+  assert.deepEqual(await failing.handle({ id: "wx-tb-3", ownerKey: "owner", channel: "weixin", text: "继续聊" }), { text: "fallback-reply" });
+});
+
+test("skip_review deterministically dismisses the latest review without invoking the model", async () => {
+  const dismissals = [];
+  const handler = new ChannelConversationHandler({
+    runtime: { async run() { throw new Error("model must not run"); } },
+    core: {},
+    ingest: {},
+    pendingDecisions: {},
+    reviewReminders: {
+      async dismissLatest(input) {
+        dismissals.push(input);
+        return { workflowId: "workflow-1", knowledgeRef: "vault/x/note.md", title: "note", status: "dismissed" };
+      },
+    },
+  });
+  const response = await handler.handle({ id: "wx-skip-1", ownerKey: "owner", channel: "weixin", text: "跳过复习" });
+  assert.match(response.text, /已跳过「note」/);
+  assert.match(response.text, /之后仍会到期/);
+  assert.equal(dismissals.length, 1);
+});
+
+test("skip_review without active reviews replies deterministically; without reviewReminders it stays a normal conversation", async () => {
+  const empty = new ChannelConversationHandler({
+    runtime: { async run() { throw new Error("model must not run"); } },
+    core: {},
+    ingest: {},
+    pendingDecisions: {},
+    reviewReminders: { async dismissLatest() { return null; } },
+  });
+  assert.deepEqual(await empty.handle({ id: "wx-skip-2", ownerKey: "owner", channel: "weixin", text: "跳过复习" }), { text: "当前没有等待你复习的新收录。" });
+
+  // 未装配 reviewReminders 时现状回归：「跳过复习」只是普通对话
+  const legacy = new ChannelConversationHandler({
+    runtime: { async run(request) { return { text: `reply:${request.text}` }; } },
+    core: {},
+    ingest: {},
+    pendingDecisions: {},
+  });
+  assert.deepEqual(await legacy.handle({ id: "wx-skip-3", ownerKey: "owner", channel: "weixin", text: "跳过复习" }), { text: "reply:跳过复习" });
+});
+
+test("deterministic protocols still win over the teach-back gate when reviews are active", async () => {
+  const events = [];
+  const handler = new ChannelConversationHandler({
+    runtime: {
+      async run() { throw new Error("model must not run for deterministic protocols"); },
+      async appendSystemEvent(event) { events.push(event); },
+    },
+    core: {},
+    ingest: {},
+    ingestWorkflows: {
+      async receive() { return { artifact: { id: "artifact-new" }, workflow: { id: "workflow-new" }, duplicate: false }; },
+      async listPending() { return [{ id: "workflow-pending", stage: "classifying" }]; },
+    },
+    pendingDecisions: {},
+    reviewReminders: { async active() { return [{ workflowId: "workflow-1", knowledgeRef: "vault/x/note.md", title: "note" }]; } },
+  });
+  // URL 收录仍走收录路径
+  assert.match((await handler.handle({ id: "wx-det-1", ownerKey: "owner", channel: "weixin", text: "https://example.com/a" })).text, /workflow-new/);
+  // 「收录状态」仍走状态路径
+  assert.match((await handler.handle({ id: "wx-det-2", ownerKey: "owner", channel: "weixin", text: "收录状态" })).text, /正在整理来源/);
+  // 两条确定性协议都不触发 priming
+  assert.equal(events.length, 0);
+});
+
+test("buildTeachBackPriming lists at most three reviews with conditional scoring instructions", async () => {
+  const { buildTeachBackPriming } = await import("../apps/syno/syno/channel-conversation-handler.mjs");
+  const priming = buildTeachBackPriming([
+    { workflowId: "w1", knowledgeRef: "vault/a.md", title: "A" },
+    { workflowId: "w2", knowledgeRef: "vault/b.md", title: "B" },
+    { workflowId: "w3", knowledgeRef: "vault/c.md", title: "C" },
+    { workflowId: "w4", knowledgeRef: "vault/d.md", title: "D" },
+  ]);
+  assert.match(priming, /「A」/);
+  assert.match(priming, /「C」/);
+  assert.doesNotMatch(priming, /「D」/);
+  assert.match(priming, /knowledgeRef: vault\/a\.md/);
+  assert.match(priming, /普通对话则正常回答，不要强行判分/);
+  assert.match(priming, /跳过复习/);
+});
