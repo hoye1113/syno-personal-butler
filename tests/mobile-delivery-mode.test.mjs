@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import { ChannelConversationHandler } from "../apps/syno/syno/channel-conversation-handler.mjs";
 import { MobileDeliveryMode } from "../apps/syno/syno/mobile-delivery-mode.mjs";
 import { routeSynoApi } from "../apps/syno/syno/runtime.mjs";
+import { runCutover } from "../scripts/cutover-mobile-delivery.mjs";
 
 test("MobileDeliveryMode keeps v2 cutover behind Owner, ingress and legacy gates", () => {
   const mode = new MobileDeliveryMode();
@@ -11,6 +15,44 @@ test("MobileDeliveryMode keeps v2 cutover behind Owner, ingress and legacy gates
   assert.throws(() => mode.set("v2"), { code: "MOBILE_V2_CUTOVER_BLOCKED" });
   assert.equal(mode.set("shadow"), "shadow");
   assert.equal(mode.set("v2", { ownerAcceptance: true, ingressFrozen: true, legacyNonTerminal: 0 }), "v2");
+});
+
+test("MobileDeliveryMode persists an approved transition and restores it after Host restart", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-mobile-delivery-mode-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const stateFile = path.join(root, "mobile-delivery-mode.json");
+  const first = new MobileDeliveryMode({ stateFile });
+  await first.commit("shadow");
+  const restored = new MobileDeliveryMode({ stateFile });
+  await restored.load();
+  assert.equal(restored.current(), "shadow");
+  await assert.rejects(
+    restored.commit("v2", { ownerAcceptance: true, ingressFrozen: true, legacyNonTerminal: 1 }),
+    { code: "MOBILE_V2_CUTOVER_BLOCKED" },
+  );
+  await restored.commit("v2", { ownerAcceptance: true, ingressFrozen: true, legacyNonTerminal: 0, evidenceRef: "owner-r6" });
+  const final = new MobileDeliveryMode({ stateFile });
+  await final.load();
+  assert.equal(final.current(), "v2");
+});
+
+test("mobile cutover requires owner evidence and drains all legacy requests before persisting v2", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-mobile-cutover-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const mode = new MobileDeliveryMode({ stateFile: path.join(root, "mode.json") });
+  const acceptance = {
+    status: "owner_passed",
+    performedBy: "owner",
+    result: "passed",
+    checks: [{ performedBy: "owner", result: "passed", evidenceRef: "ops/acceptance/r6.json" }],
+  };
+  const store = { async list() { return [{ status: "delivered" }]; } };
+  const preview = await runCutover({ acceptance, store, mode, ingressFrozen: true, confirm: false });
+  assert.equal(preview.status, "preview_only");
+  assert.equal(mode.current(), "legacy");
+  const persisted = await runCutover({ acceptance, store, mode, ingressFrozen: true, confirm: true });
+  assert.equal(persisted.status, "persisted");
+  assert.equal(mode.current(), "v2");
 });
 
 test("v2 mobile handler persists before returning and sends final through the same Outbox", async () => {

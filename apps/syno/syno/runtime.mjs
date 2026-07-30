@@ -990,6 +990,17 @@ function createSynoRuntime(options = {}) {
       };
     },
     restartOpenCode: () => startOpenCodeSecurely({ restart: true }),
+    async commitMobileDeliveryV2({ ownerAcceptance = false, ingressFrozen = false, evidenceRef = null } = {}) {
+      const records = await acceptedRequests?.list({ ownerKey: "local-user", limit: 1000 }) || [];
+      const terminal = new Set(["delivered", "canceled", "failed_terminal"]);
+      const legacyNonTerminal = records.filter((record) => !terminal.has(record.status)).length;
+      return mobileDeliveryMode.commit("v2", {
+        ownerAcceptance,
+        ingressFrozen,
+        legacyNonTerminal,
+        evidenceRef,
+      });
+    },
     developmentMode: options.developmentMode === true || process.env.SYNO_DEVELOPMENT_MODE === "true",
     async initialize({ worker = false } = {}) {
       if (initializePromise) return initializePromise;
@@ -1007,6 +1018,10 @@ function createSynoRuntime(options = {}) {
         await host.recover();
         await captureChunks.recoverRunning();
         await ingestWorkflows.recover();
+        if (typeof mobileDeliveryMode.load === "function") {
+          await mobileDeliveryMode.load();
+          await recordEvent("syno.mobile_delivery.mode_loaded", mobileDeliveryMode.snapshot());
+        }
         if (lifecycleState === "stopping") throw Object.assign(new Error("Syno Runtime 正在停止"), { code: "RUNTIME_STOPPING" });
         componentState.store = "ready";
         await recordEvent("syno.host.recovered");
