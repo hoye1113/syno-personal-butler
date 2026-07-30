@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "runAt": "2026-07-30T11:13:34+08:00",
+  "branch": "codex/exec-p10a-proactive-reliability",
+  "implementationCommit": "09b015e3261507bb7a73e2a987514fba3b54a22d",
+  "automated": {
+    "nodeTests": {
+      "passed": 552,
+      "failed": 0
+    },
+    "repositoryVerifyFiles": 1471,
+    "activeDocumentationFiles": 7,
+    "vaultPython311Unittest": {
+      "passed": 57,
+      "failed": 0
+    },
+    "gitDiffCheck": "passed"
+  },
+  "freshCheckout": {
+    "commit": "09b015e3261507bb7a73e2a987514fba3b54a22d",
+    "nodeTests": {
+      "passed": 552,
+      "failed": 0
+    },
+    "repositoryVerifyFiles": 1465,
+    "activeDocumentationFiles": 7,
+    "vaultPython311Unittest": {
+      "passed": 57,
+      "failed": 0
+    },
+    "worktree": "clean"
+  },
+  "windowsDpapiProbe": {
+    "roundTrip": true,
+    "cipherHasPlaintext": false,
+    "metadataHasPlaintext": false,
+    "cipherIsRawBase64": true
+  },
+  "reviewClosure": {
+    "legacyCadenceDualRead": "verified",
+    "targetReferenceContainment": "verified",
+    "migrationBackupDigest": "verified",
+    "launcherDailyHeartbeatSimulation": "verified"
+  },
+  "ownerAcceptance": "pending_owner",
+  "productionCutover": "not_started",
+  "notes": "自动测试、clean checkout 和 DPAPI 探针不等同于微信或飞书手机端真实验收；不包含私人正文、凭据、渠道目标或本机敏感路径。"
+}
