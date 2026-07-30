@@ -92,15 +92,14 @@ test("ChannelConversationHandler deterministically captures an embedded URL with
   assert.match((await handler.handle({ id: "capture-1", ownerKey: "owner", channel: "weixin", text: "请收录 https://example.com/a" })).text, /workflow-new/);
   assert.equal(calls[0].payload.kind, "url");
   assert.equal(model.length, 0);
-  // 已批准的行为变更（2026-07-30）：「解释 <url> 的观点」这类读链接短语 → 先收录、再带上下文进模型回答
+  // 二次修订（2026-07-30）：「解释 <url> 的观点」这类读链接短语 → 不收录，注入提示让模型用 fetch_url 读正文回答
   const readLink = await handler.handle({ id: "chat-1", ownerKey: "owner", channel: "weixin", text: "解释 https://example.com/a 的观点" });
-  assert.match(readLink.text, /ordinary/);
-  assert.match(readLink.text, /📥 该链接已同时进入收录，编号：workflow-new/);
-  assert.equal(calls.length, 2);
-  assert.equal(calls[1].payload.kind, "url");
+  assert.deepEqual(readLink, { text: "ordinary" });
+  assert.equal(calls.length, 1);
   assert.equal(model.length, 1);
   assert.match(model[0], /^解释 https:\/\/example\.com\/a 的观点/);
   assert.match(model[0], /knowledge\.fetch_url/);
+  assert.match(model[0], /不要主动调用收录/);
 });
 
 test("ChannelConversationHandler supports local-only personal capture and deterministic status", async () => {
@@ -534,7 +533,7 @@ test("buildTeachBackPriming lists at most three reviews with conditional scoring
   assert.match(priming, /跳过复习/);
 });
 
-test("read-link phrases capture first and answer with the fetch_url tool hint", async () => {
+test("read-link phrases read via fetch_url without entering the capture pipeline", async () => {
   const calls = [];
   const model = [];
   const handler = new ChannelConversationHandler({
@@ -553,13 +552,41 @@ test("read-link phrases capture first and answer with the fetch_url tool hint", 
     id: "wx-read-1", ownerKey: "owner", channel: "weixin",
     text: "你能访问获取到内容吗：https://openrouter.ai/blog/insights/evaluate-llm-provider-performance/#how-to-read-provider-benchmarks-without-getting-fooled",
   });
-  assert.match(response.text, /能读到，这是概要/);
-  assert.match(response.text, /📥 该链接已同时进入收录，编号：workflow-new/);
-  assert.deepEqual(calls.map((item) => item.kind), ["url"]);
+  assert.deepEqual(response, { text: "能读到，这是概要" });
+  assert.equal(calls.length, 0);
   assert.equal(model.length, 1);
-  assert.match(model[0], /编号 workflow-new/);
   assert.match(model[0], /knowledge\.fetch_url/);
-  assert.match(model[0], /不要编造理由/);
+  assert.match(model[0], /不要主动调用收录/);
+});
+
+test("URL glued to Chinese text is not treated as a bare URL", async () => {
+  // 2026-07-30 事故回归：「<url>；帮我读一下讲了什么」曾被 \S+ 整串当裸链接走进收录管线，
+  // 且当时动词表缺「读一下」，两边都没接住。现在应走只读不收录的读链接路径。
+  const calls = [];
+  const model = [];
+  const handler = new ChannelConversationHandler({
+    runtime: { async run(request) { model.push(request.text); return { text: "读完了" }; } },
+    core: {},
+    ingestWorkflows: {
+      async receive(payload) {
+        calls.push(payload);
+        return { artifact: { id: "artifact-new" }, workflow: { id: "workflow-new" }, duplicate: false };
+      },
+    },
+    pendingDecisions: {},
+  });
+  const response = await handler.handle({
+    id: "wx-glue-1", ownerKey: "owner", channel: "weixin",
+    text: "https://openrouter.ai/blog/insights/evaluate-llm-provider-performance/#how-to-read-provider-benchmarks-without-getting-fooled；帮我读一下讲了什么",
+  });
+  assert.deepEqual(response, { text: "读完了" });
+  assert.equal(calls.length, 0);
+  assert.equal(model.length, 1);
+  assert.match(model[0], /knowledge\.fetch_url/);
+  // 裸链接带尾随中文标点仍算裸链接（且提交的是干净链接，不带标点）
+  const bare = await handler.handle({ id: "wx-bare-1", ownerKey: "owner", channel: "weixin", text: "https://example.com/a。" });
+  assert.match(bare.text, /workflow-new/);
+  assert.deepEqual(calls.map((item) => item.value), ["https://example.com/a"]);
 });
 
 test("read-link rule stays off for long residuals, multiple URLs and local-only mode", async () => {

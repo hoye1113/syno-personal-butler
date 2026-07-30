@@ -562,6 +562,9 @@ test("production start keeps proactive delivery paused until the Owner enables t
     },
     channelDeliveryOutbox: outbox,
     signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
+    // 固定中午时钟：start() 的即时 tick 走墙钟，安静时段（22:30-07:30）会让 collect 根本不会发生，
+    // 2026-07-30 夜间全量回归就因此在 #24 卡死。本组 start/stop 竞态用例一律钉死时钟。
+    clock: () => new Date("2026-07-30T12:00:00"),
     stateFile,
   });
 
@@ -584,6 +587,7 @@ test("stop wins a race with asynchronous start and prevents a late tick or timer
     settingsRegistry: { async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? setting : undefined; } },
     signalSources: { async collect() { collections += 1; return []; } },
     signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
+    clock: () => new Date("2026-07-30T12:00:00"),
     stateFile,
   });
 
@@ -626,6 +630,7 @@ test("stop during the startup tick prevents model work, enqueue and wake", async
     channelDeliveryOutbox: outbox,
     wakeDelivery: async () => { wakes += 1; },
     signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
+    clock: () => new Date("2026-07-30T12:00:00"),
     stateFile,
   });
 
@@ -669,6 +674,7 @@ test("stop while enqueue waits on its lock cancels the durable proactive event",
     },
     wakeDelivery: async () => { wakes += 1; },
     signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
+    clock: () => new Date("2026-07-30T12:00:00"),
     stateFile,
   });
 

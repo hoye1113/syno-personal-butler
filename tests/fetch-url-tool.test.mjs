@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { DEFAULT_MAX_CHARS, fetchUrlForChat } from "../apps/syno/syno/fetch-url-tool.mjs";
+import { inspectRemoteContent } from "../apps/syno/syno/sensitive-content.mjs";
 import { MAX_SOURCE_TEXT } from "../apps/syno/syno/source-fetcher.mjs";
 import { createSynoRuntime } from "../apps/syno/syno/runtime.mjs";
 
@@ -38,6 +39,47 @@ test("fetchUrlForChat propagates the real fetch failure reason", async () => {
     fetchUrlForChat({ url: "https://example.com", fetcher: async () => { throw new Error("来源返回 HTTP 403"); } }),
     /来源返回 HTTP 403/,
   );
+});
+
+test("fetchUrlForChat redacts credential-shaped snippets before remote delivery", async () => {
+  // 2026-07-30 openrouter 博客实例：公开页面的 API key 示例曾触发 REMOTE 拦截，
+  // Owner 批准本地脱敏后发送。脱敏结果必须仍能通过工具桥同款安全检查。
+  const page = [
+    "调用示例：",
+    "Authorization: Bearer sk-example123456789",
+    'const api_key = "abcdefgh12345678";',
+    "其余正文不受影响。",
+  ].join("\n");
+  const result = await fetchUrlForChat({
+    url: "https://example.com/blog",
+    fetcher: async (value) => ({ url: value, contentType: "text/html", text: page, truncated: false }),
+  });
+  assert.equal(result.redacted, true);
+  assert.deepEqual(result.redactionReasons.sort(), ["authorization_header", "credential_assignment"]);
+  assert.doesNotMatch(result.content, /sk-example123456789/);
+  assert.doesNotMatch(result.content, /abcdefgh12345678/);
+  assert.match(result.content, /【已脱敏:authorization_header】/);
+  assert.match(result.content, /【已脱敏:credential_assignment】/);
+  assert.match(result.content, /其余正文不受影响。/);
+  assert.ok(inspectRemoteContent(result.content).safe, "脱敏后的 content 必须通过远程安全检查");
+});
+
+test("fetchUrlForChat leaves clean pages untouched and redacts sensitive query params in the source URL", async () => {
+  const clean = await fetchUrlForChat({
+    url: "https://example.com/post",
+    fetcher: async (value) => ({ url: value, contentType: "text/html", text: "干净正文", truncated: false }),
+  });
+  assert.equal(clean.redacted, false);
+  assert.deepEqual(clean.redactionReasons, []);
+  assert.match(clean.content, /干净正文/);
+
+  const signed = await fetchUrlForChat({
+    url: "https://example.com/share?access_token=tok123456789",
+    fetcher: async (value) => ({ url: value, contentType: "text/html", text: "正文", truncated: false }),
+  });
+  assert.equal(signed.redacted, true);
+  assert.deepEqual(signed.redactionReasons, ["credential_assignment"]);
+  assert.doesNotMatch(signed.sourceUrl, /tok123456789/);
 });
 
 test("createSynoRuntime registers knowledge.fetch_url and exposes it through the tool bridge", () => {

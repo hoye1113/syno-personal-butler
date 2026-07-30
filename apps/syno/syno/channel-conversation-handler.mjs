@@ -3,6 +3,11 @@ import { CapabilityPresenter } from "./capability-presenter.mjs";
 import { ChannelIntentRouter } from "./channel-intent-router.mjs";
 import { parseRecentReference } from "./recent-interaction.mjs";
 
+// 链接字符集排除 CJK 与中文/全角标点：微信里链接后紧贴中文是常态，\S+ 会把中文粘进链接——
+// 2026-07-30「<url>；帮我读一下讲了什么」就被整串当裸链接走进了收录管线。
+const URL_IN_TEXT_PATTERN = /https?:\/\/[^\s⺀-鿿豈-﫿＀-￯　-〿]+/gi;
+const BARE_URL_PATTERN = /^https?:\/\/[^\s⺀-鿿豈-﫿＀-￯　-〿]+$/i;
+
 const WORKFLOW_STATUS_LABELS = Object.freeze({
   received: "已接收",
   extracting: "正在直接抓取",
@@ -452,11 +457,14 @@ class ChannelConversationHandler {
         await this.#record("channel.review.dismissed", { ...trace, workflowId: skipped.workflowId, knowledgeRef: skipped.knowledgeRef });
         return { text: `已跳过「${skipped.title}」的复习提醒，它会留在复习曲线里，之后仍会到期。` };
       }
-      const urls = [...text.matchAll(/https?:\/\/[^\s]+/gi)].map((item) => item[0].replace(/[，。；、]+$/u, ""));
+      const urls = [...text.matchAll(URL_IN_TEXT_PATTERN)].map((item) => item[0]);
       const explicitCapture = /(?:收录|保存到知识库|记下来)/u.test(text);
-      if (/^https?:\/\/\S+$/i.test(text) || (explicitCapture && urls.length)) {
+      // 裸链接容忍尾随中文标点（「https://a.com。」仍是裸链接），但链接后粘着正文不算。
+      const bareText = text.replace(/[，。；、？！\s]+$/u, "");
+      const isBareUrl = BARE_URL_PATTERN.test(bareText);
+      if (isBareUrl || (explicitCapture && urls.length)) {
         await this.#record("channel.capture.requested", { ...trace, sourceKind: "url" });
-        const targets = (/^https?:\/\/\S+$/i.test(text) ? [text] : urls).slice(0, 10);
+        const targets = (isBareUrl ? [bareText] : urls).slice(0, 10);
         const receipts = [];
         for (let index = 0; index < targets.length; index += 1) {
           receipts.push(await this.#receive(
@@ -478,23 +486,17 @@ class ChannelConversationHandler {
         }, { ...message, ownerKey });
         return { text: `已接收个人想法，收录编号：${receipt.workflow?.id || receipt.artifact.id}。` };
       }
-      // 「读链接」意图（Owner 已批准的行为变更，2026-07-30）：恰好一个链接、去掉链接后剩余
-      // 文字 ≤30 字且命中读/看/访问/总结类动词 → 先进确定性收录管线（直抓失败自动浏览器兜底），
-      // 再让模型用 knowledge.fetch_url 读正文回答。仅本地模式不自动抓取远端；剩余文字长或
-      // 多链接的消息保持普通对话（模型仍可用 fetch_url 工具）。
+      // 「读链接」意图（Owner 2026-07-30 二次修订：只读不收录——先读内容，主人自行判断是否收录）：
+      // 恰好一个链接、去掉链接后剩余文字 ≤30 字且命中读/看/访问/总结类动词 → 注入系统提示让模型
+      // 用 knowledge.fetch_url 读正文直接回答，不走收录管线。仅本地模式不自动抓取远端；
+      // 剩余文字长或多链接的消息保持普通对话（模型仍可用 fetch_url 工具）。
       let runText = text;
-      let captureSuffix = "";
-      const rawUrls = [...text.matchAll(/https?:\/\/[^\s]+/gi)].map((item) => item[0]);
-      if (!localOnly && rawUrls.length === 1) {
-        const residual = text.replace(rawUrls[0], "").replace(/^[：:，。\s]+|[？?！!。…\s]+$/gu, "").trim();
+      if (!localOnly && urls.length === 1) {
+        const residual = text.replace(urls[0], "").replace(/^[：:；;、，。\s]+|[？?！!。…\s]+$/gu, "").trim();
         if (residual.length > 0 && residual.length <= 30
-          && /(?:访问|读取|获取|看看|看一下|读一读|打开|总结|分析|讲一讲|解读|解释|什么意思|说了啥|说了什么|内容)/u.test(residual)) {
-          await this.#record("channel.capture.requested", { ...trace, sourceKind: "url", intent: "read_link" });
-          const receipt = await this.#receive({ kind: "url", value: urls[0] }, { ...message, ownerKey });
-          await this.#record("channel.capture.completed", { ...trace, artifactIds: [receipt.artifact.id], sourceKind: "url" });
-          const captureId = receipt.workflow?.id || receipt.artifact.id;
-          runText = `${text}\n\n（系统提示：这个链接已进入收录管线，编号 ${captureId}。请使用 knowledge.fetch_url 工具读取正文并回答主人的问题；若抓取失败，如实说明失败原因，不要编造理由。）`;
-          captureSuffix = `\n\n📥 该链接已同时进入收录，编号：${captureId}。`;
+          && /(?:访问|读取|获取|看看|看一下|读一读|读一下|读读|帮我读|打开|总结|分析|讲一讲|解读|解释|什么意思|说了啥|说了什么|内容)/u.test(residual)) {
+          await this.#record("channel.read_link.requested", { ...trace, sourceKind: "url" });
+          runText = `${text}\n\n（系统提示：主人想让你读取这个链接并回答问题。请调用 knowledge.fetch_url 读取正文后回答；抓取失败或内容被安全策略拦截时如实说明原因，不要编造。主人没有要求收录，不要主动调用收录类工具。）`;
         }
       }
       // teach-back 门（所有确定性协议之后、runtime.run 正前方）：
@@ -519,7 +521,7 @@ class ChannelConversationHandler {
           messageId: message.id,
         });
         await this.#record("channel.runtime.completed", { ...trace, runId: result.runId || null });
-        return { text: `${result.text || "Syno 已处理，但没有生成可显示的文本。"}${captureSuffix}` };
+        return { text: result.text || "Syno 已处理，但没有生成可显示的文本。" };
       } catch (error) {
         if (error.retryable !== true && error.code !== "OPENCODE_ATTEMPTS_EXHAUSTED") throw error;
         if (typeof this.core.execute !== "function") throw error;
