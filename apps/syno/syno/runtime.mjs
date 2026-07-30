@@ -107,15 +107,23 @@ async function workflowContext(domain) {
   return { domain, authority: "canonical-vault-skills", sections };
 }
 
-async function readKnowledgeSnippet(knowledge, notePath, maxChars = 6_000) {
-  const note = await knowledge.read(notePath);
-  if (/^(?:sensitive|private):\s*(?:true|yes)$/imu.test(note.markdown)
-    || /^privacy:\s*(?:private|sensitive)$/imu.test(note.markdown)
-    || !inspectRemoteContent(note.markdown, { maxChars: Number.MAX_SAFE_INTEGER }).safe) {
+function isSensitiveKnowledgeNote(markdown) {
+  return /^(?:sensitive|private):\s*(?:true|yes)$/imu.test(markdown)
+    || /^privacy:\s*(?:private|sensitive)$/imu.test(markdown)
+    || !inspectRemoteContent(markdown, { maxChars: Number.MAX_SAFE_INTEGER }).safe;
+}
+
+function assertKnowledgeNotSensitive(markdown) {
+  if (isSensitiveKnowledgeNote(markdown)) {
     const error = new Error("该笔记标记为敏感内容，禁止发送给远程模型");
     error.code = "KNOWLEDGE_SENSITIVE_DENIED";
     throw error;
   }
+}
+
+async function readKnowledgeSnippet(knowledge, notePath, maxChars = 6_000) {
+  const note = await knowledge.read(notePath);
+  assertKnowledgeNotSensitive(note.markdown);
   const limit = Math.min(8_000, Math.max(200, Number(maxChars) || 6_000));
   return { path: note.path, title: note.title, snippet: note.markdown.slice(0, limit), truncated: note.markdown.length > limit };
 }
@@ -248,9 +256,21 @@ function createSynoRuntime(options = {}) {
       store: reconciliationCases,
       reconcileReadOnly: options.reconcileEffect || (async (candidate) => {
         const receipt = await effectReceipts?.get(candidate.toolInvocationKey);
-        return receipt?.status === "committed"
-          ? { resolved: true, result: "confirmed_committed", details: { receiptId: receipt.receiptId } }
-          : { resolved: false, errorCode: "AUTHORITATIVE_EFFECT_NOT_COMMITTED" };
+        if (receipt?.status === "committed") {
+          return { resolved: true, result: "confirmed_committed", details: { receiptId: receipt.receiptId } };
+        }
+        // The default reconciler deliberately does NOT auto-resolve from its own ledger — that
+        // would be a circular self-proof. A receipt that exists but never reaches "committed"
+        // (window-B: the effect may have run before the commit record crashed) is surfaced with a
+        // distinct code so it is diagnosable as pending-adjudication rather than masquerading as a
+        // fresh miss. Both unresolved cases stay fail-safe (no auto-resolution) and retry under the
+        // worker's backoff, surfacing to the Owner for authoritative adjudication.
+        return {
+          resolved: false,
+          errorCode: receipt
+            ? "AUTHORITATIVE_EFFECT_PENDING_COMMIT"
+            : "AUTHORITATIVE_EFFECT_NOT_COMMITTED",
+        };
       }),
     }))
     : null;
@@ -295,7 +315,11 @@ function createSynoRuntime(options = {}) {
       name: "knowledge.read", description: "读取搜索结果中的完整知识笔记", risk: "read", permission: "syno-read", retry: "safe", version: "1",
       inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string", minLength: 1 } }, additionalProperties: false },
       outputSchema: { type: "object" },
-      execute: ({ path: notePath }) => knowledge.read(notePath),
+      execute: async ({ path: notePath }) => {
+        const note = await knowledge.read(notePath);
+        assertKnowledgeNotSensitive(note.markdown);
+        return note;
+      },
     },
     {
       name: "knowledge.read_snippet", description: "读取单篇非敏感知识笔记的限长必要片段", risk: "read", permission: "syno-read", retry: "safe", version: "1",

@@ -378,10 +378,15 @@ class ChannelDeliveryOutbox {
   }
 
   #blockedByEarlier(record, records) {
+    // Order later versions behind in-flight or genuinely-uncertain earlier events. A
+    // failed_retryable event is known NOT to have delivered and keeps retrying on its own
+    // backoff, so it must not indefinitely suppress a later Final/Decision — otherwise one
+    // persistently failing ACK would starve the substantive reply forever. delivery_unknown
+    // stays blocking because its delivery state is genuinely uncertain (duplicate risk).
     return records.some((item) => item.sourceId === record.sourceId
       && item.targetChannel === record.targetChannel
       && Number(item.responseVersion) < Number(record.responseVersion)
-      && ["pending", "claimed", "delivery_unknown", "failed_retryable"].includes(item.status));
+      && ["pending", "claimed", "delivery_unknown"].includes(item.status));
   }
 
   async deliverDue(send, { now = this.clock(), limit = 100, onDelivered, onDeliveryUnknown, shouldDeliver } = {}) {

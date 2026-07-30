@@ -144,16 +144,20 @@ const httpServer = createServer(async (req, res) => {
 
     if (url.pathname.startsWith("/api/syno/")) {
       const state = lifecycleState;
+      // Defense-in-depth default: every browser-facing mutation must be a same-origin JSON
+      // request, not just the three system-control endpoints. The OpenCode MCP bridge is a
+      // machine-to-machine JSON-RPC endpoint driven by the opencode subprocess (no browser
+      // Origin header), so it stays on loopback-only and is exempt.
+      if (req.method !== "GET" && url.pathname !== "/api/syno/opencode/mcp") {
+        assertJsonMutation(req);
+        assertSameOriginMutation(req);
+      }
       if (url.pathname === "/api/syno/readiness") {
         return respondJson(
           res,
           await routeSynoApi(synoRuntime, req, url, readJsonBody),
           readinessHttpStatus(state),
         );
-      }
-      if (url.pathname.startsWith("/api/syno/windows-service") || ["/api/syno/opencode/restart", "/api/syno/opencode/credential"].includes(url.pathname)) {
-        assertJsonMutation(req);
-        assertSameOriginMutation(req);
       }
       return respondJson(res, await routeSynoApi(synoRuntime, req, url, readJsonBody));
     }

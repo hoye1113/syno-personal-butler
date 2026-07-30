@@ -8,6 +8,7 @@ import {
   assertOpenCodeServerSecurity,
   OPENCODE_MODELS,
   OpenCodeCognitiveRuntime,
+  OpenCodeHttpClient,
   OpenCodeSessionBindingStore,
   retryableFailure,
 } from "../apps/syno/syno/opencode-cognitive-runtime.mjs";
@@ -657,4 +658,119 @@ test("capture sessions expire after seven days while main sessions retain thirty
   assert.equal(result.deleted, 1);
   assert.deepEqual(deleted, ["capture-session"]);
   assert.equal((await bindings.active("owner", "main")).openCodeSessionId, "main-session");
+});
+
+test("recoverBindings lifts an abort-unknown freeze so the thread runs again", async (t) => {
+  const root = await temporaryRoot(t);
+  const bindings = new OpenCodeSessionBindingStore({ file: path.join(root, "bindings.json") });
+  let abortFailing = true;
+  const client = {
+    async createSession() { return { id: "session-recover" }; },
+    async sendMessage(_id, _payload, { signal }) {
+      if (abortFailing) {
+        return new Promise((_resolve, reject) => signal.addEventListener("abort", () => {
+          reject(Object.assign(new Error("aborted locally"), { code: "ABORT_ERR" }));
+        }, { once: true }));
+      }
+      return { parts: [{ type: "text", text: "recovered" }] };
+    },
+    async abortSession() {
+      if (abortFailing) throw Object.assign(new Error("ack lost"), { code: "ECONNRESET" });
+    },
+    async getSession() { return { id: "session-recover" }; },
+  };
+  const runtime = new OpenCodeCognitiveRuntime({ client, bindings });
+  let runningRunId;
+  const active = runtime.run({ text: "one" }, {
+    ownerKey: "owner",
+    threadKey: "main",
+    allowedTools: [],
+    onStart: (runId) => { runningRunId = runId; },
+  });
+  while (!runningRunId || runtime.inspect(runningRunId)?.status !== "running") {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  assert.equal(runtime.cancel(runningRunId), true);
+  await assert.rejects(active, { code: "OPENCODE_ABORT_UNKNOWN" });
+  await assert.rejects(
+    runtime.run({ text: "two" }, { ownerKey: "owner", threadKey: "main", allowedTools: [] }),
+    { code: "SCHEDULER_KEY_BLOCKED" },
+  );
+
+  const recovery = await runtime.recoverBindings();
+  assert.equal(recovery.unblocked, 1);
+
+  abortFailing = false;
+  const result = await runtime.run({ text: "three" }, { ownerKey: "owner", threadKey: "main", allowedTools: [] });
+  assert.equal(result.text, "recovered");
+});
+
+test("newConversation clears an abort-unknown freeze as the operational reset path", async (t) => {
+  const root = await temporaryRoot(t);
+  const bindings = new OpenCodeSessionBindingStore({ file: path.join(root, "bindings.json") });
+  const client = {
+    async createSession() { return { id: `session-${Math.random()}` }; },
+    async sendMessage(_id, _payload, { signal }) {
+      return new Promise((_resolve, reject) => signal.addEventListener("abort", () => {
+        reject(Object.assign(new Error("aborted locally"), { code: "ABORT_ERR" }));
+      }, { once: true }));
+    },
+    async abortSession() { throw Object.assign(new Error("ack lost"), { code: "ECONNRESET" }); },
+  };
+  const runtime = new OpenCodeCognitiveRuntime({ client, bindings });
+  let runningRunId;
+  const active = runtime.run({ text: "one" }, {
+    ownerKey: "owner",
+    threadKey: "main",
+    allowedTools: [],
+    onStart: (runId) => { runningRunId = runId; },
+  });
+  while (!runningRunId || runtime.inspect(runningRunId)?.status !== "running") {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  runtime.cancel(runningRunId);
+  await assert.rejects(active, { code: "OPENCODE_ABORT_UNKNOWN" });
+  await assert.rejects(
+    runtime.run({ text: "two" }, { ownerKey: "owner", threadKey: "main", allowedTools: [] }),
+    { code: "SCHEDULER_KEY_BLOCKED" },
+  );
+
+  const reset = await runtime.newConversation({ ownerKey: "owner", threadKey: "main" });
+  assert.equal(reset.contextReset, true);
+});
+
+test("OpenCodeHttpClient applies a hard timeout even when the caller passes a non-aborting signal", async () => {
+  const controller = new AbortController();
+  const client = new OpenCodeHttpClient({
+    credentials: async () => ({ username: "u", password: "p" }),
+    fetchImpl: (_url, init) => new Promise((_resolve, reject) => {
+      init.signal.addEventListener("abort", () => {
+        reject(Object.assign(new Error("timed out"), { name: "TimeoutError", code: "ABORT_ERR" }));
+      }, { once: true });
+    }),
+    timeoutMs: 50,
+  });
+  await assert.rejects(
+    client.sendMessage("session-1", { parts: [{ type: "text", text: "hi" }] }, { signal: controller.signal }),
+    (error) => error.code === "OPENCODE_REQUEST_TIMEOUT" && error.retryable === true,
+  );
+  assert.equal(controller.signal.aborted, false);
+});
+
+test("OpenCodeHttpClient still honors a caller abort and does not mislabel it as a timeout", async () => {
+  const controller = new AbortController();
+  const client = new OpenCodeHttpClient({
+    credentials: async () => ({ username: "u", password: "p" }),
+    fetchImpl: (_url, init) => new Promise((_resolve, reject) => {
+      const fail = () => reject(Object.assign(new Error("caller aborted"), { code: "ABORT_ERR" }));
+      if (init.signal.aborted) fail();
+      else init.signal.addEventListener("abort", fail, { once: true });
+    }),
+    timeoutMs: 5_000,
+  });
+  controller.abort();
+  await assert.rejects(
+    client.sendMessage("session-1", { parts: [] }, { signal: controller.signal }),
+    (error) => error.code === "ABORT_ERR" && error.code !== "OPENCODE_REQUEST_TIMEOUT",
+  );
 });

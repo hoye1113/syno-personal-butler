@@ -313,15 +313,37 @@ class OpenCodeHttpClient {
   async #request(method, pathname, body, { signal, timeoutMs = this.timeoutMs } = {}) {
     const auth = await this.credentials();
     const origin = String(auth.origin || this.origin).replace(/\/+$/, "");
-    const response = await this.fetchImpl(`${origin}${pathname}`, {
-      method,
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${auth.username}:${auth.password}`).toString("base64")}`,
-        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: signal || AbortSignal.timeout(timeoutMs),
-    });
+    // Every request is bounded by a hard client timeout. When the caller also passes a
+    // signal (the run AbortController), combine them so an explicit cancel AND the timeout
+    // can both abort the in-flight fetch. Without the combination a hung OpenCode response
+    // would await forever (the truthy caller signal short-circuited the timeout) and never
+    // reach the deterministic model-chain fallback.
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    const combined = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+    let response;
+    try {
+      response = await this.fetchImpl(`${origin}${pathname}`, {
+        method,
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${auth.username}:${auth.password}`).toString("base64")}`,
+          ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        signal: combined,
+      });
+    } catch (error) {
+      // If the combined signal aborted but the caller's own signal did not, the boundary
+      // that fired was our hard timeout. Surface it as a retryable failure (Node's fetch
+      // otherwise rejects with a DOMException that retryableFailure cannot classify, which
+      // would stop the model chain instead of falling back).
+      if (combined.aborted && !signal?.aborted) {
+        throw Object.assign(new Error(`OpenCode 请求超时：${method} ${pathname}`), {
+          code: "OPENCODE_REQUEST_TIMEOUT",
+          retryable: true,
+        });
+      }
+      throw error;
+    }
     if (!response.ok) {
       const error = new Error(`OpenCode 请求失败：${method} ${pathname} -> ${response.status}`);
       error.status = response.status;
@@ -477,6 +499,19 @@ class OpenCodeCognitiveRuntime {
     return true;
   }
 
+  #trimRuns(retainTerminal = 32) {
+    if (this.runs.size <= retainTerminal) return;
+    const terminalStatuses = new Set(["completed", "failed", "canceled", "cancel_unknown"]);
+    let surplus = this.runs.size - retainTerminal;
+    for (const [id, run] of this.runs) {
+      if (surplus <= 0) break;
+      if (terminalStatuses.has(run.status)) {
+        this.runs.delete(id);
+        surplus -= 1;
+      }
+    }
+  }
+
   async #session(ownerKey, threadKey) {
     const existing = await this.bindings.active(ownerKey, threadKey);
     if (existing) return existing;
@@ -560,6 +595,11 @@ class OpenCodeCognitiveRuntime {
 
   async newConversation({ ownerKey, threadKey = "main" }) {
     const sessionKey = `${ownerKey}\0${threadKey}`;
+    // A new conversation replaces the binding with a fresh OpenCode session, so any
+    // abort-unknown freeze left by the previous session no longer applies. This is the
+    // operational escape hatch that keeps a single lost abort acknowledgement from bricking
+    // the thread until a full Host restart.
+    this.sessionScheduler.unblock(sessionKey);
     return this.sessionScheduler.enqueue(sessionKey, async () => {
       const previous = await this.bindings.active(ownerKey, threadKey);
       const created = await this.client.createSession(`Syno ${threadKey}`);
@@ -786,13 +826,22 @@ class OpenCodeCognitiveRuntime {
         run.error = { code: error.code };
       }
       throw error;
+    } finally {
+      this.#trimRuns();
     }
   }
 
   async recoverBindings() {
     const bindings = await this.bindings.list();
-    const report = { available: 0, quarantined: 0, removed: 0, deletingUnknown: 0 };
+    const report = { available: 0, quarantined: 0, removed: 0, deletingUnknown: 0, unblocked: 0 };
     for (const binding of bindings) {
+      // An abort-unknown freeze (cancel or model-chain fallback) blocks the owner\0thread
+      // key until the OpenCode session state is re-verified. Recovery re-establishes that
+      // state — the session is confirmed alive, removed (404), or quarantined (never
+      // reused) — so lifting the block here is what keeps a transient abort-ack loss from
+      // bricking the thread across restarts.
+      const sessionKey = `${binding.ownerKey}\0${binding.threadKey}`;
+      if (this.sessionScheduler.unblock(sessionKey)) report.unblocked += 1;
       if (binding.lifecycle === "quarantined") {
         report.quarantined += 1;
         continue;

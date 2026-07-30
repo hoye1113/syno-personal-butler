@@ -65,7 +65,14 @@ function validateValue(key, value) {
 }
 
 class SettingsRegistry {
-  constructor({ stateFile = path.join(PATHS.stateRoot, "settings-registry.json"), clock = () => new Date() } = {}) { this.stateFile = stateFile; this.clock = clock; }
+  constructor({ stateFile = path.join(PATHS.stateRoot, "settings-registry.json"), clock = () => new Date() } = {}) {
+    this.stateFile = stateFile;
+    this.clock = clock;
+    // Serialize the load→modify→write critical section so two concurrent set() calls
+    // (e.g. a control-plane enable/disable racing a triggerTest test-event authorization)
+    // cannot both load the same state and overwrite each other's key (lost update).
+    this.mutationTail = Promise.resolve();
+  }
 
   classify(key) {
     for (const [group, keys] of Object.entries(GROUPS)) if (keys.includes(key)) return group;
@@ -77,6 +84,12 @@ class SettingsRegistry {
     if (group === "immutable" && actor === "agent") throw Object.assign(new Error(`Agent 不得修改设置：${key}`), { code: "SETTING_IMMUTABLE" });
     if (group === "confirmationRequired" && (!confirmed || actor === "agent")) throw Object.assign(new Error(`设置需要用户确认：${key}`), { code: "SETTING_CONFIRMATION_REQUIRED" });
     return group;
+  }
+
+  #serialized(operation) {
+    const current = this.mutationTail.then(operation, operation);
+    this.mutationTail = current.catch(() => {});
+    return current;
   }
 
   async load() {
@@ -107,21 +120,23 @@ class SettingsRegistry {
     if (key === "notifications.proactiveTestEventId" && options.proactiveTestAuthorizationVerified !== true) {
       throw Object.assign(new Error("主动通知受控测试授权只能由受控测试入口写入"), { code: "PROACTIVE_TEST_AUTHORIZATION_UNVERIFIED" });
     }
-    const state = await this.load();
-    state.values[key] = value;
-    state.updatedAt = this.clock().toISOString();
-    state.lastChange = {
-      key,
-      group,
-      actor: options.actor || "user",
-      at: state.updatedAt,
-      ...(options.evidenceRef ? { evidenceRef: String(options.evidenceRef) } : {}),
-    };
-    await fs.mkdir(path.dirname(this.stateFile), { recursive: true });
-    const temporary = `${this.stateFile}.${process.pid}.tmp`;
-    await fs.writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-    await fs.rename(temporary, this.stateFile);
-    return { key, value, group, updatedAt: state.updatedAt };
+    return this.#serialized(async () => {
+      const state = await this.load();
+      state.values[key] = value;
+      state.updatedAt = this.clock().toISOString();
+      state.lastChange = {
+        key,
+        group,
+        actor: options.actor || "user",
+        at: state.updatedAt,
+        ...(options.evidenceRef ? { evidenceRef: String(options.evidenceRef) } : {}),
+      };
+      await fs.mkdir(path.dirname(this.stateFile), { recursive: true });
+      const temporary = `${this.stateFile}.${process.pid}.tmp`;
+      await fs.writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+      await fs.rename(temporary, this.stateFile);
+      return { key, value, group, updatedAt: state.updatedAt };
+    });
   }
 
   contract() { return { version: 1, ...GROUPS }; }

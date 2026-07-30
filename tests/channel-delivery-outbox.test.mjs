@@ -106,6 +106,23 @@ test("delivery follows responseVersion order and never advances past an unknown 
   assert.equal(immediateRetry.delivered, 0);
 });
 
+test("a persistently failing earlier event does not starve a later Final", async (t) => {
+  const { root, outbox, clockState } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const ack = await outbox.enqueue({ ...base, responseKind: "ack", responseVersion: 1, deliveryKey: "starve-ack", payload: { text: "ACK" }, dueAt: clockState.now.toISOString() });
+  // The ACK persistently fails and backs off into the future.
+  const failedReport = await outbox.deliverDue(async () => ({ retryable: true, reason: "NETWORK" }));
+  assert.equal(failedReport.retryable, 1);
+  assert.equal((await outbox.get(ack.event.eventId)).status, "failed_retryable");
+
+  const final = await outbox.enqueue({ ...base, responseKind: "final", responseVersion: 2, deliveryKey: "starve-final", payload: { text: "FINAL" }, dueAt: clockState.now.toISOString() });
+  // The Final is due now and must not be held back by the failed_retryable ACK.
+  const finalReport = await outbox.deliverDue(async (_payload, event) => event.responseKind === "final" ? { delivered: true } : { retryable: true, reason: "NETWORK" });
+  assert.equal(finalReport.delivered, 1);
+  assert.equal((await outbox.get(final.event.eventId)).status, "delivered");
+  assert.equal((await outbox.get(ack.event.eventId)).status, "failed_retryable");
+});
+
 test("failed retryable delivery backs off and terminal failure does not retry", async (t) => {
   const { root, outbox, clockState } = await fixture();
   t.after(() => fs.rm(root, { recursive: true, force: true }));
