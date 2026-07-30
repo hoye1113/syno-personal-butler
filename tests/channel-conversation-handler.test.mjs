@@ -74,7 +74,7 @@ test("ChannelConversationHandler receives URL before invoking the model and reco
   assert.deepEqual(proposed, ["artifact-1"]);
 });
 
-test("ChannelConversationHandler deterministically captures an embedded URL only with explicit intent", async () => {
+test("ChannelConversationHandler deterministically captures an embedded URL with explicit intent or read-link phrases", async () => {
   const calls = [];
   const model = [];
   const handler = new ChannelConversationHandler({
@@ -92,8 +92,15 @@ test("ChannelConversationHandler deterministically captures an embedded URL only
   assert.match((await handler.handle({ id: "capture-1", ownerKey: "owner", channel: "weixin", text: "请收录 https://example.com/a" })).text, /workflow-new/);
   assert.equal(calls[0].payload.kind, "url");
   assert.equal(model.length, 0);
-  assert.deepEqual(await handler.handle({ id: "chat-1", ownerKey: "owner", channel: "weixin", text: "解释 https://example.com/a 的观点" }), { text: "ordinary" });
+  // 已批准的行为变更（2026-07-30）：「解释 <url> 的观点」这类读链接短语 → 先收录、再带上下文进模型回答
+  const readLink = await handler.handle({ id: "chat-1", ownerKey: "owner", channel: "weixin", text: "解释 https://example.com/a 的观点" });
+  assert.match(readLink.text, /ordinary/);
+  assert.match(readLink.text, /📥 该链接已同时进入收录，编号：workflow-new/);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].payload.kind, "url");
   assert.equal(model.length, 1);
+  assert.match(model[0], /^解释 https:\/\/example\.com\/a 的观点/);
+  assert.match(model[0], /knowledge\.fetch_url/);
 });
 
 test("ChannelConversationHandler supports local-only personal capture and deterministic status", async () => {
@@ -525,4 +532,65 @@ test("buildTeachBackPriming lists at most three reviews with conditional scoring
   assert.match(priming, /knowledgeRef: vault\/a\.md/);
   assert.match(priming, /普通对话则正常回答，不要强行判分/);
   assert.match(priming, /跳过复习/);
+});
+
+test("read-link phrases capture first and answer with the fetch_url tool hint", async () => {
+  const calls = [];
+  const model = [];
+  const handler = new ChannelConversationHandler({
+    runtime: { async run(request) { model.push(request.text); return { text: "能读到，这是概要" }; } },
+    core: {},
+    ingestWorkflows: {
+      async receive(payload) {
+        calls.push(payload);
+        return { artifact: { id: "artifact-new" }, workflow: { id: "workflow-new" }, duplicate: false };
+      },
+    },
+    pendingDecisions: {},
+  });
+  // 主人 2026-07-30 的真实句式
+  const response = await handler.handle({
+    id: "wx-read-1", ownerKey: "owner", channel: "weixin",
+    text: "你能访问获取到内容吗：https://openrouter.ai/blog/insights/evaluate-llm-provider-performance/#how-to-read-provider-benchmarks-without-getting-fooled",
+  });
+  assert.match(response.text, /能读到，这是概要/);
+  assert.match(response.text, /📥 该链接已同时进入收录，编号：workflow-new/);
+  assert.deepEqual(calls.map((item) => item.kind), ["url"]);
+  assert.equal(model.length, 1);
+  assert.match(model[0], /编号 workflow-new/);
+  assert.match(model[0], /knowledge\.fetch_url/);
+  assert.match(model[0], /不要编造理由/);
+});
+
+test("read-link rule stays off for long residuals, multiple URLs and local-only mode", async () => {
+  const calls = [];
+  const model = [];
+  const handler = new ChannelConversationHandler({
+    runtime: { async run(request) { model.push(request.text); return { text: "ordinary" }; } },
+    core: {},
+    ingestWorkflows: {
+      async receive(payload) {
+        calls.push(payload);
+        return { artifact: { id: "artifact-new" }, workflow: { id: "workflow-new" }, duplicate: false };
+      },
+    },
+    pendingDecisions: {},
+  });
+  // 剩余文字 >30 字：真正的对话，不触发自动收录（模型仍可用 fetch_url 工具）
+  assert.deepEqual(await handler.handle({
+    id: "wx-read-2", ownerKey: "owner", channel: "weixin",
+    text: "把 https://example.com/a 的核心观点和我们知识库里的 Context Engineering 笔记做个详细对比，列出三点异同并给出你的评价",
+  }), { text: "ordinary" });
+  // 多链接不触发
+  assert.deepEqual(await handler.handle({
+    id: "wx-read-3", ownerKey: "owner", channel: "weixin",
+    text: "看看 https://example.com/a 和 https://example.com/b",
+  }), { text: "ordinary" });
+  // 仅本地模式不自动抓取远端
+  assert.deepEqual(await handler.handle({
+    id: "wx-read-4", ownerKey: "owner", channel: "weixin",
+    text: "仅本地 看看 https://example.com/a",
+  }), { text: "ordinary" });
+  assert.equal(calls.length, 0);
+  assert.equal(model.length, 3);
 });

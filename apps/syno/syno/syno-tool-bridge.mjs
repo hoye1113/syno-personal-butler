@@ -30,6 +30,7 @@ const BRIDGE_TOOL_NAMES = new Set([
   "workflow.context",
   "knowledge.search",
   "knowledge.read_snippet",
+  "knowledge.fetch_url",
   "today.read",
   "capture.start",
   "capture.status",

@@ -478,6 +478,25 @@ class ChannelConversationHandler {
         }, { ...message, ownerKey });
         return { text: `已接收个人想法，收录编号：${receipt.workflow?.id || receipt.artifact.id}。` };
       }
+      // 「读链接」意图（Owner 已批准的行为变更，2026-07-30）：恰好一个链接、去掉链接后剩余
+      // 文字 ≤30 字且命中读/看/访问/总结类动词 → 先进确定性收录管线（直抓失败自动浏览器兜底），
+      // 再让模型用 knowledge.fetch_url 读正文回答。仅本地模式不自动抓取远端；剩余文字长或
+      // 多链接的消息保持普通对话（模型仍可用 fetch_url 工具）。
+      let runText = text;
+      let captureSuffix = "";
+      const rawUrls = [...text.matchAll(/https?:\/\/[^\s]+/gi)].map((item) => item[0]);
+      if (!localOnly && rawUrls.length === 1) {
+        const residual = text.replace(rawUrls[0], "").replace(/^[：:，。\s]+|[？?！!。…\s]+$/gu, "").trim();
+        if (residual.length > 0 && residual.length <= 30
+          && /(?:访问|读取|获取|看看|看一下|读一读|打开|总结|分析|讲一讲|解读|解释|什么意思|说了啥|说了什么|内容)/u.test(residual)) {
+          await this.#record("channel.capture.requested", { ...trace, sourceKind: "url", intent: "read_link" });
+          const receipt = await this.#receive({ kind: "url", value: urls[0] }, { ...message, ownerKey });
+          await this.#record("channel.capture.completed", { ...trace, artifactIds: [receipt.artifact.id], sourceKind: "url" });
+          const captureId = receipt.workflow?.id || receipt.artifact.id;
+          runText = `${text}\n\n（系统提示：这个链接已进入收录管线，编号 ${captureId}。请使用 knowledge.fetch_url 工具读取正文并回答主人的问题；若抓取失败，如实说明失败原因，不要编造理由。）`;
+          captureSuffix = `\n\n📥 该链接已同时进入收录，编号：${captureId}。`;
+        }
+      }
       // teach-back 门（所有确定性协议之后、runtime.run 正前方）：
       // 有真实送达且 72h 内的活跃复习时，先把复习窗口软引导注入会话，再照常进模型。
       // 门只加上下文、不改写主人原文，模型保留退出路径；引导失败退化为普通对话。
@@ -493,14 +512,14 @@ class ChannelConversationHandler {
       }
       try {
         await this.#record("channel.runtime.requested", { ...trace });
-        const result = await this.runtime.run({ text }, {
+        const result = await this.runtime.run({ text: runText }, {
           ownerKey,
           threadKey,
           channel: message.channel,
           messageId: message.id,
         });
         await this.#record("channel.runtime.completed", { ...trace, runId: result.runId || null });
-        return { text: result.text || "Syno 已处理，但没有生成可显示的文本。" };
+        return { text: `${result.text || "Syno 已处理，但没有生成可显示的文本。"}${captureSuffix}` };
       } catch (error) {
         if (error.retryable !== true && error.code !== "OPENCODE_ATTEMPTS_EXHAUSTED") throw error;
         if (typeof this.core.execute !== "function") throw error;
