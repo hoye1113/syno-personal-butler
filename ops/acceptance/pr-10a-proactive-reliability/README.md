@@ -10,6 +10,7 @@
 
 - 移动 v2 受控切换能力：`4af218b`
 - 主动通知去重、单 Bundle、Home Channel Outbox、加密目标恢复：`09b015e3261507bb7a73e2a987514fba3b54a22d`
+- 控制面共享 mutation lock、Outbox cutover barrier、TEST 精确授权与发布闸门并发回归：`ae6de1deda0fd9a622c249c2cf9bbb2b7069f7ce`
 
 ## 已验证的自动语义
 
@@ -22,6 +23,7 @@
 - Owner 渠道目标使用 Windows DPAPI 密文，目标恢复失败保持 retryable。
 - Proactive Ledger v1→v2 有原始备份、SHA-256 摘要、完成 marker 和歧义抑制。
 - 启动器保持 5 秒健康检查；24 小时模拟中健康与接管心跳各 24 条，错误事件不受限流。
+- Home 切换、`confirm-test` 与 `enable/disable` 由共享 mutation lock 串行化；enable-vs-switch、switch-vs-switch 并发回归通过，Home 切换永久失效旧 Home 证据与 TEST 授权。
 
 ## 证据边界
 
