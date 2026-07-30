@@ -107,14 +107,14 @@ class ProactiveOrchestrator {
   constructor({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery, recordEvent, signalEngine = new SignalEngine(), stateFile = path.join(PATHS.stateRoot, "proactive.json"), stateLock, clock = () => new Date(), quietHours = DEFAULT_QUIET_HOURS } = {}) {
     if (!host || !today || !channels) throw new Error("ProactiveOrchestrator 缺少 host、today 或 channels");
     this.host = host; this.today = today; this.channels = channels; this.conversations = conversations; this.cognitiveRuntime = cognitiveRuntime;
-    this.settingsRegistry = settingsRegistry; this.signalSources = signalSources; this.maintenance = maintenance; this.channelDeliveryOutbox = channelDeliveryOutbox; this.notifications = notifications; this.ownerChannelTargets = ownerChannelTargets; this.wakeDelivery = wakeDelivery; this.recordEvent = recordEvent; this.signalEngine = signalEngine; this.stateFile = stateFile; this.stateLock = stateLock || new ProcessFileLock({ file: `${stateFile}.lock`, timeoutMs: 30_000 }); this.clock = clock; this.quietHours = quietHours; this.timer = null;
+    this.settingsRegistry = settingsRegistry; this.signalSources = signalSources; this.maintenance = maintenance; this.channelDeliveryOutbox = channelDeliveryOutbox; this.notifications = notifications; this.ownerChannelTargets = ownerChannelTargets; this.wakeDelivery = wakeDelivery; this.recordEvent = recordEvent; this.signalEngine = signalEngine; this.stateFile = stateFile; this.stateLock = stateLock || new ProcessFileLock({ file: `${stateFile}.lock`, timeoutMs: 30_000 }); this.clock = clock; this.quietHours = quietHours; this.timer = null; this.startGeneration = 0;
   }
 
-  async load() {
+  async load({ prepareMigration = true } = {}) {
     try {
       const raw = await fs.readFile(this.stateFile, "utf8");
       const state = normalizeState(JSON.parse(raw));
-      if (state.migration?.status === "pending") {
+      if (prepareMigration && state.migration?.status === "pending") {
         await fs.copyFile(this.stateFile, `${this.stateFile}.v1-backup`, fsConstants.COPYFILE_EXCL)
           .catch((error) => { if (error.code !== "EEXIST") throw error; });
         const backup = await fs.readFile(`${this.stateFile}.v1-backup`, "utf8");
@@ -133,23 +133,52 @@ class ProactiveOrchestrator {
     const temporary = `${this.stateFile}.${process.pid}.tmp`;
     await fs.writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
     await fs.rename(temporary, this.stateFile);
-    if (state.migration?.status === "complete") {
-      const marker = `${this.stateFile}.migration-v2.json`;
-      try {
-        await fs.access(marker);
-      } catch (error) {
-        if (error.code !== "ENOENT") throw error;
-        const markerTemporary = `${marker}.${process.pid}.tmp`;
-        await fs.writeFile(markerTemporary, `${JSON.stringify({
-          version: 2,
-          fromVersion: state.migration.fromVersion,
-          status: "complete",
-          completedAt: state.migration.completedAt,
-          backupDigest: state.migration.backupDigest,
-        }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-        await fs.rename(markerTemporary, marker);
-      }
+    await this.#ensureMigrationMarker(state);
+  }
+
+  async #hasValidMigrationMarker(state) {
+    if (state.migration?.status !== "complete") return false;
+    try {
+      const marker = JSON.parse(await fs.readFile(`${this.stateFile}.migration-v2.json`, "utf8"));
+      if (marker.version !== 2
+        || marker.status !== "complete"
+        || marker.fromVersion !== state.migration.fromVersion
+        || marker.backupDigest !== state.migration.backupDigest) return false;
+      const backup = await fs.readFile(`${this.stateFile}.v1-backup`, "utf8");
+      return createHash("sha256").update(backup).digest("hex") === state.migration.backupDigest;
+    } catch {
+      return false;
     }
+  }
+
+  async #ensureMigrationMarker(state) {
+    if (state.migration?.status !== "complete") return;
+    if (!state.migration.backupDigest) {
+      throw Object.assign(new Error("主动通知迁移缺少可验证备份摘要"), { code: "PROACTIVE_MIGRATION_EVIDENCE_INVALID" });
+    }
+    const backup = await fs.readFile(`${this.stateFile}.v1-backup`, "utf8");
+    if (createHash("sha256").update(backup).digest("hex") !== state.migration.backupDigest) {
+      throw Object.assign(new Error("主动通知迁移备份摘要不匹配"), { code: "PROACTIVE_MIGRATION_EVIDENCE_INVALID" });
+    }
+    const marker = `${this.stateFile}.migration-v2.json`;
+    try {
+      await fs.access(marker);
+      if (!await this.#hasValidMigrationMarker(state)) {
+        throw Object.assign(new Error("主动通知迁移完成标记无效"), { code: "PROACTIVE_MIGRATION_MARKER_INVALID" });
+      }
+      return;
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+    const markerTemporary = `${marker}.${process.pid}.tmp`;
+    await fs.writeFile(markerTemporary, `${JSON.stringify({
+      version: 2,
+      fromVersion: state.migration.fromVersion,
+      status: "complete",
+      completedAt: state.migration.completedAt,
+      backupDigest: state.migration.backupDigest,
+    }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+    await fs.rename(markerTemporary, marker);
   }
 
   #markInactive(state, events, now) {
@@ -247,9 +276,9 @@ class ProactiveOrchestrator {
     }
   }
 
-  async #deliverBundle(state, bundle, message, now) {
+  async #deliverBundle(state, bundle, message, now, { deliveryKey: explicitDeliveryKey, shouldContinue = () => true, exclusiveActivePrefix = null } = {}) {
     const targetChannel = this.channels.homeChannel || "web";
-    const deliveryKey = `${bundle.bundleId}:${targetChannel}:v1`;
+    const deliveryKey = explicitDeliveryKey || `${bundle.bundleId}:${targetChannel}:v1`;
     state.pendingBundles[bundle.bundleId] = {
       bundleId: bundle.bundleId,
       eventId: null,
@@ -269,8 +298,15 @@ class ProactiveOrchestrator {
         businessVersion: 1,
         payload: { ...message, signalVersions: bundle.signalVersions, signalKinds: bundle.signalKinds },
         deliveryKey,
+        shouldEnqueue: shouldContinue,
+        exclusiveActivePrefix,
       });
+      if (event.skipped || !event.event) {
+        delete state.pendingBundles[bundle.bundleId];
+        return { status: "canceled", eventId: null, targetChannel };
+      }
       state.pendingBundles[bundle.bundleId].eventId = event.event.eventId;
+      if (event.event.status === "delivered") this.#applyBundleDelivered(state, bundle.bundleId, event.event.eventId, now);
       await this.recordEvent?.("proactive.bundle.enqueued", {
         bundleId: bundle.bundleId,
         signalCount: bundle.signalVersions.length,
@@ -288,7 +324,7 @@ class ProactiveOrchestrator {
           status: "pending",
         },
       }).catch(() => {});
-      return { status: "pending", eventId: event.event.eventId, targetChannel };
+      return { status: event.event.status, eventId: event.event.eventId, targetChannel };
     }
     await this.recordEvent?.("proactive.target_unavailable", {
       bundleId: bundle.bundleId,
@@ -417,24 +453,33 @@ class ProactiveOrchestrator {
   async getDiagnostics() {
     const state = await this.load();
     const outbox = await this.channelDeliveryOutbox?.list?.({ limit: 1000 }) || [];
+    const homeChannel = this.channels.homeChannel || "web";
     return {
       eligibleSignals: Number(state.lastEligibleSignals) || 0,
       pendingBundles: Object.keys(state.pendingBundles || {}).length,
       deliveryUnknown: outbox.filter((item) => item.sourceType === "proactive_bundle" && item.status === "delivery_unknown").length,
-      homeChannel: this.channels.homeChannel || "web",
-      homeTargetAvailable: Boolean(await this.ownerChannelTargets?.get?.("local-user", this.channels.homeChannel || "web").catch?.(() => null) || this.channels.homeChannel === "web"),
+      homeChannel,
+      homeTargetAvailable: await this.#homeTargetAvailable(homeChannel),
       lastDeliveredAt: Object.values(state.subjects || {}).filter((item) => item.lastDeliveredEventId).map((item) => item.updatedAt).filter(Boolean).sort().at(-1) || null,
     };
   }
 
-  async #tickLocked({ now = this.clock(), highValueEvents } = {}) {
+  async #tickLocked({ now = this.clock(), highValueEvents, shouldContinue = () => true } = {}) {
+    if (!shouldContinue()) return { delivered: [], shouldWake: false };
     const state = await this.load();
+    if (state.migration?.status === "pending"
+      || (state.migration?.status === "complete" && !await this.#hasValidMigrationMarker(state))) {
+      if (state.migration?.status === "pending") await this.save(state);
+      return { delivered: [], shouldWake: false };
+    }
     await this.#reconcileOutbox(state, now);
+    if (!shouldContinue()) return { delivered: [], shouldWake: false };
     const date = localDateKey(now);
     if (state.date !== date) Object.assign(state, { date, notificationsToday: 0 });
     const quietHours = await this.settingsRegistry?.get("notifications.quietHours") || this.quietHours;
     if (isQuietTime(now, quietHours)) return { delivered: [], shouldWake: false };
     const events = highValueEvents || await this.signalSources?.collect({ now }) || [];
+    if (!shouldContinue()) return { delivered: [], shouldWake: false };
     await this.#loadLegacyAudit(state);
     const cadence = await this.settingsRegistry?.get("notifications.cadence") || "balanced";
     const cadenceBudget = { minimal: 1, balanced: 2, active: 3 }[cadence] || 2;
@@ -454,22 +499,24 @@ class ProactiveOrchestrator {
         outboxEventId: null,
         status: "created",
       });
+      if (!shouldContinue()) return { delivered: [], shouldWake: false };
       const snapshot = await this.today.snapshot();
       const weeklySummary = prepared.some((signal) => signal.kind === "weekly") && this.maintenance ? await this.maintenance.weeklySummary() : undefined;
       const fallback = bundleMessage(bundle, snapshot, weeklySummary);
+      if (!shouldContinue()) return { delivered: [], shouldWake: false };
       const result = await this.#runAgent(bundlePrompt(bundle), bundle.bundleId);
+      if (!shouldContinue()) return { delivered: [], shouldWake: false };
       const completedText = result.job?.status === "completed" ? result.job.result?.text : "";
       const body = completedText ? `${fallback.body}\n\n建议：${completedText}` : fallback.body;
       const message = completedText ? { ...fallback, body, text: `${fallback.title}\n${body}` } : fallback;
       if (completedText && this.cognitiveRuntime?.appendSystemEvent) await this.cognitiveRuntime.appendSystemEvent({ ownerKey: "local-user", threadKey: "main", text: message.text }).catch(() => {});
-      const delivery = await this.#deliverBundle(state, bundle, message, now);
+      if (!shouldContinue()) return { delivered: [], shouldWake: false };
+      const delivery = await this.#deliverBundle(state, bundle, message, now, { shouldContinue });
+      if (delivery.status === "canceled") return { delivered: [], shouldWake: false };
       if (delivery.status === "delivered") this.#applyBundleDelivered(state, bundle.bundleId, delivery.eventId, now);
       state.notificationsToday += 1;
       state.pending[bundle.bundleId] = { signalKey: bundle.bundleId, status: delivery.status };
       delivered.push({ signal: "bundle", bundleId: bundle.bundleId, providerStatus: result.job?.status, localFallback: !completedText, deliveryStatus: delivery.status, targetChannel: delivery.targetChannel });
-    }
-    if (state.migration?.status === "pending") {
-      state.migration = { ...state.migration, status: "complete", completedAt: now.toISOString() };
     }
     if (this.conversations && state.lastPruned !== date) {
       await this.conversations.prune();
@@ -490,13 +537,210 @@ class ProactiveOrchestrator {
     return result.delivered;
   }
 
-  async start() {
-    if (this.timer) return;
-    await this.tick();
-    this.timer = setInterval(() => this.tick().catch(() => {}), 60_000);
+  async #deliveryEnabled() {
+    return (await this.settingsRegistry?.get?.("notifications.proactiveDeliveryEnabled")) === true;
   }
 
-  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }
+  async releaseStatus() {
+    const state = await this.load({ prepareMigration: false });
+    const migrationComplete = state.migration?.status === "complete"
+      ? await this.#hasValidMigrationMarker(state)
+      : state.migration?.status !== "pending";
+    return {
+      enabled: await this.#deliveryEnabled(),
+      migrationComplete,
+      migrationStatus: state.migration?.status || "current",
+    };
+  }
+
+  async migrateLedger({ now = this.clock(), highValueEvents } = {}) {
+    if (await this.#deliveryEnabled()) {
+      throw Object.assign(new Error("迁移前必须暂停主动通知"), { code: "PROACTIVE_DELIVERY_MUST_BE_PAUSED" });
+    }
+    return this.stateLock.run(async () => {
+      const state = await this.load();
+      if (state.migration?.status === "complete") {
+        const validBefore = await this.#hasValidMigrationMarker(state);
+        await this.#ensureMigrationMarker(state);
+        return { status: validBefore ? "already_current" : "marker_repaired", version: state.version };
+      }
+      if (state.migration?.status !== "pending") {
+        return { status: "already_current", version: state.version };
+      }
+      const events = highValueEvents || await this.signalSources?.collect?.({ now }) || [];
+      await this.#loadLegacyAudit(state);
+      const signals = events.map((event) => ({
+        kind: "event",
+        key: `event:${event.id}`,
+        id: String(event.id),
+        event,
+        title: event.title,
+        action: event.action,
+        priority: event.priority,
+        ref: event.ref,
+      }));
+      this.#prepareSignals(state, signals, now);
+      state.migration = {
+        ...state.migration,
+        status: "complete",
+        completedAt: now.toISOString(),
+      };
+      await this.save(state);
+      return {
+        status: "migrated",
+        version: state.version,
+        suppressedSignals: Object.values(state.subjects).filter((subject) => subject.migrationSuppressed).length,
+      };
+    });
+  }
+
+  async triggerTest(runId, { now = this.clock() } = {}) {
+    const normalizedRunId = String(runId || "").trim();
+    if (!/^[A-Za-z0-9_-]{6,64}$/.test(normalizedRunId)) {
+      throw Object.assign(new Error("主动通知测试 runId 非法"), { code: "PROACTIVE_TEST_RUN_ID_INVALID" });
+    }
+    const release = await this.releaseStatus();
+    if (release.enabled) {
+      throw Object.assign(new Error("受控测试期间必须保持真实主动通知暂停"), { code: "PROACTIVE_DELIVERY_MUST_BE_PAUSED" });
+    }
+    if (!release.migrationComplete) {
+      throw Object.assign(new Error("主动通知 Ledger 尚未完成受控迁移"), { code: "PROACTIVE_MIGRATION_REQUIRED" });
+    }
+    const targetChannel = this.channels.homeChannel || "web";
+    const deliveryKey = `proactive-test:${normalizedRunId}:${targetChannel}:v1`;
+    const result = await this.stateLock.run(async () => {
+      const state = await this.load({ prepareMigration: false });
+      const signal = {
+        id: `proactive-test:${normalizedRunId}`,
+        key: `proactive-test:${normalizedRunId}`,
+        kind: "event",
+        title: `[Syno TEST ${normalizedRunId}]`,
+        action: "请确认只收到这一条受控主动通知",
+        priority: 100,
+        ref: { status: "test", businessVersion: normalizedRunId },
+      };
+      signal.identity = signalIdentity(signal, state.subjects);
+      state.subjects[signal.identity.subjectKey] = {
+        ...(state.subjects[signal.identity.subjectKey] || {}),
+        subjectKey: signal.identity.subjectKey,
+        episode: signal.identity.episode,
+        lastSeenVersion: signal.identity.businessVersion,
+        active: true,
+        updatedAt: now.toISOString(),
+      };
+      const bundle = buildProactiveBundle([signal], { now, slot: "test" });
+      const message = {
+        title: signal.title,
+        body: signal.action,
+        text: `${signal.title}\n${signal.action}`,
+        level: "info",
+        source: "proactive",
+        data: { idempotencyKey: deliveryKey, signal: "test", testRunId: normalizedRunId },
+      };
+      let delivery;
+      try {
+        delivery = await this.#deliverBundle(state, bundle, message, now, {
+          deliveryKey,
+          exclusiveActivePrefix: "proactive-test:",
+        });
+      } catch (error) {
+        if (error?.code === "DELIVERY_EXCLUSIVE_GROUP_CONFLICT") {
+          throw Object.assign(new Error("已有一条受控主动通知等待确定结果"), {
+            code: "PROACTIVE_TEST_ALREADY_PENDING",
+            conflictingEventId: error.conflictingEventId,
+          });
+        }
+        throw error;
+      }
+      await this.save(state);
+      return {
+        runId: normalizedRunId,
+        bundleId: bundle.bundleId,
+        eventId: delivery.eventId,
+        targetChannel: delivery.targetChannel,
+        status: delivery.status,
+      };
+    });
+    if (result.eventId && ["pending", "claimed", "failed_retryable"].includes(result.status)) {
+      await this.settingsRegistry?.set?.("notifications.proactiveTestEventId", result.eventId, {
+        actor: "system",
+        proactiveTestAuthorizationVerified: true,
+      });
+      await this.wakeDelivery?.({ allowProactiveEventId: result.eventId });
+    }
+    return result;
+  }
+
+  async #homeTargetAvailable(channel = this.channels.homeChannel || "web") {
+    if (channel === "web") return true;
+    try {
+      return Boolean(await this.ownerChannelTargets?.get?.("local-user", channel));
+    } catch {
+      return false;
+    }
+  }
+
+  async preview({ now = this.clock(), highValueEvents } = {}) {
+    const state = await this.load({ prepareMigration: false });
+    const homeChannel = this.channels.homeChannel || "web";
+    const quietHours = await this.settingsRegistry?.get?.("notifications.quietHours") || this.quietHours;
+    if (isQuietTime(now, quietHours)) {
+      return {
+        enabled: await this.#deliveryEnabled(),
+        homeChannel,
+        homeTargetAvailable: await this.#homeTargetAvailable(homeChannel),
+        eligibleSignals: 0,
+        bundle: null,
+      };
+    }
+    const events = highValueEvents || await this.signalSources?.collect({ now }) || [];
+    await this.#loadLegacyAudit(state);
+    const cadence = await this.settingsRegistry?.get?.("notifications.cadence") || "balanced";
+    const cadenceBudget = { minimal: 1, balanced: 2, active: 3 }[cadence] || 2;
+    this.#markInactive(state, events, now);
+    this.#pruneResolvedSubjects(state, now);
+    const signals = this.signalEngine.collect({
+      now,
+      lastRuns: state.lastRuns,
+      highValueEvents: events,
+      notificationsToday: state.notificationsToday,
+      maxDailyNotifications: cadenceBudget,
+      returnAllEligible: true,
+    });
+    const prepared = this.#prepareSignals(state, signals, now);
+    const slot = prepared.find((signal) => ["morning", "evening", "weekly"].includes(signal.kind))?.kind || "event";
+    const bundle = prepared.length ? buildProactiveBundle(prepared, { now, slot }) : null;
+    return {
+      enabled: await this.#deliveryEnabled(),
+      homeChannel,
+      homeTargetAvailable: await this.#homeTargetAvailable(homeChannel),
+      eligibleSignals: prepared.length,
+      bundle: bundle ? {
+        bundleId: bundle.bundleId,
+        signalCount: bundle.signalVersions.length,
+        remainingCount: bundle.remainingCount,
+      } : null,
+    };
+  }
+
+  async start() {
+    if (this.timer) return;
+    const generation = ++this.startGeneration;
+    const tickIfEnabled = async () => {
+      if (!await this.#deliveryEnabled()) return [];
+      if (generation !== this.startGeneration) return [];
+      return this.tick({ shouldContinue: () => generation === this.startGeneration });
+    };
+    await tickIfEnabled();
+    if (generation !== this.startGeneration) return;
+    this.timer = setInterval(() => tickIfEnabled().catch(() => {}), 60_000);
+  }
+
+  stop() {
+    this.startGeneration += 1;
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
+  }
 }
 
 export { DEFAULT_QUIET_HOURS, ProactiveOrchestrator, isQuietTime, localMessage };

@@ -51,6 +51,7 @@ class ChannelDeliveryOutbox {
     protect = (value) => runDpapi("protect", value),
     unprotect = (value) => runDpapi("unprotect", value),
     processLock,
+    beforeClaimCommit,
   } = {}) {
     this.root = path.resolve(root);
     this.payloadRoot = path.resolve(payloadRoot);
@@ -60,6 +61,10 @@ class ChannelDeliveryOutbox {
     this.protect = protect;
     this.unprotect = unprotect;
     this.processLock = processLock || new ProcessFileLock({ file: lockFile, timeoutMs: 30_000 });
+    this.beforeClaimCommit = beforeClaimCommit;
+    this.frozenProactiveTargets = new Set();
+    this.inFlightProactiveTargets = new Map();
+    this.inFlightWaiters = new Map();
   }
 
   async #ensureRoots() {
@@ -110,6 +115,8 @@ class ChannelDeliveryOutbox {
     dueAt,
     supersedesEventId = null,
     createdAt = this.clock().toISOString(),
+    shouldEnqueue = () => true,
+    exclusiveActivePrefix = null,
   } = {}) {
     if (!sourceId || !ownerKey || !targetChannel || !deliveryKey) throw new Error("ChannelDeliveryOutbox 缺少 sourceId/ownerKey/targetChannel/deliveryKey");
     if (!RESPONSE_KINDS.has(responseKind)) throw new Error(`未知响应类型：${responseKind}`);
@@ -117,11 +124,24 @@ class ChannelDeliveryOutbox {
     const payloadDigest = digest(normalizedPayload);
     const id = String(requestedEventId || eventId());
     return this.processLock.run(async () => {
+      if (!await shouldEnqueue()) return { created: false, event: null, skipped: true };
       const records = await this.#listUnlocked();
       const sameKey = records.find((item) => item.deliveryKey === deliveryKey);
       if (sameKey) {
         if (sameKey.payloadDigest !== payloadDigest) throw Object.assign(new Error("delivery key 对应不同 payload"), { code: "DELIVERY_IDENTITY_CONFLICT" });
         return { created: false, event: sameKey };
+      }
+      if (exclusiveActivePrefix) {
+        const conflicting = records.find((item) => item.ownerKey === ownerKey
+          && item.targetChannel === targetChannel
+          && String(item.deliveryKey || "").startsWith(exclusiveActivePrefix)
+          && ["pending", "claimed", "failed_retryable", "delivery_unknown"].includes(item.status));
+        if (conflicting) {
+          throw Object.assign(new Error("已有同组投递事件处于非终态"), {
+            code: "DELIVERY_EXCLUSIVE_GROUP_CONFLICT",
+            conflictingEventId: conflicting.eventId,
+          });
+        }
       }
       const now = new Date(createdAt);
       const sameSource = records.filter((item) => item.sourceId === sourceId && item.targetChannel === targetChannel);
@@ -195,6 +215,116 @@ class ChannelDeliveryOutbox {
       && (!dueBefore || new Date(item.dueAt).getTime() <= dueMs)).slice(0, Math.max(1, Number(limit) || 100));
   }
 
+  async findActiveProactiveTest(ownerKey, targetChannel) {
+    const active = new Set(["pending", "claimed", "failed_retryable", "delivery_unknown"]);
+    const records = await this.#listUnlocked();
+    return records
+      .filter((item) => item.sourceType === "proactive_bundle"
+        && item.ownerKey === ownerKey
+        && item.targetChannel === targetChannel
+        && String(item.deliveryKey || "").startsWith("proactive-test:")
+        && active.has(item.status))
+      .sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)))[0] || null;
+  }
+
+  async supersedeProactiveTarget(ownerKey, targetChannel) {
+    const active = new Set(["pending", "claimed", "failed_retryable", "delivery_unknown"]);
+    return this.processLock.run(async () => {
+      const records = await this.#listUnlocked();
+      const matches = records.filter((item) => item.sourceType === "proactive_bundle"
+        && item.ownerKey === ownerKey
+        && item.targetChannel === targetChannel
+        && active.has(item.status));
+      for (const item of matches) {
+        await this.#updateUnlocked(item.eventId, { status: "superseded", claim: null });
+      }
+      return matches.length;
+    });
+  }
+
+  #targetKey(ownerKey, targetChannel) {
+    return `${ownerKey}\u0000${targetChannel}`;
+  }
+
+  #incrementInFlight(key) {
+    this.inFlightProactiveTargets.set(key, (this.inFlightProactiveTargets.get(key) || 0) + 1);
+  }
+
+  #decrementInFlight(key) {
+    const next = Math.max(0, (this.inFlightProactiveTargets.get(key) || 0) - 1);
+    if (next) this.inFlightProactiveTargets.set(key, next);
+    else {
+      this.inFlightProactiveTargets.delete(key);
+      for (const resolve of this.inFlightWaiters.get(key) || []) resolve();
+      this.inFlightWaiters.delete(key);
+    }
+  }
+
+  async beginProactiveTargetCutover(ownerKey, targetChannel, { timeoutMs = 30_000 } = {}) {
+    const key = this.#targetKey(ownerKey, targetChannel);
+    this.frozenProactiveTargets.add(key);
+    try {
+      if ((this.inFlightProactiveTargets.get(key) || 0) > 0) {
+        await new Promise((resolve, reject) => {
+          const waiters = this.inFlightWaiters.get(key) || [];
+          waiters.push(resolve);
+          this.inFlightWaiters.set(key, waiters);
+          const timer = setTimeout(() => reject(Object.assign(new Error("旧 Home 主动投递仍在发送"), { code: "PROACTIVE_TARGET_CUTOVER_TIMEOUT" })), timeoutMs);
+          timer.unref?.();
+          waiters[waiters.length - 1] = () => {
+            clearTimeout(timer);
+            resolve();
+          };
+        });
+      }
+      await this.supersedeProactiveTarget(ownerKey, targetChannel);
+      let released = false;
+      return {
+        release: () => {
+          if (released) return;
+          released = true;
+          this.frozenProactiveTargets.delete(key);
+        },
+      };
+    } catch (error) {
+      this.frozenProactiveTargets.delete(key);
+      throw error;
+    }
+  }
+
+  async #settleClaim(id, lease, patch) {
+    return this.processLock.run(async () => {
+      const current = JSON.parse(await fs.readFile(eventFile(this.root, id), "utf8"));
+      if (current.status !== "claimed" || current.claim?.leaseId !== lease.leaseId) return null;
+      return this.#updateUnlocked(id, patch);
+    });
+  }
+
+  async #commitClaim(candidate, lease) {
+    return this.processLock.run(async () => {
+      const current = JSON.parse(await fs.readFile(eventFile(this.root, candidate.eventId), "utf8"));
+      const eligible = ["pending", "delivery_unknown", "failed_retryable"].includes(current.status)
+        || (current.status === "claimed" && new Date(current.claim?.leaseExpiresAt || 0).getTime() <= this.clock().getTime());
+      if (!eligible) return null;
+      const proactiveTargetKey = current.sourceType === "proactive_bundle"
+        ? this.#targetKey(current.ownerKey, current.targetChannel)
+        : null;
+      if (proactiveTargetKey && this.frozenProactiveTargets.has(proactiveTargetKey)) return null;
+      if (proactiveTargetKey) this.#incrementInFlight(proactiveTargetKey);
+      try {
+        const claimed = await this.#updateUnlocked(candidate.eventId, {
+          status: "claimed",
+          claim: lease,
+          attempts: Number(current.attempts || 0) + 1,
+        });
+        return { claimed, proactiveTargetKey };
+      } catch (error) {
+        if (proactiveTargetKey) this.#decrementInFlight(proactiveTargetKey);
+        throw error;
+      }
+    });
+  }
+
   async wakeTarget(ownerKey, targetChannel, { now = this.clock() } = {}) {
     if (!ownerKey || !targetChannel) return 0;
     return this.processLock.run(async () => {
@@ -254,7 +384,7 @@ class ChannelDeliveryOutbox {
       && ["pending", "claimed", "delivery_unknown", "failed_retryable"].includes(item.status));
   }
 
-  async deliverDue(send, { now = this.clock(), limit = 100, onDelivered, onDeliveryUnknown } = {}) {
+  async deliverDue(send, { now = this.clock(), limit = 100, onDelivered, onDeliveryUnknown, shouldDeliver } = {}) {
     if (typeof send !== "function") throw new Error("ChannelDeliveryOutbox.deliverDue 需要发送函数");
     const max = Math.max(1, Number(limit) || 100);
     const report = { scanned: 0, delivered: 0, retryable: 0, terminal: 0, unknown: 0, superseded: 0, projected: 0, projectionFailed: 0 };
@@ -288,18 +418,31 @@ class ChannelDeliveryOutbox {
         }
         continue;
       }
-      const candidate = records
+      const candidates = records
         .filter((item) => (["pending", "delivery_unknown", "failed_retryable"].includes(item.status)
             || (item.status === "claimed" && new Date(item.claim?.leaseExpiresAt || 0).getTime() <= new Date(now).getTime()))
           && new Date(item.nextAttemptAt || item.dueAt).getTime() <= new Date(now).getTime()
+          && !(item.sourceType === "proactive_bundle" && this.frozenProactiveTargets.has(this.#targetKey(item.ownerKey, item.targetChannel)))
           && !this.#blockedByEarlier(item, records))
-        .sort((a, b) => Number(a.responseVersion) - Number(b.responseVersion) || String(a.createdAt).localeCompare(String(b.createdAt)))[0];
+        .sort((a, b) => Number(a.responseVersion) - Number(b.responseVersion) || String(a.createdAt).localeCompare(String(b.createdAt)));
+      let candidate = null;
+      for (const item of candidates) {
+        if (typeof shouldDeliver !== "function" || await shouldDeliver(item)) {
+          candidate = item;
+          break;
+        }
+      }
       if (!candidate) break;
       report.scanned += 1;
       const lease = await this.#claimLease(candidate.eventId, new Date(now));
       if (!lease) continue;
+      let proactiveTargetKey = null;
       try {
-        const claimed = await this.processLock.run(() => this.#updateUnlocked(candidate.eventId, { status: "claimed", claim: lease, attempts: Number(candidate.attempts || 0) + 1 }));
+        await this.beforeClaimCommit?.(candidate, lease);
+        const committedClaim = await this.#commitClaim(candidate, lease);
+        if (!committedClaim) continue;
+        const { claimed } = committedClaim;
+        proactiveTargetKey = committedClaim.proactiveTargetKey;
         const payload = await this.get(candidate.eventId, { includePayload: true });
         let result;
         try { result = await send(payload.payload, { ...claimed, deliveryTarget: payload.deliveryTarget }); }
@@ -307,20 +450,26 @@ class ChannelDeliveryOutbox {
           result = error?.deliveryUnknown === true ? { deliveryUnknown: true, reason: error.code || "DELIVERY_UNKNOWN" } : { retryable: error?.retryable !== false, reason: error.code || "DELIVERY_FAILED" };
         }
         if (result?.delivered === true) {
-          await this.processLock.run(() => this.#updateUnlocked(candidate.eventId, { status: "delivered", claim: null, deliveredAt: this.clock().toISOString() }));
-          report.delivered += 1;
+          const settled = await this.#settleClaim(candidate.eventId, lease, { status: "delivered", claim: null, deliveredAt: this.clock().toISOString() });
+          if (settled) report.delivered += 1;
+          else report.superseded += 1;
         } else if (result?.deliveryUnknown === true) {
-          const unknown = await this.processLock.run(() => this.#updateUnlocked(candidate.eventId, { status: "delivery_unknown", claim: null, nextAttemptAt: new Date(this.clock().getTime() + backoff(claimed.attempts, this.retryBaseMs)).toISOString(), lastErrorCode: result.reason || "DELIVERY_UNKNOWN" }));
-          await onDeliveryUnknown?.(unknown);
-          report.unknown += 1;
+          const unknown = await this.#settleClaim(candidate.eventId, lease, { status: "delivery_unknown", claim: null, nextAttemptAt: new Date(this.clock().getTime() + backoff(claimed.attempts, this.retryBaseMs)).toISOString(), lastErrorCode: result.reason || "DELIVERY_UNKNOWN" });
+          if (unknown) {
+            await onDeliveryUnknown?.(unknown);
+            report.unknown += 1;
+          } else report.superseded += 1;
         } else if (result?.retryable !== false) {
-          await this.processLock.run(() => this.#updateUnlocked(candidate.eventId, { status: "failed_retryable", claim: null, dueAt: new Date(this.clock().getTime() + backoff(claimed.attempts, this.retryBaseMs)).toISOString(), lastErrorCode: result?.reason || "DELIVERY_RETRYABLE" }));
-          report.retryable += 1;
+          const settled = await this.#settleClaim(candidate.eventId, lease, { status: "failed_retryable", claim: null, dueAt: new Date(this.clock().getTime() + backoff(claimed.attempts, this.retryBaseMs)).toISOString(), lastErrorCode: result?.reason || "DELIVERY_RETRYABLE" });
+          if (settled) report.retryable += 1;
+          else report.superseded += 1;
         } else {
-          await this.processLock.run(() => this.#updateUnlocked(candidate.eventId, { status: "failed_terminal", claim: null, lastErrorCode: result?.reason || "DELIVERY_TERMINAL" }));
-          report.terminal += 1;
+          const settled = await this.#settleClaim(candidate.eventId, lease, { status: "failed_terminal", claim: null, lastErrorCode: result?.reason || "DELIVERY_TERMINAL" });
+          if (settled) report.terminal += 1;
+          else report.superseded += 1;
         }
       } finally {
+        if (proactiveTargetKey) this.#decrementInFlight(proactiveTargetKey);
         await this.#releaseLease(lease);
       }
     }

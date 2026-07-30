@@ -409,6 +409,94 @@ test("SettingsRegistry persists only valid Agent-adjustable preferences", async 
   await assert.rejects(registry.set("notifications.quietHours", { start: "99:00", end: "07:00" }, { actor: "agent" }), /安静时间/);
 });
 
+test("proactive delivery release gate is disabled by default and requires explicit Owner confirmation", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-proactive-setting-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const registry = new SettingsRegistry({ stateFile: path.join(root, "settings.json") });
+
+  assert.equal(await registry.get("notifications.proactiveDeliveryEnabled"), false);
+  assert.equal(registry.classify("notifications.proactiveDeliveryEnabled"), "confirmationRequired");
+  await assert.rejects(
+    registry.set("notifications.proactiveDeliveryEnabled", true, { actor: "user" }),
+    /用户确认/,
+  );
+  await assert.rejects(
+    registry.set("notifications.proactiveDeliveryEnabled", true, { actor: "user", confirmed: true }),
+    { code: "PROACTIVE_TEST_REQUIRED" },
+  );
+  const result = await registry.set("notifications.proactiveDeliveryEnabled", true, {
+    actor: "user",
+    confirmed: true,
+    evidenceRef: "outbox-test-confirmed",
+  });
+  assert.equal(result.value, true);
+  assert.equal((await registry.load()).lastChange.evidenceRef, "outbox-test-confirmed");
+});
+
+test("existing SettingsRegistry files receive additive release defaults without a rewrite", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-proactive-setting-overlay-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const stateFile = path.join(root, "settings.json");
+  const legacy = { version: 1, values: { "notifications.cadence": "minimal" }, updatedAt: "2026-07-29T00:00:00.000Z" };
+  await fs.writeFile(stateFile, `${JSON.stringify(legacy)}\n`);
+  const registry = new SettingsRegistry({ stateFile });
+
+  assert.equal(await registry.get("notifications.proactiveDeliveryEnabled"), false);
+  assert.equal((await registry.load()).values["notifications.cadence"], "minimal");
+  assert.deepEqual(JSON.parse(await fs.readFile(stateFile, "utf8")), legacy);
+});
+
+test("proactive Owner observation is stable release evidence, not a transient lastChange", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-proactive-release-evidence-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const registry = new SettingsRegistry({ stateFile: path.join(root, "settings.json") });
+  const evidence = {
+    eventId: "outbox-test-1",
+    runId: "release-20260730",
+    homeChannel: "weixin",
+    visibleCount: 1,
+    order: "single",
+    performedBy: "owner",
+    result: "passed",
+    confirmedAt: "2026-07-30T08:00:00.000Z",
+  };
+
+  await assert.rejects(
+    registry.set("notifications.proactiveReleaseEvidence", evidence, { actor: "user", confirmed: true }),
+    { code: "PROACTIVE_RELEASE_EVIDENCE_UNVERIFIED" },
+  );
+  await registry.set("notifications.proactiveReleaseEvidence", evidence, {
+    actor: "user",
+    confirmed: true,
+    releaseEvidenceVerified: true,
+  });
+  await registry.set("learning.dailyReviewCount", 6, { actor: "agent" });
+
+  assert.deepEqual(await registry.get("notifications.proactiveReleaseEvidence"), evidence);
+});
+
+test("controlled proactive retry authorization is exact, persisted, and internal-only", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-proactive-test-authorization-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const registry = new SettingsRegistry({ stateFile: path.join(root, "settings.json") });
+
+  assert.equal(await registry.get("notifications.proactiveTestEventId"), null);
+  await assert.rejects(
+    registry.set("notifications.proactiveTestEventId", "outbox-test-a", { actor: "user", confirmed: true }),
+    { code: "PROACTIVE_TEST_AUTHORIZATION_UNVERIFIED" },
+  );
+  await registry.set("notifications.proactiveTestEventId", "outbox-test-a", {
+    actor: "system",
+    proactiveTestAuthorizationVerified: true,
+  });
+  assert.equal(await registry.get("notifications.proactiveTestEventId"), "outbox-test-a");
+  await registry.set("notifications.proactiveTestEventId", null, {
+    actor: "system",
+    proactiveTestAuthorizationVerified: true,
+  });
+  assert.equal(await registry.get("notifications.proactiveTestEventId"), null);
+});
+
 test("Provider API never returns the submitted token", async () => {
   let saved;
   const runtime = { credentials: {

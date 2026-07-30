@@ -175,6 +175,27 @@ function parseStructuredModelOutput(text) {
   }
 }
 
+// 控制面共享 mutation lock：单 Host 进程内串行化 Home 切换、confirm-test 与主动通知 enable/disable。
+// 三者各自在临界区内重读当前 Home / release evidence / test event / enabled，避免交错产生
+// new Home + enabled=true + evidence=null 等不一致终态，以及两路切换共享同一 previousHome 而漏冻中间 Home。
+// 文件级跨进程锁（ProcessFileLock）面向多 Host 抢占，不适用于本进程内控制面的顺序化。
+function createControlMutationLock() {
+  let tail = Promise.resolve();
+  const runExclusive = (task) => {
+    const result = tail.then(() => task());
+    tail = result.then(() => undefined, () => undefined);
+    return result;
+  };
+  return { runExclusive };
+}
+
+// routeSynoApi 可能收到未挂锁的测试用 runtime；此时直接执行，保持单操作的调用顺序与语义不变。
+async function runControlMutation(runtime, operation) {
+  const lock = runtime?.controlMutationLock;
+  if (lock && typeof lock.runExclusive === "function") return lock.runExclusive(operation);
+  return operation();
+}
+
 function createSynoRuntime(options = {}) {
   let lifecycleState = "starting";
   let initializePromise = null;
@@ -845,7 +866,7 @@ function createSynoRuntime(options = {}) {
   reports = new ReportService({ host, knowledge, notifications, channels, gitGuard });
   const today = options.today || new TodayService({ goals, learning, host, settingsRegistry, signalSources, planner });
   core = new SynoCore({ host, knowledge, notifications, channels, reports, today });
-  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance: knowledgeMaintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery: () => drainChannelDeliveryOutbox().catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })), recordEvent });
+  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance: knowledgeMaintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery: (deliveryOptions) => drainChannelDeliveryOutbox(deliveryOptions).catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })), recordEvent });
   const approvalAdvisor = options.approvalAdvisor || new ApprovalAdvisor({ provider, ingest });
   let channelRecoveryTimer = null;
   let providerRecoveryTimer = null;
@@ -895,7 +916,7 @@ function createSynoRuntime(options = {}) {
       return results[event.targetChannel] || { delivered: false, reason: "channel_missing" };
     });
   }
-  async function drainChannelDeliveryOutbox() {
+  async function drainChannelDeliveryOutbox({ allowProactiveEventId = null } = {}) {
     if (!channelDeliveryOutbox || !channels) return { skipped: true };
     return channelDeliveryOutbox.deliverDue(async (payload, event) => {
       let persistedTarget = null;
@@ -941,6 +962,12 @@ function createSynoRuntime(options = {}) {
           }
         } else if (event.sourceType === "proactive_bundle") {
           await proactive.markBundleDelivered(event.sourceId, event.eventId);
+          if ((await settingsRegistry.get("notifications.proactiveTestEventId").catch(() => null)) === event.eventId) {
+            await settingsRegistry.set("notifications.proactiveTestEventId", null, {
+              actor: "system",
+              proactiveTestAuthorizationVerified: true,
+            });
+          }
         }
       },
       onDeliveryUnknown: async (event) => {
@@ -956,6 +983,22 @@ function createSynoRuntime(options = {}) {
           outboxEventId: event.eventId,
           status: event.status,
         }, { level: "warning" });
+      },
+      shouldDeliver: async (event) => {
+        if (event.sourceType !== "proactive_bundle") return true;
+        if (event.targetChannel !== channels.homeChannel) return false;
+        if (allowProactiveEventId && event.eventId === allowProactiveEventId) return true;
+        try {
+          if ((await settingsRegistry.get("notifications.proactiveTestEventId")) === event.eventId) return true;
+          return (await settingsRegistry.get("notifications.proactiveDeliveryEnabled")) === true;
+        } catch (error) {
+          await recordEvent("proactive.release_gate.unavailable", {
+            outboxEventId: event.eventId,
+            status: "paused",
+            error,
+          }, { level: "error" }).catch(() => {});
+          return false;
+        }
       },
     });
   }
@@ -973,6 +1016,8 @@ function createSynoRuntime(options = {}) {
       throw error;
     }
   }
+
+  const controlMutationLock = options.controlMutationLock || createControlMutationLock();
 
   return {
     core,
@@ -1029,6 +1074,7 @@ function createSynoRuntime(options = {}) {
     toolBridge,
     contextManager,
     settingsRegistry,
+    controlMutationLock,
     journal,
     windowsService,
     lifecycle() {
@@ -1225,6 +1271,66 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "GET" && url.pathname === "/api/syno/jobs") return { jobs: await runtime.host.list({ limit: 100 }) };
   if (method === "GET" && url.pathname === "/api/syno/notifications") return { notifications: await runtime.notifications.list({ limit: 100 }) };
   if (method === "GET" && url.pathname === "/api/syno/channels") return { channels: runtime.channels.status() };
+  if (method === "GET" && url.pathname === "/api/syno/proactive/preview") return runtime.proactive.preview();
+  if (method === "POST" && url.pathname === "/api/syno/proactive/migrate") {
+    const body = await readBody(req);
+    if (body?.confirmed !== true) {
+      throw Object.assign(new Error("主动通知 Ledger 迁移需要 Owner 明确确认"), { code: "PROACTIVE_MIGRATION_CONFIRMATION_REQUIRED", statusCode: 409 });
+    }
+    if ((await runtime.settingsRegistry.get("notifications.proactiveDeliveryEnabled")) === true) {
+      throw Object.assign(new Error("迁移前必须暂停主动通知"), { code: "PROACTIVE_DELIVERY_MUST_BE_PAUSED", statusCode: 409 });
+    }
+    return runtime.proactive.migrateLedger();
+  }
+  if (method === "POST" && url.pathname === "/api/syno/proactive/test") {
+    const body = await readBody(req);
+    if (body?.confirmed !== true) {
+      throw Object.assign(new Error("主动通知受控测试需要 Owner 明确确认"), { code: "PROACTIVE_TEST_CONFIRMATION_REQUIRED", statusCode: 409 });
+    }
+    if ((await runtime.settingsRegistry.get("notifications.proactiveDeliveryEnabled")) === true) {
+      throw Object.assign(new Error("受控测试期间必须保持真实主动通知暂停"), { code: "PROACTIVE_DELIVERY_MUST_BE_PAUSED", statusCode: 409 });
+    }
+    return runtime.proactive.triggerTest(body.runId);
+  }
+  if (method === "POST" && url.pathname === "/api/syno/proactive/confirm-test") {
+    const body = await readBody(req);
+    if (body?.confirmed !== true) {
+      throw Object.assign(new Error("主动通知手机验收需要 Owner 明确确认"), { code: "PROACTIVE_OWNER_CONFIRMATION_REQUIRED", statusCode: 409 });
+    }
+    return runControlMutation(runtime, async () => {
+      const homeChannel = runtime.channels?.homeChannel;
+      const eventId = String(body.eventId || "");
+      const runId = String(body.runId || "");
+      const event = await runtime.channelDeliveryOutbox?.get?.(eventId).catch(() => null);
+      const valid = event
+        && event.sourceType === "proactive_bundle"
+        && event.status === "delivered"
+        && event.ownerKey === "local-user"
+        && event.targetChannel === homeChannel
+        && event.deliveryKey === `proactive-test:${runId}:${homeChannel}:v1`
+        && body.visibleCount === 1
+        && body.order === "single"
+        && body.result === "passed";
+      if (!valid) {
+        throw Object.assign(new Error("主动通知手机验收与当前 Home Channel 或测试投递不匹配"), { code: "PROACTIVE_OWNER_EVIDENCE_INVALID", statusCode: 409 });
+      }
+      const evidence = {
+        eventId,
+        runId,
+        homeChannel,
+        visibleCount: 1,
+        order: "single",
+        performedBy: "owner",
+        result: "passed",
+        confirmedAt: new Date().toISOString(),
+      };
+      return runtime.settingsRegistry.set("notifications.proactiveReleaseEvidence", evidence, {
+        actor: "user",
+        confirmed: true,
+        releaseEvidenceVerified: true,
+      });
+    });
+  }
   if (method === "GET" && url.pathname === "/api/syno/mobile-delivery") {
     const [accepted, outbox, unknownCases] = await Promise.all([
       runtime.acceptedRequests?.list({ ownerKey: "local-user", limit: 1000 }) || [],
@@ -1251,6 +1357,45 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "GET" && url.pathname === "/api/syno/settings") return runtime.settingsRegistry.load();
   if (method === "POST" && url.pathname === "/api/syno/settings") {
     const body = await readBody(req);
+    if (["notifications.proactiveReleaseEvidence", "notifications.proactiveTestEventId"].includes(String(body.key || ""))) {
+      throw Object.assign(new Error("主动通知内部发布状态只能由受控入口写入"), { code: "PROACTIVE_RELEASE_STATE_UNVERIFIED", statusCode: 409 });
+    }
+    if (String(body.key || "") === "notifications.proactiveDeliveryEnabled") {
+      return runControlMutation(runtime, async () => {
+        if (body.value === true) {
+          const release = await runtime.proactive.releaseStatus();
+          if (!release.migrationComplete) {
+            throw Object.assign(new Error("主动通知 Ledger 尚未完成受控迁移"), { code: "PROACTIVE_MIGRATION_REQUIRED", statusCode: 409 });
+          }
+          const evidenceEventId = String(body.evidenceEventId || "");
+          const ownerEvidence = await runtime.settingsRegistry.get("notifications.proactiveReleaseEvidence");
+          const homeChannel = runtime.channels?.homeChannel;
+          const evidenceEvent = await runtime.channelDeliveryOutbox?.get?.(evidenceEventId).catch(() => null);
+          const deliveredTest = Boolean(evidenceEvent
+            && evidenceEvent.eventId === evidenceEventId
+            && evidenceEvent.sourceType === "proactive_bundle"
+            && evidenceEvent.status === "delivered"
+            && evidenceEvent.ownerKey === "local-user"
+            && evidenceEvent.targetChannel === homeChannel
+            && ownerEvidence?.eventId === evidenceEventId
+            && ownerEvidence?.homeChannel === homeChannel
+            && ownerEvidence?.performedBy === "owner"
+            && ownerEvidence?.result === "passed"
+            && ownerEvidence?.visibleCount === 1
+            && ownerEvidence?.order === "single"
+            && evidenceEvent.deliveryKey === `proactive-test:${ownerEvidence?.runId}:${homeChannel}:v1`);
+          if (!deliveredTest) {
+            throw Object.assign(new Error("启用真实主动通知前必须完成一条受控测试投递"), { code: "PROACTIVE_TEST_REQUIRED", statusCode: 409 });
+          }
+          return runtime.settingsRegistry.set(String(body.key || ""), body.value, {
+            actor: "user",
+            confirmed: body.confirmed === true,
+            evidenceRef: evidenceEventId,
+          });
+        }
+        return runtime.settingsRegistry.set(String(body.key || ""), body.value, { actor: "user", confirmed: body.confirmed === true });
+      });
+    }
     return runtime.settingsRegistry.set(String(body.key || ""), body.value, { actor: "user", confirmed: body.confirmed === true });
   }
   const migrationPreview = /^\/api\/syno\/migrations\/([^/]+)$/.exec(url.pathname);
@@ -1348,7 +1493,37 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "POST" && url.pathname === "/api/syno/feishu/disconnect") return runtime.feishu.stop();
   if (method === "POST" && url.pathname === "/api/syno/channels/home") {
     const body = await readBody(req);
-    return { channels: await runtime.channels.setHome(String(body.channel || "")) };
+    const nextHome = String(body.channel || "");
+    return runControlMutation(runtime, async () => {
+      if (nextHome !== runtime.channels.homeChannel) {
+        const availableChannels = runtime.channels.status();
+        if (!Object.hasOwn(availableChannels, nextHome)) {
+          throw Object.assign(new Error(`未知渠道：${nextHome}`), { code: "CHANNEL_NOT_FOUND", statusCode: 400 });
+        }
+        const previousHome = runtime.channels.homeChannel;
+        await runtime.settingsRegistry.set("notifications.proactiveDeliveryEnabled", false, {
+          actor: "user",
+          confirmed: true,
+        });
+        const cutover = await runtime.channelDeliveryOutbox?.beginProactiveTargetCutover?.("local-user", previousHome);
+        try {
+          const channelState = await runtime.channels.setHome(nextHome);
+          await runtime.settingsRegistry.set("notifications.proactiveReleaseEvidence", null, {
+            actor: "system",
+            confirmed: true,
+            releaseEvidenceVerified: true,
+          });
+          await runtime.settingsRegistry.set("notifications.proactiveTestEventId", null, {
+            actor: "system",
+            proactiveTestAuthorizationVerified: true,
+          });
+          return { channels: channelState };
+        } finally {
+          cutover?.release?.();
+        }
+      }
+      return { channels: await runtime.channels.setHome(nextHome) };
+    });
   }
   const adviceMatch = /^\/api\/syno\/jobs\/([^/]+)\/advice$/.exec(url.pathname);
   if (method === "GET" && adviceMatch) {
@@ -1378,4 +1553,4 @@ async function routeSynoApi(runtime, req, url, readBody) {
   throw error;
 }
 
-export { PUBLIC_COMMAND_INTENTS, buildOpenCodeMigrationContext, createSynoRuntime, createWeixinMessageHandler, parseWeixinApproval, readKnowledgeSnippet, redactMigrationText, remoteSafeJobSummary, routeSynoApi };
+export { PUBLIC_COMMAND_INTENTS, buildOpenCodeMigrationContext, createControlMutationLock, createSynoRuntime, createWeixinMessageHandler, parseWeixinApproval, readKnowledgeSnippet, redactMigrationText, remoteSafeJobSummary, routeSynoApi };

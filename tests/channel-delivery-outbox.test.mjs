@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { ChannelDeliveryOutbox } from "../apps/syno/syno/channel-delivery-outbox.mjs";
 
-async function fixture() {
+async function fixture(options = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-channel-outbox-"));
   const protect = async (value) => `ciphertext:${Buffer.from(value, "utf8").toString("base64")}`;
   const unprotect = async (value) => Buffer.from(String(value).replace(/^ciphertext:/, ""), "base64").toString("utf8");
@@ -18,6 +18,7 @@ async function fixture() {
     clock: () => clockState.now,
     protect,
     unprotect,
+    ...options,
   });
   return { root, outbox, clockState };
 }
@@ -236,4 +237,206 @@ test("an authenticated Home target update makes target-blocked proactive deliver
   const report = await outbox.deliverDue(async () => ({ delivered: true }));
   assert.equal(report.delivered, 1);
   assert.equal((await outbox.get(created.event.eventId)).status, "delivered");
+});
+
+test("delivery policy can pause proactive events without blocking ordinary mobile replies", async (t) => {
+  const { root, outbox, clockState } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const proactive = await outbox.enqueue({
+    sourceType: "proactive_bundle",
+    sourceId: "proactive-paused",
+    ownerKey: "owner-a",
+    targetChannel: "weixin",
+    responseKind: "proactive",
+    deliveryKey: "proactive-paused:weixin:v1",
+    payload: { text: "DO NOT SEND YET" },
+    dueAt: clockState.now.toISOString(),
+  });
+  const ordinary = await outbox.enqueue({
+    ...base,
+    sourceId: "request-unblocked",
+    responseKind: "final",
+    deliveryKey: "ordinary-unblocked",
+    payload: { text: "SEND ORDINARY" },
+    dueAt: clockState.now.toISOString(),
+  });
+  const sent = [];
+  const report = await outbox.deliverDue(
+    async (_payload, event) => { sent.push(event.eventId); return { delivered: true }; },
+    { shouldDeliver: async (event) => event.sourceType !== "proactive_bundle" },
+  );
+
+  assert.deepEqual(sent, [ordinary.event.eventId]);
+  assert.equal(report.delivered, 1);
+  assert.equal((await outbox.get(proactive.event.eventId)).status, "pending");
+  assert.equal((await outbox.get(proactive.event.eventId)).attempts, 0);
+});
+
+test("enqueue cancellation is checked inside the Outbox lock before any durable write", async (t) => {
+  const { root, outbox } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  let checks = 0;
+  const result = await outbox.enqueue({
+    sourceType: "proactive_bundle",
+    sourceId: "proactive-stopped",
+    ownerKey: "owner-a",
+    targetChannel: "weixin",
+    responseKind: "proactive",
+    deliveryKey: "proactive-stopped:weixin:v1",
+    payload: { text: "MUST NOT PERSIST" },
+    shouldEnqueue: async () => {
+      checks += 1;
+      return false;
+    },
+  });
+
+  assert.equal(checks, 1);
+  assert.equal(result.skipped, true);
+  assert.equal(result.event, null);
+  assert.equal((await outbox.list({ limit: 10 })).length, 0);
+});
+
+test("Home cutover supersedes every nonterminal proactive event for the old target", async (t) => {
+  const { root, outbox } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const old = await outbox.enqueue({
+    sourceType: "proactive_bundle",
+    sourceId: "old-home-bundle",
+    ownerKey: "local-user",
+    targetChannel: "weixin",
+    responseKind: "proactive",
+    deliveryKey: "old-home-bundle:weixin:v1",
+    payload: { text: "OLD HOME" },
+  });
+  const current = await outbox.enqueue({
+    sourceType: "proactive_bundle",
+    sourceId: "new-home-bundle",
+    ownerKey: "local-user",
+    targetChannel: "feishu",
+    responseKind: "proactive",
+    deliveryKey: "new-home-bundle:feishu:v1",
+    payload: { text: "NEW HOME" },
+  });
+
+  assert.equal(await outbox.supersedeProactiveTarget("local-user", "weixin"), 1);
+  assert.equal((await outbox.get(old.event.eventId)).status, "superseded");
+  assert.equal((await outbox.get(current.event.eventId)).status, "pending");
+});
+
+test("Home cutover waits for an in-flight old-target send and fences later sends", async (t) => {
+  const { root, outbox } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const first = await outbox.enqueue({
+    sourceType: "proactive_bundle",
+    sourceId: "old-home-in-flight",
+    ownerKey: "local-user",
+    targetChannel: "weixin",
+    responseKind: "proactive",
+    deliveryKey: "old-home-in-flight:weixin:v1",
+    payload: { text: "IN FLIGHT" },
+  });
+  let sendStarted;
+  let releaseSend;
+  const started = new Promise((resolve) => { sendStarted = resolve; });
+  const sending = new Promise((resolve) => { releaseSend = resolve; });
+  const drain = outbox.deliverDue(async () => {
+    sendStarted();
+    await sending;
+    return { delivered: true };
+  });
+  await started;
+
+  let cutoverResolved = false;
+  const cutoverPromise = outbox.beginProactiveTargetCutover("local-user", "weixin").then((value) => {
+    cutoverResolved = true;
+    return value;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(cutoverResolved, false);
+  releaseSend();
+  await drain;
+  const cutover = await cutoverPromise;
+  assert.equal((await outbox.get(first.event.eventId)).status, "delivered");
+
+  const later = await outbox.enqueue({
+    sourceType: "proactive_bundle",
+    sourceId: "old-home-later",
+    ownerKey: "local-user",
+    targetChannel: "weixin",
+    responseKind: "proactive",
+    deliveryKey: "old-home-later:weixin:v1",
+    payload: { text: "LATER" },
+  });
+  let laterSends = 0;
+  await outbox.deliverDue(async () => { laterSends += 1; return { delivered: true }; });
+  assert.equal(laterSends, 0);
+  cutover.release();
+  assert.equal((await outbox.get(later.event.eventId)).status, "pending");
+});
+
+test("a superseded in-flight claim cannot overwrite its terminal status", async (t) => {
+  const { root, outbox } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const created = await outbox.enqueue({
+    sourceType: "proactive_bundle",
+    sourceId: "old-home-cas",
+    ownerKey: "local-user",
+    targetChannel: "weixin",
+    responseKind: "proactive",
+    deliveryKey: "old-home-cas:weixin:v1",
+    payload: { text: "CAS" },
+  });
+  let sendStarted;
+  let releaseSend;
+  const started = new Promise((resolve) => { sendStarted = resolve; });
+  const sending = new Promise((resolve) => { releaseSend = resolve; });
+  const drain = outbox.deliverDue(async () => {
+    sendStarted();
+    await sending;
+    return { delivered: true };
+  });
+  await started;
+  await outbox.supersedeProactiveTarget("local-user", "weixin");
+  releaseSend();
+  const report = await drain;
+
+  assert.equal(report.delivered, 0);
+  assert.equal(report.superseded, 1);
+  assert.equal((await outbox.get(created.event.eventId)).status, "superseded");
+});
+
+test("cutover between lease acquisition and claimed commit prevents the old-target send", async (t) => {
+  let claimReached;
+  let releaseClaim;
+  const reached = new Promise((resolve) => { claimReached = resolve; });
+  const held = new Promise((resolve) => { releaseClaim = resolve; });
+  const { root, outbox } = await fixture({
+    beforeClaimCommit: async () => {
+      claimReached();
+      await held;
+    },
+  });
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const created = await outbox.enqueue({
+    sourceType: "proactive_bundle",
+    sourceId: "old-home-pre-claim",
+    ownerKey: "local-user",
+    targetChannel: "weixin",
+    responseKind: "proactive",
+    deliveryKey: "old-home-pre-claim:weixin:v1",
+    payload: { text: "PRE CLAIM" },
+  });
+  let sends = 0;
+  const drain = outbox.deliverDue(async () => {
+    sends += 1;
+    return { delivered: true };
+  });
+  await reached;
+  const cutover = await outbox.beginProactiveTargetCutover("local-user", "weixin");
+  releaseClaim();
+  await drain;
+
+  assert.equal(sends, 0);
+  assert.equal((await outbox.get(created.event.eventId)).status, "superseded");
+  cutover.release();
 });

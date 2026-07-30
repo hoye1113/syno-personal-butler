@@ -266,10 +266,9 @@ test("versionless proactive ledger migrates a previously notified event without 
     signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
     stateFile,
   });
-  await proactive.tick({
-    now: new Date("2026-07-30T08:30:00+08:00"),
-    highValueEvents: [{ id: "ingest-pending:legacy", kind: "ingest-pending", title: "旧待办", priority: 75, ref: { status: "pending" } }],
-  });
+  const legacyEvents = [{ id: "ingest-pending:legacy", kind: "ingest-pending", title: "旧待办", priority: 75, ref: { status: "pending" } }];
+  await proactive.migrateLedger({ now: new Date("2026-07-30T08:30:00+08:00"), highValueEvents: legacyEvents });
+  await proactive.tick({ now: new Date("2026-07-30T08:30:00+08:00"), highValueEvents: legacyEvents });
   assert.equal(messages.length, 0);
   const migrated = JSON.parse(await fs.readFile(stateFile, "utf8"));
   assert.equal(migrated.version, 2);
@@ -413,10 +412,9 @@ test("legacy Web audit suppresses a migrated current event when lastRuns is inco
     signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
     stateFile,
   });
-  await proactive.tick({
-    now: new Date("2026-07-30T08:30:00+08:00"),
-    highValueEvents: [{ id: "ingest-pending:audit", kind: "ingest-pending", title: "审计中已有", priority: 75, ref: { status: "pending" } }],
-  });
+  const auditedEvents = [{ id: "ingest-pending:audit", kind: "ingest-pending", title: "审计中已有", priority: 75, ref: { status: "pending" } }];
+  await proactive.migrateLedger({ now: new Date("2026-07-30T08:30:00+08:00"), highValueEvents: auditedEvents });
+  await proactive.tick({ now: new Date("2026-07-30T08:30:00+08:00"), highValueEvents: auditedEvents });
   assert.equal((await outbox.list({ limit: 10 })).length, 0);
   const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
   assert.equal(state.subjects["ingest-pending:audit"].migrationSuppressed, true);
@@ -443,6 +441,7 @@ test("an unconfirmed legacy event is migration-ambiguous and waits for a materia
     stateFile,
   });
   const current = { id: "ingest-pending:ambiguous", kind: "ingest-pending", title: "迁移歧义", priority: 75, ref: { status: "pending", businessVersion: "1" } };
+  await proactive.migrateLedger({ now: new Date("2026-07-30T08:30:00+08:00"), highValueEvents: [current] });
   await proactive.tick({ now: new Date("2026-07-30T08:30:00+08:00"), highValueEvents: [current] });
   assert.equal((await outbox.list({ limit: 10 })).length, 0);
   const migrated = JSON.parse(await fs.readFile(stateFile, "utf8"));
@@ -538,4 +537,379 @@ test("resolved proactive subjects are retained for 30 days and then pruned", asy
   const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
   assert.equal(state.subjects.expired, undefined);
   assert.equal(state.subjects.recent.active, false);
+});
+
+test("production start keeps proactive delivery paused until the Owner enables the release gate", async (t) => {
+  const stateFile = await tempState(t, "syno-proactive-release-gate-");
+  const root = path.dirname(stateFile);
+  const outbox = new ChannelDeliveryOutbox({
+    root: path.join(root, "outbox"),
+    payloadRoot: path.join(root, "payloads"),
+    lockFile: path.join(root, "outbox.lock"),
+    protect: async (value) => value,
+    unprotect: async (value) => value,
+  });
+  const proactive = new ProactiveOrchestrator({
+    host: { async receive() { throw new Error("paused start must not invoke the model"); } },
+    today: { async snapshot() { throw new Error("paused start must not build content"); } },
+    channels: { homeChannel: "weixin", async send() { throw new Error("paused start must not send"); } },
+    settingsRegistry: { async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? false : undefined; } },
+    signalSources: {
+      async collect() {
+        return [{ id: "ingest-pending:release-gate", kind: "ingest-pending", title: "不得提前发送", priority: 95, ref: { status: "pending" } }];
+      },
+    },
+    channelDeliveryOutbox: outbox,
+    signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
+    stateFile,
+  });
+
+  await proactive.start();
+  proactive.stop();
+
+  assert.equal((await outbox.list({ limit: 10 })).length, 0);
+  await assert.rejects(fs.access(stateFile), { code: "ENOENT" });
+});
+
+test("stop wins a race with asynchronous start and prevents a late tick or timer", async (t) => {
+  const stateFile = await tempState(t, "syno-proactive-start-stop-race-");
+  let releaseSetting;
+  const setting = new Promise((resolve) => { releaseSetting = resolve; });
+  let collections = 0;
+  const proactive = new ProactiveOrchestrator({
+    host: { async receive() { throw new Error("stopped start must not invoke the model"); } },
+    today: { async snapshot() { throw new Error("stopped start must not build content"); } },
+    channels: { homeChannel: "weixin", async send() { throw new Error("stopped start must not send"); } },
+    settingsRegistry: { async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? setting : undefined; } },
+    signalSources: { async collect() { collections += 1; return []; } },
+    signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
+    stateFile,
+  });
+
+  const starting = proactive.start();
+  proactive.stop();
+  releaseSetting(true);
+  await starting;
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  assert.equal(collections, 0);
+  await assert.rejects(fs.access(stateFile), { code: "ENOENT" });
+});
+
+test("stop during the startup tick prevents model work, enqueue and wake", async (t) => {
+  const stateFile = await tempState(t, "syno-proactive-stop-during-tick-");
+  const root = path.dirname(stateFile);
+  let releaseSignals;
+  let collectingResolve;
+  const collecting = new Promise((resolve) => { collectingResolve = resolve; });
+  const outbox = new ChannelDeliveryOutbox({
+    root: path.join(root, "outbox"),
+    payloadRoot: path.join(root, "payloads"),
+    lockFile: path.join(root, "outbox.lock"),
+    protect: async (value) => value,
+    unprotect: async (value) => value,
+  });
+  let modelCalls = 0;
+  let wakes = 0;
+  const proactive = new ProactiveOrchestrator({
+    host: { async receive() { modelCalls += 1; return { job: { status: "waiting_provider" } }; } },
+    today: { async snapshot() { return { priorities: [] }; } },
+    channels: { homeChannel: "weixin", async send() { throw new Error("must not send"); } },
+    settingsRegistry: { async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? true : undefined; } },
+    signalSources: {
+      async collect() {
+        collectingResolve();
+        return new Promise((resolve) => { releaseSignals = resolve; });
+      },
+    },
+    channelDeliveryOutbox: outbox,
+    wakeDelivery: async () => { wakes += 1; },
+    signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
+    stateFile,
+  });
+
+  const starting = proactive.start();
+  await collecting;
+  proactive.stop();
+  releaseSignals([{ id: "ingest-pending:late", kind: "ingest-pending", title: "不得发送", priority: 95, ref: { status: "pending" } }]);
+  await starting;
+
+  assert.equal(modelCalls, 0);
+  assert.equal(wakes, 0);
+  assert.equal((await outbox.list({ limit: 10 })).length, 0);
+});
+
+test("stop while enqueue waits on its lock cancels the durable proactive event", async (t) => {
+  const stateFile = await tempState(t, "syno-proactive-stop-at-enqueue-");
+  let enteredEnqueue;
+  let releaseEnqueue;
+  const enqueueEntered = new Promise((resolve) => { enteredEnqueue = resolve; });
+  const enqueueRelease = new Promise((resolve) => { releaseEnqueue = resolve; });
+  let wakes = 0;
+  let deliveryEnabled = false;
+  const proactive = new ProactiveOrchestrator({
+    host: { async receive() { return { job: { status: "waiting_provider" } }; } },
+    today: { async snapshot() { return { priorities: [] }; } },
+    channels: { homeChannel: "weixin" },
+    settingsRegistry: { async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? deliveryEnabled : undefined; } },
+    signalSources: {
+      async collect() {
+        return [{ id: "ingest-pending:enqueue-race", kind: "ingest-pending", title: "不得入队", priority: 95, ref: { status: "pending" } }];
+      },
+    },
+    channelDeliveryOutbox: {
+      async list() { return []; },
+      async enqueue(options) {
+        enteredEnqueue();
+        await enqueueRelease;
+        if (!await options.shouldEnqueue()) return { created: false, event: null, skipped: true };
+        throw new Error("stopped enqueue must not create an event");
+      },
+    },
+    wakeDelivery: async () => { wakes += 1; },
+    signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
+    stateFile,
+  });
+
+  await proactive.migrateLedger();
+  deliveryEnabled = true;
+  const starting = proactive.start();
+  await enqueueEntered;
+  proactive.stop();
+  releaseEnqueue();
+  await starting;
+
+  assert.equal(wakes, 0);
+});
+
+test("proactive preview reports a redacted Bundle without mutating Ledger or Outbox", async (t) => {
+  const stateFile = await tempState(t, "syno-proactive-preview-");
+  const root = path.dirname(stateFile);
+  const outbox = new ChannelDeliveryOutbox({
+    root: path.join(root, "outbox"),
+    payloadRoot: path.join(root, "payloads"),
+    lockFile: path.join(root, "outbox.lock"),
+    protect: async (value) => value,
+    unprotect: async (value) => value,
+  });
+  const proactive = new ProactiveOrchestrator({
+    host: { async receive() { throw new Error("preview must not invoke the model"); } },
+    today: { async snapshot() { throw new Error("preview must not render user content"); } },
+    channels: { homeChannel: "weixin", async send() { throw new Error("preview must not send"); } },
+    ownerChannelTargets: { async get() { return { contextToken: "must-not-be-returned" }; } },
+    channelDeliveryOutbox: outbox,
+    signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
+    stateFile,
+  });
+  const preview = await proactive.preview({
+    now: new Date("2026-07-30T08:30:00+08:00"),
+    highValueEvents: [{ id: "ingest-pending:preview", kind: "ingest-pending", title: "私人标题不得返回", priority: 95, ref: { status: "pending" } }],
+  });
+
+  assert.deepEqual(preview, {
+    enabled: false,
+    homeChannel: "weixin",
+    homeTargetAvailable: true,
+    eligibleSignals: 1,
+    bundle: { bundleId: preview.bundle.bundleId, signalCount: 1, remainingCount: 0 },
+  });
+  assert.doesNotMatch(JSON.stringify(preview), /私人标题/);
+  assert.doesNotMatch(JSON.stringify(preview), /must-not-be-returned/);
+  assert.equal((await outbox.list({ limit: 10 })).length, 0);
+  await assert.rejects(fs.access(stateFile), { code: "ENOENT" });
+});
+
+test("Ledger migration is an explicit no-delivery step before any production tick", async (t) => {
+  const stateFile = await tempState(t, "syno-proactive-explicit-migration-");
+  const root = path.dirname(stateFile);
+  await fs.writeFile(stateFile, `${JSON.stringify({
+    date: "2026-07-29",
+    notificationsToday: 3,
+    lastRuns: { morning: "2026-07-29" },
+    pending: {},
+  })}\n`);
+  const outbox = new ChannelDeliveryOutbox({
+    root: path.join(root, "outbox"),
+    payloadRoot: path.join(root, "payloads"),
+    lockFile: path.join(root, "outbox.lock"),
+    protect: async (value) => value,
+    unprotect: async (value) => value,
+  });
+  const proactive = new ProactiveOrchestrator({
+    host: { async receive() { throw new Error("migration must not invoke the model"); } },
+    today: { async snapshot() { throw new Error("migration must not render content"); } },
+    channels: { homeChannel: "weixin", async send() { throw new Error("migration must not send"); } },
+    signalSources: {
+      async collect() {
+        return [{ id: "ingest-pending:migration-current", kind: "ingest-pending", title: "当前旧事项", priority: 95, ref: { status: "pending", businessVersion: "1" } }];
+      },
+    },
+    channelDeliveryOutbox: outbox,
+    stateFile,
+  });
+
+  const report = await proactive.migrateLedger({ now: new Date("2026-07-30T08:00:00+08:00") });
+
+  assert.equal(report.status, "migrated");
+  assert.equal(report.version, 2);
+  assert.equal(report.suppressedSignals, 1);
+  assert.equal((await outbox.list({ limit: 10 })).length, 0);
+  const migrated = JSON.parse(await fs.readFile(stateFile, "utf8"));
+  assert.equal(migrated.migration.status, "complete");
+  assert.equal(migrated.subjects["ingest-pending:migration-current"].migrationSuppressed, true);
+  await fs.access(`${stateFile}.v1-backup`);
+  await fs.access(`${stateFile}.migration-v2.json`);
+
+  await fs.rm(`${stateFile}.migration-v2.json`);
+  assert.equal((await proactive.releaseStatus()).migrationComplete, false);
+  assert.equal((await proactive.migrateLedger()).status, "marker_repaired");
+  await fs.access(`${stateFile}.migration-v2.json`);
+  assert.equal((await proactive.releaseStatus()).migrationComplete, true);
+});
+
+test("ordinary tick cannot complete or bypass a pending Ledger migration", async (t) => {
+  const stateFile = await tempState(t, "syno-proactive-pending-migration-");
+  await fs.writeFile(stateFile, `${JSON.stringify({
+    date: "2026-07-29",
+    notificationsToday: 0,
+    lastRuns: {},
+    pending: {},
+  })}\n`);
+  let collections = 0;
+  let enqueues = 0;
+  const proactive = new ProactiveOrchestrator({
+    host: { async receive() { throw new Error("pending migration must not invoke model"); } },
+    today: { async snapshot() { throw new Error("pending migration must not render"); } },
+    channels: { homeChannel: "weixin" },
+    settingsRegistry: { async get() { return true; } },
+    signalSources: { async collect() { collections += 1; return []; } },
+    channelDeliveryOutbox: {
+      async list() { return []; },
+      async enqueue() { enqueues += 1; throw new Error("pending migration must not enqueue"); },
+    },
+    stateFile,
+  });
+
+  const delivered = await proactive.tick({ now: new Date("2026-07-30T08:00:00+08:00") });
+  const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
+
+  assert.deepEqual(delivered, []);
+  assert.equal(collections, 0);
+  assert.equal(enqueues, 0);
+  assert.equal(state.migration.status, "pending");
+});
+
+test("controlled proactive test creates one tagged Outbox event without collecting real signals", async (t) => {
+  const stateFile = await tempState(t, "syno-proactive-controlled-test-");
+  const root = path.dirname(stateFile);
+  const outbox = new ChannelDeliveryOutbox({
+    root: path.join(root, "outbox"),
+    payloadRoot: path.join(root, "payloads"),
+    lockFile: path.join(root, "outbox.lock"),
+    protect: async (value) => value,
+    unprotect: async (value) => value,
+  });
+  let collections = 0;
+  const wakeOptions = [];
+  const authorizedEvents = [];
+  const proactive = new ProactiveOrchestrator({
+    host: { async receive() { throw new Error("controlled test must not invoke the model"); } },
+    today: { async snapshot() { throw new Error("controlled test must not render real content"); } },
+    channels: { homeChannel: "weixin", async send() { throw new Error("Outbox owns delivery"); } },
+    signalSources: { async collect() { collections += 1; return []; } },
+    settingsRegistry: {
+      async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? false : undefined; },
+      async set(key, value, options) {
+        assert.equal(key, "notifications.proactiveTestEventId");
+        assert.equal(options.proactiveTestAuthorizationVerified, true);
+        authorizedEvents.push(value);
+      },
+    },
+    channelDeliveryOutbox: outbox,
+    wakeDelivery: async (options) => wakeOptions.push(options),
+    stateFile,
+  });
+  await proactive.migrateLedger({ now: new Date("2026-07-30T08:00:00+08:00") });
+
+  const first = await proactive.triggerTest("release-20260730");
+  const duplicate = await proactive.triggerTest("release-20260730");
+  const records = await outbox.list({ limit: 10 });
+  const payload = (await outbox.get(first.eventId, { includePayload: true })).payload;
+
+  assert.equal(first.eventId, duplicate.eventId);
+  assert.equal(records.length, 1);
+  assert.match(records[0].deliveryKey, /^proactive-test:release-20260730:/);
+  assert.match(payload.text, /\[Syno TEST release-20260730\]/);
+  assert.equal(collections, 0, "controlled test must not inspect real signals");
+  assert.deepEqual(authorizedEvents, [first.eventId, first.eventId]);
+  assert.deepEqual(wakeOptions, [{ allowProactiveEventId: first.eventId }, { allowProactiveEventId: first.eventId }]);
+});
+
+test("a second controlled run is rejected while the exact first test remains nonterminal", async (t) => {
+  const stateFile = await tempState(t, "syno-proactive-controlled-test-serial-");
+  const root = path.dirname(stateFile);
+  const outbox = new ChannelDeliveryOutbox({
+    root: path.join(root, "outbox"),
+    payloadRoot: path.join(root, "payloads"),
+    lockFile: path.join(root, "outbox.lock"),
+    protect: async (value) => value,
+    unprotect: async (value) => value,
+  });
+  const proactive = new ProactiveOrchestrator({
+    host: { async receive() { throw new Error("controlled test must not invoke model"); } },
+    today: { async snapshot() { throw new Error("controlled test must not render"); } },
+    channels: { homeChannel: "weixin" },
+    settingsRegistry: {
+      async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? false : undefined; },
+      async set() {},
+    },
+    channelDeliveryOutbox: outbox,
+    stateFile,
+  });
+  await proactive.migrateLedger();
+  const outcomes = await Promise.allSettled([
+    proactive.triggerTest("release-first"),
+    proactive.triggerTest("release-second"),
+  ]);
+  assert.equal(outcomes.filter((item) => item.status === "fulfilled").length, 1);
+  const rejected = outcomes.find((item) => item.status === "rejected");
+  assert.equal(rejected.reason.code, "PROACTIVE_TEST_ALREADY_PENDING");
+  assert.equal((await outbox.list({ limit: 10 })).length, 1);
+});
+
+test("replaying an already delivered controlled run does not reauthorize or redeliver it", async (t) => {
+  const stateFile = await tempState(t, "syno-proactive-controlled-test-delivered-");
+  const root = path.dirname(stateFile);
+  const outbox = new ChannelDeliveryOutbox({
+    root: path.join(root, "outbox"),
+    payloadRoot: path.join(root, "payloads"),
+    lockFile: path.join(root, "outbox.lock"),
+    protect: async (value) => value,
+    unprotect: async (value) => value,
+  });
+  const authorizations = [];
+  let wakes = 0;
+  const proactive = new ProactiveOrchestrator({
+    host: { async receive() { throw new Error("controlled test must not invoke model"); } },
+    today: { async snapshot() { throw new Error("controlled test must not render"); } },
+    channels: { homeChannel: "weixin" },
+    settingsRegistry: {
+      async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? false : undefined; },
+      async set(_key, value) { authorizations.push(value); },
+    },
+    channelDeliveryOutbox: outbox,
+    wakeDelivery: async () => { wakes += 1; },
+    stateFile,
+  });
+  await proactive.migrateLedger();
+  const first = await proactive.triggerTest("release-delivered");
+  await outbox.deliverDue(async () => ({ delivered: true }));
+  const replay = await proactive.triggerTest("release-delivered");
+
+  assert.equal(replay.eventId, first.eventId);
+  assert.equal(replay.status, "delivered");
+  assert.deepEqual(authorizations, [first.eventId]);
+  assert.equal(wakes, 1);
+  const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
+  assert.equal(Object.keys(state.pendingBundles).length, 0);
 });
