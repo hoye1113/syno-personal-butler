@@ -21,7 +21,7 @@
 ## 执行器
 
 - 产品只启用 `OpenCodeCognitiveRuntime`；原生 Agent 在真实验收完成前仅作为非活动迁移回滚实现，禁止自动回退。
-- 模型链固定为 `deepseek/deepseek-v4-flash`、`deepseek/deepseek-chat`（自有 `DEEPSEEK_API_KEY`，2026-07-31 Owner 决策：免费档持续 429 限流），兜底 `opencode/mimo-v2.5-free`、`opencode/deepseek-v4-flash-free`、`opencode/laguna-s-2.1-free`。
+- 模型链固定为 `deepseek/deepseek-v4-flash`、`deepseek/deepseek-chat`（2026-07-31 Owner 决策：免费档持续 429 限流；key 来源 = host 环境变量 `DEEPSEEK_API_KEY` 优先，缺省时 supervisor 自动读用户本机 opencode 凭据存储 `~/.local/share/opencode/auth.json` 的 deepseek 条目注入子进程，零手工配置），兜底 `opencode/mimo-v2.5-free`、`opencode/deepseek-v4-flash-free`、`opencode/laguna-s-2.1-free`。
 - 仅在不可用、限流、连接失败、超时、5xx、空响应或契约校验失败，且本次尝试尚未产生不可逆副作用时，才由 Syno 按上述顺序确定性回退。
 - OpenCode Agent 不得选择模型、Provider 或回退目标；全部失败时进入 `waiting_provider`，不得升级到 Claude Code 或原生 Agent。
 - OpenCode 只能使用项目内 `syno-*` Skills 和静态 `syno_*` Tool Bridge；禁止直接读写仓库、执行 Shell/Git、分享会话、启动子 Agent或动态加载 MCP。

@@ -2,6 +2,7 @@ import { execFile, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { promises as fs } from "node:fs";
 import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -27,6 +28,19 @@ function isRealOpenCodeExecutable(candidate) {
 async function defaultVersionOf(executable) {
   const { stdout } = await execFileAsync(executable, ["--version"], { windowsHide: true, timeout: 10_000 });
   return String(stdout).trim();
+}
+
+// 用户本机 opencode 的凭据存储（opencode auth login 写入）。Syno 子进程的 XDG 目录被
+// 重定向到隔离 profile、看不到它；这里只读 deepseek 条目经环境变量注入子进程——
+// key 只过内存，不落新文件、不进日志。读不到一律返回空串（主链快速失败后落回免费档兜底）。
+async function defaultDeepseekKeyLoader({ authFile } = {}) {
+  const file = authFile || path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share"), "opencode", "auth.json");
+  try {
+    const entry = JSON.parse(await fs.readFile(file, "utf8"))?.deepseek;
+    return typeof entry?.key === "string" ? entry.key : "";
+  } catch {
+    return "";
+  }
 }
 
 async function executableFromLauncher(candidate) {
@@ -218,6 +232,7 @@ class OpenCodeSupervisor {
     killTree = defaultKillTree,
     randomSecret = () => randomBytes(32).toString("base64url"),
     tokenLoader,
+    deepseekKeyLoader = defaultDeepseekKeyLoader,
     bridgeOrigin,
     bridgeToken,
     journal = new RuntimeJournal(),
@@ -234,6 +249,7 @@ class OpenCodeSupervisor {
     this.killTree = killTree;
     this.randomSecret = randomSecret;
     this.tokenLoader = tokenLoader;
+    this.deepseekKeyLoader = deepseekKeyLoader;
     this.bridgeOrigin = bridgeOrigin;
     this.bridgeToken = bridgeToken;
     this.journal = journal;
@@ -320,6 +336,9 @@ class OpenCodeSupervisor {
     if (!this.installation) await this.configure();
     this.password = this.randomSecret();
     const token = this.tokenLoader ? await this.tokenLoader() : "";
+    // DEEPSEEK_API_KEY 优先用主机环境变量（已被 minimalChildEnvironment 白名单透传）；
+    // 未设置时回落到用户本机 opencode 凭据存储，复用已有 key、零手工配置。
+    const deepseekKey = process.env.DEEPSEEK_API_KEY || (this.deepseekKeyLoader ? await this.deepseekKeyLoader() : "");
     const profileRoot = path.join(this.localRoot, "profile");
     const isolatedWorkspace = path.join(profileRoot, "workspace");
     const env = {
@@ -333,6 +352,7 @@ class OpenCodeSupervisor {
       XDG_CONFIG_HOME: path.join(profileRoot, "config"),
       XDG_CACHE_HOME: path.join(profileRoot, "cache"),
       ...(token ? { SYNO_OPENCODE_API_KEY: token } : {}),
+      ...(deepseekKey ? { DEEPSEEK_API_KEY: deepseekKey } : {}),
     };
     await Promise.all([env.XDG_DATA_HOME, env.XDG_CONFIG_HOME, env.XDG_CACHE_HOME, isolatedWorkspace].map((directory) => fs.mkdir(directory, { recursive: true })));
     const args = ["serve", "--pure", "--hostname", "127.0.0.1", "--port", String(this.port), "--log-level", "ERROR"];
@@ -402,6 +422,7 @@ class OpenCodeSupervisor {
 
 export {
   DEFAULT_OPENCODE_PORT,
+  defaultDeepseekKeyLoader,
   discoverOpenCodeCandidates,
   LOCKED_OPENCODE_VERSION,
   OpenCodeSupervisor,

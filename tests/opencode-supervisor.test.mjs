@@ -8,6 +8,7 @@ import test from "node:test";
 
 import { RuntimeJournal } from "../apps/syno/syno/runtime-journal.mjs";
 import {
+  defaultDeepseekKeyLoader,
   discoverOpenCodeCandidates,
   LOCKED_OPENCODE_VERSION,
   minimalChildEnvironment,
@@ -79,6 +80,72 @@ test("secureConfig enables the DeepSeek provider with env-injected keys and keep
   assert.equal(config.provider.deepseek.options.apiKey, "{env:DEEPSEEK_API_KEY}");
   assert.equal(config.provider.opencode.options.apiKey, "{env:SYNO_OPENCODE_API_KEY}");
   assert.equal(config.default_agent, "syno");
+});
+
+test("defaultDeepseekKeyLoader reads only the deepseek entry and fails closed", async (t) => {
+  const root = await temporaryRoot(t);
+  const authFile = path.join(root, "auth.json");
+  await fs.writeFile(authFile, JSON.stringify({ deepseek: { type: "api", key: "stored-key" }, opencode: { type: "oauth", refresh: "unrelated" } }));
+  assert.equal(await defaultDeepseekKeyLoader({ authFile }), "stored-key");
+  await fs.writeFile(authFile, JSON.stringify({ opencode: { type: "oauth" } }));
+  assert.equal(await defaultDeepseekKeyLoader({ authFile }), "");
+  await fs.writeFile(authFile, "not json");
+  assert.equal(await defaultDeepseekKeyLoader({ authFile }), "");
+  assert.equal(await defaultDeepseekKeyLoader({ authFile: path.join(root, "missing.json") }), "");
+});
+
+async function supervisorWithRecordingSpawn(t, overrides = {}) {
+  const root = await temporaryRoot(t);
+  const executable = path.join(root, "node_modules", "opencode-ai", "bin", "opencode.exe");
+  await fs.mkdir(path.dirname(executable), { recursive: true });
+  await fs.writeFile(executable, "real");
+  const children = [];
+  const supervisor = new OpenCodeSupervisor({
+    localRoot: root,
+    repoRoot: root,
+    executable,
+    versionOf: async () => "1.18.2",
+    spawnImpl: (_file, _args, options) => {
+      const child = new EventEmitter();
+      child.pid = 4646;
+      child.exitCode = null;
+      child.stdout = new EventEmitter();
+      child.stderr = new EventEmitter();
+      child.kill = () => {};
+      children.push({ options, child });
+      return child;
+    },
+    fetchImpl: async () => ({ ok: true, status: 200, async json() { return { healthy: true, version: "1.18.2" }; } }),
+    portProbe: async () => false,
+    killTree: async () => {},
+    healthAttempts: 1,
+    ...overrides,
+  });
+  return { children, supervisor };
+}
+
+test("OpenCodeSupervisor reuses the DeepSeek key from the user's opencode auth store when the env var is absent", async (t) => {
+  const saved = process.env.DEEPSEEK_API_KEY;
+  delete process.env.DEEPSEEK_API_KEY;
+  t.after(() => { if (saved === undefined) delete process.env.DEEPSEEK_API_KEY; else process.env.DEEPSEEK_API_KEY = saved; });
+  const { children, supervisor } = await supervisorWithRecordingSpawn(t, { deepseekKeyLoader: async () => "stored-key" });
+
+  await supervisor.start();
+
+  assert.equal(children[0].options.env.DEEPSEEK_API_KEY, "stored-key");
+});
+
+test("OpenCodeSupervisor prefers an explicit DEEPSEEK_API_KEY over the stored credential", async (t) => {
+  const saved = process.env.DEEPSEEK_API_KEY;
+  process.env.DEEPSEEK_API_KEY = "explicit-env-key";
+  t.after(() => { if (saved === undefined) delete process.env.DEEPSEEK_API_KEY; else process.env.DEEPSEEK_API_KEY = saved; });
+  const { children, supervisor } = await supervisorWithRecordingSpawn(t, {
+    deepseekKeyLoader: async () => { throw new Error("store must not be consulted"); },
+  });
+
+  await supervisor.start();
+
+  assert.equal(children[0].options.env.DEEPSEEK_API_KEY, "explicit-env-key");
 });
 
 test("OpenCode binary resolver fails closed for an incompatible version", async (t) => {
