@@ -13,6 +13,7 @@ import {
   minimalChildEnvironment,
   OpenCodeSupervisor,
   resolveOpenCodeBinary,
+  secureConfig,
 } from "../apps/syno/syno/opencode-supervisor.mjs";
 
 async function temporaryRoot(t) {
@@ -57,6 +58,27 @@ test("OpenCode child environment keeps only runtime essentials and drops unrelat
     TEMP: "C:\\Temp",
     HTTPS_PROXY: "http://127.0.0.1:7892",
   });
+});
+
+test("OpenCode child environment whitelists only the two model provider keys", () => {
+  // 2026-07-31 Owner 决策：DeepSeek 自有 key 主链。key 仅经环境变量注入子进程，
+  // 其他主机密钥仍然一律不下发。
+  const env = minimalChildEnvironment({
+    DEEPSEEK_API_KEY: "ds-key",
+    SYNO_OPENCODE_API_KEY: "zen-key",
+    FEISHU_APP_SECRET: "must-not-leak",
+  });
+  assert.equal(env.DEEPSEEK_API_KEY, "ds-key");
+  assert.equal(env.SYNO_OPENCODE_API_KEY, "zen-key");
+  assert.equal(env.FEISHU_APP_SECRET, undefined);
+});
+
+test("secureConfig enables the DeepSeek provider with env-injected keys and keeps the free fallback", () => {
+  const config = JSON.parse(secureConfig("C:\\repo", {}));
+  assert.deepEqual(config.enabled_providers, ["deepseek", "opencode"]);
+  assert.equal(config.provider.deepseek.options.apiKey, "{env:DEEPSEEK_API_KEY}");
+  assert.equal(config.provider.opencode.options.apiKey, "{env:SYNO_OPENCODE_API_KEY}");
+  assert.equal(config.default_agent, "syno");
 });
 
 test("OpenCode binary resolver fails closed for an incompatible version", async (t) => {
@@ -151,7 +173,8 @@ test("OpenCodeSupervisor owns one child, authenticates health, and only stops it
   assert.equal(injected.permission["*"], "deny");
   assert.equal(injected.permission["syno_*"], "allow");
   assert.equal(injected.tools.read, false);
-  assert.deepEqual(injected.enabled_providers, ["opencode"]);
+  assert.deepEqual(injected.enabled_providers, ["deepseek", "opencode"]);
+  assert.equal(injected.provider.deepseek.options.apiKey, "{env:DEEPSEEK_API_KEY}");
   assert.equal(injected.provider.opencode.options.apiKey, "{env:SYNO_OPENCODE_API_KEY}");
   assert.doesNotMatch(children[0].options.env.OPENCODE_CONFIG_CONTENT, /zen-secret/);
   assert.match(requests[0].options.headers.Authorization, /^Basic /);

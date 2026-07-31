@@ -150,8 +150,15 @@ function secureConfig(repoRoot, { bridgeOrigin, bridgeToken } = {}) {
     share: "disabled",
     snapshot: false,
     default_agent: "syno",
-    enabled_providers: ["opencode"],
+    // 2026-07-31 Owner 决策：DeepSeek 官方（自有 DEEPSEEK_API_KEY）为主链提供商，
+    // opencode 免费档保留兜底。key 只经环境变量注入，不落配置文件。
+    enabled_providers: ["deepseek", "opencode"],
     provider: {
+      deepseek: {
+        options: {
+          apiKey: "{env:DEEPSEEK_API_KEY}",
+        },
+      },
       opencode: {
         options: {
           apiKey: "{env:SYNO_OPENCODE_API_KEY}",
@@ -182,6 +189,9 @@ function minimalChildEnvironment(source = process.env) {
     "APPDATA", "COMSPEC", "HOMEDRIVE", "HOMEPATH", "LOCALAPPDATA", "NODE_EXTRA_CA_CERTS",
     "NO_PROXY", "PATH", "PATHEXT", "SYSTEMDRIVE", "SYSTEMROOT", "TEMP", "TMP", "USERPROFILE",
     "WINDIR", "HTTP_PROXY", "HTTPS_PROXY",
+    // 模型提供商 key：仅这两个经白名单注入子进程（secureConfig 的 {env:*} 占位符依赖它们），
+    // 其他主机侧密钥（FEISHU_APP_SECRET 等）依然一律不下发。
+    "DEEPSEEK_API_KEY", "SYNO_OPENCODE_API_KEY",
   ]);
   return Object.fromEntries(Object.entries(source).filter(([key, value]) => {
     const upper = key.toUpperCase();

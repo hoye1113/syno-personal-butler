@@ -6,10 +6,12 @@ import test from "node:test";
 
 import {
   assertOpenCodeServerSecurity,
+  DEFAULT_MODEL_CHAIN,
   OPENCODE_MODELS,
   OpenCodeCognitiveRuntime,
   OpenCodeHttpClient,
   OpenCodeSessionBindingStore,
+  parseQualifiedModel,
   retryableFailure,
 } from "../apps/syno/syno/opencode-cognitive-runtime.mjs";
 import {
@@ -95,8 +97,8 @@ test("OpenCodeCognitiveRuntime declares the locked v2 capability contract", () =
     version: 2,
     adapter: "opencode-cli-server",
     agentCount: 1,
-    provider: "opencode",
-    models: OPENCODE_MODELS,
+    provider: "deepseek",
+    models: DEFAULT_MODEL_CHAIN,
     agentSelectableModel: false,
     providerFallback: false,
     sessionRecovery: {
@@ -126,7 +128,7 @@ test("OpenCode server security gate fails closed on a callable builtin or missin
   const secure = {
     isolatedWorkspace: true,
     defaultAgent: "syno",
-    enabledProviders: ["opencode"],
+    enabledProviders: ["deepseek", "opencode"],
     shareDisabled: true,
     snapshotsDisabled: true,
     globalPermissionDenied: true,
@@ -137,6 +139,8 @@ test("OpenCode server security gate fails closed on a callable builtin or missin
   assert.equal(assertOpenCodeServerSecurity(secure), secure);
   assert.throws(() => assertOpenCodeServerSecurity({ ...secure, forbiddenCallableToolIds: ["bash"] }), (error) => error.code === "OPENCODE_SECURITY_GATE_FAILED");
   assert.throws(() => assertOpenCodeServerSecurity({ ...secure, mcpNames: [] }), (error) => error.code === "OPENCODE_SECURITY_GATE_FAILED");
+  assert.throws(() => assertOpenCodeServerSecurity({ ...secure, enabledProviders: ["opencode"] }), (error) => error.code === "OPENCODE_SECURITY_GATE_FAILED");
+  assert.throws(() => assertOpenCodeServerSecurity({ ...secure, enabledProviders: ["deepseek", "opencode", "anthropic"] }), (error) => error.code === "OPENCODE_SECURITY_GATE_FAILED");
 });
 
 test("OpenCode sessions follow the Owner across channels and persist only binding metadata", async (t) => {
@@ -408,9 +412,9 @@ test("OpenCode model fallback is deterministic and stops after an irreversible t
   const result = await runtime.run({ text: "hello" }, { ownerKey: "owner", threadKey: "main" });
   assert.equal(result.text, "ok");
   assert.deepEqual(attempts, [
-    OPENCODE_MODELS[0].replace(/^opencode\//, ""),
+    DEFAULT_MODEL_CHAIN[0].split("/")[1],
     "abort:session-fallback",
-    OPENCODE_MODELS[1].replace(/^opencode\//, ""),
+    DEFAULT_MODEL_CHAIN[1].split("/")[1],
   ]);
   assert.equal(result.attempts[0].failureCode, "HTTP_429");
 
@@ -428,6 +432,36 @@ test("OpenCode model fallback is deterministic and stops after an irreversible t
     assert.equal(error.attempts.length, 1);
     return true;
   });
+});
+
+test("qualified model strings carry their provider across the fallback chain", async (t) => {
+  // 2026-07-31 Owner 决策：主链 deepseek 官方（自有 key），opencode 免费档兜底。
+  // providerID 必须从 qualifiedModel 解析，不能继续硬编码 "opencode"。
+  assert.deepEqual(parseQualifiedModel("deepseek/deepseek-v4-flash"), { providerID: "deepseek", modelID: "deepseek-v4-flash" });
+  assert.deepEqual(parseQualifiedModel("opencode/mimo-v2.5-free"), { providerID: "opencode", modelID: "mimo-v2.5-free" });
+  assert.deepEqual(parseQualifiedModel("mimo-v2.5-free"), { providerID: "opencode", modelID: "mimo-v2.5-free" });
+  assert.equal(DEFAULT_MODEL_CHAIN[0], "deepseek/deepseek-v4-flash");
+  assert.deepEqual([...DEFAULT_MODEL_CHAIN.slice(2)], [...OPENCODE_MODELS]);
+
+  const root = await temporaryRoot(t);
+  const bindings = new OpenCodeSessionBindingStore({ file: path.join(root, "bindings.json") });
+  const seen = [];
+  const client = {
+    async createSession() { return { id: "session-cross-provider" }; },
+    async abortSession() {},
+    async sendMessage(_id, payload) {
+      seen.push(payload.model);
+      if (seen.length === 1) throw Object.assign(new Error("limited"), { status: 429 });
+      return { parts: [{ type: "text", text: "ok" }] };
+    },
+  };
+  const runtime = new OpenCodeCognitiveRuntime({ client, bindings });
+  const result = await runtime.run({ text: "hello" }, { ownerKey: "owner", threadKey: "main" });
+  assert.equal(result.text, "ok");
+  assert.deepEqual(seen, [
+    { providerID: "deepseek", modelID: "deepseek-v4-flash" },
+    { providerID: "deepseek", modelID: "deepseek-chat" },
+  ]);
 });
 
 test("fallback abort unknown freezes the Session and never advances the model chain", async (t) => {

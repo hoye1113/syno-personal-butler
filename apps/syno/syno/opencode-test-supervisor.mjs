@@ -62,7 +62,7 @@ class OpenCodeTestSupervisor {
     const url = new URL(request.url, `http://${this.hostname}:${this.port}`);
     if (request.method === "GET" && url.pathname === "/global/health") return this.#json(response, { healthy: true, version: "1.18.2" });
     if (request.method === "GET" && url.pathname === "/config") return this.#json(response, {
-      default_agent: "syno", enabled_providers: ["opencode"], share: "disabled", snapshot: false,
+      default_agent: "syno", enabled_providers: ["deepseek", "opencode"], share: "disabled", snapshot: false,
       permission: { "*": "deny" },
     });
     if (request.method === "GET" && url.pathname === "/agent") return this.#json(response, [{ name: "syno" }]);

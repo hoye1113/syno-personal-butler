@@ -17,8 +17,10 @@ function assertCognitiveCapabilities(report, { expectedTools } = {}) {
     for (const name of ["agentSelectableModel", "providerFallback", "directFileAccess", "terminal", "sourceWrite", "dynamicMcp"]) {
       if (report[name] !== false) throw capabilityError(`CognitiveRuntime v2 禁止能力未关闭：${name}`);
     }
-    if (report.adapter !== "opencode-cli-server" || report.provider !== "opencode") throw capabilityError("CognitiveRuntime v2 必须使用受控 OpenCode CLI Server Adapter");
-    if (!Array.isArray(report.models) || !report.models.length || report.models.some((model) => !String(model).startsWith("opencode/"))) {
+    // 2026-07-31 宪法修订（AGENTS.md 执行器节）：模型链允许跨提供商（deepseek 官方主链 +
+    // opencode 免费档兜底），不变的约束是受控 adapter 与"<provider>/<model>"定形链。
+    if (report.adapter !== "opencode-cli-server" || typeof report.provider !== "string" || !report.provider) throw capabilityError("CognitiveRuntime v2 必须使用受控 OpenCode CLI Server Adapter");
+    if (!Array.isArray(report.models) || !report.models.length || report.models.some((model) => !/^[\w-]+\/\S+$/.test(String(model)))) {
       throw capabilityError("CognitiveRuntime v2 模型链无效");
     }
     const tools = [...new Set((report.tools || []).map(String))].sort();
