@@ -32,7 +32,12 @@ class EffectReconciliationWorker {
 
   start() {
     if (this.timer) return;
-    this.timer = setInterval(() => this.runOnce().catch(() => {}), this.intervalMs);
+    this.timer = setInterval(() => {
+      // single-flight：上一轮 runOnce 未结束时跳过本轮，避免长周期叠加并发巡检（O10）。
+      if (this.running) return;
+      this.running = true;
+      this.runOnce().catch(() => {}).finally(() => { this.running = false; });
+    }, this.intervalMs);
     this.timer.unref?.();
   }
 

@@ -1,11 +1,14 @@
 class AcceptedRequestRecoveryWorker {
-  constructor({ store, processRequest = async () => ({ status: "waiting_provider" }), intervalMs = 60_000, clock = () => new Date(), backoffMs = 30_000 } = {}) {
+  constructor({ store, processRequest = async () => ({ status: "waiting_provider" }), intervalMs = 60_000, clock = () => new Date(), backoffMs = 30_000, onEscalation = null, escalationThreshold = 10 } = {}) {
     if (!store) throw new Error("AcceptedRequestRecoveryWorker 缺少 AcceptedRequestStore");
     this.store = store;
     this.processRequest = processRequest;
     this.intervalMs = Math.max(1_000, Number(intervalMs) || 60_000);
     this.clock = clock;
     this.backoffMs = Math.max(1_000, Number(backoffMs) || 30_000);
+    // O7：accepted_request 不能转 terminal（会孤儿回执），故持续重试；但 retries 超阈值时回调告警，让“静默无限重试”变可观测。
+    this.onEscalation = typeof onEscalation === "function" ? onEscalation : null;
+    this.escalationThreshold = Math.max(1, Number(escalationThreshold) || 10);
     this.timer = null;
     this.running = false;
   }
@@ -25,6 +28,11 @@ class AcceptedRequestRecoveryWorker {
       seen.add(candidate.requestId);
       const claim = await this.store.claim(candidate.requestId, { workerId: `accepted-recovery-${process.pid}`, now });
       if (!claim.claimed) continue;
+      // 命中阈值时触发一次升级告警（best-effort，不阻断恢复循环，也不转 terminal）。
+      const attempts = Number(claim.request?.attempts || 0);
+      if (this.onEscalation && attempts === this.escalationThreshold) {
+        try { await this.onEscalation(claim.request); } catch { /* 升级告警失败不影响恢复 */ }
+      }
       report.claimed += 1;
       try {
         const request = await this.store.get(candidate.requestId, { includePayload: true });
@@ -58,8 +66,12 @@ class AcceptedRequestRecoveryWorker {
 
   start() {
     if (this.timer) return;
-    this.running = true;
-    this.timer = setInterval(() => this.runOnce().catch(() => {}), this.intervalMs);
+    this.timer = setInterval(() => {
+      // single-flight：上一轮 runOnce 未结束时跳过本轮，避免长周期叠加并发恢复（O10）。
+      if (this.running) return;
+      this.running = true;
+      this.runOnce().catch(() => {}).finally(() => { this.running = false; });
+    }, this.intervalMs);
     this.timer.unref?.();
   }
 

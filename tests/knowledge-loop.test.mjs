@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { IngestService, isAllowedIngestPath, proposalAllowsWriteJob } from "../apps/syno/syno/ingest-service.mjs";
+import { IngestService, isAllowedIngestPath, isAllowedExistingVaultPath, proposalAllowsWriteJob } from "../apps/syno/syno/ingest-service.mjs";
 import { ClaimEvidenceService } from "../apps/syno/syno/claim-evidence-service.mjs";
 import { GoalService } from "../apps/syno/syno/goal-service.mjs";
 import { LearningService, calibrationFor, reviewIntervalDays } from "../apps/syno/syno/learning-service.mjs";
@@ -492,4 +492,77 @@ test("Today exposes one next action, needs-owner items, recent intake and daily 
   assert.equal(snapshot.recentIntake[0].area, "capture");
   assert.equal(snapshot.recentIntake[0].intent, "review-ingest");
   assert.deepEqual(snapshot.progress, { completed: 1, waiting: 1, failed: 0 });
+});
+
+test("isAllowedExistingVaultPath confines append/link targets to the vault without the 4-subdir rule (O5)", () => {
+  // 既有笔记可能在 vault 任意子路径下，不强制四个规范目录。
+  assert.equal(isAllowedExistingVaultPath("vault/02-Resources/AI and Agents/note.md"), true);
+  assert.equal(isAllowedExistingVaultPath("vault/existing.md"), true);
+  // 但必须落在 vault 内、且无 `..` 越界。
+  assert.equal(isAllowedExistingVaultPath("vault/../../ops/secret.md"), false);
+  assert.equal(isAllowedExistingVaultPath("../etc/passwd"), false);
+  assert.equal(isAllowedExistingVaultPath("ops/memory/secret.md"), false);
+});
+
+test("append-source rejects an existingNoteRef that escapes the vault (O5)", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-ingest-o5-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const stateRoot = path.join(root, "state");
+  await fs.mkdir(stateRoot, { recursive: true });
+  // 直接写入一个 existingNoteRef 越界的 proposal 状态（绕过 propose 的查重归一化）。
+  await fs.writeFile(path.join(stateRoot, "artifact-o5.json"), JSON.stringify({
+    status: "proposed",
+    created: "2026-08-02T00:00:00.000Z",
+    proposal: { risk: "merge", existingNoteRef: "vault/../../ops/secret.md" },
+  }), "utf8");
+  const service = new IngestService({ knowledge: { async search() { return []; } }, stateRoot });
+  await assert.rejects(
+    service.apply("artifact-o5", { workspace: root, decision: { action: "append-source" } }),
+    (error) => error.code === "INGEST_TARGET_PATH_DENIED",
+  );
+});
+
+test("ingest create writes the vault note atomically with no leftover temp file (R3)", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-ingest-r3-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const service = new IngestService({
+    intake: { async prepare(payload) { return { sourceType: "text", text: payload.value }; } },
+    knowledge: { async search() { return []; } },
+    opsRoot: path.join(root, "ops"), stateRoot: path.join(root, "state"),
+    clock: () => new Date("2026-08-02T00:00:00.000Z"),
+  });
+  const receipt = await service.receive({ kind: "text", value: "原子写测试正文" });
+  await service.propose(receipt.artifact.id);
+  const applied = await service.apply(receipt.artifact.id, { workspace: root, decision: { action: "create" } });
+  const note = await fs.readFile(path.join(root, applied.path), "utf8");
+  assert.match(note, /原子写测试正文/);
+  // 原子写（tmp + rename）完成后，笔记目录不应残留 .tmp 文件。
+  const dir = path.dirname(path.join(root, applied.path));
+  const leftovers = (await fs.readdir(dir)).filter((name) => name.endsWith(".tmp"));
+  assert.deepEqual(leftovers, []);
+});
+
+test("concurrent append-source to the same existing note keep both additions (R3)", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-ingest-r3lock-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.mkdir(path.join(root, "vault", "02-Resources"), { recursive: true });
+  await fs.writeFile(path.join(root, "vault", "02-Resources", "existing.md"), "# Existing\n", "utf8");
+  // 单实例 IngestService：生产中同一实例处理并发请求，按目标文件串行化靠的就是实例级锁。
+  const service = new IngestService({
+    intake: { async prepare(payload) { return { sourceType: "text", text: payload.value }; } },
+    knowledge: { async search() { return [{ path: "vault/02-Resources/existing.md" }]; } },
+    opsRoot: path.join(root, "ops"), stateRoot: path.join(root, "state"),
+    clock: () => new Date("2026-08-02T00:00:00.000Z"),
+  });
+  const r1 = await service.receive({ kind: "text", value: "第一条补充" });
+  await service.propose(r1.artifact.id);
+  const r2 = await service.receive({ kind: "text", value: "第二条补充" });
+  await service.propose(r2.artifact.id);
+  await Promise.all([
+    service.apply(r1.artifact.id, { workspace: root, decision: { action: "append-source" } }),
+    service.apply(r2.artifact.id, { workspace: root, decision: { action: "append-source" } }),
+  ]);
+  const merged = await fs.readFile(path.join(root, "vault", "02-Resources", "existing.md"), "utf8");
+  assert.match(merged, /第一条补充/);
+  assert.match(merged, /第二条补充/);
 });

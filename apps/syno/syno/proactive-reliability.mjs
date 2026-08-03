@@ -185,6 +185,19 @@ class OwnerChannelTargetStore {
       }
     });
   }
+
+  // 只读 metadata，不触发 DPAPI 解密；供 deliveryHealth 推算 token 年龄等诊断字段。
+  async meta(ownerKey, channel) {
+    return this.processLock.run(async () => {
+      try {
+        const metadata = JSON.parse(await fs.readFile(metadataFile(this.root, ownerKey, channel), "utf8"));
+        return { ownerKey: metadata.ownerKey, channel: metadata.channel, updatedAt: metadata.updatedAt || null };
+      } catch (error) {
+        if (error.code === "ENOENT") return null;
+        throw error;
+      }
+    });
+  }
 }
 
 export {

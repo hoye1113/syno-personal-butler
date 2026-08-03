@@ -16,10 +16,24 @@ async function atomicJson(file, value) {
 }
 
 class ConversationStore {
+  // 本进程内、按会话 id 串行化变更的互斥量。ProcessFileLock（跨进程、非重入）面向多 Host 抢占，
+  // 不适合此处读-改-写的本进程顺序化（且会与 tool-loop-agent 的 runExclusive 外层锁嵌套死锁）。
+  #mutex = new Map();
+
   constructor({ root = path.join(PATHS.stateRoot, "conversations"), clock = () => new Date(), retention = RETENTION } = {}) {
     this.root = root;
     this.clock = clock;
     this.retention = { ...RETENTION, ...retention };
+  }
+
+  // 串行化同一会话的读-改-写，避免并发 append/addSummary 互相覆盖丢失。空闲后清条目防止 Map 无界增长。
+  #serialize(id, task) {
+    const previous = this.#mutex.get(id) ?? Promise.resolve();
+    const result = previous.then(() => task());
+    const next = result.then(() => undefined, () => undefined);
+    this.#mutex.set(id, next);
+    next.then(() => { if (this.#mutex.get(id) === next) this.#mutex.delete(id); });
+    return result;
   }
 
   file(id) {
@@ -71,39 +85,49 @@ class ConversationStore {
   }
 
   async append(id, ...messages) {
-    const conversation = await this.get(id);
-    if (!conversation) throw new Error(`Conversation 不存在：${id}`);
-    conversation.messages.push(...messages);
-    return this.save(conversation);
+    return this.#serialize(id, async () => {
+      const conversation = await this.get(id);
+      if (!conversation) throw new Error(`Conversation 不存在：${id}`);
+      conversation.messages.push(...messages);
+      return this.save(conversation);
+    });
   }
 
   async archiveMessages(id, messagesToArchive, reason = "compaction", archivedAt = this.clock().toISOString()) {
-    const conversation = await this.get(id);
-    if (!conversation) throw new Error(`Conversation 不存在：${id}`);
-    const stamped = (messagesToArchive || []).map((message) => ({ ...message, archivedAt, archiveReason: reason }));
-    conversation.archive.push(...stamped);
-    return this.save(conversation);
+    return this.#serialize(id, async () => {
+      const conversation = await this.get(id);
+      if (!conversation) throw new Error(`Conversation 不存在：${id}`);
+      const stamped = (messagesToArchive || []).map((message) => ({ ...message, archivedAt, archiveReason: reason }));
+      conversation.archive.push(...stamped);
+      return this.save(conversation);
+    });
   }
 
   async addSummary(id, summary) {
-    const conversation = await this.get(id);
-    if (!conversation) throw new Error(`Conversation 不存在：${id}`);
-    conversation.summaries.push({ at: this.clock().toISOString(), ...summary });
-    return this.save(conversation);
+    return this.#serialize(id, async () => {
+      const conversation = await this.get(id);
+      if (!conversation) throw new Error(`Conversation 不存在：${id}`);
+      conversation.summaries.push({ at: this.clock().toISOString(), ...summary });
+      return this.save(conversation);
+    });
   }
 
   async addCompactionLog(id, log) {
-    const conversation = await this.get(id);
-    if (!conversation) throw new Error(`Conversation 不存在：${id}`);
-    conversation.compactionLog.push({ at: this.clock().toISOString(), ...log });
-    return this.save(conversation);
+    return this.#serialize(id, async () => {
+      const conversation = await this.get(id);
+      if (!conversation) throw new Error(`Conversation 不存在：${id}`);
+      conversation.compactionLog.push({ at: this.clock().toISOString(), ...log });
+      return this.save(conversation);
+    });
   }
 
   async setHandoffContext(id, context) {
-    const conversation = await this.get(id);
-    if (!conversation) throw new Error(`Conversation 不存在：${id}`);
-    conversation.handoffContext = context;
-    return this.save(conversation);
+    return this.#serialize(id, async () => {
+      const conversation = await this.get(id);
+      if (!conversation) throw new Error(`Conversation 不存在：${id}`);
+      conversation.handoffContext = context;
+      return this.save(conversation);
+    });
   }
 
   // 外置 archive 按需读取（RECOVER/巡检用）；未外置时回退内联 archive。
@@ -147,61 +171,69 @@ class ConversationStore {
         }
         continue;
       }
-      const value = JSON.parse(await fs.readFile(file, "utf8"));
-      let changed = false;
-      for (const message of value.messages || []) {
-        const voice = message.rawVoice;
-        if (!voice || !voice.confirmedAt) continue;
-        if (this.clock().getTime() - new Date(voice.confirmedAt).getTime() <= this.retention.confirmedVoiceDays * DAY_MS) continue;
-        delete message.rawVoice;
-        changed = true;
-      }
-      const keptArchive = (value.archive || []).filter((message) => {
-        if (!message.archivedAt) return true;
-        return this.clock().getTime() - new Date(message.archivedAt).getTime() <= this.retention.archivedDays * DAY_MS;
-      });
-      if (keptArchive.length !== (value.archive || []).length) {
-        value.archive = keptArchive;
-        changed = true;
-      }
-      // 元数据滚动上限：长对话的 compactionLog/summaries 有界，避免主文件无限膨胀（STORE 3.2）
-      const log = Array.isArray(value.compactionLog) ? value.compactionLog : [];
-      if (log.length > this.retention.compactionLogMax) {
-        value.compactionLog = log.slice(log.length - this.retention.compactionLogMax);
-        changed = true;
-      }
-      const summaries = Array.isArray(value.summaries) ? value.summaries : [];
-      if (summaries.length > this.retention.summariesMax) {
-        value.summaries = summaries.slice(summaries.length - this.retention.summariesMax);
-        changed = true;
-      }
-      if (!["completed", "failed", "archived"].includes(value.status)) {
-        if (changed) await atomicJson(file, value);
+      // 单文件隔离：损坏/无法解析的会话文件只跳过该文件并记录，不中断整轮 prune（O9）。
+      try {
+        const value = JSON.parse(await fs.readFile(file, "utf8"));
+        let changed = false;
+        for (const message of value.messages || []) {
+          const voice = message.rawVoice;
+          if (!voice || !voice.confirmedAt) continue;
+          if (this.clock().getTime() - new Date(voice.confirmedAt).getTime() <= this.retention.confirmedVoiceDays * DAY_MS) continue;
+          delete message.rawVoice;
+          changed = true;
+        }
+        const keptArchive = (value.archive || []).filter((message) => {
+          if (!message.archivedAt) return true;
+          return this.clock().getTime() - new Date(message.archivedAt).getTime() <= this.retention.archivedDays * DAY_MS;
+        });
+        if (keptArchive.length !== (value.archive || []).length) {
+          value.archive = keptArchive;
+          changed = true;
+        }
+        // 元数据滚动上限：长对话的 compactionLog/summaries 有界，避免主文件无限膨胀（STORE 3.2）
+        const log = Array.isArray(value.compactionLog) ? value.compactionLog : [];
+        if (log.length > this.retention.compactionLogMax) {
+          value.compactionLog = log.slice(log.length - this.retention.compactionLogMax);
+          changed = true;
+        }
+        const summaries = Array.isArray(value.summaries) ? value.summaries : [];
+        if (summaries.length > this.retention.summariesMax) {
+          value.summaries = summaries.slice(summaries.length - this.retention.summariesMax);
+          changed = true;
+        }
+        if (!["completed", "failed", "archived"].includes(value.status)) {
+          if (changed) await atomicJson(file, value);
+          continue;
+        }
+        const days = value.status === "failed" ? this.retention.failedPayloadDays
+          : value.status === "archived" ? this.retention.archivedConvDays
+          : this.retention.completedChatDays;
+        if (this.clock().getTime() - new Date(value.updatedAt).getTime() <= days * DAY_MS) {
+          if (changed) await atomicJson(file, value);
+          continue;
+        }
+        await fs.rm(file, { force: true });
+        await fs.rm(path.join(this.root, this.#archiveFile(value.id)), { force: true }); // 连带删除外置 archive
+        removed.push(value.id);
+        continue;
+      } catch (error) {
+        if (error.code === "ENOENT") continue; // 本轮被并发删除，跳过
+        console.warn(`[syno] prune 跳过无法处理的会话文件：${entry.name}`, error?.message || error);
         continue;
       }
-      const days = value.status === "failed" ? this.retention.failedPayloadDays
-        : value.status === "archived" ? this.retention.archivedConvDays
-        : this.retention.completedChatDays;
-      if (this.clock().getTime() - new Date(value.updatedAt).getTime() <= days * DAY_MS) {
-        if (changed) await atomicJson(file, value);
-        continue;
-      }
-      await fs.rm(file, { force: true });
-      await fs.rm(path.join(this.root, this.#archiveFile(value.id)), { force: true }); // 连带删除外置 archive
-      removed.push(value.id);
-      changed = false;
-      continue;
     }
     return removed;
   }
 
   async markVoiceConfirmed(id, messageIndex, confirmedAt = this.clock().toISOString()) {
-    const conversation = await this.get(id);
-    if (!conversation) throw new Error(`Conversation 不存在：${id}`);
-    const message = conversation.messages?.[messageIndex];
-    if (!message?.rawVoice) throw new Error("指定消息没有原始语音");
-    message.rawVoice.confirmedAt = confirmedAt;
-    return this.save(conversation);
+    return this.#serialize(id, async () => {
+      const conversation = await this.get(id);
+      if (!conversation) throw new Error(`Conversation 不存在：${id}`);
+      const message = conversation.messages?.[messageIndex];
+      if (!message?.rawVoice) throw new Error("指定消息没有原始语音");
+      message.rawVoice.confirmedAt = confirmedAt;
+      return this.save(conversation);
+    });
   }
 }
 

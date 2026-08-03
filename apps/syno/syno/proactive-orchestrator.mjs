@@ -685,6 +685,42 @@ class ProactiveOrchestrator {
     }
   }
 
+  // 主动通道投递健康（诊断用，preview 调用频率低可接受 O(n≤200) 扫描）：
+  // consecutiveFailures = 从最新事件向前累加连续失败态（failed_retryable/terminal/delivery_unknown）事件的 attempts
+  //   ——与 runtime 进程级计数器（health.deliveryConsecutiveFailures）同口径：连续失败投递次数（非失败事件数）；
+  // lastDeliveryError = 最近一条 lastErrorCode；targetTokenAgeMs = 持久 target token 自更新以来的毫秒数（指向 token 过期根因，下界 0）。
+  async #deliveryHealth(homeChannel, now = this.clock()) {
+    const FAILING = new Set(["failed_retryable", "failed_terminal", "delivery_unknown"]);
+    let consecutiveFailures = 0;
+    let lastDeliveryError = null;
+    let lastSeenAt = null;
+    try {
+      const items = await this.channelDeliveryOutbox?.list?.({ limit: 200, order: "desc" }) || [];
+      const scoped = items
+        .filter((item) => item.targetChannel === homeChannel && item.sourceType === "proactive_bundle")
+        .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+      for (const item of scoped) {
+        if (FAILING.has(item.status)) {
+          consecutiveFailures += Number(item.attempts || 0);
+          if (!lastDeliveryError && item.lastErrorCode) lastDeliveryError = item.lastErrorCode;
+        } else {
+          break;
+        }
+      }
+      if (scoped.length) lastSeenAt = scoped[0].updatedAt || scoped[0].createdAt || null;
+    } catch {
+      // best-effort：outbox 不可用时返回空诊断，不阻断 preview
+    }
+    let targetTokenAgeMs = null;
+    try {
+      const meta = await this.ownerChannelTargets?.meta?.("local-user", homeChannel);
+      if (meta?.updatedAt) targetTokenAgeMs = Math.max(0, now.getTime() - new Date(meta.updatedAt).getTime());
+    } catch {
+      // best-effort：target 不可读时 token 年龄留空
+    }
+    return { homeChannel, consecutiveFailures, lastDeliveryError, lastSeenAt, targetTokenAgeMs };
+  }
+
   async preview({ now = this.clock(), highValueEvents } = {}) {
     const state = await this.load({ prepareMigration: false });
     const homeChannel = this.channels.homeChannel || "web";
@@ -694,6 +730,7 @@ class ProactiveOrchestrator {
         enabled: await this.#deliveryEnabled(),
         homeChannel,
         homeTargetAvailable: await this.#homeTargetAvailable(homeChannel),
+        deliveryHealth: await this.#deliveryHealth(homeChannel, now),
         eligibleSignals: 0,
         bundle: null,
       };
@@ -719,6 +756,7 @@ class ProactiveOrchestrator {
       enabled: await this.#deliveryEnabled(),
       homeChannel,
       homeTargetAvailable: await this.#homeTargetAvailable(homeChannel),
+      deliveryHealth: await this.#deliveryHealth(homeChannel, now),
       eligibleSignals: prepared.length,
       bundle: bundle ? {
         bundleId: bundle.bundleId,

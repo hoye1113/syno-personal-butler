@@ -174,6 +174,14 @@ function isAllowedIngestPath(value) {
     .test(String(value || ""));
 }
 
+// append/link 写入的是已存在的 vault 笔记（existingNoteRef，来自 knowledge.search）。
+// 约束比 isAllowedIngestPath 宽：只要落在 vault 内、且无 `..` 越界即可，
+// 不强制四个规范子目录——主人既有笔记可能就在 vault 其它子路径下（O5）。
+function isAllowedExistingVaultPath(value) {
+  return /^vault\/(?!.*(?:^|\/)\.\.(?:\/|$))[\p{L}\p{N} _./&()-]+\.md$/u
+    .test(String(value || ""));
+}
+
 async function atomicJson(file, value) {
   await fs.mkdir(path.dirname(file), { recursive: true });
   const temporary = `${file}.${process.pid}.tmp`;
@@ -181,10 +189,32 @@ async function atomicJson(file, value) {
   await fs.rename(temporary, file);
 }
 
+// 原子写 vault 笔记正文：uuid tmp + rename，避免进程在写一半崩溃留下截断/损坏的 .md（R3）。
+// 不强制 0o600——vault 笔记是主人可读的知识文件，沿用默认权限，与历史 fs.writeFile 行为一致。
+async function atomicText(file, content) {
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  const temporary = `${file}.${process.pid}.${randomUUID().slice(0, 8)}.tmp`;
+  await fs.writeFile(temporary, content, "utf8");
+  await fs.rename(temporary, file);
+}
+
 class IngestService {
+  // 按目标笔记路径串行化 append/link 的读-改-写，避免并发收录决策互相覆盖丢失（R3）。
+  #targetLocks = new Map();
+
   constructor({ intake = new IntakeService(), knowledge, opsRoot = PATHS.opsRoot, stateRoot = path.join(PATHS.stateRoot, "ingest"), clock = () => new Date() } = {}) {
     if (!knowledge) throw new Error("IngestService 缺少 KnowledgeStore");
     this.intake = intake; this.knowledge = knowledge; this.opsRoot = opsRoot; this.stateRoot = stateRoot; this.clock = clock;
+  }
+
+  // 串行化对同一目标文件的写；空闲后清条目防止 Map 无界增长。
+  #serializeTarget(target, task) {
+    const previous = this.#targetLocks.get(target) ?? Promise.resolve();
+    const result = previous.then(() => task());
+    const next = result.then(() => undefined, () => undefined);
+    this.#targetLocks.set(target, next);
+    next.then(() => { if (this.#targetLocks.get(target) === next) this.#targetLocks.delete(target); });
+    return result;
   }
 
   async receive(payload, { ownerId = "local-user", channel = "web", messageId = "" } = {}) {
@@ -452,8 +482,12 @@ class IngestService {
       : new Set(["append-source", "link-only", "keep-separate", "reject"]);
     if (!allowed.has(action)) throw Object.assign(new Error(`收录决策 ${action} 不适用于 ${state.proposal.risk} 方案`), { code: "INGEST_DECISION_INVALID" });
     const relative = action === "append-source" || action === "link-only" ? state.proposal.existingNoteRef : state.proposal.suggestedPath;
-    if ((action === "create" || action === "keep-separate") && !isAllowedIngestPath(relative)) {
-      throw Object.assign(new Error(`收录目标不在允许的知识目录：${relative}`), { code: "INGEST_TARGET_PATH_DENIED" });
+    // O5：所有写入型决策都要先校验目标路径——新建必须在四个规范知识目录内（isAllowedIngestPath），
+    //     append/link 写的是既有 vault 笔记，只要落在 vault 内、无 `..` 越界即可（isAllowedExistingVaultPath）。
+    if (action === "create" || action === "keep-separate") {
+      if (!isAllowedIngestPath(relative)) throw Object.assign(new Error(`收录目标不在允许的知识目录：${relative}`), { code: "INGEST_TARGET_PATH_DENIED" });
+    } else if (action === "append-source" || action === "link-only") {
+      if (!isAllowedExistingVaultPath(relative)) throw Object.assign(new Error(`收录目标不在 vault 内：${relative}`), { code: "INGEST_TARGET_PATH_DENIED" });
     }
     const target = relative ? path.join(workspace, relative) : null;
     const descriptor = state.proposal.sourceDescriptor || state.artifact?.sourceDescriptor || buildSourceDescriptor({ payload: state.payload, prepared: state.prepared, channel: state.channel, messageId: state.messageId, now: state.created });
@@ -473,15 +507,17 @@ class IngestService {
     const changedPaths = [];
     if (action === "create" || action === "keep-separate") {
       try { await fs.access(target); throw Object.assign(new Error("目标笔记已存在，需要重新查重"), { code: "INGEST_TARGET_EXISTS" }); } catch (error) { if (error.code !== "ENOENT") throw error; }
-      await fs.mkdir(path.dirname(target), { recursive: true });
-      await fs.writeFile(target, content, "utf8");
+      await atomicText(target, content);
       changedPaths.push(relative);
     } else if (action === "append-source" || action === "link-only") {
-      const existing = await fs.readFile(target, "utf8");
-      const addition = action === "append-source"
-        ? `\n\n## 收录补充 · ${state.candidate.title}\n\n${state.prepared.content || state.prepared.text}\n`
-        : `\n\n## 候选关联\n\n- 收录候选：${state.candidate.title}（Artifact ${id}）\n`;
-      await fs.writeFile(target, `${existing.trimEnd()}${addition}`, "utf8");
+      // 读-改-写需按目标串行化，避免并发收录决策互相覆盖（R3）。
+      await this.#serializeTarget(target, async () => {
+        const existing = await fs.readFile(target, "utf8");
+        const addition = action === "append-source"
+          ? `\n\n## 收录补充 · ${state.candidate.title}\n\n${state.prepared.content || state.prepared.text}\n`
+          : `\n\n## 候选关联\n\n- 收录候选：${state.candidate.title}（Artifact ${id}）\n`;
+        await atomicText(target, `${existing.trimEnd()}${addition}`);
+      });
       changedPaths.push(relative);
     }
 
@@ -566,4 +602,4 @@ class IngestService {
   }
 }
 
-export { IngestService, isAllowedIngestPath, proposalAllowsWriteJob, slug, titleFromPrepared };
+export { IngestService, isAllowedIngestPath, isAllowedExistingVaultPath, proposalAllowsWriteJob, slug, titleFromPrepared };

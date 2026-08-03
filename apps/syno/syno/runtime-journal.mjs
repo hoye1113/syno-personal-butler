@@ -85,4 +85,4 @@ class RuntimeJournal {
   }
 }
 
-export { redact, RuntimeJournal };
+export { redact, redactString, RuntimeJournal };

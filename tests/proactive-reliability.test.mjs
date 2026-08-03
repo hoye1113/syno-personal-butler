@@ -9,6 +9,7 @@ import { ProactiveOrchestrator } from "../apps/syno/syno/proactive-orchestrator.
 import { SignalEngine } from "../apps/syno/syno/signal-engine.mjs";
 import { ChannelDeliveryOutbox } from "../apps/syno/syno/channel-delivery-outbox.mjs";
 import { OwnerChannelTargetStore } from "../apps/syno/syno/proactive-reliability.mjs";
+import { createSynoRuntime, routeSynoApi } from "../apps/syno/syno/runtime.mjs";
 
 async function tempState(t, prefix) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), prefix));
@@ -717,6 +718,7 @@ test("proactive preview reports a redacted Bundle without mutating Ledger or Out
     enabled: false,
     homeChannel: "weixin",
     homeTargetAvailable: true,
+    deliveryHealth: { homeChannel: "weixin", consecutiveFailures: 0, lastDeliveryError: null, lastSeenAt: null, targetTokenAgeMs: null },
     eligibleSignals: 1,
     bundle: { bundleId: preview.bundle.bundleId, signalCount: 1, remainingCount: 0 },
   });
@@ -949,4 +951,144 @@ test("a failing onSignalsDelivered callback does not affect delivery or state", 
   // 同步抛错被吞掉：delivered 事实与 state 保存不受影响，同一信号不会重推
   await proactive.tick({ now: new Date("2026-07-30T08:35:00+08:00"), highValueEvents: [event] });
   assert.equal(messages.length, 1);
+});
+
+// 构造一个真 runtime（createSynoRuntime，全可注入），用真 drain 闭包（runtime.mjs
+// drainChannelDeliveryOutbox）验证「主动通道静默失效 → 有界兜底 + 可观测 + 跨渠道告警」。
+// 直接 outbox.enqueue 绕过信号收集，经 runtime.proactive.wakeDelivery() 反复驱动同一事件。
+async function buildDrainRuntime(t, { proactiveResult, terminalResult } = {}) {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-proactive-drain-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const clockState = { now: new Date("2026-08-02T08:00:00.000Z") };
+  const recorded = [];
+  const sent = [];
+  const acceptedUpdates = [];
+  const acceptedRequests = { async update(id, patch) { acceptedUpdates.push({ id, patch }); } };
+  const channels = {
+    homeChannel: "weixin",
+    async send(message, targets) {
+      sent.push({ source: message.source, level: message.level, deliveryKey: message.deliveryKey, targets });
+      const result = {};
+      for (const target of targets) {
+        if (message.source === "system-health") result[target] = { delivered: true };
+        else if (terminalResult && String(message.deliveryKey || "").startsWith("accepted-terminal")) result[target] = terminalResult;
+        else result[target] = proactiveResult || { delivered: false, reason: "provider_rejected" };
+      }
+      return result;
+    },
+  };
+  const outbox = new ChannelDeliveryOutbox({
+    root: path.join(root, "outbox"),
+    payloadRoot: path.join(root, "payloads"),
+    lockFile: path.join(root, "outbox.lock"),
+    clock: () => clockState.now,
+    protect: async (value) => value,
+    unprotect: async (value) => value,
+  });
+  const targets = new OwnerChannelTargetStore({
+    root: path.join(root, "targets"),
+    payloadRoot: path.join(root, "target-payloads"),
+    protect: async (value) => value,
+    unprotect: async (value) => value,
+    clock: () => clockState.now,
+  });
+  await targets.set("local-user", "weixin", { toUserId: "owner", contextToken: "ctx" });
+  const journal = { async record(event, data, settings) { recorded.push({ event, data, level: settings?.level }); return true; } };
+  const settingsRegistry = {
+    async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? true : null; },
+    async set() {},
+  };
+  const runtime = createSynoRuntime({ channels, channelDeliveryOutbox: outbox, ownerChannelTargets: targets, acceptedRequests, journal, settingsRegistry });
+  return { runtime, outbox, clockState, recorded, sent, acceptedUpdates };
+}
+
+test("a persistently rejected proactive bundle exhausts attempts to terminal and raises observable signals", async (t) => {
+  const { runtime, outbox, clockState, recorded, sent } = await buildDrainRuntime(t);
+  const enqueued = await outbox.enqueue({
+    sourceType: "proactive_bundle",
+    sourceId: "bundle-exhaust",
+    ownerKey: "local-user",
+    targetChannel: "weixin",
+    responseKind: "proactive",
+    deliveryKey: "bundle-exhaust:weixin:v1",
+    payload: { signalVersions: [{ kind: "ingest-pending", title: "x" }] },
+    dueAt: clockState.now.toISOString(),
+  });
+  // 推进 8 次投递（每次后把时钟拨过 backoff 上限 15min），第 8 次达上限转 terminal。
+  for (let i = 0; i < 8; i += 1) {
+    await runtime.proactive.wakeDelivery();
+    clockState.now = new Date(clockState.now.getTime() + 20 * 60_000);
+  }
+  const retryableEvents = recorded.filter((r) => r.event === "proactive.bundle.delivery_failed_retryable");
+  const terminalEvents = recorded.filter((r) => r.event === "proactive.bundle.delivery_failed_terminal");
+  assert.equal(retryableEvents.length, 7);
+  assert.ok(retryableEvents.every((r) => r.level === "warning"), "每次可重试失败记 warning");
+  assert.equal(terminalEvents.length, 1);
+  assert.equal(terminalEvents[0].level, "error");
+  assert.equal((await outbox.get(enqueued.event.eventId)).status, "failed_terminal");
+
+  const alerts = sent.filter((s) => s.source === "system-health");
+  assert.ok(alerts.some((s) => s.level === "error"), "达上限应跨渠道弹 error 级告警");
+
+  const health = await routeSynoApi(runtime, { method: "GET" }, new URL("http://localhost/api/syno/health"), async () => ({}));
+  assert.equal(health.deliveryConsecutiveFailures, 8);
+  assert.equal(health.deliveryOk, false);
+});
+
+test("an accepted_request final terminal delivery pushes the request to failed_terminal (no orphan)", async (t) => {
+  const { runtime, outbox, clockState, acceptedUpdates } = await buildDrainRuntime(t, { terminalResult: { retryable: false, reason: "REJECTED" } });
+  const enqueued = await outbox.enqueue({
+    sourceType: "accepted_request",
+    sourceId: "request-orphan",
+    ownerKey: "local-user",
+    targetChannel: "weixin",
+    responseKind: "final",
+    deliveryKey: "accepted-terminal-1",
+    payload: { text: "FINAL" },
+    dueAt: clockState.now.toISOString(),
+  });
+  await runtime.proactive.wakeDelivery();
+  assert.equal((await outbox.get(enqueued.event.eventId)).status, "failed_terminal");
+  assert.deepEqual(acceptedUpdates, [{ id: "request-orphan", patch: { status: "failed_terminal", claim: null } }]);
+});
+
+test("preview deliveryHealth sums consecutive failed attempts and surfaces the newest error", async (t) => {
+  const stateFile = await tempState(t, "syno-proactive-health-");
+  const root = path.dirname(stateFile);
+  const clockState = { now: new Date("2026-08-02T08:00:00.000Z") };
+  const outbox = new ChannelDeliveryOutbox({
+    root: path.join(root, "outbox"),
+    payloadRoot: path.join(root, "payloads"),
+    lockFile: path.join(root, "outbox.lock"),
+    clock: () => clockState.now,
+    protect: async (value) => value,
+    unprotect: async (value) => value,
+  });
+  const proactive = new ProactiveOrchestrator({
+    host: { async receive() { throw new Error("preview must not invoke the model"); } },
+    today: { async snapshot() { throw new Error("preview must not render user content"); } },
+    channels: { homeChannel: "weixin", async send() { throw new Error("preview must not send"); } },
+    channelDeliveryOutbox: outbox,
+    signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
+    stateFile,
+  });
+  await outbox.enqueue({
+    sourceType: "proactive_bundle",
+    sourceId: "bundle-health",
+    ownerKey: "local-user",
+    targetChannel: "weixin",
+    responseKind: "proactive",
+    deliveryKey: "bundle-health:weixin:v1",
+    payload: { signalVersions: [{ kind: "ingest-pending", title: "x" }] },
+    dueAt: clockState.now.toISOString(),
+  });
+  // 同一事件失败 3 次（attempts 累加到 3），deliveryHealth.consecutiveFailures 应为 attempts 累加值（与 health 计数器同口径）。
+  for (let i = 0; i < 3; i += 1) {
+    await outbox.deliverDue(async () => ({ retryable: true, reason: "provider_rejected" }));
+    clockState.now = new Date(clockState.now.getTime() + 20 * 60_000);
+  }
+  const preview = await proactive.preview({ now: clockState.now, highValueEvents: [] });
+  assert.equal(preview.deliveryHealth.homeChannel, "weixin");
+  assert.equal(preview.deliveryHealth.consecutiveFailures, 3);
+  assert.equal(preview.deliveryHealth.lastDeliveryError, "provider_rejected");
 });

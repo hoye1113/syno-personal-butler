@@ -142,16 +142,17 @@ const httpServer = createServer(async (req, res) => {
       return respondJson(res, runtimeNotReady(lifecycleState), 503);
     }
 
+    // Defense-in-depth default: every browser-facing /api/ mutation must be a same-origin JSON
+    // request, not only /api/syno/* — legacy /api/inbox|settings|wiki|topics|notes|memory|lark
+    // routes otherwise rely on assertLocalRequest alone, which validates Origin only when present
+    // and never requires it. The OpenCode MCP bridge is machine-to-machine JSON-RPC driven by the
+    // opencode subprocess (no browser Origin), so it stays on loopback-only and is exempt.
+    if (url.pathname.startsWith("/api/") && req.method !== "GET" && url.pathname !== "/api/syno/opencode/mcp") {
+      assertJsonMutation(req);
+      assertSameOriginMutation(req);
+    }
     if (url.pathname.startsWith("/api/syno/")) {
       const state = lifecycleState;
-      // Defense-in-depth default: every browser-facing mutation must be a same-origin JSON
-      // request, not just the three system-control endpoints. The OpenCode MCP bridge is a
-      // machine-to-machine JSON-RPC endpoint driven by the opencode subprocess (no browser
-      // Origin header), so it stays on loopback-only and is exempt.
-      if (req.method !== "GET" && url.pathname !== "/api/syno/opencode/mcp") {
-        assertJsonMutation(req);
-        assertSameOriginMutation(req);
-      }
       if (url.pathname === "/api/syno/readiness") {
         return respondJson(
           res,
@@ -314,7 +315,16 @@ async function editVaultNote(payload) {
   const workspace = legacyWorkspace.getStore()?.workspace || PATHS.repoRoot;
   const relative = optionalString(payload.path).replace(/\\/g, "/");
   if (!relative.startsWith("vault/") || !relative.endsWith(".md")) throw badRequest("只允许编辑 vault 内 Markdown");
-  const target = resolveInside(workspace, relative);
+  // Strip the literal "vault/" prefix and confine to the vault root: resolveInside only enforces
+  // containment within `workspace` (repoRoot), so a payload like "vault/../ops/x.md" would
+  // otherwise fold past vault/ and write anywhere in the repo.
+  let target;
+  try {
+    target = resolveInside(path.join(workspace, "vault"), relative.slice("vault/".length));
+  } catch (error) {
+    if (error.code === "PATH_OUTSIDE_ROOT") throw badRequest("只允许编辑 vault 内 Markdown");
+    throw error;
+  }
   const markdown = String(payload.markdown || "");
   if (!markdown || Buffer.byteLength(markdown, "utf8") > 2 * 1024 * 1024) throw badRequest("原文为空或超过 2 MB");
   if (!markdown.startsWith("---\n") && !markdown.startsWith("---\r\n")) throw badRequest("原文必须保留 frontmatter");
@@ -411,7 +421,15 @@ async function promoteMemoryProposal(payload) {
   const workspace = legacyWorkspace.getStore()?.workspace || PATHS.repoRoot;
   const relative = optionalString(payload.path).replace(/\\/g, "/");
   if (!/^ops\/memory\/proposals\/.*\.md$/i.test(relative)) throw badRequest("只允许晋升 ops/memory/proposals 内候选");
-  const sourceFile = resolveInside(workspace, relative);
+  // Confine to the proposals root: the regex's `.*` matches "../../", which resolveInside
+  // (confining only to workspace) would fold past ops/memory/proposals/.
+  let sourceFile;
+  try {
+    sourceFile = resolveInside(path.join(workspace, "ops", "memory", "proposals"), relative.slice("ops/memory/proposals/".length));
+  } catch (error) {
+    if (error.code === "PATH_OUTSIDE_ROOT") throw badRequest("只允许晋升 ops/memory/proposals 内候选");
+    throw error;
+  }
   const raw = await fs.readFile(sourceFile, "utf8");
   const parsed = parseFrontmatter(raw);
   await validateContractRecord("memory-proposal", parsed.frontmatter);
@@ -2246,7 +2264,7 @@ async function resolveTopicPath(relPath) {
   }
   const { vaultRoot, topicDir } = await getPlannerPaths();
   const resolved = path.resolve(vaultRoot, clean);
-  if (!resolved.startsWith(topicDir)) {
+  if (resolved !== topicDir && !resolved.startsWith(topicDir + path.sep)) {
     throw badRequest("非法的选题路径");
   }
   return resolved;
@@ -2439,14 +2457,14 @@ function respondJson(res, payload, status = 200) {
 
 function respondError(res, error) {
   const status = error?.statusCode || 500;
-  respondJson(
-    res,
-    {
-      ok: false,
-      error: error.message || "未知错误",
-    },
-    status,
-  );
+  if (status >= 500) {
+    // 5xx are internal failures whose messages routinely embed absolute paths,
+    // %LOCALAPPDATA% (owner username), or CLI/network detail. Log server-side and return a
+    // generic message; 4xx messages are intentional user-facing feedback (badRequest, etc.).
+    if (error?.stack) console.error("[syno] request error:", error);
+    return respondJson(res, { ok: false, error: "内部错误" }, status);
+  }
+  respondJson(res, { ok: false, error: error?.message || "未知错误" }, status);
 }
 
 function badRequest(message) {

@@ -199,7 +199,7 @@ async function waitForHealth(child, port, logs) {
 async function requestJson(port, pathname, body) {
   const payload = body ? JSON.stringify(body) : "";
   return new Promise((resolve, reject) => {
-    const req = request({ hostname: "127.0.0.1", port, path: pathname, method: body ? "POST" : "GET", headers: body ? { "content-type": "application/json", "content-length": Buffer.byteLength(payload) } : {} }, (res) => {
+    const req = request({ hostname: "127.0.0.1", port, path: pathname, method: body ? "POST" : "GET", headers: body ? { "content-type": "application/json", "content-length": Buffer.byteLength(payload), origin: `http://127.0.0.1:${port}` } : {} }, (res) => {
       let raw = ""; res.setEncoding("utf8"); res.on("data", (chunk) => { raw += chunk; });
       res.on("end", () => { try { resolve({ statusCode: res.statusCode, body: raw ? JSON.parse(raw) : null }); } catch (error) { reject(error); } });
     });

@@ -76,3 +76,24 @@ test("HermesSidecarBridge kills timed-out work and can start a clean process lat
   await assert.rejects(target.run({ runId: "run-timeout", message: "x", modelId: "fixed-model", tools }, {}), (error) => error.code === "HERMES_REQUEST_TIMEOUT");
   assert.equal((await target.health()).ready, true);
 });
+
+test("cancel is surgical: cancelling one run does not reject a concurrent run (R4)", async (t) => {
+  const target = bridge();
+  t.after(() => target.close());
+  // run A hangs on its tool call（永不 resolve，保持 pending）；run B 正常完成。
+  const runA = target.run({ runId: "run-a", message: "x", modelId: "fixed-model", tools }, {
+    onToolCall: () => new Promise(() => {}),
+  });
+  // 先挂上 runA 的拒绝处理器，避免 cancel 后、await 前出现未处理拒绝。
+  const runARejected = assert.rejects(runA, (error) => error.code === "AGENT_CANCELED");
+  // run B 的工具调用延迟 resolve，确保取消 run A 时 run B 仍在飞行中。
+  const runB = target.run({ runId: "run-b", message: "y", modelId: "fixed-model", tools }, {
+    onEvent: () => {},
+    onToolCall: ({ name, arguments: input }) => new Promise((resolve) => setTimeout(() => resolve({ name, input }), 100)),
+  });
+  await new Promise((resolve) => setTimeout(resolve, 60)); // 让两条 run 的 tool_call 都已发出
+  assert.equal(target.cancel("run-a"), true);             // 外科手术式：只取消 run A
+  const bResult = await runB;                              // run B 仍能完成 → 子进程未被连带杀死
+  assert.equal(bResult.model, "fixed-model");
+  await runARejected;
+});

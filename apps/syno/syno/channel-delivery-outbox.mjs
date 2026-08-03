@@ -207,12 +207,42 @@ class ChannelDeliveryOutbox {
     return { ...record, payload: body, deliveryTarget };
   }
 
-  async list({ sourceId, status, dueBefore, limit = 100 } = {}) {
+  async list({ sourceId, status, dueBefore, limit = 100, order = "asc" } = {}) {
     const records = await this.#listUnlocked();
     const dueMs = dueBefore ? new Date(dueBefore).getTime() : Infinity;
-    return records.filter((item) => (!sourceId || item.sourceId === sourceId)
+    const filtered = records.filter((item) => (!sourceId || item.sourceId === sourceId)
       && (!status || item.status === status)
-      && (!dueBefore || new Date(item.dueAt).getTime() <= dueMs)).slice(0, Math.max(1, Number(limit) || 100));
+      && (!dueBefore || new Date(item.dueAt).getTime() <= dueMs));
+    // #listUnlocked returns oldest-first; "desc" re-sorts newest-first BEFORE slicing so a small
+    // limit returns the newest records (not the oldest) — diagnostics (seed, deliveryHealth) rely on it.
+    const sorted = order === "desc"
+      ? filtered.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+      : filtered;
+    return sorted.slice(0, Math.max(1, Number(limit) || 100));
+  }
+
+  // Bounded retention (R7): terminal records (delivered/failed_terminal/superseded) are never
+  // re-delivered, so evicting the oldest of them keeps the outbox directory small — otherwise every
+  // drain tick re-reads+parses every file, and diagnostics that slice a small limit go stale (R2).
+  // Safe under concurrency: deliverDue's candidate filter excludes these statuses and #listUnlocked
+  // fail-closes on missing/malformed files.
+  async retain({ now = this.clock(), maxAgeMs = 14 * 24 * 60 * 60 * 1000, limit = 200 } = {}) {
+    const terminal = new Set(["delivered", "failed_terminal", "superseded"]);
+    const cutoff = new Date(now).getTime() - Math.max(0, Number(maxAgeMs) || 0);
+    const records = await this.#listUnlocked();
+    let removed = 0;
+    for (const record of records) {
+      if (removed >= limit) break;
+      if (!terminal.has(record.status)) continue;
+      const ts = new Date(record.updatedAt || record.deliveredAt || record.createdAt).getTime();
+      if (!Number.isFinite(ts) || ts > cutoff) continue;
+      await this.processLock.run(async () => {
+        try { await fs.rm(eventFile(this.root, record.eventId), { force: true }); } catch {}
+        try { if (record.payloadRef) await fs.rm(payloadFile(this.payloadRoot, record.payloadRef), { force: true }); } catch {}
+      });
+      removed += 1;
+    }
+    return { removed };
   }
 
   async findActiveProactiveTest(ownerKey, targetChannel) {
@@ -389,7 +419,7 @@ class ChannelDeliveryOutbox {
       && ["pending", "claimed", "delivery_unknown"].includes(item.status));
   }
 
-  async deliverDue(send, { now = this.clock(), limit = 100, onDelivered, onDeliveryUnknown, shouldDeliver } = {}) {
+  async deliverDue(send, { now = this.clock(), limit = 100, onDelivered, onDeliveryUnknown, onFailedRetryable, onFailedTerminal, shouldDeliver } = {}) {
     if (typeof send !== "function") throw new Error("ChannelDeliveryOutbox.deliverDue 需要发送函数");
     const max = Math.max(1, Number(limit) || 100);
     const report = { scanned: 0, delivered: 0, retryable: 0, terminal: 0, unknown: 0, superseded: 0, projected: 0, projectionFailed: 0 };
@@ -461,16 +491,16 @@ class ChannelDeliveryOutbox {
         } else if (result?.deliveryUnknown === true) {
           const unknown = await this.#settleClaim(candidate.eventId, lease, { status: "delivery_unknown", claim: null, nextAttemptAt: new Date(this.clock().getTime() + backoff(claimed.attempts, this.retryBaseMs)).toISOString(), lastErrorCode: result.reason || "DELIVERY_UNKNOWN" });
           if (unknown) {
-            await onDeliveryUnknown?.(unknown);
+            try { await onDeliveryUnknown?.(unknown); } catch { /* best-effort: settle is durable, don't abort the batch */ }
             report.unknown += 1;
           } else report.superseded += 1;
         } else if (result?.retryable !== false) {
           const settled = await this.#settleClaim(candidate.eventId, lease, { status: "failed_retryable", claim: null, dueAt: new Date(this.clock().getTime() + backoff(claimed.attempts, this.retryBaseMs)).toISOString(), lastErrorCode: result?.reason || "DELIVERY_RETRYABLE" });
-          if (settled) report.retryable += 1;
+          if (settled) { try { await onFailedRetryable?.(settled); } catch { /* best-effort: settle is durable, don't abort the batch */ } report.retryable += 1; }
           else report.superseded += 1;
         } else {
           const settled = await this.#settleClaim(candidate.eventId, lease, { status: "failed_terminal", claim: null, lastErrorCode: result?.reason || "DELIVERY_TERMINAL" });
-          if (settled) report.terminal += 1;
+          if (settled) { try { await onFailedTerminal?.(settled); } catch { /* best-effort: settle is durable, don't abort the batch */ } report.terminal += 1; }
           else report.superseded += 1;
         }
       } finally {

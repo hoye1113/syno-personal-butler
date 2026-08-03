@@ -89,6 +89,10 @@ const REPO_FINGERPRINT = createHash("sha256")
   .update(path.resolve(PATHS.repoRoot).toLocaleLowerCase("en-US"), "utf8")
   .digest("hex").slice(0, 16);
 
+const PROACTIVE_MAX_DELIVERY_ATTEMPTS = 8;
+const PROACTIVE_EARLY_WARN_ATTEMPTS = 4;
+const SYSTEM_ALERT_COOLDOWN_MS = 30 * 60 * 1000;
+
 const WORKFLOW_FILES = Object.freeze({
   capture: ["vault/99-System/Agent/ROUTER.md", "vault/99-System/Agent/INGEST-CONTRACT.md", "vault/99-System/Skills/vskill-vault-curate/SKILL.md"],
   knowledge: ["vault/99-System/Agent/ROUTER.md", "vault/99-System/Skills/vskill-vault-discuss/SKILL.md"],
@@ -244,7 +248,16 @@ function createSynoRuntime(options = {}) {
   const workflowOutbox = options.workflowOutbox || new WorkflowOutbox();
   const acceptedRequests = options.acceptedRequests || (process.env.NODE_ENV === "test" ? null : new AcceptedRequestStore());
   const acceptedRecovery = acceptedRequests
-    ? (options.acceptedRecovery || new AcceptedRequestRecoveryWorker({ store: acceptedRequests }))
+    ? (options.acceptedRecovery || new AcceptedRequestRecoveryWorker({
+      store: acceptedRequests,
+      onEscalation: (request) => recordEvent("accepted.request.recovery_escalation", {
+        requestId: request?.requestId,
+        ownerKey: request?.ownerKey,
+        originChannel: request?.originChannel,
+        attempts: Number(request?.attempts || 0),
+        lastErrorCode: request?.lastErrorCode || null,
+      }, { level: "warning" }),
+    }))
     : null;
   const channelDeliveryOutbox = options.channelDeliveryOutbox || (process.env.NODE_ENV === "test" ? null : new ChannelDeliveryOutbox());
   const ownerChannelTargets = options.ownerChannelTargets || (process.env.NODE_ENV === "test" ? null : new OwnerChannelTargetStore());
@@ -905,6 +918,20 @@ function createSynoRuntime(options = {}) {
     onMessage: (message) => channelConversationHandler.handle({ ...message, ownerKey: "local-user", threadKey: "main", channel: "feishu" }),
   });
   const channels = options.channels || new ChannelHub({ web, windows, weixin, feishu });
+  // proactive 主动通道连续投递失败计数（drain 回调增/重投成功清零）；health 探活 O(1) 读，避免每探活扫 outbox。
+  let proactiveDeliveryConsecutiveFailures = 0;
+  const systemAlertLastSentAt = new Map();
+  const notifySystemAlert = ({ title, body, level = "error" }) => {
+    const now = Date.now();
+    const key = String(level || "error");
+    const last = systemAlertLastSentAt.get(key) || 0;
+    if (now - last < SYSTEM_ALERT_COOLDOWN_MS) return { throttled: true };
+    systemAlertLastSentAt.set(key, now);
+    const alertTitle = String(title || "Syno 系统告警").slice(0, 120);
+    const alertBody = String(body || "").slice(0, 500);
+    return channels.send({ title: alertTitle, body: alertBody, source: "system-health", level: key }, ["windows", "web"])
+      .catch((error) => { recordEvent("system.alert.failed", { title: alertTitle, error: { code: error?.code, message: error?.message } }, { level: "error" }); return { delivered: false }; });
+  };
   reports = new ReportService({ host, knowledge, notifications, channels, gitGuard });
   const today = options.today || new TodayService({ goals, learning, host, settingsRegistry, signalSources, planner });
   core = new SynoCore({ host, knowledge, notifications, channels, reports, today });
@@ -960,6 +987,13 @@ function createSynoRuntime(options = {}) {
   }
   async function drainChannelDeliveryOutbox({ allowProactiveEventId = null } = {}) {
     if (!channelDeliveryOutbox || !channels) return { skipped: true };
+    // Bounded retention (R7): evict old terminal records hourly (throttled via a function property so
+    // the 1s drain timer doesn't trigger a sweep every tick). Best-effort; never blocks delivery.
+    const retentionNow = Date.now();
+    if (!drainChannelDeliveryOutbox.retainAt || retentionNow - drainChannelDeliveryOutbox.retainAt > 3600_000) {
+      drainChannelDeliveryOutbox.retainAt = retentionNow;
+      channelDeliveryOutbox.retain?.({ now: new Date(retentionNow) }).catch(() => {});
+    }
     return channelDeliveryOutbox.deliverDue(async (payload, event) => {
       let persistedTarget = null;
       if (event.sourceType === "proactive_bundle") {
@@ -993,7 +1027,12 @@ function createSynoRuntime(options = {}) {
         eventId: event.eventId,
         deliveryKey: event.deliveryKey,
       }, [event.targetChannel]);
-      return results[event.targetChannel] || { delivered: false, reason: "channel_missing" };
+      const result = results[event.targetChannel] || { delivered: false, reason: "channel_missing" };
+      if (event.sourceType === "proactive_bundle" && !result.delivered && result.retryable !== false
+          && Number(event.attempts || 0) >= PROACTIVE_MAX_DELIVERY_ATTEMPTS) {
+        return { ...result, retryable: false, reason: `PROACTIVE_DELIVERY_EXHAUSTED:${result.reason || ""}` };
+      }
+      return result;
     }, {
       onDelivered: async (event) => {
         if (event.sourceType === "accepted_request" && acceptedRequests) {
@@ -1003,6 +1042,7 @@ function createSynoRuntime(options = {}) {
             await acceptedRequests.update(event.sourceId, { ackEventId: event.eventId });
           }
         } else if (event.sourceType === "proactive_bundle") {
+          proactiveDeliveryConsecutiveFailures = 0;
           await proactive.markBundleDelivered(event.sourceId, event.eventId);
           if ((await settingsRegistry.get("notifications.proactiveTestEventId").catch(() => null)) === event.eventId) {
             await settingsRegistry.set("notifications.proactiveTestEventId", null, {
@@ -1025,6 +1065,54 @@ function createSynoRuntime(options = {}) {
           outboxEventId: event.eventId,
           status: event.status,
         }, { level: "warning" });
+      },
+      onFailedRetryable: async (event) => {
+        if (event.sourceType !== "proactive_bundle") return;
+        proactiveDeliveryConsecutiveFailures += 1;
+        const attempts = Number(event.attempts || 0);
+        await recordEvent("proactive.bundle.delivery_failed_retryable", {
+          bundleId: event.sourceId,
+          signalCount: 0,
+          channel: event.targetChannel,
+          outboxEventId: event.eventId,
+          status: event.status,
+          lastErrorCode: event.lastErrorCode,
+          attempts,
+        }, { level: "warning" });
+        if (attempts >= PROACTIVE_EARLY_WARN_ATTEMPTS) {
+          notifySystemAlert({
+            title: "Syno 主动通道异常",
+            body: `${event.targetChannel} 主动通知连续投递失败（第 ${attempts} 次）。微信给 Syno 发条消息可刷新 token 恢复。`,
+            level: "warning",
+          });
+        }
+      },
+      onFailedTerminal: async (event) => {
+        if (event.sourceType === "proactive_bundle") {
+          proactiveDeliveryConsecutiveFailures += 1;
+          await recordEvent("proactive.bundle.delivery_failed_terminal", {
+            bundleId: event.sourceId,
+            signalCount: 0,
+            channel: event.targetChannel,
+            outboxEventId: event.eventId,
+            status: event.status,
+            lastErrorCode: event.lastErrorCode,
+            attempts: Number(event.attempts || 0),
+          }, { level: "error" });
+          notifySystemAlert({
+            title: "Syno 主动通道异常",
+            body: `${event.targetChannel} 连续投递失败已达上限，主动播报暂停。微信给 Syno 发条消息可刷新 token 恢复。`,
+            level: "error",
+          });
+        } else if (event.sourceType === "accepted_request" && acceptedRequests && ["final", "decision", "recovery"].includes(event.responseKind)) {
+          await acceptedRequests.update(event.sourceId, { status: "failed_terminal", claim: null }).catch(() => {});
+          await recordEvent("accepted_request.delivery_failed_terminal", {
+            requestId: event.sourceId,
+            outboxEventId: event.eventId,
+            responseKind: event.responseKind,
+            lastErrorCode: event.lastErrorCode,
+          }, { level: "error" }).catch(() => {});
+        }
       },
       shouldDeliver: async (event) => {
         if (event.sourceType !== "proactive_bundle") return true;
@@ -1124,6 +1212,7 @@ function createSynoRuntime(options = {}) {
       return {
         state: lifecycleState,
         components: { ...componentState },
+        proactiveDeliveryConsecutiveFailures,
       };
     },
     restartOpenCode: () => startOpenCodeSecurely({ restart: true }),
@@ -1162,6 +1251,27 @@ function createSynoRuntime(options = {}) {
         if (lifecycleState === "stopping") throw Object.assign(new Error("Syno Runtime 正在停止"), { code: "RUNTIME_STOPPING" });
         componentState.store = "ready";
         await recordEvent("syno.host.recovered");
+        // 重启后用持久化 outbox 重建「主动通道连续失败」计数：计数器是进程级 let，重启归零，
+        // 否则 health.deliveryOk 会在通道仍坏时短暂假绿。口径与 live 计数器一致——从最新事件向前
+        // 累加连续失败态事件的 attempts。best-effort：扫描失败不阻断 initialize。
+        try {
+          const homeChannel = channels.homeChannel;
+          if (channelDeliveryOutbox && homeChannel) {
+            const failingStatus = new Set(["failed_retryable", "failed_terminal", "delivery_unknown"]);
+            const seeded = (await channelDeliveryOutbox.list({ limit: 200, order: "desc" }))
+              .filter((item) => item.sourceType === "proactive_bundle" && item.targetChannel === homeChannel)
+              .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+            let seed = 0;
+            for (const item of seeded) {
+              if (failingStatus.has(item.status)) seed += Number(item.attempts || 0);
+              else break;
+            }
+            proactiveDeliveryConsecutiveFailures = seed;
+            if (seed) await recordEvent("proactive.delivery.seeded_failures", { homeChannel, consecutiveFailures: seed });
+          }
+        } catch (error) {
+          await recordEvent("proactive.delivery.seed_failed", { error }, { level: "warning" }).catch(() => {});
+        }
         reconciliationWorker?.start();
         if (runtimeMode === "opencode") {
           try {
@@ -1265,11 +1375,16 @@ async function routeSynoApi(runtime, req, url, readBody) {
   const lifecycle = typeof runtime.lifecycle === "function"
     ? runtime.lifecycle()
     : { state: "ready", components: {} };
-  if (method === "GET" && url.pathname === "/api/syno/health") return {
-    ok: true, alive: true, state: lifecycle.state, product: HEALTH_PRODUCT,
-    protocolVersion: HEALTH_PROTOCOL_VERSION, repoFingerprint: REPO_FINGERPRINT,
-    now: new Date().toISOString(),
-  };
+  if (method === "GET" && url.pathname === "/api/syno/health") {
+    const consecutive = Number(lifecycle.proactiveDeliveryConsecutiveFailures) || 0;
+    return {
+      ok: true, alive: true, state: lifecycle.state, product: HEALTH_PRODUCT,
+      protocolVersion: HEALTH_PROTOCOL_VERSION, repoFingerprint: REPO_FINGERPRINT,
+      now: new Date().toISOString(),
+      deliveryOk: consecutive < PROACTIVE_EARLY_WARN_ATTEMPTS,
+      deliveryConsecutiveFailures: consecutive,
+    };
+  }
   if (method === "GET" && url.pathname === "/api/syno/readiness") return {
     ok: lifecycle.state === "ready",
     state: lifecycle.state,

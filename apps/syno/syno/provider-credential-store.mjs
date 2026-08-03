@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -44,7 +45,7 @@ function runDpapi(mode, value) {
 
 async function atomicWrite(file, value) {
   await fs.mkdir(path.dirname(file), { recursive: true });
-  const temporary = `${file}.${process.pid}.tmp`;
+  const temporary = `${file}.${process.pid}.${randomUUID().slice(0, 8)}.tmp`;
   await fs.writeFile(temporary, value, { encoding: "utf8", mode: 0o600 });
   await fs.rename(temporary, file);
   await fs.chmod(file, 0o600).catch(() => {});

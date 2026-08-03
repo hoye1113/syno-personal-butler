@@ -457,3 +457,82 @@ test("cutover between lease acquisition and claimed commit prevents the old-targ
   assert.equal((await outbox.get(created.event.eventId)).status, "superseded");
   cutover.release();
 });
+
+test("onFailedRetryable and onFailedTerminal hooks receive the settled record", async (t) => {
+  const { root, outbox, clockState } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+  const retryable = await outbox.enqueue({ ...base, sourceId: "request-retryable-hook", responseKind: "final", deliveryKey: "hook-retryable", payload: { text: "RETRYABLE" }, dueAt: clockState.now.toISOString() });
+  const retryableEvents = [];
+  await outbox.deliverDue(
+    async () => ({ retryable: true, reason: "NETWORK" }),
+    { onFailedRetryable: async (event) => retryableEvents.push([event.status, event.lastErrorCode, Number(event.attempts || 0)]) },
+  );
+  assert.deepEqual(retryableEvents, [["failed_retryable", "NETWORK", 1]]);
+  assert.equal((await outbox.get(retryable.event.eventId)).status, "failed_retryable");
+
+  const terminal = await outbox.enqueue({ ...base, sourceId: "request-terminal-hook", responseKind: "final", deliveryKey: "hook-terminal", payload: { text: "TERMINAL" }, dueAt: clockState.now.toISOString() });
+  const terminalEvents = [];
+  await outbox.deliverDue(
+    async (_payload, event) => event.sourceId === "request-terminal-hook" ? { retryable: false, reason: "WRONG_CHANNEL" } : { delivered: true },
+    { onFailedTerminal: async (event) => terminalEvents.push([event.status, event.lastErrorCode, event.sourceId]) },
+  );
+  assert.deepEqual(terminalEvents, [["failed_terminal", "WRONG_CHANNEL", "request-terminal-hook"]]);
+  assert.equal((await outbox.get(terminal.event.eventId)).status, "failed_terminal");
+});
+
+test("list order desc returns the newest records within a small limit (R2)", async (t) => {
+  const { root, outbox, clockState } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const ids = [];
+  for (let i = 0; i < 3; i += 1) {
+    clockState.now = new Date(clockState.now.getTime() + 60_000);
+    const enqueued = await outbox.enqueue({ ...base, sourceId: `r2-${i}`, responseKind: "final", deliveryKey: `r2-${i}`, payload: { text: `R2-${i}` }, dueAt: clockState.now.toISOString() });
+    ids.push(enqueued.event.eventId);
+  }
+  // oldest-first (default) with limit 2 returns the two OLDEST; desc returns the two NEWEST.
+  const asc = await outbox.list({ limit: 2 });
+  const desc = await outbox.list({ limit: 2, order: "desc" });
+  assert.deepEqual(asc.map((item) => item.eventId), [ids[0], ids[1]]);
+  assert.deepEqual(desc.map((item) => item.eventId), [ids[2], ids[1]]);
+});
+
+test("retain evicts old terminal records but keeps recent terminal and non-terminal (R7)", async (t) => {
+  const { root, outbox, clockState } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const t0 = clockState.now.getTime();
+  // Old delivered record (will age past the retention window).
+  const oldDelivered = await outbox.enqueue({ ...base, sourceId: "r7-old", responseKind: "final", deliveryKey: "r7-old", payload: { text: "OLD" }, dueAt: clockState.now.toISOString() });
+  await outbox.deliverDue(async () => ({ delivered: true }));
+  assert.equal((await outbox.get(oldDelivered.event.eventId)).status, "delivered");
+  // Advance well past the 14-day window, then add a pending + a fresh delivered record.
+  clockState.now = new Date(t0 + 20 * 86_400_000);
+  const pending = await outbox.enqueue({ ...base, sourceId: "r7-pending", responseKind: "final", deliveryKey: "r7-pending", payload: { text: "PENDING" }, dueAt: clockState.now.toISOString() });
+  const freshDelivered = await outbox.enqueue({ ...base, sourceId: "r7-fresh", responseKind: "final", deliveryKey: "r7-fresh", payload: { text: "FRESH" }, dueAt: clockState.now.toISOString() });
+  await outbox.deliverDue(
+    async () => ({ delivered: true }),
+    { shouldDeliver: async (event) => event.sourceId === "r7-fresh" },
+  );
+  assert.equal((await outbox.get(freshDelivered.event.eventId)).status, "delivered");
+  assert.equal((await outbox.get(pending.event.eventId)).status, "pending");
+
+  const result = await outbox.retain({ now: clockState.now, maxAgeMs: 14 * 86_400_000 });
+  assert.equal(result.removed, 1);
+  // evicted terminal record: get() throws ENOENT for a deleted file
+  await assert.rejects(() => outbox.get(oldDelivered.event.eventId), (error) => error.code === "ENOENT");
+  assert.equal((await outbox.get(freshDelivered.event.eventId)).status, "delivered");     // kept (recent terminal)
+  assert.equal((await outbox.get(pending.event.eventId)).status, "pending");              // kept (non-terminal)
+});
+
+test("a throwing delivery hook does not abort the rest of the drain batch (O8)", async (t) => {
+  const { root, outbox, clockState } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await outbox.enqueue({ ...base, sourceId: "o8-a", responseKind: "final", deliveryKey: "o8-a", payload: { text: "A" }, dueAt: clockState.now.toISOString() });
+  await outbox.enqueue({ ...base, sourceId: "o8-b", responseKind: "final", deliveryKey: "o8-b", payload: { text: "B" }, dueAt: clockState.now.toISOString() });
+  // The hook throws on every call; both events must still settle and the drain must resolve.
+  const report = await outbox.deliverDue(
+    async () => ({ retryable: true, reason: "NETWORK" }),
+    { onFailedRetryable: async () => { throw new Error("hook blew up"); } },
+  );
+  assert.equal(report.retryable, 2);
+});

@@ -2,6 +2,8 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import readline from "node:readline";
 
+import { redactString } from "./runtime-journal.mjs";
+
 function runtimeError(code, message, { retryable = false } = {}) {
   return Object.assign(new Error(message), { code, retryable });
 }
@@ -83,16 +85,18 @@ class HermesSidecarBridge {
           modelId: provider.modelId,
           contextLength: provider.contextLength,
         },
-      }, this.requestTimeoutMs);
+      }, this.requestTimeoutMs, { runId: payload.runId });
     } finally {
       this.runs.delete(payload.runId);
     }
   }
 
   cancel(runId) {
-    if (!this.child || !this.runs.has(runId)) return false;
-    const error = runtimeError("AGENT_CANCELED", "Hermes run canceled");
-    this.#terminate(error);
+    if (!this.runs.has(runId)) return false;
+    // 外科手术式取消：只拒绝该 run 自己的挂起请求，不动共享子进程，也不波及其它 run / health 握手（R4）。
+    // 被取消的 run 在子进程侧仍会跑完，但其回包因 pending 已删而被忽略；若子进程真正卡死，下一次 run 的超时仍会触发整体回收。
+    this.#rejectRun(runId, runtimeError("AGENT_CANCELED", "Hermes run canceled"));
+    this.runs.delete(runId);
     return true;
   }
 
@@ -122,7 +126,8 @@ class HermesSidecarBridge {
     child.stdin.on("error", () => {});
     readline.createInterface({ input: child.stdout }).on("line", (line) => this.#receive(line));
     readline.createInterface({ input: child.stderr }).on("line", (line) => {
-      let sanitized = String(line).replace(/Bearer\s+\S+/giu, "Bearer [REDACTED]");
+      // 复用 runtime-journal 的综合 redactString（Bearer/sk-/JWT/PEM/query/token= 等），再叠加实际 apiKey（O6）。
+      let sanitized = redactString(String(line));
       for (const secret of this.secrets) sanitized = sanitized.replaceAll(secret, "[REDACTED]");
       sanitized = sanitized.slice(0, 2_000);
       this.stderrTail.push(sanitized);
@@ -137,7 +142,7 @@ class HermesSidecarBridge {
     return child;
   }
 
-  async #request(type, payload, timeoutMs) {
+  async #request(type, payload, timeoutMs, { runId = null } = {}) {
     await this.#ensureProcess();
     const requestId = `bridge-${randomUUID()}`;
     return new Promise((resolve, reject) => {
@@ -146,7 +151,7 @@ class HermesSidecarBridge {
         this.#terminate(error);
       }, timeoutMs);
       timer.unref?.();
-      this.pending.set(requestId, { resolve, reject, timer });
+      this.pending.set(requestId, { resolve, reject, timer, runId });
       try {
         this.#write({ type, requestId, ...payload });
       } catch (error) {
@@ -157,7 +162,20 @@ class HermesSidecarBridge {
     });
   }
 
+  // 只拒绝某个 run 的挂起请求（用于外科手术式 cancel），不影响其它 pending 或子进程。
+  #rejectRun(runId, error) {
+    for (const [requestId, pending] of this.pending) {
+      if (pending.runId !== runId) continue;
+      clearTimeout(pending.timer);
+      this.pending.delete(requestId);
+      pending.reject(error);
+    }
+  }
+
   #receive(line) {
+    // 子进程已关闭/替换时，丢弃其迟到输出——外科手术式 cancel 不再杀子进程，
+    // close() 置空 this.child 后仍可能有缓冲行到达，处理它们会触发对空 child 的写（R4）。
+    if (!this.child) return;
     let message;
     try {
       message = JSON.parse(line);
@@ -168,18 +186,18 @@ class HermesSidecarBridge {
     if (message.type === "tool_call") {
       if (!this.allowedToolNames.has(String(message.name))) {
         const error = runtimeError("HERMES_TOOL_NOT_ALLOWED", `Hermes 请求了未授权工具：${String(message.name).slice(0, 100)}`);
-        this.#write({ type: "tool_result", callId: message.callId, ok: false, error: { code: error.code, message: error.message } });
+        this.#writeSafe({ type: "tool_result", callId: message.callId, ok: false, error: { code: error.code, message: error.message } });
         this.#terminate(error);
         return;
       }
       const callbacks = this.runs.get(message.runId);
       if (!callbacks?.onToolCall) {
-        this.#write({ type: "tool_result", callId: message.callId, ok: false, error: { code: "TOOL_PROXY_UNAVAILABLE", message: "工具代理不可用" } });
+        this.#writeSafe({ type: "tool_result", callId: message.callId, ok: false, error: { code: "TOOL_PROXY_UNAVAILABLE", message: "工具代理不可用" } });
         return;
       }
       Promise.resolve(callbacks.onToolCall({ name: message.name, arguments: message.arguments || {} }))
-        .then((result) => this.#write({ type: "tool_result", callId: message.callId, ok: true, result }))
-        .catch((error) => this.#write({ type: "tool_result", callId: message.callId, ok: false, error: { code: error.code || "TOOL_PROXY_FAILED", message: String(error.message || "工具调用失败").slice(0, 500) } }));
+        .then((result) => this.#writeSafe({ type: "tool_result", callId: message.callId, ok: true, result }))
+        .catch((error) => this.#writeSafe({ type: "tool_result", callId: message.callId, ok: false, error: { code: error.code || "TOOL_PROXY_FAILED", message: String(error.message || "工具调用失败").slice(0, 500) } }));
       return;
     }
     if (message.type === "event") {
@@ -199,6 +217,12 @@ class HermesSidecarBridge {
 
   #write(message) {
     if (!this.child) throw runtimeError("HERMES_PROCESS_MISSING", "Hermes sidecar 未运行", { retryable: true });
+    this.#writeTo(this.child, message);
+  }
+
+  // best-effort 写：用于回传给子进程的 tool_result。子进程已退出/替换时静默丢弃，不抛错（R4）。
+  #writeSafe(message) {
+    if (!this.child) return;
     this.#writeTo(this.child, message);
   }
 

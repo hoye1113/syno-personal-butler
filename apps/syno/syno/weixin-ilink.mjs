@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 
 import { PATHS, resolveInside } from "./paths.mjs";
 import { runDpapi } from "./provider-credential-store.mjs";
+import { redactString } from "./runtime-journal.mjs";
 
 const DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com/";
 const DEFAULT_CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c/";
@@ -64,7 +65,7 @@ async function fetchJson(url, options = {}, timeoutMs = 20_000) {
   try {
     const response = await fetch(url, { ...options, signal: controller.signal, redirect: "error" });
     const text = await response.text();
-    if (!response.ok) throw new Error(`iLink HTTP ${response.status}: ${text.slice(0, 200)}`);
+    if (!response.ok) throw new Error(`iLink HTTP ${response.status}: ${redactString(text).slice(0, 200)}`);
     return JSON.parse(text);
   } finally {
     clearTimeout(timer);
@@ -142,7 +143,7 @@ class WeixinIlinkClient {
 
 async function atomicWrite(file, value) {
   await fs.mkdir(path.dirname(file), { recursive: true });
-  const temporary = `${file}.${process.pid}.tmp`;
+  const temporary = `${file}.${process.pid}.${randomUUID().slice(0, 8)}.tmp`;
   await fs.writeFile(temporary, value, { encoding: "utf8", mode: 0o600 });
   await fs.rename(temporary, file);
   await fs.chmod(file, 0o600).catch(() => {});
