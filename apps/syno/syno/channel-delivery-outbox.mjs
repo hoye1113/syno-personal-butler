@@ -40,6 +40,21 @@ function eventFile(root, id) { return path.join(root, `${id}.json`); }
 function payloadFile(root, ref) { return path.join(root, `${ref}.dpapi`); }
 function leaseFile(root, id) { return path.join(root, `${id}.lease`); }
 
+// 聚合主动通道连续投递失败。records 须已按 createdAt desc 排序、且已限定到目标 channel/sourceType
+// （用 list({sourceType,targetChannel,order:"desc"}) 取）。从最新向前累加连续失败态事件的 attempts，遇到
+// 首个非失败态即停——与 runtime 进程级计数器同口径（每次失败 settle 既 +1 计数器又 +1 attempts，故 Σattempts == 计数器）。
+const DELIVERY_FAILING_STATUS = new Set(["failed_retryable", "failed_terminal", "delivery_unknown"]);
+function aggregateDeliveryFailures(records) {
+  let consecutiveFailures = 0;
+  let lastDeliveryError = null;
+  for (const item of records || []) {
+    if (!DELIVERY_FAILING_STATUS.has(item.status)) break;
+    consecutiveFailures += Number(item.attempts || 0);
+    if (!lastDeliveryError && item.lastErrorCode) lastDeliveryError = item.lastErrorCode;
+  }
+  return { consecutiveFailures, lastDeliveryError };
+}
+
 class ChannelDeliveryOutbox {
   constructor({
     root = path.join(PATHS.stateRoot, "channel-outbox"),
@@ -207,10 +222,14 @@ class ChannelDeliveryOutbox {
     return { ...record, payload: body, deliveryTarget };
   }
 
-  async list({ sourceId, status, dueBefore, limit = 100, order = "asc" } = {}) {
+  async list({ sourceId, sourceType, targetChannel, status, dueBefore, limit = 100, order = "asc" } = {}) {
     const records = await this.#listUnlocked();
     const dueMs = dueBefore ? new Date(dueBefore).getTime() : Infinity;
+    // sourceType/targetChannel 过滤在切片前完成：诊断（seed、deliveryHealth）按这两个维度限定后再取
+    // 最新 N 条，避免被其它类型的海量事件挤出 limit 窗口导致假绿。
     const filtered = records.filter((item) => (!sourceId || item.sourceId === sourceId)
+      && (!sourceType || item.sourceType === sourceType)
+      && (!targetChannel || item.targetChannel === targetChannel)
       && (!status || item.status === status)
       && (!dueBefore || new Date(item.dueAt).getTime() <= dueMs));
     // #listUnlocked returns oldest-first; "desc" re-sorts newest-first BEFORE slicing so a small
@@ -512,4 +531,4 @@ class ChannelDeliveryOutbox {
   }
 }
 
-export { CHANNEL_DELIVERY_OUTBOX_VERSION, ChannelDeliveryOutbox, canonicalize, digest };
+export { CHANNEL_DELIVERY_OUTBOX_VERSION, ChannelDeliveryOutbox, aggregateDeliveryFailures, canonicalize, digest };

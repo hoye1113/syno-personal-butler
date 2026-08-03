@@ -50,3 +50,28 @@ test("prune skips a corrupt conversation file without aborting the sweep (O9)", 
   // 损坏文件原样保留（prune 只跳过，不删未知文件）。
   await assert.doesNotReject(fs.access(path.join(root, "conv-corrupt.json")));
 });
+
+test("prune is serialized with append — no message lost when prune trims an active conversation (R6 补齐)", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-conv-prune-r6-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const store = new ConversationStore({ root, clock: () => new Date("2026-08-02T00:00:00.000Z") });
+  // 活跃会话，首条消息带「已过期」的 rawVoice —— 让 prune 的 changed=true 并写回该活跃会话文件
+  // （prune 只删除终态会话；活跃会话仅在需裁剪时写回）。这正是历史上能与 append 交错覆盖、丢消息的写入路径。
+  await store.save({
+    id: "conv-prune", status: "active", channel: "web", updatedAt: "2026-08-02T00:00:00.000Z",
+    messages: [{ role: "user", content: "m0", rawVoice: { confirmedAt: "2020-01-01T00:00:00.000Z", text: "hi" } }],
+    archive: [], summaries: [], compactionLog: [],
+  });
+  // 并发：prune 与多次 append 同时发起。串行化后两者按序落地、互不覆盖。
+  const N = 10;
+  await Promise.all([
+    store.prune(),
+    ...Array.from({ length: N }, (_, i) => store.append("conv-prune", { role: "assistant", content: `msg-${i}` })),
+  ]);
+  const after = await store.get("conv-prune");
+  // 所有 append 的消息都在（没有被 prune 的陈旧写回覆盖）。
+  const contents = after.messages.map((m) => m.content);
+  for (let i = 0; i < N; i += 1) assert.ok(contents.includes(`msg-${i}`), `缺失 msg-${i}`);
+  // prune 的裁剪也生效（过期 rawVoice 被删）。
+  assert.equal(after.messages.find((m) => m.content === "m0").rawVoice, undefined);
+});

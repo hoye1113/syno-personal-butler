@@ -171,51 +171,12 @@ class ConversationStore {
         }
         continue;
       }
-      // 单文件隔离：损坏/无法解析的会话文件只跳过该文件并记录，不中断整轮 prune（O9）。
+      // 单文件隔离 + 与 mutator 互斥：每个会话的读-改-写在 #serialize(id) 内完成，避免与并发
+      // append/addSummary 交错覆盖丢消息（R6 补齐 prune 这条写入路径）。损坏/无法解析的文件只跳过并记录（O9）。
+      const id = entry.name.slice(0, -".json".length);
       try {
-        const value = JSON.parse(await fs.readFile(file, "utf8"));
-        let changed = false;
-        for (const message of value.messages || []) {
-          const voice = message.rawVoice;
-          if (!voice || !voice.confirmedAt) continue;
-          if (this.clock().getTime() - new Date(voice.confirmedAt).getTime() <= this.retention.confirmedVoiceDays * DAY_MS) continue;
-          delete message.rawVoice;
-          changed = true;
-        }
-        const keptArchive = (value.archive || []).filter((message) => {
-          if (!message.archivedAt) return true;
-          return this.clock().getTime() - new Date(message.archivedAt).getTime() <= this.retention.archivedDays * DAY_MS;
-        });
-        if (keptArchive.length !== (value.archive || []).length) {
-          value.archive = keptArchive;
-          changed = true;
-        }
-        // 元数据滚动上限：长对话的 compactionLog/summaries 有界，避免主文件无限膨胀（STORE 3.2）
-        const log = Array.isArray(value.compactionLog) ? value.compactionLog : [];
-        if (log.length > this.retention.compactionLogMax) {
-          value.compactionLog = log.slice(log.length - this.retention.compactionLogMax);
-          changed = true;
-        }
-        const summaries = Array.isArray(value.summaries) ? value.summaries : [];
-        if (summaries.length > this.retention.summariesMax) {
-          value.summaries = summaries.slice(summaries.length - this.retention.summariesMax);
-          changed = true;
-        }
-        if (!["completed", "failed", "archived"].includes(value.status)) {
-          if (changed) await atomicJson(file, value);
-          continue;
-        }
-        const days = value.status === "failed" ? this.retention.failedPayloadDays
-          : value.status === "archived" ? this.retention.archivedConvDays
-          : this.retention.completedChatDays;
-        if (this.clock().getTime() - new Date(value.updatedAt).getTime() <= days * DAY_MS) {
-          if (changed) await atomicJson(file, value);
-          continue;
-        }
-        await fs.rm(file, { force: true });
-        await fs.rm(path.join(this.root, this.#archiveFile(value.id)), { force: true }); // 连带删除外置 archive
-        removed.push(value.id);
-        continue;
+        const removedId = await this.#serialize(id, () => this.#pruneConversation(file));
+        if (removedId) removed.push(removedId);
       } catch (error) {
         if (error.code === "ENOENT") continue; // 本轮被并发删除，跳过
         console.warn(`[syno] prune 跳过无法处理的会话文件：${entry.name}`, error?.message || error);
@@ -223,6 +184,53 @@ class ConversationStore {
       }
     }
     return removed;
+  }
+
+  // 单个会话的裁剪/删除；在 #serialize(id) 内调用，故与 append/addSummary 等互斥。
+  // 返回被删除的会话 id（终态且过期时），否则返回 null；ENOENT/解析失败向上抛，由 prune 外层处理。
+  async #pruneConversation(file) {
+    const value = JSON.parse(await fs.readFile(file, "utf8"));
+    let changed = false;
+    for (const message of value.messages || []) {
+      const voice = message.rawVoice;
+      if (!voice || !voice.confirmedAt) continue;
+      if (this.clock().getTime() - new Date(voice.confirmedAt).getTime() <= this.retention.confirmedVoiceDays * DAY_MS) continue;
+      delete message.rawVoice;
+      changed = true;
+    }
+    const keptArchive = (value.archive || []).filter((message) => {
+      if (!message.archivedAt) return true;
+      return this.clock().getTime() - new Date(message.archivedAt).getTime() <= this.retention.archivedDays * DAY_MS;
+    });
+    if (keptArchive.length !== (value.archive || []).length) {
+      value.archive = keptArchive;
+      changed = true;
+    }
+    // 元数据滚动上限：长对话的 compactionLog/summaries 有界，避免主文件无限膨胀（STORE 3.2）
+    const log = Array.isArray(value.compactionLog) ? value.compactionLog : [];
+    if (log.length > this.retention.compactionLogMax) {
+      value.compactionLog = log.slice(log.length - this.retention.compactionLogMax);
+      changed = true;
+    }
+    const summaries = Array.isArray(value.summaries) ? value.summaries : [];
+    if (summaries.length > this.retention.summariesMax) {
+      value.summaries = summaries.slice(summaries.length - this.retention.summariesMax);
+      changed = true;
+    }
+    if (!["completed", "failed", "archived"].includes(value.status)) {
+      if (changed) await atomicJson(file, value);
+      return null;
+    }
+    const days = value.status === "failed" ? this.retention.failedPayloadDays
+      : value.status === "archived" ? this.retention.archivedConvDays
+      : this.retention.completedChatDays;
+    if (this.clock().getTime() - new Date(value.updatedAt).getTime() <= days * DAY_MS) {
+      if (changed) await atomicJson(file, value);
+      return null;
+    }
+    await fs.rm(file, { force: true });
+    await fs.rm(path.join(this.root, this.#archiveFile(value.id)), { force: true }); // 连带删除外置 archive
+    return value.id;
   }
 
   async markVoiceConfirmed(id, messageIndex, confirmedAt = this.clock().toISOString()) {

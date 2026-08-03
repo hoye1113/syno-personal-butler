@@ -5,6 +5,7 @@ import path from "node:path";
 import { PATHS } from "./paths.mjs";
 import { ProcessFileLock } from "./process-lock.mjs";
 import { SignalEngine, localDateKey } from "./signal-engine.mjs";
+import { aggregateDeliveryFailures } from "./channel-delivery-outbox.mjs";
 import { PROACTIVE_RESPONSE_KIND, buildProactiveBundle, normalizeState, signalIdentity } from "./proactive-reliability.mjs";
 
 const DEFAULT_QUIET_HOURS = Object.freeze({ start: "22:30", end: "07:30" });
@@ -690,23 +691,13 @@ class ProactiveOrchestrator {
   //   ——与 runtime 进程级计数器（health.deliveryConsecutiveFailures）同口径：连续失败投递次数（非失败事件数）；
   // lastDeliveryError = 最近一条 lastErrorCode；targetTokenAgeMs = 持久 target token 自更新以来的毫秒数（指向 token 过期根因，下界 0）。
   async #deliveryHealth(homeChannel, now = this.clock()) {
-    const FAILING = new Set(["failed_retryable", "failed_terminal", "delivery_unknown"]);
     let consecutiveFailures = 0;
     let lastDeliveryError = null;
     let lastSeenAt = null;
     try {
-      const items = await this.channelDeliveryOutbox?.list?.({ limit: 200, order: "desc" }) || [];
-      const scoped = items
-        .filter((item) => item.targetChannel === homeChannel && item.sourceType === "proactive_bundle")
-        .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
-      for (const item of scoped) {
-        if (FAILING.has(item.status)) {
-          consecutiveFailures += Number(item.attempts || 0);
-          if (!lastDeliveryError && item.lastErrorCode) lastDeliveryError = item.lastErrorCode;
-        } else {
-          break;
-        }
-      }
+      // list 在服务端按 sourceType/targetChannel 过滤后再切片，避免被其它类型事件挤出窗口导致假绿。
+      const scoped = await this.channelDeliveryOutbox?.list?.({ limit: 200, order: "desc", sourceType: "proactive_bundle", targetChannel: homeChannel }) || [];
+      ({ consecutiveFailures, lastDeliveryError } = aggregateDeliveryFailures(scoped));
       if (scoped.length) lastSeenAt = scoped[0].updatedAt || scoped[0].createdAt || null;
     } catch {
       // best-effort：outbox 不可用时返回空诊断，不阻断 preview

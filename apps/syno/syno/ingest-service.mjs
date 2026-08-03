@@ -194,8 +194,13 @@ async function atomicJson(file, value) {
 async function atomicText(file, content) {
   await fs.mkdir(path.dirname(file), { recursive: true });
   const temporary = `${file}.${process.pid}.${randomUUID().slice(0, 8)}.tmp`;
-  await fs.writeFile(temporary, content, "utf8");
-  await fs.rename(temporary, file);
+  try {
+    await fs.writeFile(temporary, content, "utf8");
+    await fs.rename(temporary, file);
+  } catch (error) {
+    await fs.rm(temporary, { force: true }).catch(() => {}); // rename 失败时清理残留 tmp
+    throw error;
+  }
 }
 
 class IngestService {
@@ -506,8 +511,11 @@ class IngestService {
     const content = `---\ntitle: ${JSON.stringify(state.candidate.title)}\ntags: ${JSON.stringify(canonicalTags)}\ncreated: ${String(state.created).slice(0, 10)}\nsource: ${JSON.stringify(sourceRef)}\ndescription: ${JSON.stringify(description)}\nknowledge_state: captured\nlink_status: ${relations.length ? "connected" : "orphan"}\n${genericSource}${specialized}source_kind: ${descriptor.kind}\nsource_reliability: ${descriptor.reliability}\nsource_verification: ${descriptor.verificationStatus}\n${sourceUrl}${sourceDigest}${sourceFileDigest}---\n\n# ${state.candidate.title}\n\n${noteBody}\n\n## 关系状态\n\n${renderRelations(relations)}\n`;
     const changedPaths = [];
     if (action === "create" || action === "keep-separate") {
-      try { await fs.access(target); throw Object.assign(new Error("目标笔记已存在，需要重新查重"), { code: "INGEST_TARGET_EXISTS" }); } catch (error) { if (error.code !== "ENOENT") throw error; }
-      await atomicText(target, content);
+      // 「存在性检查 + 写」也按目标串行化，避免并发同路径新建的 TOCTOU（两者都见 ENOENT 后互相覆盖）（R3 补齐）。
+      await this.#serializeTarget(target, async () => {
+        try { await fs.access(target); throw Object.assign(new Error("目标笔记已存在，需要重新查重"), { code: "INGEST_TARGET_EXISTS" }); } catch (error) { if (error.code !== "ENOENT") throw error; }
+        await atomicText(target, content);
+      });
       changedPaths.push(relative);
     } else if (action === "append-source" || action === "link-only") {
       // 读-改-写需按目标串行化，避免并发收录决策互相覆盖（R3）。

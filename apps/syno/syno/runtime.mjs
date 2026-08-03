@@ -62,7 +62,7 @@ import { WorkflowContextCompiler } from "./workflow-context-compiler.mjs";
 import { WorkflowOutbox } from "./workflow-outbox.mjs";
 import { AcceptedRequestStore } from "./accepted-request-store.mjs";
 import { AcceptedRequestRecoveryWorker } from "./accepted-request-recovery.mjs";
-import { ChannelDeliveryOutbox } from "./channel-delivery-outbox.mjs";
+import { ChannelDeliveryOutbox, aggregateDeliveryFailures } from "./channel-delivery-outbox.mjs";
 import { MobileDeliveryMode } from "./mobile-delivery-mode.mjs";
 import { OwnerChannelTargetStore } from "./proactive-reliability.mjs";
 import { EffectReceiptStore } from "./effect-receipt-store.mjs";
@@ -1257,15 +1257,9 @@ function createSynoRuntime(options = {}) {
         try {
           const homeChannel = channels.homeChannel;
           if (channelDeliveryOutbox && homeChannel) {
-            const failingStatus = new Set(["failed_retryable", "failed_terminal", "delivery_unknown"]);
-            const seeded = (await channelDeliveryOutbox.list({ limit: 200, order: "desc" }))
-              .filter((item) => item.sourceType === "proactive_bundle" && item.targetChannel === homeChannel)
-              .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
-            let seed = 0;
-            for (const item of seeded) {
-              if (failingStatus.has(item.status)) seed += Number(item.attempts || 0);
-              else break;
-            }
+            // list 在服务端按 sourceType/targetChannel 过滤后再切片，避免被其它类型事件挤出窗口导致假绿。
+            const scoped = await channelDeliveryOutbox.list({ limit: 200, order: "desc", sourceType: "proactive_bundle", targetChannel: homeChannel });
+            const { consecutiveFailures: seed } = aggregateDeliveryFailures(scoped);
             proactiveDeliveryConsecutiveFailures = seed;
             if (seed) await recordEvent("proactive.delivery.seeded_failures", { homeChannel, consecutiveFailures: seed });
           }

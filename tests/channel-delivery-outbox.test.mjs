@@ -536,3 +536,17 @@ test("a throwing delivery hook does not abort the rest of the drain batch (O8)",
   );
   assert.equal(report.retryable, 2);
 });
+
+test("list filters by sourceType/targetChannel server-side before slicing", async (t) => {
+  const { root, outbox, clockState } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  // 先入一条 proactive_bundle（较旧），再入一条 accepted_request（较新）。
+  clockState.now = new Date("2026-07-29T00:01:00.000Z");
+  const older = await outbox.enqueue({ ...base, sourceType: "proactive_bundle", sourceId: "pb-old", responseKind: "final", deliveryKey: "pb-old", payload: { text: "PB" }, dueAt: clockState.now.toISOString() });
+  clockState.now = new Date("2026-07-29T00:02:00.000Z");
+  await outbox.enqueue({ ...base, sourceType: "accepted_request", sourceId: "ar-new", responseKind: "final", deliveryKey: "ar-new", payload: { text: "AR" }, dueAt: clockState.now.toISOString() });
+  // limit:1 + sourceType:proactive_bundle：服务端先过滤再切片 → 返回那条较旧的 proactive 事件；
+  // 若过滤发生在切片之后（旧行为），最新 1 条是 accepted_request，过滤后为空。
+  const scoped = await outbox.list({ limit: 1, order: "desc", sourceType: "proactive_bundle", targetChannel: "weixin" });
+  assert.deepEqual(scoped.map((item) => item.eventId), [older.event.eventId]);
+});

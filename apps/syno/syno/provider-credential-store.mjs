@@ -46,8 +46,13 @@ function runDpapi(mode, value) {
 async function atomicWrite(file, value) {
   await fs.mkdir(path.dirname(file), { recursive: true });
   const temporary = `${file}.${process.pid}.${randomUUID().slice(0, 8)}.tmp`;
-  await fs.writeFile(temporary, value, { encoding: "utf8", mode: 0o600 });
-  await fs.rename(temporary, file);
+  try {
+    await fs.writeFile(temporary, value, { encoding: "utf8", mode: 0o600 });
+    await fs.rename(temporary, file);
+  } catch (error) {
+    await fs.rm(temporary, { force: true }).catch(() => {}); // rename 失败时清理残留 tmp
+    throw error;
+  }
   await fs.chmod(file, 0o600).catch(() => {});
 }
 
