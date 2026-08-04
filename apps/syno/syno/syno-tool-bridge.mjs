@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { inspectRemoteContent } from "./sensitive-content.mjs";
+import { serializeForMcp } from "./tool-result-serializer.mjs";
 
 function toolInvocationKey({ ownerKey, threadKey, messageId, toolName }) {
   return createHash("sha256")
@@ -53,9 +54,10 @@ const BRIDGE_TOOL_NAMES = new Set([
 ]);
 
 class SynoToolBridge {
-  constructor({ tools, token, ownerKey = "local-user", onResult = async () => {}, isRuntimeReady = () => true, effectReceipts = null, reconciliationCases = null } = {}) {
+  constructor({ tools, token, ownerKey = "local-user", onResult = async () => {}, isRuntimeReady = () => true, effectReceipts = null, reconciliationCases = null, charLimit = null } = {}) {
     if (!tools || !token) throw new Error("SynoToolBridge 缺少 ToolRegistry 或进程级 Token");
     this.tools = tools;
+    this.charLimit = charLimit;
     this.token = token;
     this.ownerKey = ownerKey;
     this.onResult = onResult;
@@ -165,8 +167,7 @@ class SynoToolBridge {
           const replay = {
             ...response,
             result: {
-              content: [{ type: "text", text: JSON.stringify(cached) }],
-              structuredContent: cached,
+              ...serializeForMcp(cached, { charLimit: this.charLimit }),
               directEffect: stored.directEffect,
               businessOutcome: stored.businessOutcome,
               isError: false,
@@ -194,10 +195,9 @@ class SynoToolBridge {
         allowAgentSettings: true,
         allowWrites: false,
       });
-      const serializedResult = JSON.stringify(result);
-      if (!inspectRemoteContent(serializedResult).safe) {
-        throw bridgeError("REMOTE_TOOL_RESULT_BLOCKED", "工具结果可能包含凭据或敏感信息，已阻止发送到远程模型");
-      }
+      // 序列化（脱敏 + structuredContent 契约）前置到 commit 之前：不合规结果不落盘。
+      // onResult / effectReceipts.commit 仍接收原始 result（见不变量）。
+      const egress = serializeForMcp(result, { charLimit: this.charLimit });
       await this.onResult({ tool: definition, result, ...active });
       const directEffect = definition.risk === "read"
         ? { status: "no_effect", type: definition.name, sourceType: null, sourceId: null, toolInvocationKey: toolInvocation || null, occurredAt: null }
@@ -207,8 +207,7 @@ class SynoToolBridge {
       const success = {
         ...response,
         result: {
-          content: [{ type: "text", text: serializedResult }],
-          structuredContent: result,
+          ...egress,
           directEffect,
           businessOutcome,
           isError: false,

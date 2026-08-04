@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { assertCognitiveCapabilities } from "./cognitive-runtime.mjs";
+import { redactResultObject } from "./tool-result-serializer.mjs";
 
 const CONTROL_COMMAND = /^\s*\/[\p{L}\p{N}_-]+\b/iu;
 
@@ -76,11 +77,15 @@ class HermesCognitiveRuntime {
       }, {
         signal: context.signal,
         onEvent: emit,
-        onToolCall: async ({ name, arguments: input }) => this.tools.execute(name, input || {}, {
-          channel: context.channel || "web", ownerId: context.ownerId || "local-user",
-          conversationId: context.conversationId, allowWrites: false,
-          allowJobSubmission: true, allowAgentSettings: true,
-        }),
+        onToolCall: async ({ name, arguments: input }) => {
+          const result = await this.tools.execute(name, input || {}, {
+            channel: context.channel || "web", ownerId: context.ownerId || "local-user",
+            conversationId: context.conversationId, allowWrites: false,
+            allowJobSubmission: true, allowAgentSettings: true,
+          });
+          // 保对象契约（外层 adapter 期望对象）；unsafe 时返回 {ok:false,error} stub。
+          return redactResultObject(result);
+        },
       });
       if (result?.model !== this.fixedModelId) {
         const error = new Error("Hermes 返回了非固定 Model ID");

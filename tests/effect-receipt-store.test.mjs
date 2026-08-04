@@ -73,6 +73,47 @@ test("SynoToolBridge uses durable receipts across bridge instances and never rep
   assert.equal(executions, 1);
 });
 
+test("Replay branch routes an array-shaped committed result through the serializer (no structuredContent)", async (t) => {
+  // 锁定 bridge 重放分支（syno-tool-bridge.mjs:170 serializeForMcp(cached)）：
+  // 跨重启幂等重放时，无论 commit 存了什么形状的 result，都不能回放数组型 structuredContent——
+  // 否则 OpenCode chat-message 层 tool_result.structuredContent 再次以 invalid_type 拒绝，
+  // 原始 bug 在「同一调用身份二次命中 committed」时间歇复现。
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-effect-replay-array-"));
+  t.after(() => cleanup(root));
+  const store = makeStore(root);
+  let executions = 0;
+  const tools = new ToolRegistry([{
+    name: "settings.adjust", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1",
+    agentAdjustableBoundary: true,
+    inputSchema: { type: "object", required: ["key"], properties: { key: { type: "string" } }, additionalProperties: false },
+    outputSchema: { type: "array", items: { type: "object" } },
+    // 故意让写工具返回顶层数组：验证重放分支对任意 result 形状都经 serializeForMcp 正确降级
+    // （serializer 以运行时值 isPlainObject(result) 判定，而非声明 outputSchema）。
+    execute: async () => { executions += 1; return [{ key: "quiet", changed: true }]; },
+  }]);
+  const call = (id) => ({ authorization: "Bearer secret", body: { jsonrpc: "2.0", id, method: "tools/call", params: { name: "settings_adjust", arguments: { key: "quiet" } } } });
+  const makeBridge = () => new SynoToolBridge({ tools, token: "secret", effectReceipts: store });
+  const first = makeBridge();
+  const release1 = first.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-replay-array", allowedTools: ["settings_adjust"] });
+  const committed = await first.handle(call(1));
+  release1();
+  assert.equal(committed.result.directEffect.status, "committed");
+  // 新 bridge 实例（模拟跨重启）：同 toolInvocationKey 命中 committed → 走重放分支。
+  const second = makeBridge();
+  const release2 = second.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-replay-array", allowedTools: ["settings_adjust"] });
+  const replay = await second.handle(call(2));
+  release2();
+  assert.equal(executions, 1); // 重放不重复执行写副作用
+  assert.equal(replay.result.isError, false);
+  // 数组型 cached → serializeForMcp 不产 structuredContent；完整数组仍走 content text（LLM 读到的内容不变）。
+  assert.equal("structuredContent" in replay.result, false);
+  assert.equal(replay.result.content[0].type, "text");
+  const replayed = JSON.parse(replay.result.content[0].text);
+  assert.ok(Array.isArray(replayed));
+  // effect store 落盘前 canonicalize 会按字母序排 key；用 deepEqual 比对象（属性序无关）而非比原始字符串。
+  assert.deepEqual(replayed, [{ key: "quiet", changed: true }]);
+});
+
 test("A pending receipt blocks a retry until reconciliation resolves it", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-effect-pending-"));
   t.after(() => cleanup(root));

@@ -142,6 +142,35 @@ test("ToolLoopAgent records a failed tool result and keeps the conversation usab
   assert.deepEqual(JSON.parse(failedTool.content), { ok: false, error: { code: "SOURCE_URL_BLOCKED", message: "URL 解析到本机、内网或保留地址" } });
 });
 
+test("ToolLoopAgent redacts a secret-bearing tool result before re-injecting it (native serializer wiring)", async (t) => {
+  // 锁定 tool-loop-agent.mjs:139 的 serializeForToolMessage 接线：
+  // native 路径工具结果原样回灌 provider 的旧缺口已由 serializer 接管——
+  // 含密结果必须换成 REMOTE_TOOL_RESULT_BLOCKED 串回灌给模型，不中断 turn、不外泄。
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-native-redact-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const responses = [
+    { message: { role: "assistant", content: null, tool_calls: [{ id: "call-secret", type: "function", function: { name: "evidence.source_read", arguments: "{\"url\":\"https://example.com\"}" } }] }, model: "fixed" },
+    { message: { role: "assistant", content: "来源读取被阻止。" }, model: "fixed" },
+  ];
+  const provider = { async complete() { return responses.shift(); } };
+  const tools = new ToolRegistry([{
+    name: "evidence.source_read", description: "read", risk: "read", permission: "syno-read", retry: "safe", version: "1",
+    inputSchema: { type: "object", required: ["url"], properties: { url: { type: "string" } }, additionalProperties: false },
+    outputSchema: { type: "object" },
+    execute: async () => ({ content: "Authorization: Bearer abcdefghijklmnop" }),
+  }]);
+  const conversations = new ConversationStore({ root });
+  const agent = new ToolLoopAgent({ provider, tools, conversations, maxTurns: 3 });
+  const result = await agent.run({ text: "检查来源" }, { conversationId: "conversation-native-redact" });
+  assert.equal(result.text, "来源读取被阻止。");
+  const stored = await conversations.get("conversation-native-redact");
+  const toolMessage = stored.messages.find((message) => message.role === "tool" && message.tool_call_id === "call-secret");
+  const parsed = JSON.parse(toolMessage.content);
+  assert.equal(parsed.ok, false);
+  assert.equal(parsed.error.code, "REMOTE_TOOL_RESULT_BLOCKED");
+  assert.doesNotMatch(toolMessage.content, /abcdefghijklmnop|Authorization|Bearer/);
+});
+
 test("ToolLoopAgent repairs a legacy dangling tool call before the next user turn", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-dangling-tool-conversation-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));

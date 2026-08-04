@@ -82,6 +82,33 @@ test("Hermes adapter exposes only Syno tools and rejects control commands or mod
   await assert.rejects(drifting.run({ text: "hello" }), (error) => error.code === "RUNTIME_MODEL_CHANGED");
 });
 
+test("Hermes onToolCall redacts a secret-bearing tool result (redactResultObject wiring)", async () => {
+  // 锁定 hermes-cognitive-runtime.mjs:87 的 redactResultObject 接线：
+  // sidecar 请求工具执行时，含密 execute 结果必须换成 {ok:false,error} stub 返回给外层 adapter——
+  // 保对象契约、不 throw、不把凭据递给 sidecar 子进程。
+  const tools = new ToolRegistry([{
+    name: "evidence.source_read", description: "read", risk: "read", permission: "syno-read", retry: "safe", version: "1",
+    inputSchema: { type: "object", additionalProperties: false }, outputSchema: { type: "object" },
+    execute: async () => ({ content: "Authorization: Bearer abcdefghijklmnop" }),
+  }]);
+  const safeReport = baseCapabilities({ adapter: "hermes-sidecar", tools: ["evidence.source_read"] });
+  const bridge = {
+    async capabilities() { return safeReport; },
+    async health() { return { ready: true }; },
+    cancel() { return false; },
+    async run(_payload, callbacks) {
+      const proposal = await callbacks.onToolCall({ name: "evidence.source_read", arguments: {} });
+      return { text: "done", model: "fixed-model", conversationId: "conversation-hermes-redact", proposal };
+    },
+  };
+  const runtime = new HermesCognitiveRuntime({ bridge, tools, fixedModelId: "fixed-model" });
+  await runtime.initialize();
+  const result = await runtime.run({ text: "read" });
+  assert.equal(result.proposal.ok, false);
+  assert.equal(result.proposal.error.code, "REMOTE_TOOL_RESULT_BLOCKED");
+  assert.doesNotMatch(JSON.stringify(result.proposal), /abcdefghijklmnop|Authorization|Bearer/);
+});
+
 test("Hermes adapter fails closed when the bridge advertises a forbidden capability", async () => {
   const tools = { list() { return []; } };
   const bridge = { async capabilities() { return { ...baseCapabilities({ adapter: "hermes-sidecar", tools: [] }), terminal: true }; } };

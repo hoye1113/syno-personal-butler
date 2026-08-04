@@ -1,3 +1,5 @@
+import { serializeForToolMessage } from "./tool-result-serializer.mjs";
+
 const DEFAULT_SYSTEM_PROMPT = `你是 Syno，一个主动但克制的知识闭环私人管家。
 你只能使用提供的工具；不能修改源码、配置权限、Provider、Policy 或 ToolRegistry。
 知识写入必须创建可审批 Job。AI 生成内容不是用户的学习证据，不能提升掌握度。
@@ -132,7 +134,9 @@ class ToolLoopAgent {
           if (this.contextManager) {
             result = this.contextManager.truncateToolResult(result, name);
           }
-          const toolMessage = { role: "tool", tool_call_id: call.id, content: JSON.stringify(result) };
+          // 统一经序列化层：脱敏（含错误包装 result 的 message）+ 序列化。
+          // 截断已由 contextManager.truncateToolResult 完成；此处不重复截断。
+          const toolMessage = { role: "tool", tool_call_id: call.id, content: serializeForToolMessage(result) };
           conversation.messages.push(toolMessage);
         }
         await this.conversations.save(conversation);

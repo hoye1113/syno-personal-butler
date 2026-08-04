@@ -44,7 +44,10 @@ test("SynoToolBridge exposes only generated syno tools and executes through Tool
     body: { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "knowledge_search", arguments: { query: "agent" } } },
   });
   release();
-  assert.deepEqual(called.result.structuredContent, [{ path: "vault/note.md", query: "agent" }]);
+  // 数组型工具结果：MCP structuredContent 必须缺省（chat-message 层要求顶层 object），
+  // 完整结果走 content text——LLM 读到的内容不变。
+  assert.equal("structuredContent" in called.result, false);
+  assert.deepEqual(called.result.content, [{ type: "text", text: JSON.stringify([{ path: "vault/note.md", query: "agent" }]) }]);
 });
 
 test("SynoToolBridge accepts the OpenCode namespaced run capability for its internal MCP name", async () => {
@@ -65,7 +68,10 @@ test("SynoToolBridge accepts the OpenCode namespaced run capability for its inte
     },
   });
   release();
-  assert.deepEqual(called.result.structuredContent, [{ path: "vault/note.md", query: "agent" }]);
+  // 数组型工具结果：MCP structuredContent 必须缺省（chat-message 层要求顶层 object），
+  // 完整结果走 content text——LLM 读到的内容不变。
+  assert.equal("structuredContent" in called.result, false);
+  assert.deepEqual(called.result.content, [{ type: "text", text: JSON.stringify([{ path: "vault/note.md", query: "agent" }]) }]);
 });
 
 test("SynoToolBridge blocks a secret-bearing ToolRegistry result before MCP serialization", async () => {
