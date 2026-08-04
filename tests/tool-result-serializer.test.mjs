@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { serializeForMcp, serializeForToolMessage, redactResultObject, inferOutputShape, isPlainObject } from "../apps/syno/syno/tool-result-serializer.mjs";
-
-const arrayTool = { name: "knowledge.search", outputSchema: { type: "array", items: { type: "object" } } };
-const objectTool = { name: "browser.status", outputSchema: { type: "object" } };
-const scalarTool = { name: "today.read", outputSchema: { type: "string" } };
+import { serializeForMcp, serializeForToolMessage, redactResultObject, isPlainObject } from "../apps/syno/syno/tool-result-serializer.mjs";
 
 test("serializeForMcp: 数组结果不产 structuredContent，完整结果走 content text", () => {
   const result = [{ path: "vault/note.md", query: "agent" }];
@@ -76,18 +72,17 @@ test("redactResultObject: 含密时返回 {ok:false,error} stub（保对象契�
   assert.doesNotMatch(JSON.stringify(out), /abcdefghijklmnop|Authorization|Bearer/);
 });
 
-test("isPlainObject: 对象为 true，数组/null/原始值 为 false", () => {
+test("isPlainObject: 仅字面量对象为 true，数组/null/原始值/类实例(Date/Map/Set/Error) 为 false", () => {
   assert.equal(isPlainObject({}), true);
+  assert.equal(isPlainObject(new Object()), true); // new Object() 同字面量
+  assert.equal(isPlainObject(Object.create(null)), true); // 无原型字典仍算 plain
   assert.equal(isPlainObject([]), false);
   assert.equal(isPlainObject(null), false);
   assert.equal(isPlainObject("x"), false);
   assert.equal(isPlainObject(0), false);
-});
-
-test("inferOutputShape: 按 outputSchema.type 推断 list/object/scalar", () => {
-  assert.equal(inferOutputShape(arrayTool), "list");
-  assert.equal(inferOutputShape(objectTool), "object");
-  assert.equal(inferOutputShape(scalarTool), "scalar");
-  assert.equal(inferOutputShape({ outputSchema: {} }), "scalar");
-  assert.equal(inferOutputShape({}), "scalar");
+  // 类实例/内置对象的 prototype 不指向 Object.prototype——绝不能塞进 structuredContent
+  assert.equal(isPlainObject(new Date()), false);
+  assert.equal(isPlainObject(new Map()), false);
+  assert.equal(isPlainObject(new Set()), false);
+  assert.equal(isPlainObject(new Error("x")), false);
 });

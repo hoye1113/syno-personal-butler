@@ -1,7 +1,9 @@
 const SENSITIVE_PATTERNS = Object.freeze([
   ["privacy_marker", /^(?:privacy|sensitive|private):\s*(?:private|sensitive|true|yes)$/imu],
-  ["authorization_header", /\bauthorization\s*:\s*(?:bearer|basic)\s+\S+/iu],
-  ["credential_assignment", /\b(?:api[_ -]?key|access[_ -]?token|refresh[_ -]?token|auth[_ -]?token|token|password|passwd|secret|cookie)\b\s*[=:]\s*["']?[^\s"',;]{8,}/iu],
+  // ["']? 允许可选引号包围键名：工具结果经 JSON.stringify 后是 {"token":"xxx"} 形态，
+  // 键名被引号包围，若不允可选引号则 \s*[=:] 会在键后引号处失配，整体漏检（serializer 三路径都先 JSON.stringify）。
+  ["authorization_header", /\bauthorization["']?\s*:\s*["']?(?:bearer|basic)\s+\S+/iu],
+  ["credential_assignment", /\b(?:api[_ -]?key|access[_ -]?token|refresh[_ -]?token|auth[_ -]?token|token|password|passwd|secret|cookie)\b["']?\s*[=:]\s*["']?[^\s"',;]{8,}/iu],
   ["jwt", /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{8,}\b/u],
   ["private_key", /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/u],
   ["provider_key", /\b(?:sk-(?:proj-)?|ghp_|github_pat_|xox[baprs]-)[A-Za-z0-9_-]{16,}\b/u],

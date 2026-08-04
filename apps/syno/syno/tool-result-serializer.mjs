@@ -12,7 +12,15 @@
 
 import { inspectRemoteContent } from "./sensitive-content.mjs";
 
-const isPlainObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+// 仅字面量对象（{} / new Object()）或无原型字典（Object.create(null)）算 plain。
+// Date/Map/Set/Error/类实例的 prototype 不指向 Object.prototype，不算 plain——
+// 避免把带类标签的对象塞进 structuredContent（MCP chat-message schema 要求顶层普通 object）。
+// 原先用 typeof+!Array.isArray 会把 Date/Map/Set 误判为 plain（修正点）。
+const isPlainObject = (v) => {
+  if (v === null || typeof v !== "object") return false;
+  const proto = Object.getPrototypeOf(v);
+  return proto === Object.prototype || proto === null;
+};
 
 function blockedError(reasons) {
   const error = new Error("工具结果可能包含凭据或敏感信息，已阻止发送到远程模型");
@@ -73,9 +81,4 @@ function redactResultObject(result) {
     : { ok: false, error: { code: "REMOTE_TOOL_RESULT_BLOCKED", message: "工具结果可能包含凭据或敏感信息，已脱敏" } };
 }
 
-const inferOutputShape = (tool) => {
-  const t = tool?.outputSchema?.type;
-  return t === "array" ? "list" : t === "object" ? "object" : "scalar";
-};
-
-export { serializeForMcp, serializeForToolMessage, redactResultObject, inferOutputShape, isPlainObject };
+export { serializeForMcp, serializeForToolMessage, redactResultObject, isPlainObject };

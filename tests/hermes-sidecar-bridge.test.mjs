@@ -97,3 +97,17 @@ test("cancel is surgical: cancelling one run does not reject a concurrent run (R
   assert.equal(bResult.model, "fixed-model");
   await runARejected;
 });
+
+test("HermesSidecarBridge redacts a secret-bearing tool error before echoing it to the sidecar", async (t) => {
+  // 锁定 hermes-sidecar-bridge.mjs :200 throw 路径脱敏：
+  // onToolCall 抛出的 error.message 若夹带凭据（如 evidence.source_read 抓到 token 后 execute 失败），
+  // 经 IPC 发回 sidecar 子进程前必须脱敏——对齐 bridge safeError 语义，凭据形状不出本进程。
+  const target = bridge();
+  t.after(() => target.close());
+  const result = await target.run({ runId: "run-secret-error", message: "x", modelId: "fixed-model", tools }, {
+    onToolCall: () => { throw new Error("Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456"); },
+  });
+  // fake sidecar 把 tool_result 回灌成 text（failure 分支回灌 {ok:false,error}）
+  assert.match(result.text, /REMOTE_TOOL_ERROR_REDACTED/);
+  assert.doesNotMatch(result.text, /Authorization|Bearer|abcdefghijklmnop/i);
+});

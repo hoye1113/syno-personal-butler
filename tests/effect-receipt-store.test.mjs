@@ -153,3 +153,32 @@ test("Tool output validation failure stores a committed direct-effect receipt", 
   assert.equal(response.result.directEffect.status, "committed");
   assert.equal((await store.list({ status: "committed" })).length, 1);
 });
+
+test("Error-branch effectOutput bearing a secret is never persisted and the MCP response is redacted", async (t) => {
+  // 锁定 bridge 错误分支脱敏门（syno-tool-bridge.mjs :225-240）：
+  // 当 execute 的返回既违反 outputSchema 又夹带凭据时，validateValue 抛 TOOL_OUTPUT_INVALID
+  // 并把 effectOutput 透传到 bridge 错误分支。修复前该分支直接 structuredContent: result 落盘 + 回灌，
+  // 凭据形状既持久化又发回对端。修复后：含密 effectOutput 不 commit、回灌脱敏错误。
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-effect-redact-error-"));
+  t.after(() => cleanup(root));
+  const store = makeStore(root);
+  const tools = new ToolRegistry([{
+    name: "settings.adjust", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1", agentAdjustableBoundary: true,
+    inputSchema: { type: "object", required: ["key"], properties: { key: { type: "string" } }, additionalProperties: false },
+    outputSchema: { type: "object", required: ["changed"], properties: { changed: { type: "boolean" } }, additionalProperties: false },
+    // 违反 boolean outputSchema 且值夹带凭据：触发 output-validation 失败 + 含密 effectOutput。
+    execute: async () => ({ changed: "Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456" }),
+  }]);
+  const bridge = new SynoToolBridge({ tools, token: "secret", effectReceipts: store });
+  const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-redact-error", allowedTools: ["settings_adjust"] });
+  const response = await bridge.handle({ authorization: "Bearer secret", body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "settings_adjust", arguments: { key: "quiet" } } } });
+  release();
+  const serialized = JSON.stringify(response);
+  assert.equal(response.result.isError, true);
+  assert.match(serialized, /REMOTE_TOOL_RESULT_BLOCKED/);
+  // 凭据形状绝不发回对端
+  assert.doesNotMatch(serialized, /Authorization|Bearer|abcdefghijklmnop/i);
+  // 含密 effectOutput 不落盘为 committed（保「redact→commit」不变量）
+  const committed = await store.list({ status: "committed" });
+  assert.equal(committed.length, 0);
+});

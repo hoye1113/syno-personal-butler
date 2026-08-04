@@ -29,7 +29,10 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
     const runId = message.callId.replace(/^call-/, "");
     const run = pendingRuns.get(runId);
     pendingRuns.delete(runId);
-    return send({ type: "response", requestId: run.requestId, ok: true, result: { text: JSON.stringify(message.result), model: run.modelId, conversationId: run.conversationId } });
+    // failure 分支用 error 字段（不是 result）。success 时 payload === message.result（保持原回灌形态，
+    // 不影响既有 success 断言）；failure 时回灌 {ok:false,error}，让测试能断言脱敏后的 error.message。
+    const payload = message.ok === false ? { ok: false, error: message.error } : message.result;
+    return send({ type: "response", requestId: run.requestId, ok: true, result: { text: JSON.stringify(payload), model: run.modelId, conversationId: run.conversationId } });
   }
   if (message.type === "cancel") {
     const run = pendingRuns.get(message.runId);

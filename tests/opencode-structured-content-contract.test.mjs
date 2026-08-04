@@ -1,26 +1,27 @@
-// 契约测试：用 OpenCode 实际安装的 zod 复刻其「tool result → LLM 对话消息」层校验
-// structuredContent 的 schema，从 schema 层证明修复后不再触发 invalid_type。
+// 契约测试：从 schema 层证明 bridge 序列化输出永远不触发 MCP 的 invalid_type。
 //
-// 背景（fact-check 核实）：MCP CallToolResult 层接受任意 structuredContent；真正抛 invalid_type
-// 的是 OpenCode 把工具结果转对话消息时 tool_result.structuredContent = z.object({}).loose().optional()
-// （要求顶层 object 或缺省，数组/null/标量被以 invalid_type 拒绝）。本测试用同一份 zod v4 复刻该校验。
+// 拒绝点（fact-check + MCP SDK 1.30 实测核实）：MCP SDK 的 CallToolResultSchema.structuredContent
+// 定义为 z.record(z.string(), z.unknown()).optional()（@modelcontextprotocol/sdk/types.js）。
+// 数组传入 → safeParse 以 invalid_type 拒绝（"Invalid input: expected record, received array"，
+// path=["structuredContent"]）。这就是管家微信搜文章时 OpenCode 回灌 invalid_type / 「应为对象却收到数组」的根因。
 //
-// zod 取自 opencode profile（仓库无本地 zod）：仅在路径存在时实跑；否则整组 skip，
-// 不影响无此安装的环境。
+// 早期分析曾误定位为 OpenCode chat-message 层的 z.object({}).loose()；实测 MCP SDK 的 z.record 即拒绝点
+// （两者对数组同样报 invalid_type，但真值是 MCP SDK 层）。本测试用真实 CallToolResultSchema 做端到端验证，
+// 并保留一份显式 z.record 复刻（不依赖 SDK 内部实现，锁定「structuredContent 形态 = record」这一论断）。
+//
+// 依赖通过 devDependencies 提供（zod + @modelcontextprotocol/sdk），bare import 可移植，无本机绝对路径。
 
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { z } from "zod";
+import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
+
 import { SynoToolBridge } from "../apps/syno/syno/syno-tool-bridge.mjs";
 import { ToolRegistry } from "../apps/syno/syno/tool-registry.mjs";
 
-const ZOD_URL = "file:///C:/Users/38788/AppData/Local/Syno/opencode/profile/config/opencode/node_modules/zod/index.js";
-let z = null;
-try { z = (await import(ZOD_URL)).z; } catch { z = null; }
-
-// 与 OpenCode tool_result.structuredContent 同构：顶层 object 或缺省。
-const structuredContentSchema = z ? z.object({}).loose().optional() : null;
-const SKIP = !z;
+// 显式复刻 MCP SDK structuredContent 字段形态（z.record），锁定论断；与上方真实 schema 同构。
+const structuredContentField = z.record(z.string(), z.unknown()).optional();
 
 function bridgeName(name) {
   return name.replaceAll(".", "_").replaceAll("-", "_");
@@ -57,29 +58,40 @@ const ARRAY_TOOLS = [
   ["jobs.list", [{ jobId: "j" }]],
 ];
 
-test("OpenCode zod schema 以 invalid_type 拒绝裸数组（复现原 bug，证明本测试有意义）", { skip: SKIP }, () => {
+test("复刻 z.record schema 以 invalid_type 拒绝裸数组（复现原 bug，证明校验有效）", () => {
   assert.throws(
-    () => structuredContentSchema.parse([{ a: 1 }]),
+    () => structuredContentField.parse([{ a: 1 }]),
     (error) => error?.issues?.[0]?.code === "invalid_type",
   );
 });
 
-test("OpenCode zod schema 接受 object 与缺省（undefined）", { skip: SKIP }, () => {
-  structuredContentSchema.parse({ available: true }); // 不抛
-  structuredContentSchema.parse(undefined); // 不抛
+test("复刻 z.record schema 接受 object 与缺省（undefined）", () => {
+  structuredContentField.parse({ available: true }); // 不抛
+  structuredContentField.parse(undefined); // 不抛
+});
+
+test("真实 CallToolResultSchema 以 invalid_type 拒绝数组 structuredContent（锁定拒绝点 = MCP SDK 层）", () => {
+  // 这条直接复现管家搜文章时的报错：数组 structuredContent 被 MCP SDK 拒，path 命中 structuredContent。
+  const parsed = CallToolResultSchema.safeParse({ content: [{ type: "text", text: "x" }], structuredContent: [{ a: 1 }] });
+  assert.equal(parsed.success, false);
+  assert.equal(parsed.error.issues[0].code, "invalid_type");
+  assert.deepEqual(parsed.error.issues[0].path, ["structuredContent"]);
 });
 
 for (const [name, stub] of ARRAY_TOOLS) {
-  test(`数组工具 ${name}：bridge 输出通过 zod schema（不再 invalid_type）`, { skip: SKIP }, async () => {
+  test(`数组工具 ${name}：bridge 输出通过真实 CallToolResultSchema（端到端，不再 invalid_type）`, async () => {
     const out = await callTool({ name, outputSchema: { type: "array", items: { type: "object" } }, stub });
     assert.equal("structuredContent" in out.result, false); // 数组结果不产 structuredContent
-    structuredContentSchema.parse(out.result.structuredContent); // 不抛即通过 = OpenCode 不会再回灌 invalid_type
-    assert.ok(Array.isArray(JSON.parse(out.result.content[0].text))); // 完整数组仍走 content text
+    // 端到端：bridge 全响应（含 directEffect/businessOutcome 额外字段）经真实 MCP schema 校验通过。
+    const parsed = CallToolResultSchema.safeParse(out.result);
+    assert.equal(parsed.success, true, JSON.stringify(parsed.error?.issues));
+    assert.ok(Array.isArray(JSON.parse(out.result.content[0].text))); // 完整数组仍走 content text，LLM 读到的内容不变
   });
 }
 
-test("object 工具 browser.status：bridge 输出通过 zod schema", { skip: SKIP }, async () => {
+test("object 工具 browser.status：bridge 输出通过真实 CallToolResultSchema", async () => {
   const out = await callTool({ name: "browser.status", outputSchema: { type: "object" }, stub: { available: true } });
-  structuredContentSchema.parse(out.result.structuredContent);
   assert.deepEqual(out.result.structuredContent, { available: true });
+  const parsed = CallToolResultSchema.safeParse(out.result);
+  assert.equal(parsed.success, true, JSON.stringify(parsed.error?.issues));
 });

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import readline from "node:readline";
 
 import { redactString } from "./runtime-journal.mjs";
+import { inspectRemoteContent } from "./sensitive-content.mjs";
 
 function runtimeError(code, message, { retryable = false } = {}) {
   return Object.assign(new Error(message), { code, retryable });
@@ -195,9 +196,18 @@ class HermesSidecarBridge {
         this.#writeSafe({ type: "tool_result", callId: message.callId, ok: false, error: { code: "TOOL_PROXY_UNAVAILABLE", message: "工具代理不可用" } });
         return;
       }
-      Promise.resolve(callbacks.onToolCall({ name: message.name, arguments: message.arguments || {} }))
+      // onToolCall 可能同步 throw（如含密 error.message）——必须把调用放进 .then 回调里，
+      // 否则 Promise.resolve(fn()) 在参数求值阶段就抛出，绕过下方 .catch（原写法对同步 throw 不安全）。
+      Promise.resolve()
+        .then(() => callbacks.onToolCall({ name: message.name, arguments: message.arguments || {} }))
         .then((result) => this.#writeSafe({ type: "tool_result", callId: message.callId, ok: true, result }))
-        .catch((error) => this.#writeSafe({ type: "tool_result", callId: message.callId, ok: false, error: { code: error.code || "TOOL_PROXY_FAILED", message: String(error.message || "工具调用失败").slice(0, 500) } }));
+        .catch((error) => {
+          const raw = String(error.message || "工具调用失败").slice(0, 500);
+          // onToolCall 抛出的 error.message 可能夹带凭据（如 evidence.source_read 抓到 token 后 execute 失败）——
+          // 经 IPC 发回 sidecar 子进程前先脱敏，与 bridge safeError 语义对齐。
+          const safeMessage = inspectRemoteContent(raw).safe ? raw : "REMOTE_TOOL_ERROR_REDACTED: 工具执行失败，详细错误仅保留本机";
+          this.#writeSafe({ type: "tool_result", callId: message.callId, ok: false, error: { code: error.code || "TOOL_PROXY_FAILED", message: safeMessage } });
+        });
       return;
     }
     if (message.type === "event") {

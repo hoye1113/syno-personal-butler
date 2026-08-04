@@ -228,8 +228,18 @@ class SynoToolBridge {
         const directEffect = { ...error.effectReceipt.directEffect, toolInvocationKey: toolInvocation, occurredAt: new Date().toISOString() };
         const businessOutcome = error.effectReceipt.businessOutcome;
         const result = { directEffect, businessOutcome, result: error.effectOutput };
+        // 错误分支也走脱敏门：含密的 effectOutput 绝不落盘（保「redact→commit」不变量，
+        // 与成功分支 :200 的 serializeForMcp 脱敏门对齐）。开对账 case 让人工介入，
+        // 返回脱敏错误——不持久化、不发回对端。
+        const effectOutputSafe = inspectRemoteContent(JSON.stringify(result)).safe;
+        if (!effectOutputSafe) {
+          if (this.reconciliationCases && toolInvocation) {
+            await this.reconciliationCases.open({ toolInvocationKey: toolInvocation, toolName: name, ownerKey: active.ownerKey, sourceType: "tool", sourceId: active.messageId, lastErrorCode: "REMOTE_TOOL_RESULT_BLOCKED" }).catch(() => {});
+          }
+          return { ...response, result: { content: [{ type: "text", text: JSON.stringify({ ok: false, error: { code: "REMOTE_TOOL_RESULT_BLOCKED", message: "工具结果可能包含凭据或敏感信息，已阻止持久化与发送" } }) }], isError: true } };
+        }
         await this.effectReceipts.commit({ toolInvocationKey: toolInvocation, toolName: name, ownerKey: active.ownerKey, argumentsDigest, result, directEffect, businessOutcome });
-        return { ...response, result: { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result, directEffect, businessOutcome, isError: true } };
+        return { ...response, result: { ...serializeForMcp(result, { redact: false, charLimit: this.charLimit }), directEffect, businessOutcome, isError: true } };
       }
       if (this.reconciliationCases && toolInvocation && definition.risk !== "read" && !["TOOL_INPUT_INVALID", "TOOL_NOT_ALLOWED"].includes(error.code)) {
         await this.reconciliationCases.open({ toolInvocationKey: toolInvocation, toolName: name, ownerKey: active.ownerKey, sourceType: "tool", sourceId: active.messageId, lastErrorCode: error.code || "EFFECT_UNKNOWN" }).catch(() => {});
