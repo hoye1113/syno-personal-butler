@@ -54,7 +54,7 @@ import { ToolLoopAgent } from "./tool-loop-agent.mjs";
 import { ToolLoopExecutor } from "./tool-loop-executor.mjs";
 import { ToolRegistry } from "./tool-registry.mjs";
 import { TodayService } from "./today-service.mjs";
-import { WeixinIlinkAdapter } from "./weixin-ilink.mjs";
+import { WeixinIlinkAdapter, envToggle } from "./weixin-ilink.mjs";
 import { VaultMigrationService } from "./vault-migration-service.mjs";
 import { WindowsServiceManager } from "./windows-service-manager.mjs";
 import { WindowsServiceControl } from "./windows-service-control.mjs";
@@ -912,6 +912,11 @@ function createSynoRuntime(options = {}) {
     },
   });
   const weixin = options.weixin || new WeixinIlinkAdapter({
+    // typing 指示器默认开；SYNO_WEIXIN_TYPING=0|false 可关。
+    typingIndicator: envToggle(process.env.SYNO_WEIXIN_TYPING, { defaultOn: true }),
+    // ack 文本默认关：实测 typing「正在输入」可见（纯 UI 状态、不占聊天流、无存储），ack 是真实消息会在聊天流累积成噪音。
+    // SYNO_WEIXIN_ACK=1|true 可开（typing 不可见的微信版本/场景保底）。
+    ackOnReceive: envToggle(process.env.SYNO_WEIXIN_ACK, { defaultOn: false }),
     onMessage: (message) => channelConversationHandler.handle({ ...message, ownerKey: "local-user", threadKey: "main", channel: "weixin" }),
   });
   const feishu = options.feishu || new FeishuChannelAdapter({

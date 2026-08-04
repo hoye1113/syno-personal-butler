@@ -13,6 +13,8 @@ const CDN_ALLOWLIST = new Set(["novac2c.cdn.weixin.qq.com"]);
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const ATTACHMENT_TIMEOUT_MS = 20_000;
 const STALE_SESSION_PAUSE_MS = 60 * 60 * 1_000;
+// iLink 请求的统一 base_info（getUpdates/sendText/getConfig/sendTyping 共用，避免字面量重复）。
+const BASE_INFO = Object.freeze({ channel_version: "1.0.0", bot_agent: "Syno/1.0.0" });
 
 function abortableDelay(ms, signal) {
   return new Promise((resolve) => {
@@ -57,6 +59,13 @@ async function renderLoginQr(value) {
 
 function randomWechatUin() {
   return Buffer.from(String(randomBytes(4).readUInt32BE(0)), "utf8").toString("base64");
+}
+
+// env 开关解析，统一两类语义：defaultOn=true 用黑名单（"0"/"false" 关，其余含缺省都开）；
+// defaultOn=false 用白名单（"1"/"true" 开，其余含缺省都关）。避免「一个默认开一个默认关」的内联表述混淆。
+function envToggle(rawValue, { defaultOn }) {
+  const v = String(rawValue ?? "").trim().toLocaleLowerCase("en-US");
+  return defaultOn ? !["0", "false"].includes(v) : ["1", "true"].includes(v);
 }
 
 async function fetchJson(url, options = {}, timeoutMs = 20_000) {
@@ -106,7 +115,7 @@ class WeixinIlinkClient {
       const response = await this.fetch(this.url("ilink/bot/getupdates"), {
         method: "POST",
         headers: this.headers(),
-        body: JSON.stringify({ get_updates_buf: cursor, base_info: { channel_version: "1.0.0", bot_agent: "Syno/1.0.0" } }),
+        body: JSON.stringify({ get_updates_buf: cursor, base_info: BASE_INFO }),
         signal: controller.signal,
         redirect: "error",
       });
@@ -135,9 +144,31 @@ class WeixinIlinkClient {
           message_state: 2,
           item_list: [{ type: 1, text_item: { text } }],
         },
-        base_info: { channel_version: "1.0.0", bot_agent: "Syno/1.0.0" },
+        base_info: BASE_INFO,
       }),
     }, 20_000);
+  }
+  // 取 typing_ticket（iLink「正在输入」指示器所需的短命凭证，~24h；调用方缓存，失效重取）。
+  async getConfig({ ilinkUserId, contextToken }) {
+    return this.fetcher(this.url("ilink/bot/getconfig"), {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify({ ilink_user_id: ilinkUserId, ...(contextToken ? { context_token: contextToken } : {}), base_info: BASE_INFO }),
+    }, 15_000);
+  }
+  // 发送 typing 状态：status=1 开始（正在输入），status=2 取消。长任务需每 ~5s 重发 status:1 作 keepalive。
+  async sendTyping({ ilinkUserId, typingTicket, status, contextToken }) {
+    return this.fetcher(this.url("ilink/bot/sendtyping"), {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify({
+        ilink_user_id: ilinkUserId,
+        typing_ticket: typingTicket,
+        status,
+        ...(contextToken ? { context_token: contextToken } : {}),
+        base_info: BASE_INFO,
+      }),
+    }, 10_000);
   }
 }
 
@@ -356,7 +387,7 @@ function normalizeInbound(message) {
 }
 
 class WeixinIlinkAdapter {
-  constructor({ client, clientFactory, credentialStore = new LocalCredentialStore(), processLock = new LocalProcessLock(), fetchImpl = fetch, qrRenderer = renderLoginQr, onMessage = async () => ({ text: "已收到" }), quarantineRoot = path.join(PATHS.runtimeRoot, "quarantine", "weixin"), staleSessionPauseMs = STALE_SESSION_PAUSE_MS, delay = abortableDelay } = {}) {
+  constructor({ client, clientFactory, credentialStore = new LocalCredentialStore(), processLock = new LocalProcessLock(), fetchImpl = fetch, qrRenderer = renderLoginQr, onMessage = async () => ({ text: "已收到" }), quarantineRoot = path.join(PATHS.runtimeRoot, "quarantine", "weixin"), staleSessionPauseMs = STALE_SESSION_PAUSE_MS, delay = abortableDelay, typingIndicator = true, typingIntervalMs = 5_000, ackOnReceive = true } = {}) {
     this.credentials = credentialStore;
     this.client = client || new WeixinIlinkClient();
     this.clientFactory = clientFactory || ((credential) => client || new WeixinIlinkClient({ baseUrl: credential.baseUrl, token: credential.token }));
@@ -367,6 +398,11 @@ class WeixinIlinkAdapter {
     this.quarantineRoot = quarantineRoot;
     this.staleSessionPauseMs = staleSessionPauseMs;
     this.delay = delay;
+    this.typingIndicator = Boolean(typingIndicator);
+    // keepalive 间隔 clamp 下限 500ms：误传 0/负/过小会让 setInterval 高频触发 sendtyping 打爆 iLink；<500ms 无生产意义。
+    this.typingIntervalMs = Number.isFinite(Number(typingIntervalMs)) && Number(typingIntervalMs) > 0 ? Math.max(500, Number(typingIntervalMs)) : 5_000;
+    this.ackOnReceive = Boolean(ackOnReceive);
+    this.typingTicket = null;
     this.running = false;
     this.abortController = null;
     this.seen = new Set();
@@ -539,21 +575,80 @@ class WeixinIlinkAdapter {
       try { artifacts.push(await this.#quarantine(item)); } catch (error) { artifacts.push({ rejected: true, reason: error.message }); }
     }
     if (!message.text && !artifacts.length) { await this.#markProcessed(message.id); return; }
-    const response = await this.onMessage({ channel: "weixin", ...message, artifacts, privateConversation: true });
-    if (response?.deferredDelivery === true) {
+    // 即时反馈：ack（保底 100% 可见）+ typing 指示器（实测可见性）。让主人秒级知道管家在线/在处理，而非死机。
+    // ack 必须 catch——否则失败会冒泡到 #pollLoop 的 catch 中断本条消息处理。typing 内部已 best-effort。
+    // 注意：v2 deferred 模式的 #handleV2 自带 outbox ack（channel-conversation-handler.mjs）——若开 ack 且启用 v2 会双发。
+    if (this.ackOnReceive) await this.client.sendText({ toUserId: message.senderId, contextToken: message.contextToken, text: "收到，正在处理…" }).catch(() => {});
+    const typing = this.typingIndicator ? this.#startTyping(message.senderId, message.contextToken) : null;
+    try {
+      const response = await this.onMessage({ channel: "weixin", ...message, artifacts, privateConversation: true });
+      if (response?.deferredDelivery === true) {
+        await this.#markProcessed(message.id);
+        return { delivered: true, deferred: true, requestId: response.requestId || null };
+      }
+      const delivery = await this.send({ toUserId: message.senderId, contextToken: message.contextToken, text: response?.text || response?.job?.result?.text || "任务已记录，请在 Syno 查看状态。" });
+      if (!delivery.delivered) throw new Error(`微信回复未送达：${delivery.reason || "unknown"}`);
       await this.#markProcessed(message.id);
-      return { delivered: true, deferred: true, requestId: response.requestId || null };
+      return delivery;
+    } finally {
+      await typing?.stop();
     }
-    const delivery = await this.send({ toUserId: message.senderId, contextToken: message.contextToken, text: response?.text || response?.job?.result?.text || "任务已记录，请在 Syno 查看状态。" });
-    if (!delivery.delivered) throw new Error(`微信回复未送达：${delivery.reason || "unknown"}`);
-    await this.#markProcessed(message.id);
-    return delivery;
   }
 
   async #markProcessed(id) {
     this.seen.add(id);
     if (this.seen.size > 2_000) this.seen.delete(this.seen.values().next().value);
     await this.#persistRuntimeState();
+  }
+
+  // typing_ticket 是 iLink「正在输入」所需的短命凭证（~24h）。内存缓存（不持久化：丢了重取即可，
+  // 且避免污染 LocalCredentialStore 的 saveRuntime 路径）。文档未给精确 TTL，保守按 20h 失效强制重取。
+  // 单值缓存假设 ticket 为 bot 级——当前单用户（ownerId 过滤非主人）实测成立；ticket 若实为 per-user 或未来多用户，改 Map<userId,ticket>。
+  async #ensureTypingTicket(ilinkUserId, contextToken) {
+    if (this.typingTicket && this.typingTicket.expiresAt > Date.now()) return this.typingTicket.value;
+    const result = await this.client.getConfig({ ilinkUserId, contextToken });
+    const explicitFailure = (result.ret !== undefined && Number(result.ret) !== 0)
+      || (result.errcode !== undefined && Number(result.errcode) !== 0);
+    if (explicitFailure) throw new Error(`getconfig 失败 ret=${result.ret} errcode=${result.errcode}`);
+    const value = result.typing_ticket;
+    if (!value) throw new Error("getconfig 未返回 typing_ticket");
+    this.typingTicket = { value, expiresAt: Date.now() + 20 * 60 * 60 * 1_000 };
+    return value;
+  }
+
+  // 发 typing 状态，best-effort：任何失败都静默——typing 是瞬态 UI 信号，丢了不影响业务回复。
+  // 票据失效（sendtyping 返回非 0 errcode/ret）→ 清空缓存重取重试一次，对调用方透明。
+  async #sendTypingSafe(ilinkUserId, contextToken, status) {
+    try {
+      const ticket = await this.#ensureTypingTicket(ilinkUserId, contextToken);
+      const result = await this.client.sendTyping({ ilinkUserId, typingTicket: ticket, status, contextToken });
+      const failed = (result.ret !== undefined && Number(result.ret) !== 0)
+        || (result.errcode !== undefined && Number(result.errcode) !== 0);
+      if (failed) {
+        this.typingTicket = null;
+        const fresh = await this.#ensureTypingTicket(ilinkUserId, contextToken);
+        await this.client.sendTyping({ ilinkUserId, typingTicket: fresh, status, contextToken });
+      }
+    } catch {
+      // typing 丢了不影响业务：吞掉，不冒泡到 #pollLoop 导致整条消息处理中断。
+    }
+  }
+
+  // 起 typing：立即发 status:1 + 每 5s 重发（keepalive，句柄 unref 不阻止进程退出）。
+  // 返回控制柄，stop() 清 interval 并发 status:2（取消）。调用方须在 finally 里 stop，避免悬空「正在输入」。
+  #startTyping(ilinkUserId, contextToken) {
+    // lastSend 跟踪最后一次 status:1 的发送 Promise；stop 先等它落地再发 status:2，
+    // 避免「在飞的 status:1 晚于 status:2 到达服务端」导致 typing 被重新点亮（乱序悬空）。
+    let lastSend = this.#sendTypingSafe(ilinkUserId, contextToken, 1).catch(() => {});
+    const handle = setInterval(() => { lastSend = this.#sendTypingSafe(ilinkUserId, contextToken, 1).catch(() => {}); }, this.typingIntervalMs);
+    handle.unref?.();
+    return {
+      stop: async () => {
+        clearInterval(handle);
+        await lastSend;
+        await this.#sendTypingSafe(ilinkUserId, contextToken, 2).catch(() => {});
+      },
+    };
   }
 
   async #quarantine(item) {
@@ -605,6 +700,7 @@ export {
   WeixinIlinkAdapter,
   WeixinIlinkClient,
   fetchJson,
+  envToggle,
   isDirectMessage,
   isGroupMessage,
   normalizeInbound,

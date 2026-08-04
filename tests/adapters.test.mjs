@@ -179,7 +179,7 @@ test("Weixin poller replies to consecutive owner messages and advances each stat
     async sendText(value) { sent.push(value); return { message_id: `reply-${sent.length}` }; },
   };
   const processLock = { async acquire() { return true; }, async release() {} };
-  const adapter = new WeixinIlinkAdapter({ client, clientFactory: () => client, credentialStore: credentials, processLock, onMessage: async ({ text }) => ({ text: `reply to ${text}` }) });
+  const adapter = new WeixinIlinkAdapter({ client, clientFactory: () => client, credentialStore: credentials, processLock, typingIndicator: false, ackOnReceive: false, onMessage: async ({ text }) => ({ text: `reply to ${text}` }) });
   await adapter.start();
   for (let index = 0; index < 40 && (sent.length < 2 || saved.cursor !== "cursor-2"); index += 1) await new Promise((resolve) => setTimeout(resolve, 5));
   assert.equal(sent.length, 2);
@@ -219,6 +219,8 @@ test("Weixin stale session cooldown preserves credentials and resumes polling", 
     credentialStore: credentials,
     processLock,
     staleSessionPauseMs: 1,
+    typingIndicator: false,
+    ackOnReceive: false,
     onMessage: async () => ({ text: "recovered" }),
   });
   await adapter.start();
@@ -667,6 +669,8 @@ test("Weixin decrypts real iLink AES-128-ECB image and file payloads before quar
     client,
     credentialStore: credentials,
     quarantineRoot: root,
+    typingIndicator: false,
+    ackOnReceive: false,
     fetchImpl: async () => new Response(responses.shift(), { status: 200, headers: { "content-type": "application/octet-stream" } }),
     onMessage: async (message) => { inbound = message; return { text: "ok" }; },
   });
