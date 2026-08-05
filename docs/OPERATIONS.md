@@ -46,6 +46,7 @@ pnpm state:archive -- restore D:\Backups\syno-state-20260717
 - `.pnpm-store/` 是安装缓存，删除需要按仓库受控执行规则提供精确目标和影响预览。
 - 主动/工作流 outbox 的终态记录（`delivered`/`failed_terminal`）由 `retain()` 按小时节流、超 14 天自动淘汰，目录不再单调膨胀（drain 时 best-effort，不阻塞投递）。
 - 历史上 `proactive.bundle.recovery_failed`（如 f1b29459）刷屏的根因是对账循环重读已损坏的 outbox payload 抛错、每 tick 记一条失败——已由「对账排除 `failed_terminal`（C6）」+「drain 时把结构损坏 payload 转终态（A1）」根治，不再复现。若日志仍见，多为修复前残留记录：把 `state/channel-outbox/<id>.json` 的 status 改 `failed_terminal`，或删除其 `.dpapi` payload 后重启即可。
+- 系统性「静默无限重试/停滞」bug 类已由 P1–P4 + 收尾复审 R1–R3（commit `8ce4cb3`）根治：凡是 `loop / retry / 定时 drain / setInterval tick` 的回调内 uncaught throw 被外层归默认 retryable、又无终态升级、再加过宽 `.catch(()=>{})` 吞错，就会不抛错不告警地永远重试或永远不推进。**改动任何重试/循环路径必须保留三件套**：终态出口（`failed_terminal`）、maxAttempts 上限（惯例 8）、可观测回调（`recordEvent`，不得 `.catch(()=>{})` 吞）；且 maxAttempts cap 必须放在 `send()`/调用**之前**（事后 cap 在 send 抛错时结构性不可达，R3）。诊断事件：`accepted_request.recovery_failed`（accepted 恢复 tick 抛错）、`INGEST_PREPARE_EXHAUSTED`（收录 prepare 重试耗尽）、`WORKFLOW_DELIVERY_EXHAUSTED`/`PROACTIVE_DELIVERY_EXHAUSTED`（投递耗尽转终态）、`proactive.bundle.blocked_sensitive`（主动提醒命中高精度凭据，已净化为回退文案）。这些只在真实故障时出现，正常启动不应刷屏。
 
 ## 故障检查顺序
 
