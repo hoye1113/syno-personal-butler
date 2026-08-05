@@ -1,13 +1,24 @@
 class EffectReconciliationWorker {
-  constructor({ store, reconcileReadOnly, workerId = `reconcile-${process.pid}`, intervalMs = 60_000, limit = 20 } = {}) {
+  constructor({ store, reconcileReadOnly, workerId = `reconcile-${process.pid}`, intervalMs = 60_000, limit = 20, onTerminal = null, recordEvent = null } = {}) {
     if (!store || typeof reconcileReadOnly !== "function") throw new Error("EffectReconciliationWorker 缺少 Store 或只读 reconcile 函数");
     this.store = store;
     this.reconcileReadOnly = reconcileReadOnly;
     this.workerId = workerId;
     this.intervalMs = Math.max(1_000, Number(intervalMs) || 60_000);
     this.limit = Math.max(1, Number(limit) || 20);
+    this.onTerminal = typeof onTerminal === "function" ? onTerminal : null;
+    this.recordEvent = typeof recordEvent === "function" ? recordEvent : null;
     this.timer = null;
     this.running = false;
+  }
+
+  async #handleFailure(caseId, options) {
+    const updated = await this.store.recordFailure(caseId, options);
+    // C5：store 在达 maxAttempts 时转 failed_terminal；终态经 onTerminal 触达（recordEvent/notifySystemAlert）。
+    if (updated?.status === "failed_terminal" && this.onTerminal) {
+      try { await this.onTerminal(updated); } catch { /* 终态告警失败不影响巡检节奏 */ }
+    }
+    return updated;
   }
 
   async runOnce() {
@@ -20,10 +31,10 @@ class EffectReconciliationWorker {
       try {
         const outcome = await this.reconcileReadOnly(claimed.case);
         if (outcome?.resolved) await this.store.resolveSystem(claimed.case.caseId, { result: outcome.result || "resolved", details: outcome.details || null });
-        else await this.store.recordFailure(claimed.case.caseId, { workerId: this.workerId, errorCode: outcome?.errorCode || "RECONCILE_UNRESOLVED", nextReconcileAt: outcome?.nextReconcileAt });
+        else await this.#handleFailure(claimed.case.caseId, { workerId: this.workerId, errorCode: outcome?.errorCode || "RECONCILE_UNRESOLVED", nextReconcileAt: outcome?.nextReconcileAt });
         outcomes.push({ caseId: claimed.case.caseId, ...outcome });
       } catch (error) {
-        await this.store.recordFailure(claimed.case.caseId, { workerId: this.workerId, errorCode: error.code || "RECONCILE_FAILED" });
+        await this.#handleFailure(claimed.case.caseId, { workerId: this.workerId, errorCode: error.code || "RECONCILE_FAILED" });
         outcomes.push({ caseId: claimed.case.caseId, resolved: false, errorCode: error.code || "RECONCILE_FAILED" });
       }
     }
@@ -36,7 +47,7 @@ class EffectReconciliationWorker {
       // single-flight：上一轮 runOnce 未结束时跳过本轮，避免长周期叠加并发巡检（O10）。
       if (this.running) return;
       this.running = true;
-      this.runOnce().catch(() => {}).finally(() => { this.running = false; });
+      this.runOnce().catch((error) => this.recordEvent?.("effect.reconcile.tick_failed", { error }, { level: "error" }).catch(() => {})).finally(() => { this.running = false; });
     }, this.intervalMs);
     this.timer.unref?.();
   }

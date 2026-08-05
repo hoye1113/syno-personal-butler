@@ -63,3 +63,37 @@ test("Owner-confirmed not-started reconciliation never reuses the old invocation
   assert.equal(resolved.ownerResolution.result, "confirmed_not_started");
   assert.notEqual("new-invocation", resolved.toolInvocationKey);
 });
+
+test("Reconciliation Worker escalates a case to failed_terminal after maxAttempts failures and stops re-claiming it", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-effect-terminal-"));
+  t.after(() => cleanup(root));
+  let now = new Date("2026-07-29T00:00:00.000Z");
+  const store = new EffectReconciliationCaseStore({ root, lockFile: path.join(root, "..", "cases-terminal.lock"), leaseMs: 1_000, clock: () => now, maxAttempts: 2 });
+  const opened = await store.open({ toolInvocationKey: "invocation-terminal", toolName: "job.create", ownerKey: "owner" });
+  const terminalCalls = [];
+  const worker = new EffectReconciliationWorker({
+    store, workerId: "worker-terminal",
+    reconcileReadOnly: async () => ({ resolved: false, errorCode: "NEVER_COMMITTED" }),
+    onTerminal: async (caseRecord) => terminalCalls.push(caseRecord.caseId),
+  });
+
+  // 第一次失败：failureCount 1 (< 2) -> 仍 open + 退避。
+  await worker.runOnce();
+  let current = await store.get(opened.case.caseId);
+  assert.equal(current.status, "open");
+  assert.equal(current.failureCount, 1);
+
+  // 推过 nextReconcileAt 使 case 再次到期。
+  now = new Date("2026-07-29T00:10:00.000Z");
+  await worker.runOnce();
+  current = await store.get(opened.case.caseId);
+  assert.equal(current.status, "failed_terminal");
+  assert.equal(current.failureCount, 2);
+  assert.deepEqual(terminalCalls, [opened.case.caseId]);
+
+  // 终态 case 不再被认领/重对账（list({status:"open"}) 与 claim 前置双保险）。
+  const reconciled = [];
+  const again = new EffectReconciliationWorker({ store, workerId: "worker-2", reconcileReadOnly: async (candidate) => { reconciled.push(candidate.caseId); return { resolved: false }; } });
+  await again.runOnce();
+  assert.deepEqual(reconciled, []);
+});

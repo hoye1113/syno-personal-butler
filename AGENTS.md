@@ -46,6 +46,18 @@
 
 不要只描述方案。在完成必要检查后直接实施，并在最终结果中简要说明：修改内容、关键决策、验证结果和剩余风险。
 
+## 跨进程文本往返编码约束
+
+本机 zh-CN 系统 ACP=936（GBK）。任何 `spawn`（powershell.exe / python / 其它）后经 `[Console]::In`/`[Console]::Out` 或默认 stdio 文本层往返非 ASCII（中文、emoji）payload 时，子进程默认编码是 GBK，**双向**都会损坏 UTF-8 字节，且只在下游 `JSON.parse` 抛 `SyntaxError` 时才暴露（静默无报错）——曾经的典型症状是「主动推送静默无限重试」。
+
+**硬约束**：新增或修改任何跨进程文本往返时，只让 ASCII / 显式 UTF-8 跨过 stdio 边界，绝不依赖「默认编码刚好是 UTF-8」——在 zh-CN 主机它不是：
+
+- Node 侧写 PowerShell stdin 用 `Buffer.from(x,"utf8").toString("base64")`；写 Python/其它子进程 stdin 直接写 UTF-8（Node 默认）。
+- PowerShell 脚本内只用 `[Convert]::FromBase64String`/`ToBase64String`，绝不调 `UTF8.GetString/GetBytes` 或依赖默认编码。
+- Python sidecar 用 `io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", line_buffering=True, write_through=True)` 包裹协议 stdio（须在 `sys.stdout=sys.stderr` 重定向之前取 `buffer`），reader 侧同包 stdin；并让 bridge 经 `processBootstrapEnv` 注入 `PYTHONUTF8=1` / `PYTHONIOENCODING=utf-8` 作双保险。
+
+参考实现：`runDpapi`（`apps/syno/syno/provider-credential-store.mjs`，Base64 传输）、Hermes sidecar（`scripts/sidecars/hermes_runtime.py` + `apps/syno/syno/hermes-sidecar-bridge.mjs`，UTF-8 字节层 + `PYTHONUTF8`）。运维侧说明见 `docs/OPERATIONS.md`「zh-CN 主机的 PowerShell/子进程编码陷阱」。新增跨进程文本往返必须有对应测试覆盖中文路径（参考 `tests/hermes-sidecar-bridge.test.mjs` 的 Python 集成用例）。
+
 ## 知识任务
 
 `vault/AGENTS.md` 及 `vault/99-System/Agent/` 中的 canonical Skill 继续约束知识收录、关联、写作和 MOC。平台入口只负责转发，不复制业务规则。

@@ -141,3 +141,21 @@ test("WorkflowOutbox grants one durable delivery lease across instances", async 
   assert.equal(secondResult.processed, 0);
   assert.equal(deliveredEvents.length, 1);
 });
+
+test("WorkflowOutbox.list tolerates a corrupt record file without aborting the whole directory", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-workflow-corrupt-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const outbox = new WorkflowOutbox({ root });
+  await outbox.enqueue({
+    workflowId: "workflow-good", eventType: "proposal.ready", ownerKey: "owner", targetChannel: "weixin",
+    redactedPayload: { text: "完好记录" }, idempotencyKey: "workflow-good:proposal:1",
+  });
+  // 模拟半写/磁盘损坏：合法前缀但内容非法的 .json。此前会让整目录 list() 抛 → 全部事件停滞。
+  await fs.writeFile(path.join(root, "outbox-deadbeefdeadbeefdead.json"), "{ not valid json");
+  const records = await outbox.list();
+  assert.equal(records.length, 1);
+  assert.equal(records[0].workflowId, "workflow-good");
+  // 损坏文件不阻断投递：good 记录仍可 drain。
+  const report = await outbox.deliverDue(async () => ({ delivered: true }));
+  assert.equal(report.delivered, 1);
+});

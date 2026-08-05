@@ -139,7 +139,14 @@ class WorkflowOutbox {
     const records = [];
     for (const entry of entries) {
       if (!entry.isFile() || !/^outbox-[a-f0-9]{20}\.json$/.test(entry.name)) continue;
-      const item = JSON.parse(await fs.readFile(path.join(this.root, entry.name), "utf8"));
+      // C2: per-file tolerance — a single corrupt/half-written .json must not abort the whole
+      // directory (which would stall ALL pending events). Skip the bad file; delivery continues.
+      let item;
+      try {
+        item = JSON.parse(await fs.readFile(path.join(this.root, entry.name), "utf8"));
+      } catch {
+        continue;
+      }
       if (!includeDelivered && item.status === "delivered") continue;
       records.push(item);
     }

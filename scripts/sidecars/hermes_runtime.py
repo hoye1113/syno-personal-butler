@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import queue
@@ -14,7 +15,11 @@ from pathlib import Path
 from typing import Any
 
 
-PROTOCOL_OUT = sys.stdout
+# zh-CN 主机 ACP=936：默认 stdio 文本层是 GBK，中文/emoji 字节经 GBK 编码会让 bridge 的 JSON.parse
+# 抛 HERMES_PROTOCOL_INVALID_JSON（与 runDpapi 同一类缺陷）。强制 UTF-8 字节层——只让 UTF-8 跨 stdio 边界。
+# 必须在 sys.stdout=sys.stderr 重定向之前取 buffer；叠加 bridge 注入的 PYTHONUTF8=1 双保险。
+PROTOCOL_OUT = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", line_buffering=True, write_through=True)
+PROTOCOL_IN = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8")
 sys.stdout = sys.stderr
 SOURCE = Path(os.environ.get("HERMES_SOURCE_ROOT", "")).resolve()
 EXPECTED_COMMIT = os.environ.get("HERMES_EXPECTED_COMMIT", "")
@@ -54,7 +59,9 @@ CANCELED: set[str] = set()
 
 def emit(message: dict[str, Any]) -> None:
     with OUTPUT_LOCK:
-        PROTOCOL_OUT.write(json.dumps(message, ensure_ascii=False, separators=(",", ":")) + "\n")
+        # ensure_ascii=True 作协议层纯 ASCII 兜底（\uXXXX 转义，bridge 侧 JSON.parse 正确还原中文），
+        # 与 UTF-8 字节层叠加最稳：即便字节层失效，纯 ASCII 也不受代码页影响。
+        PROTOCOL_OUT.write(json.dumps(message, ensure_ascii=True, separators=(",", ":")) + "\n")
         PROTOCOL_OUT.flush()
 
 
@@ -63,7 +70,7 @@ def respond(request: dict[str, Any], result: Any = None, error: dict[str, Any] |
 
 
 def reader() -> None:
-    for line in sys.stdin:
+    for line in PROTOCOL_IN:
         try:
             message = json.loads(line)
         except json.JSONDecodeError:

@@ -1,8 +1,16 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import test from "node:test";
 
-import { HermesSidecarBridge } from "../apps/syno/syno/hermes-sidecar-bridge.mjs";
+import { HermesSidecarBridge, processBootstrapEnv } from "../apps/syno/syno/hermes-sidecar-bridge.mjs";
+
+function pythonCommand() {
+  for (const cmd of ["python", "python3"]) {
+    try { execFileSync(cmd, ["--version"], { stdio: "ignore", timeout: 3_000 }); return cmd; } catch {}
+  }
+  return null;
+}
 
 const fixture = path.resolve(import.meta.dirname, "fixtures", "fake-hermes-sidecar.mjs");
 const tools = [{ name: "knowledge.search", description: "search", risk: "read", version: "1", inputSchema: { type: "object", required: ["query"], properties: { query: { type: "string" } }, additionalProperties: false } }];
@@ -110,4 +118,26 @@ test("HermesSidecarBridge redacts a secret-bearing tool error before echoing it 
   // fake sidecar 把 tool_result 回灌成 text（failure 分支回灌 {ok:false,error}）
   assert.match(result.text, /REMOTE_TOOL_ERROR_REDACTED/);
   assert.doesNotMatch(result.text, /Authorization|Bearer|abcdefghijklmnop/i);
+});
+
+test("processBootstrapEnv forces Python UTF-8 mode and lets the caller override it (B1)", () => {
+  const env = processBootstrapEnv({});
+  assert.equal(env.PYTHONUTF8, "1");
+  assert.equal(env.PYTHONIOENCODING, "utf-8");
+  // 白名单允许 PYTHONUTF8/PYTHONIOENCODING 覆盖（如需关闭 UTF-8 模式做诊断）。
+  const overridden = processBootstrapEnv({ PYTHONUTF8: "0" });
+  assert.equal(overridden.PYTHONUTF8, "0");
+});
+
+test("HermesSidecarBridge round-trips Chinese through a UTF-8 Python sidecar (B1)", async (t) => {
+  const py = pythonCommand();
+  if (process.platform !== "win32" || !py) t.skip("requires python on win32 (zh-CN GBK host)");
+  const fixture = path.resolve(import.meta.dirname, "fixtures", "echo-hermes-sidecar.py");
+  const target = new HermesSidecarBridge({ command: py, args: [fixture], tools, getProvider: provider, startupTimeoutMs: 3_000, requestTimeoutMs: 3_000 });
+  t.after(() => target.close());
+  const capabilities = await target.capabilities();
+  assert.ok(Array.isArray(capabilities.tools) && capabilities.tools.some((name) => String(name).includes("中文")));
+  const result = await target.run({ runId: "run-cn", message: "你好", modelId: "fixed-model", conversationId: "c1", tools }, {});
+  // 真实 Python sidecar 经 UTF-8 字节层往返中文——Node fake fixture 测不到的 GBK 路径。
+  assert.equal(result.text, "结果：中文往返成功 ✦");
 });

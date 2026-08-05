@@ -251,13 +251,23 @@ function createSynoRuntime(options = {}) {
   const acceptedRecovery = acceptedRequests
     ? (options.acceptedRecovery || new AcceptedRequestRecoveryWorker({
       store: acceptedRequests,
-      onEscalation: (request) => recordEvent("accepted.request.recovery_escalation", {
-        requestId: request?.requestId,
-        ownerKey: request?.ownerKey,
-        originChannel: request?.originChannel,
-        attempts: Number(request?.attempts || 0),
-        lastErrorCode: request?.lastErrorCode || null,
-      }, { level: "warning" }),
+      onEscalation: async (request) => {
+        await recordEvent("accepted.request.recovery_escalation", {
+          requestId: request?.requestId,
+          ownerKey: request?.ownerKey,
+          originChannel: request?.originChannel,
+          attempts: Number(request?.attempts || 0),
+          lastErrorCode: request?.lastErrorCode || null,
+        }, { level: "warning" });
+        // C7：升级此前只落 journal（用户看不到）。notifySystemAlert 把"静默无限重试"触达到人。
+        // level:warning 与 effect terminal(error) 分桶互不抑制；升级每 request 仅触发一次（attempts===threshold），
+        // 30min 去重只在多 request 短时集中升级时合并，可接受。
+        notifySystemAlert({
+          title: "请求恢复重试已达阈值",
+          body: `${request?.requestId || "?"} 已重试 ${Number(request?.attempts || 0)} 次：${request?.lastErrorCode || "未知"}`,
+          level: "warning",
+        }).catch(() => {});
+      },
     }))
     : null;
   const channelDeliveryOutbox = options.channelDeliveryOutbox || (process.env.NODE_ENV === "test" ? null : new ChannelDeliveryOutbox());
@@ -288,6 +298,22 @@ function createSynoRuntime(options = {}) {
             : "AUTHORITATIVE_EFFECT_NOT_COMMITTED",
         };
       }),
+      // C5：效应重试达 maxAttempts 转终态时触达——recordEvent 落 journal，notifySystemAlert 触达人。
+      onTerminal: async (caseRecord) => {
+        await recordEvent("effect.reconcile.terminal", {
+          caseId: caseRecord?.caseId,
+          toolName: caseRecord?.toolName,
+          ownerKey: caseRecord?.ownerKey,
+          failureCount: caseRecord?.failureCount,
+          lastErrorCode: caseRecord?.lastErrorCode || null,
+        }, { level: "error" });
+        notifySystemAlert({
+          title: "效应重试已达上限",
+          body: `${caseRecord?.toolName || "工具"} 效应重试 ${caseRecord?.failureCount || 0} 次未确认，已转终态：${caseRecord?.lastErrorCode || "未知"}`,
+          level: "error",
+        }).catch(() => {});
+      },
+      recordEvent,
     }))
     : null;
   const captureChunks = options.captureChunks || new CaptureChunkStore();
@@ -948,7 +974,6 @@ function createSynoRuntime(options = {}) {
   let workflowOutboxTimer = null;
   let workflowRetryTimer = null;
   let channelDeliveryOutboxTimer = null;
-  let reconciliationTimer = null;
   let openCodeRecoveryPromise = null;
   async function recoverOpenCode() {
     if (runtimeMode !== "opencode" || componentState.openCode !== "degraded") return;
@@ -1332,7 +1357,8 @@ function createSynoRuntime(options = {}) {
           recordEvent("channel.outbox.drain_failed", { error }, { level: "error" }).catch(() => {}),
         ), 1_000);
         channelDeliveryOutboxTimer.unref?.();
-        reconciliationTimer = setInterval(() => reconciliationWorker?.runOnce().catch(() => {}), 60_000);
+        // C5: effect reconcile 由 reconciliationWorker.start()（自带 single-flight）单驱动；此前另有一个 60s
+        // reconciliationTimer 重复 runOnce（绕过 single-flight），已移除以消除重复驱动。
         // C3: ingest failed_retryable 工作流此前只在进程重启 recover() 时处理（retryDue 全仓零 caller），失败后停滞到下次重启。
         // 60s 与 #prepare 的 nextRetryAt=now+60s 自洽；retryDue 不吞错，外层 catch 记 retry_failed 可观测，不阻断下一 tick。
         workflowRetryTimer = setInterval(() => ingestWorkflows.retryDue().catch((error) =>
@@ -1363,8 +1389,6 @@ function createSynoRuntime(options = {}) {
         workflowOutboxTimer = null;
         if (channelDeliveryOutboxTimer) clearInterval(channelDeliveryOutboxTimer);
         channelDeliveryOutboxTimer = null;
-        if (reconciliationTimer) clearInterval(reconciliationTimer);
-        reconciliationTimer = null;
         if (workflowRetryTimer) clearInterval(workflowRetryTimer);
         workflowRetryTimer = null;
         await acceptedRecovery?.stop().catch(() => {});

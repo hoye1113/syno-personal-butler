@@ -19,11 +19,12 @@ function caseKey(toolInvocationKey) { return createHash("sha256").update(String(
 function metadataFile(root, key) { return path.join(root, `${key}.json`); }
 
 class EffectReconciliationCaseStore {
-  constructor({ root = path.join(PATHS.stateRoot, "effect-cases"), lockFile = path.join(PATHS.stateRoot, "locks", "effect-cases.lock"), leaseMs = 5 * 60 * 1_000, clock = () => new Date(), processLock } = {}) {
+  constructor({ root = path.join(PATHS.stateRoot, "effect-cases"), lockFile = path.join(PATHS.stateRoot, "locks", "effect-cases.lock"), leaseMs = 5 * 60 * 1_000, clock = () => new Date(), processLock, maxAttempts = 8 } = {}) {
     this.root = path.resolve(root);
     this.leaseMs = Math.max(30_000, Number(leaseMs) || 5 * 60 * 1_000);
     this.clock = clock;
     this.processLock = processLock || new ProcessFileLock({ file: lockFile, timeoutMs: 30_000 });
+    this.maxAttempts = Math.max(1, Number(maxAttempts) || 8);
   }
 
   async #ensureRoot() { await fs.mkdir(this.root, { recursive: true }); }
@@ -57,6 +58,7 @@ class EffectReconciliationCaseStore {
         sourceId: sourceId ? String(sourceId) : null,
         status: "open",
         attempts: 0,
+        failureCount: 0,
         nextReconcileAt: now,
         claim: null,
         lastErrorCode: String(lastErrorCode || "EFFECT_UNKNOWN"),
@@ -133,8 +135,15 @@ class EffectReconciliationCaseStore {
   async recordFailure(caseIdOrInvocation, { workerId, errorCode = "RECONCILE_UNRESOLVED", nextReconcileAt } = {}) {
     return this.processLock.run(async () => {
       const current = await this.get(caseIdOrInvocation);
+      // C5：用独立的 failureCount 判 max（attempts 是 claim 认领数，含并发空认领，判 max 不准）。
+      // 达 maxAttempts 转终态——claim 前置 status!=="open" 天然阻止终态复用，失败 case 不再永远循环。
+      const failureCount = Number(current.failureCount || 0) + 1;
+      const common = { claim: null, failureCount, lastErrorCode: String(errorCode), ...(workerId ? { lastWorkerId: String(workerId) } : {}) };
+      if (failureCount >= this.maxAttempts) {
+        return this.#updateUnlocked(caseKey(current.toolInvocationKey), { status: "failed_terminal", ...common });
+      }
       const next = nextReconcileAt || new Date(this.clock().getTime() + Math.min(60 * 60_000, Math.max(5_000, (2 ** Math.min(8, Number(current.attempts || 1))) * 1_000))).toISOString();
-      return this.#updateUnlocked(caseKey(current.toolInvocationKey), { status: "open", claim: null, lastErrorCode: String(errorCode), nextReconcileAt: next, ...(workerId ? { lastWorkerId: String(workerId) } : {}) });
+      return this.#updateUnlocked(caseKey(current.toolInvocationKey), { status: "open", nextReconcileAt: next, ...common });
     });
   }
 

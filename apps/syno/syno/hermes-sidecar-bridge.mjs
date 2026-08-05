@@ -21,7 +21,7 @@ function publicTool(tool) {
 
 const SIDECAR_ENV_KEYS = new Set([
   "HERMES_EXPECTED_COMMIT", "HERMES_HOME", "HERMES_SOURCE_ROOT", "HERMES_YOLO_MODE",
-  "PYTHONDONTWRITEBYTECODE", "PYTHONPATH",
+  "PYTHONDONTWRITEBYTECODE", "PYTHONPATH", "PYTHONUTF8", "PYTHONIOENCODING",
 ]);
 
 function processBootstrapEnv(extra) {
@@ -32,7 +32,8 @@ function processBootstrapEnv(extra) {
   for (const key of ["PATH", "Path", "PATHEXT", "SystemRoot", "SYSTEMROOT", "ComSpec", "COMSPEC", "TEMP", "TMP"]) {
     if (process.env[key] !== undefined) inherited[key] = process.env[key];
   }
-  return { ...inherited, ...extra };
+  // B1：强制 Python UTF-8 模式作为字节层双保险（覆盖 sidecar 改动遗漏的情形）。extra 仍可覆盖。
+  return { ...inherited, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8", ...extra };
 }
 
 class HermesSidecarBridge {
