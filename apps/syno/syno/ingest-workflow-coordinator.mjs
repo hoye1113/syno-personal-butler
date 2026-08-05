@@ -179,6 +179,7 @@ class IngestWorkflowCoordinator {
     reconcileExecution = null,
     browserCapture = null,
     browserRuntime = null,
+    maxPrepareAttempts = 8,
   } = {}) {
     if (!ingest) throw new Error("IngestWorkflowCoordinator 缺少 IngestService");
     this.ingest = ingest;
@@ -193,6 +194,10 @@ class IngestWorkflowCoordinator {
     this.reconcileExecution = reconcileExecution;
     this.browserCapture = browserCapture;
     this.browserRuntime = browserRuntime;
+    // R2：#prepare 的 retryable 失败此前无上限——C3 把 retryDue 接上 60s timer 后，持续 retryable 错误
+    // （如 PROVIDER_RATE_LIMITED）会每 60s 无限重投、永不升终态。镜像 effect-store 的 maxAttempts，
+    // 达上限转 failed_terminal（ingest 工作流的合法终态），封堵本系列自身引入的无界重试。
+    this.maxPrepareAttempts = Math.max(1, Number(maxPrepareAttempts) || 8);
     this.inFlight = new Map();
     this.receiveTail = Promise.resolve();
   }
@@ -425,10 +430,14 @@ class IngestWorkflowCoordinator {
           return await this.store.get(id);
         } catch (error) {
           const retryable = error.retryable !== false;
+          // R2：重发布路径此前不自增计数——在此自增并按上限升终态，避免持续 retryable 无限重投。
+          const prepareAttempts = Number(current.attempts?.prepare || 0) + 1;
+          const exhausted = retryable && prepareAttempts >= this.maxPrepareAttempts;
           const failed = await this.store.update(id, {
-            stage: retryable ? "failed_retryable" : "failed_terminal",
-            lastError: { code: error.code || "INGEST_PUBLISH_FAILED", message: error.message, retryable },
-            ...(retryable ? { nextRetryAt: new Date(this.clock().getTime() + 60_000).toISOString() } : {}),
+            attempts: { ...current.attempts, prepare: prepareAttempts },
+            stage: exhausted ? "failed_terminal" : (retryable ? "failed_retryable" : "failed_terminal"),
+            lastError: { code: exhausted ? "INGEST_PREPARE_EXHAUSTED" : (error.code || "INGEST_PUBLISH_FAILED"), message: error.message, retryable },
+            ...(retryable && !exhausted ? { nextRetryAt: new Date(this.clock().getTime() + 60_000).toISOString() } : {}),
           });
           await this.onEvent?.({ type: "workflow.failed", workflow: failed, error });
           return failed;
@@ -506,14 +515,17 @@ class IngestWorkflowCoordinator {
         return proposed;
       } catch (error) {
         const retryable = error.retryable === true;
+        // R2：attempts.prepare 已在上方 started 自增并持久；读其值判上限，达阈值升终态（不重复自增）。
+        const prepareAttempts = Number(started.attempts?.prepare || 0);
+        const exhausted = retryable && prepareAttempts >= this.maxPrepareAttempts;
         const failed = await this.store.update(id, {
-          stage: retryable ? "failed_retryable" : "failed_terminal",
-          lastError: { code: error.code || "INGEST_PREPARE_FAILED", message: error.message, retryable },
+          stage: exhausted ? "failed_terminal" : (retryable ? "failed_retryable" : "failed_terminal"),
+          lastError: { code: exhausted ? "INGEST_PREPARE_EXHAUSTED" : (error.code || "INGEST_PREPARE_FAILED"), message: error.message, retryable },
           ...(error.browserStatus ? { browserStatus: error.browserStatus } : {}),
           ...(error.browserSessionId ? { browserSessionId: error.browserSessionId } : {}),
           ...(error.requestedUrl ? { requestedUrl: error.requestedUrl } : {}),
           ...(error.finalUrl ? { finalUrl: error.finalUrl } : {}),
-          ...(retryable ? { nextRetryAt: new Date(this.clock().getTime() + 60_000).toISOString() } : {}),
+          ...(retryable && !exhausted ? { nextRetryAt: new Date(this.clock().getTime() + 60_000).toISOString() } : {}),
         });
         await this.onEvent?.({ type: "workflow.failed", workflow: failed, error });
         return failed;

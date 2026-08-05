@@ -181,3 +181,49 @@ test("WorkflowOutbox.retain evicts old terminal records and keeps non-terminal o
   const left = await outbox.list();
   assert.deepEqual(left.map((r) => r.eventId), [pending.eventId]); // 非终态保留
 });
+
+test("R3: a cap-before-send guard terminates a persistently-throwing delivery at the attempt limit (throw path)", async (t) => {
+  // 镜像 runtime.drainWorkflowOutbox 的 deliverDue 回调：cap 检查在 channels.send 之前。
+  // R3 之前 cap 在 send 之后——一旦 send 抛错，异常逃出回调被 outbox 归为默认 retryable，
+  // 事后 cap 结构性不可达 → 事件无限重试。本例用「持续 throw」锁抛错路径（区别于既有「返回未送达」用例），
+  // 证明前置 cap 在 send 抛错时仍可达：达上限那一次 drain 根本不调用 send 即返回终态。
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-workflow-r3-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  let now = new Date("2026-07-28T00:00:00.000Z");
+  const outbox = new WorkflowOutbox({ root, clock: () => now });
+  await outbox.enqueue({
+    workflowId: "workflow-r3", eventType: "proposal.ready", ownerKey: "owner", targetChannel: "weixin",
+    redactedPayload: { text: "R3 抛错路径" }, idempotencyKey: "workflow-r3:proposal:1",
+  });
+
+  const MAX = 8; // = runtime WORKFLOW_OUTBOX_MAX_ATTEMPTS
+  let sendThrows = 0;
+  const deliver = async (event) => {
+    // 前置 cap（与 runtime 一致）：达上限即返回 retryable:false，绝不走到下面的 throw。
+    if (Number(event.attempts || 0) >= MAX) {
+      return { delivered: false, retryable: false, reason: "WORKFLOW_DELIVERY_EXHAUSTED" };
+    }
+    sendThrows += 1;
+    throw Object.assign(new Error("channel send exploded"), { code: "SEND_EXPLODED" });
+  };
+
+  let report;
+  let drains = 0;
+  do {
+    report = await outbox.deliverDue(deliver);
+    drains += 1;
+    now = new Date(now.getTime() + 2 * 3600_000); // 越过最长退避（上限 1h）使事件重新 due
+  } while (report.terminal === 0 && drains < MAX + 2);
+
+  // 关键：达上限那次 drain 未调用 send（cap 在 send 前）→ send 只发生了 MAX 次（前 MAX 次），不是 MAX+1。
+  assert.equal(sendThrows, MAX);
+  assert.equal(report.terminal, 1);
+  const record = (await outbox.list())[0];
+  assert.equal(record.status, "failed_terminal");
+  assert.equal(record.lastError.code, "WORKFLOW_DELIVERY_EXHAUSTED");
+
+  // 终态后不再重投（即使换成会成功的回调也不再被调用）。
+  const again = await outbox.deliverDue(async () => { sendThrows += 1; return { delivered: true }; });
+  assert.equal(sendThrows, MAX);
+  assert.equal(again.processed, 0);
+});

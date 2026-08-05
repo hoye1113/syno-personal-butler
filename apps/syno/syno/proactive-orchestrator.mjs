@@ -7,6 +7,7 @@ import { ProcessFileLock } from "./process-lock.mjs";
 import { SignalEngine, localDateKey } from "./signal-engine.mjs";
 import { aggregateDeliveryFailures } from "./channel-delivery-outbox.mjs";
 import { PROACTIVE_RESPONSE_KIND, buildProactiveBundle, normalizeState, signalIdentity } from "./proactive-reliability.mjs";
+import { detectStrictCredential } from "./sensitive-content.mjs";
 
 const DEFAULT_QUIET_HOURS = Object.freeze({ start: "22:30", end: "07:30" });
 
@@ -279,6 +280,15 @@ class ProactiveOrchestrator {
 
   async #deliverBundle(state, bundle, message, now, { deliveryKey: explicitDeliveryKey, shouldContinue = () => true, exclusiveActivePrefix = null } = {}) {
     const targetChannel = this.channels.homeChannel || "web";
+    // S1：高精度凭据脱敏门（detectStrictCredential，排除松模式 credential_assignment）。
+    // #prepare 的上游脱敏门仅 remote 模式生效，local-only 收录的凭据形标题/正文会原样进 bundleMessage → 入微信；
+    // channelDeliveryOutbox 零脱敏。此处 defense-in-depth：命中即降级为回退文案，仍投递（保留 bundle 身份与可恢复）。
+    const strictHit = detectStrictCredential(`${message.title || ""}\n${message.body || ""}`);
+    if (strictHit) {
+      await this.recordEvent?.("proactive.bundle.blocked_sensitive", { bundleId: bundle.bundleId, channel: targetChannel, reason: strictHit });
+      const notice = "一项主动提醒因疑似包含凭据已暂缓自动推送，请在 Syno 内查看详情。";
+      message = { ...message, body: notice, text: `${message.title || "Syno · 主动提醒"}\n${notice}` };
+    }
     const deliveryKey = explicitDeliveryKey || `${bundle.bundleId}:${targetChannel}:v1`;
     state.pendingBundles[bundle.bundleId] = {
       bundleId: bundle.bundleId,

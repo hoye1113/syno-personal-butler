@@ -627,3 +627,78 @@ test("recover reconciles a durable mid-execution Workflow with its authoritative
   await scheduled.shift()();
   assert.equal((await store.get(receipt.workflow.id)).stage, "reported");
 });
+
+test("R2: extract branch caps retryable prepare failures at maxPrepareAttempts (no infinite retry)", async (t) => {
+  const { ingest, store, coordinator } = await fixture(t);
+  // C3 把 retryDue 接上 60s timer 后，持续 retryable 抛错（如 PROVIDER_RATE_LIMITED）会无限重投、永不升终态。
+  // R2：#prepare 的两 catch 分支均按 maxPrepareAttempts 计数并达上限转 failed_terminal。本例锁提取分支。
+  ingest.propose = async () => {
+    throw Object.assign(new Error("provider rate limited"), { code: "PROVIDER_RATE_LIMITED", retryable: true });
+  };
+  const receipt = await coordinator.receive(
+    { kind: "text", value: "stuck prepare" },
+    { ownerKey: "owner", channel: "web", messageId: "r2-extract" },
+  );
+
+  let workflow;
+  for (let i = 0; i < 8; i += 1) {
+    workflow = await coordinator.retry(receipt.workflow.id);
+    if (i < 7) {
+      // 前 7 次：计数自增、仍 retryable，未到上限——绝不提前升终态、不写 INGEST_PREPARE_EXHAUSTED。
+      assert.equal(workflow.stage, "failed_retryable");
+      assert.equal(workflow.lastError.code, "PROVIDER_RATE_LIMITED");
+      assert.equal(workflow.attempts.prepare, i + 1);
+    }
+  }
+  // 第 8 次命中上限 → 终态，封堵无界重试。
+  assert.equal(workflow.stage, "failed_terminal");
+  assert.equal(workflow.lastError.code, "INGEST_PREPARE_EXHAUSTED");
+  assert.equal(workflow.attempts.prepare, 8);
+
+  // 终态后：retryDue 不再拾取、retry() 拒绝重试（不会再被无限驱动）。
+  assert.equal((await coordinator.retryDue(10)).processed, 0);
+  await assert.rejects(
+    () => coordinator.retry(receipt.workflow.id),
+    { code: "INGEST_WORKFLOW_NOT_RETRYABLE" },
+  );
+});
+
+test("R2: re-publish branch caps retryable publish failures at maxPrepareAttempts", async (t) => {
+  const { scheduled, ingest, store, coordinator } = await fixture(t);
+  ingest.status = async (artifactId) => ({
+    candidate: { id: `candidate-${artifactId}` },
+    proposal: { id: `proposal-${artifactId}` },
+  });
+  // 先让首轮 propose 走通到 proposed（onProposed 此刻未配置 → no-op，attempts.prepare 已计 1），
+  // 再配置 onProposed 持续抛 retryable——此后每次 #prepare 经重发布分支重投 proposal。
+  const receipt = await coordinator.receive(
+    { kind: "text", value: "republish stuck" },
+    { ownerKey: "owner", channel: "web", messageId: "r2-republish" },
+  );
+  await scheduled.shift()();
+  assert.equal((await store.get(receipt.workflow.id)).stage, "proposed");
+  // 模拟「首轮发布已失败一次」的生产态：stage=failed_retryable 且带 jobId+proposalId——
+  // 这正是 retryDue timer 周期性重投的对象；使其连续重试都走重发布分支、验证该路径计数自增与上限。
+  await store.update(receipt.workflow.id, { stage: "failed_retryable", jobId: "job-stable" });
+  coordinator.configure({
+    async onProposed() {
+      throw Object.assign(new Error("outbox unavailable"), { code: "OUTBOX_DOWN", retryable: true });
+    },
+  });
+
+  let workflow;
+  for (let i = 0; i < 7; i += 1) {
+    workflow = await coordinator.retry(receipt.workflow.id);
+    if (i < 6) {
+      assert.equal(workflow.stage, "failed_retryable");
+      assert.equal(workflow.lastError.code, "OUTBOX_DOWN");
+      // 首轮 extract 已计 prepare=1；重发布分支在此之上每次自增 1。
+      assert.equal(workflow.attempts.prepare, i + 2);
+    }
+  }
+  // 第 7 次重发布（prepare 累计至 8）命中上限 → 终态。
+  assert.equal(workflow.stage, "failed_terminal");
+  assert.equal(workflow.lastError.code, "INGEST_PREPARE_EXHAUSTED");
+  assert.equal(workflow.attempts.prepare, 8);
+  assert.equal((await coordinator.retryDue(10)).processed, 0);
+});

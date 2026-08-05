@@ -251,6 +251,8 @@ function createSynoRuntime(options = {}) {
   const acceptedRecovery = acceptedRequests
     ? (options.acceptedRecovery || new AcceptedRequestRecoveryWorker({
       store: acceptedRequests,
+      // R1：把 tick 内 runOnce 的异常落 journal（与启动期 bootstrap 的 accepted_request.recovery_failed 同事件）。
+      recordEvent,
       onEscalation: async (request) => {
         await recordEvent("accepted.request.recovery_escalation", {
           requestId: request?.requestId,
@@ -1022,6 +1024,11 @@ function createSynoRuntime(options = {}) {
         });
         return { delivered: true };
       }
+      // R3：cap 检查提到 send 之前。原事后检查在 send 之后——一旦 channels.send 抛错，异常逃出回调被 outbox
+      // 转为默认 retryable，cap 结构性不可达 → 事件无限重试。前置即覆盖「返回未送达」与「抛错」两路径，且省一次空投。
+      if (Number(event.attempts || 0) >= WORKFLOW_OUTBOX_MAX_ATTEMPTS) {
+        return { delivered: false, retryable: false, reason: "WORKFLOW_DELIVERY_EXHAUSTED" };
+      }
       const results = await channels.send({
         ...event.redactedPayload,
         ...(event.deliveryTarget || {}),
@@ -1029,10 +1036,6 @@ function createSynoRuntime(options = {}) {
         idempotencyKey: event.idempotencyKey,
       }, [event.targetChannel]);
       const result = results[event.targetChannel] || { delivered: false, retryable: false, reason: "channel_missing" };
-      // 目标渠道永久缺失是结构性终态（不无限重试）；瞬时失败在 attempts 达上限后也转终态，避免静默无限重试。
-      if (!result.delivered && result.retryable !== false && Number(event.attempts || 0) >= WORKFLOW_OUTBOX_MAX_ATTEMPTS) {
-        return { ...result, retryable: false, reason: `WORKFLOW_DELIVERY_EXHAUSTED:${result.reason || ""}` };
-      }
       return result;
     });
   }
@@ -1048,6 +1051,10 @@ function createSynoRuntime(options = {}) {
     const outboxReport = await channelDeliveryOutbox.deliverDue(async (payload, event) => {
       let persistedTarget = null;
       if (event.sourceType === "proactive_bundle") {
+        // R3：cap 提到 target 查找与 send 之前（同 workflow outbox），覆盖 send 抛错路径、省一次空投。
+        if (Number(event.attempts || 0) >= PROACTIVE_MAX_DELIVERY_ATTEMPTS) {
+          return { delivered: false, retryable: false, reason: "PROACTIVE_DELIVERY_EXHAUSTED" };
+        }
         try {
           persistedTarget = await ownerChannelTargets?.get?.(event.ownerKey, event.targetChannel) || null;
         } catch (error) {
@@ -1079,10 +1086,6 @@ function createSynoRuntime(options = {}) {
         deliveryKey: event.deliveryKey,
       }, [event.targetChannel]);
       const result = results[event.targetChannel] || { delivered: false, reason: "channel_missing" };
-      if (event.sourceType === "proactive_bundle" && !result.delivered && result.retryable !== false
-          && Number(event.attempts || 0) >= PROACTIVE_MAX_DELIVERY_ATTEMPTS) {
-        return { ...result, retryable: false, reason: `PROACTIVE_DELIVERY_EXHAUSTED:${result.reason || ""}` };
-      }
       return result;
     }, {
       onDelivered: async (event) => {

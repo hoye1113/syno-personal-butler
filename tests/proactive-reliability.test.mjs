@@ -73,6 +73,32 @@ test("a material event version change creates one new summary on the same date",
   assert.match(messages[1].message.body, /版本二/);
 });
 
+test("S1: a bundle whose body carries a credential shape is sanitized before delivery and records blocked_sensitive", async (t) => {
+  // local-only 收录的凭据形标题会原样进 bundleMessage → 入微信；#deliverBundle 的 detectStrictCredential 门
+  // 命中即降级为回退文案（仍投递，保留 bundle 身份），并记一次 proactive.bundle.blocked_sensitive。
+  const messages = [];
+  const eventsLog = [];
+  const proactive = await makeProactive(t, { messages, eventsLog });
+  const event = {
+    id: "leak:artifact-1",
+    kind: "ingest-pending",
+    title: "处理收录：Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456",
+    priority: 75,
+    ref: { status: "pending", updatedAt: "2026-08-05" },
+  };
+  await proactive.tick({ now: new Date("2026-08-05T08:30:00+08:00"), highValueEvents: [event] });
+
+  // 仍投递一条（降级文案，不阻断），但凭据字样不得出现在任何投递字段。
+  assert.equal(messages.length, 1);
+  const delivered = messages.map((m) => `${m.message.title || ""}\n${m.message.body || ""}\n${m.message.text || ""}`).join("\n");
+  assert.doesNotMatch(delivered, /Authorization|Bearer|abcdefghijklmnopqrstuvwxyz123456/);
+  assert.match(delivered, /因疑似包含凭据已暂缓自动推送/);
+  // 命中记一次观测事件，理由为高精度 authorization_header。
+  const blocked = eventsLog.filter((e) => e.name === "proactive.bundle.blocked_sensitive");
+  assert.equal(blocked.length, 1);
+  assert.equal(blocked[0].data.reason, "authorization_header");
+});
+
 test("a cosmetic title change does not create a new proactive business version", async (t) => {
   const messages = [];
   const proactive = await makeProactive(t, { messages });

@@ -1,5 +1,5 @@
 class AcceptedRequestRecoveryWorker {
-  constructor({ store, processRequest = async () => ({ status: "waiting_provider" }), intervalMs = 60_000, clock = () => new Date(), backoffMs = 30_000, onEscalation = null, escalationThreshold = 10 } = {}) {
+  constructor({ store, processRequest = async () => ({ status: "waiting_provider" }), intervalMs = 60_000, clock = () => new Date(), backoffMs = 30_000, onEscalation = null, escalationThreshold = 10, recordEvent = null } = {}) {
     if (!store) throw new Error("AcceptedRequestRecoveryWorker 缺少 AcceptedRequestStore");
     this.store = store;
     this.processRequest = processRequest;
@@ -9,6 +9,9 @@ class AcceptedRequestRecoveryWorker {
     // O7：accepted_request 不能转 terminal（会孤儿回执），故持续重试；但 retries 超阈值时回调告警，让“静默无限重试”变可观测。
     this.onEscalation = typeof onEscalation === "function" ? onEscalation : null;
     this.escalationThreshold = Math.max(1, Number(escalationThreshold) || 10);
+    // R1：tick 内 runOnce 的异常原被 .catch(()=>{}) 静默吞（同 effect/proactive worker 已修的 bug 类）。
+    // 此钩子把被吞的异常落 journal，事件名与启动期 bootstrap 的 runOnce 失败一致（accepted_request.recovery_failed）。
+    this.recordEvent = typeof recordEvent === "function" ? recordEvent : null;
     this.timer = null;
     this.running = false;
   }
@@ -70,7 +73,14 @@ class AcceptedRequestRecoveryWorker {
       // single-flight：上一轮 runOnce 未结束时跳过本轮，避免长周期叠加并发恢复（O10）。
       if (this.running) return;
       this.running = true;
-      this.runOnce().catch(() => {}).finally(() => { this.running = false; });
+      this.runOnce().catch((error) => {
+        // R1：recoverExpired/list/claim 抛错会中止 runOnce；落 journal 使「恢复静默停滞」可见，不阻断下一 tick。
+        try {
+          this.recordEvent?.("accepted_request.recovery_failed", {
+            error: { code: error?.code, message: String(error?.message || error).slice(0, 300) },
+          }, { level: "error" });
+        } catch { /* 观测自身更 best-effort，绝不冒泡影响 tick 节奏 */ }
+      }).finally(() => { this.running = false; });
     }, this.intervalMs);
     this.timer.unref?.();
   }

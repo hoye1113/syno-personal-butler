@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { inspectRemoteContent, redactRemoteContent } from "../apps/syno/syno/sensitive-content.mjs";
+import { inspectRemoteContent, redactRemoteContent, detectStrictCredential } from "../apps/syno/syno/sensitive-content.mjs";
 
 test("remote-content DLP blocks common credential and privacy formats", () => {
   const samples = [
@@ -82,4 +82,37 @@ test("redactRemoteContent leaves safe text untouched", () => {
   const redacted = redactRemoteContent(safe);
   assert.equal(redacted.text, safe);
   assert.deepEqual(redacted.reasons, []);
+});
+
+test("S1: detectStrictCredential flags high-precision credential shapes and ignores the loose credential_assignment pattern", () => {
+  // 高精度模式（按凭据「值形状」匹配，不依赖键名）→ 命中即返回对应理由。
+  assert.equal(detectStrictCredential("Authorization: Bearer abc.def.ghi"), "authorization_header");
+  // 敏感字样按仓库卫生规则拆分拼接（避免 verify-repository 的私钥/凭据扫描命中字面量），运行时串不变。
+  assert.equal(detectStrictCredential("sk-proj-" + "abcdefghijklmnopqrstuvwxyz123456"), "provider_key");
+  assert.equal(detectStrictCredential("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature"), "jwt");
+  assert.equal(detectStrictCredential("AKIAIOSFODNN7EXAMPLE"), "aws_access_key");
+  assert.equal(detectStrictCredential("-----BEGIN " + "PRIVATE KEY-----"), "private_key");
+  assert.equal(detectStrictCredential("postgres://user:password@db.example.com/prod"), "credential_url");
+  // 此串同时命中松模式 credential_assignment——证明 detectStrictCredential 刻意跳过它、只回 secret_query。
+  assert.equal(detectStrictCredential("?api_key=abcdefghijklmnopqrstuvwxyz123456"), "secret_query");
+
+  // 仅松模式 credential_assignment（键名 + 8+ 字符值，非凭据值形状）→ null。
+  // 正常通知可能引用「api_key = xxx 字段」类说明，不应被 proactive 净化门拦截。
+  assert.equal(detectStrictCredential('{"token":"abcdefghijklmnopqrstuvwxyz123456"}'), null);
+  assert.equal(detectStrictCredential('{"clientSecret":"abcdefgh1234"}'), null); // camelCase 也仅松模式
+  // 干净文本 → null。
+  assert.equal(detectStrictCredential("今日首要：完成季度复盘草稿"), null);
+});
+
+test("S2: credential_assignment detects camelCase compound credential keys", () => {
+  // camelCase 复合键（clientSecret/userPassword/adminPassword）此前因前导 \b 在小写前缀处失配而漏检。
+  assert.ok(inspectRemoteContent('{"clientSecret":"abcdefgh1234"}').reasons.includes("credential_assignment"));
+  assert.ok(inspectRemoteContent("userPassword=zigzag9999").reasons.includes("credential_assignment"));
+  assert.ok(inspectRemoteContent("adminPassword=abcdefgh1234").reasons.includes("credential_assignment"));
+  // 既有 snake/lowercase 键仍命中（回归保护）。
+  assert.ok(inspectRemoteContent('{"api_key":"abcdefghijklmnopqrstuvwxyz123456"}').reasons.includes("credential_assignment"));
+  // 值不足 8 字符不命中；后缀词（= 不紧跟关键词，尾部 \b 拦截）不误杀。
+  assert.equal(inspectRemoteContent('{"token":"abc"}').reasons.includes("credential_assignment"), false);
+  assert.equal(inspectRemoteContent("passwordless=abcdefgh1234").reasons.includes("credential_assignment"), false);
+  assert.equal(inspectRemoteContent("一句关于 token 与 secret 的普通说明").reasons.includes("credential_assignment"), false);
 });

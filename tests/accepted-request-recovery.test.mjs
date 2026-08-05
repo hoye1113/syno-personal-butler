@@ -60,3 +60,37 @@ test("recovery without an onEscalation hook still retries normally (O7)", async 
   assert.equal(report.retryable, 1);
   assert.notEqual(store.lastPatch?.status, "failed_terminal");
 });
+
+test("a tick whose runOnce throws is surfaced via recordEvent, not silently swallowed (R1)", async () => {
+  // store.recoverExpired 是 runOnce 的首个 await；让它抛错 → runOnce reject。
+  // 此前 start() 的 .catch(()=>{}) 会把恢复静默停滞；R1 改为经 recordEvent 落 journal。
+  const throwingStore = Object.assign(Object.create(mockStore({ attempts: 1 })), {
+    async recoverExpired() { throw Object.assign(new Error("state dir 权限被撤"), { code: "STORE_RECOVER_IO" }); },
+  });
+  const events = [];
+  const worker = new AcceptedRequestRecoveryWorker({
+    store: throwingStore,
+    processRequest: async () => ({ status: "waiting_provider" }),
+    clock: () => new Date("2026-08-02T00:00:00.000Z"),
+    intervalMs: 1_000, // 构造函数下限
+    recordEvent: (event, data) => { events.push({ event, data }); },
+  });
+  worker.start();
+  try {
+    // 等首个 tick（~1s）触发并落事件，最长等 3s 防卡死。
+    const started = Date.now();
+    await new Promise((resolve) => {
+      const handle = setInterval(() => {
+        if (events.length > 0 || Date.now() - started > 3_000) { clearInterval(handle); resolve(); }
+      }, 25);
+    });
+  } finally {
+    worker.stop();
+  }
+  const failed = events.find((e) => e.event === "accepted_request.recovery_failed");
+  assert.ok(failed, "runOnce 的异常必须经 recordEvent 落 accepted_request.recovery_failed");
+  assert.equal(failed.data.error.code, "STORE_RECOVER_IO");
+  // finally 复位 single-flight 标记——下一 tick 仍可运行（未卡死）。
+  assert.equal(worker.running, false);
+  assert.equal(worker.timer, null); // stop 已清理
+});
