@@ -390,6 +390,42 @@ test("an unreadable proactive Outbox payload becomes an explicit recovery failur
   assert.equal(state.recoveryFailures[record.eventId].code, "PROACTIVE_OUTBOX_PAYLOAD_UNAVAILABLE");
 });
 
+test("a failed_terminal proactive Outbox event is excluded from reconcile and never spams recoveryFailures", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-proactive-terminal-reconcile-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const stateFile = path.join(root, "proactive.json");
+  const outbox = new ChannelDeliveryOutbox({
+    root: path.join(root, "outbox"),
+    payloadRoot: path.join(root, "payloads"),
+    lockFile: path.join(root, "outbox.lock"),
+    protect: async (value) => value,
+    unprotect: async (value) => value,
+  });
+  const proactive = new ProactiveOrchestrator({
+    host: { async receive() { return { job: { status: "waiting_provider" } }; } },
+    today: { async snapshot() { return { priorities: [] }; } },
+    channels: { homeChannel: "weixin", async send() { throw new Error("no direct delivery"); } },
+    channelDeliveryOutbox: outbox,
+    signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
+    stateFile,
+  });
+  await proactive.tick({
+    now: new Date("2026-07-30T08:30:00+08:00"),
+    highValueEvents: [{ id: "ingest-pending:terminal", kind: "ingest-pending", title: "已终态", priority: 75, ref: { status: "pending" } }],
+  });
+  const [record] = await outbox.list({ limit: 1 });
+  // 终态事件：直接落 failed_terminal（模拟重试耗尽/结构性失败后的状态），并损坏 payload（最坏情况）。
+  const eventPath = path.join(root, "outbox", `${record.eventId}.json`);
+  const settled = JSON.parse(await fs.readFile(eventPath, "utf8"));
+  await fs.writeFile(eventPath, JSON.stringify({ ...settled, status: "failed_terminal" }, null, 2), "utf8");
+  await fs.writeFile(path.join(root, "payloads", `${record.payloadRef}.dpapi`), "not-json");
+
+  await proactive.tick({ now: new Date("2026-07-30T08:35:00+08:00"), highValueEvents: [] });
+  const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
+  // C6：failed_terminal 不进 reconcile，即便 payload 损坏也不刷 recoveryFailures（根治 f1b29459 噪音）。
+  assert.equal(state.recoveryFailures?.[record.eventId], undefined);
+});
+
 test("legacy Web audit suppresses a migrated current event when lastRuns is incomplete", async (t) => {
   const stateFile = await tempState(t, "syno-proactive-web-audit-migration-");
   await fs.writeFile(stateFile, JSON.stringify({ date: "2026-07-29", notificationsToday: 0, lastRuns: {}, pending: {} }));

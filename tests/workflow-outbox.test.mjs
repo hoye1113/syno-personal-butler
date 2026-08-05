@@ -33,13 +33,56 @@ test("WorkflowOutbox is idempotent and retries undelivered workflow events", asy
   assert.equal(duplicate.eventId, first.eventId);
 
   const failed = await outbox.deliverDue(async () => ({ delivered: false, reason: "offline" }));
-  assert.equal(failed.failed, 1);
+  assert.equal(failed.retryable, 1);
+  assert.equal((await outbox.list())[0].status, "failed_retryable");
   assert.equal((await outbox.list())[0].attempts, 1);
 
   now = new Date("2026-07-28T00:01:00.000Z");
   const delivered = await outbox.deliverDue(async () => ({ delivered: true }));
   assert.equal(delivered.delivered, 1);
   assert.equal((await outbox.list({ includeDelivered: false })).length, 0);
+});
+
+test("WorkflowOutbox settles a non-retryable delivery as failed_terminal and never re-attempts it", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-workflow-terminal-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  let now = new Date("2026-07-28T00:00:00.000Z");
+  const outbox = new WorkflowOutbox({ root, clock: () => now });
+  await outbox.enqueue({
+    workflowId: "workflow-terminal", eventType: "proposal.ready", ownerKey: "owner", targetChannel: "weixin",
+    redactedPayload: { text: "终态" }, idempotencyKey: "workflow-terminal:proposal:1",
+  });
+  const terminalEvents = [];
+  const report = await outbox.deliverDue(
+    async () => ({ delivered: false, retryable: false, reason: "channel_missing" }),
+    { onFailedTerminal: async (event) => terminalEvents.push(event) },
+  );
+  assert.equal(report.terminal, 1);
+  assert.equal(report.retryable, 0);
+  const record = (await outbox.list())[0];
+  assert.equal(record.status, "failed_terminal");
+  assert.equal(record.lastError.code, "channel_missing");
+  assert.equal(terminalEvents.length, 1);
+
+  // A terminal record is filtered out of the next drain — never re-attempted.
+  let sends = 0;
+  const again = await outbox.deliverDue(async () => { sends += 1; return { delivered: true }; });
+  assert.equal(sends, 0);
+  assert.equal(again.processed, 0);
+});
+
+test("WorkflowOutbox treats a thrown deliver without retryable as failed_retryable", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-workflow-throw-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  let now = new Date("2026-07-28T00:00:00.000Z");
+  const outbox = new WorkflowOutbox({ root, clock: () => now });
+  await outbox.enqueue({
+    workflowId: "workflow-throw", eventType: "proposal.ready", ownerKey: "owner", targetChannel: "weixin",
+    redactedPayload: { text: "抛错" }, idempotencyKey: "workflow-throw:proposal:1",
+  });
+  const report = await outbox.deliverDue(async () => { throw new Error("transient boom"); });
+  assert.equal(report.retryable, 1);
+  assert.equal((await outbox.list())[0].status, "failed_retryable");
 });
 
 test("WorkflowOutbox accepts only a bounded redacted text payload", async (t) => {

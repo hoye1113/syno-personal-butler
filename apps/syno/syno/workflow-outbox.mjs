@@ -146,41 +146,52 @@ class WorkflowOutbox {
     return records.sort((left, right) => String(left.createdAt).localeCompare(String(right.createdAt)));
   }
 
-  async deliverDue(deliver, { limit = 50 } = {}) {
+  async deliverDue(deliver, { limit = 50, onFailedRetryable, onFailedTerminal } = {}) {
     const operation = this.tail.catch(() => {}).then(async () => {
       const now = this.clock();
       const due = (await this.list({ includeDelivered: false }))
-        .filter((item) => !item.nextAttemptAt || new Date(item.nextAttemptAt).getTime() <= now.getTime())
+        .filter((item) => item.status !== "failed_terminal"
+          && (!item.nextAttemptAt || new Date(item.nextAttemptAt).getTime() <= now.getTime()))
         .slice(0, Math.max(1, Number(limit) || 50));
       let delivered = 0;
-      let failed = 0;
+      let retryable = 0;
+      let terminal = 0;
       for (const item of due) {
         const lease = await this.#acquireLease(item.eventId);
         if (!lease) continue;
         try {
           const current = await this.#get(item.eventId);
-          if (!current || current.status === "delivered") continue;
-          const result = await deliver(current);
-          if (!result?.delivered) throw Object.assign(new Error(result?.reason || "渠道未确认投递"), { code: "OUTBOX_UNDELIVERED" });
-          await atomicJson(this.#file(item.eventId), { ...current, status: "delivered", deliveredAt: now.toISOString(), attempts: current.attempts + 1 });
-          delivered += 1;
-        } catch (error) {
-          const current = await this.#get(item.eventId) || item;
-          const attempts = current.attempts + 1;
-          const delayMs = Math.min(60 * 60 * 1_000, 30_000 * (2 ** Math.min(7, attempts - 1)));
-          await atomicJson(this.#file(item.eventId), {
-            ...current,
-            status: "pending",
-            attempts,
-            nextAttemptAt: new Date(now.getTime() + delayMs).toISOString(),
-            lastError: { code: error.code || "OUTBOX_DELIVERY_FAILED", message: error.message },
-          });
-          failed += 1;
+          if (!current || current.status === "delivered" || current.status === "failed_terminal") continue;
+          // 镜像 ChannelDeliveryOutbox：deliver 抛错按 retryable（默认）归类，除非显式 retryable:false。
+          let result;
+          try {
+            result = await deliver(current);
+          } catch (error) {
+            result = { delivered: false, retryable: error?.retryable !== false, reason: error?.code || "OUTBOX_DELIVERY_FAILED" };
+          }
+          if (result?.delivered) {
+            await atomicJson(this.#file(item.eventId), { ...current, status: "delivered", deliveredAt: now.toISOString(), attempts: current.attempts + 1 });
+            delivered += 1;
+          } else if (result?.retryable !== false) {
+            // 瞬时失败：退避后重试（不再无条件回 pending 静默无限重试），经 onFailedRetryable 可观测。
+            const attempts = current.attempts + 1;
+            const delayMs = Math.min(60 * 60 * 1_000, 30_000 * (2 ** Math.min(7, attempts - 1)));
+            const settled = { ...current, status: "failed_retryable", attempts, nextAttemptAt: new Date(now.getTime() + delayMs).toISOString(), lastError: { code: String(result?.reason || "OUTBOX_DELIVERY_FAILED"), message: String(result?.reason || "渠道未确认投递") } };
+            await atomicJson(this.#file(item.eventId), settled);
+            try { await onFailedRetryable?.(settled); } catch { /* best-effort：落盘已持久，勿中断批次 */ }
+            retryable += 1;
+          } else {
+            // 结构性失败（目标渠道永久缺失、重试耗尽等）：终态，停止重试，经 onFailedTerminal 告警。
+            const settled = { ...current, status: "failed_terminal", attempts: current.attempts + 1, lastError: { code: String(result?.reason || "OUTBOX_TERMINAL"), message: String(result?.reason || "渠道投递终态失败") } };
+            await atomicJson(this.#file(item.eventId), settled);
+            try { await onFailedTerminal?.(settled); } catch { /* best-effort：落盘已持久，勿中断批次 */ }
+            terminal += 1;
+          }
         } finally {
           await this.#releaseLease(lease);
         }
       }
-      return { processed: delivered + failed, delivered, failed };
+      return { processed: delivered + retryable + terminal, delivered, retryable, terminal };
     });
     this.tail = operation;
     return operation;

@@ -392,7 +392,7 @@ class ProactiveOrchestrator {
   async #reconcileOutbox(state, now) {
     if (!this.channelDeliveryOutbox?.list || !this.channelDeliveryOutbox?.get) return;
     const records = (await this.channelDeliveryOutbox.list({ limit: 1000 }))
-      .filter((item) => item.sourceType === "proactive_bundle" && item.status !== "superseded");
+      .filter((item) => item.sourceType === "proactive_bundle" && item.status !== "superseded" && item.status !== "failed_terminal");
     for (const record of records) {
       let payload;
       try {
@@ -767,7 +767,10 @@ class ProactiveOrchestrator {
     };
     await tickIfEnabled();
     if (generation !== this.startGeneration) return;
-    this.timer = setInterval(() => tickIfEnabled().catch(() => {}), 60_000);
+    this.timer = setInterval(() => tickIfEnabled().catch((error) => {
+      // tick 失败此前被完全静默（save IO 错 / enqueue 冲突 / snapshot 错都消失）；落 journal 可观测，不阻断下一 tick。
+      this.recordEvent?.("proactive.tick.failed", { error: { code: error?.code, message: String(error?.message || error).slice(0, 500) } }, { level: "error" }).catch(() => {});
+    }), 60_000);
   }
 
   stop() {

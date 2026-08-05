@@ -91,6 +91,7 @@ const REPO_FINGERPRINT = createHash("sha256")
 
 const PROACTIVE_MAX_DELIVERY_ATTEMPTS = 8;
 const PROACTIVE_EARLY_WARN_ATTEMPTS = 4;
+const WORKFLOW_OUTBOX_MAX_ATTEMPTS = 8;
 const SYSTEM_ALERT_COOLDOWN_MS = 30 * 60 * 1000;
 
 const WORKFLOW_FILES = Object.freeze({
@@ -945,6 +946,7 @@ function createSynoRuntime(options = {}) {
   let channelRecoveryTimer = null;
   let providerRecoveryTimer = null;
   let workflowOutboxTimer = null;
+  let workflowRetryTimer = null;
   let channelDeliveryOutboxTimer = null;
   let reconciliationTimer = null;
   let openCodeRecoveryPromise = null;
@@ -987,7 +989,12 @@ function createSynoRuntime(options = {}) {
         eventId: event.eventId,
         idempotencyKey: event.idempotencyKey,
       }, [event.targetChannel]);
-      return results[event.targetChannel] || { delivered: false, reason: "channel_missing" };
+      const result = results[event.targetChannel] || { delivered: false, retryable: false, reason: "channel_missing" };
+      // 目标渠道永久缺失是结构性终态（不无限重试）；瞬时失败在 attempts 达上限后也转终态，避免静默无限重试。
+      if (!result.delivered && result.retryable !== false && Number(event.attempts || 0) >= WORKFLOW_OUTBOX_MAX_ATTEMPTS) {
+        return { ...result, retryable: false, reason: `WORKFLOW_DELIVERY_EXHAUSTED:${result.reason || ""}` };
+      }
+      return result;
     });
   }
   async function drainChannelDeliveryOutbox({ allowProactiveEventId = null } = {}) {
@@ -1326,6 +1333,11 @@ function createSynoRuntime(options = {}) {
         ), 1_000);
         channelDeliveryOutboxTimer.unref?.();
         reconciliationTimer = setInterval(() => reconciliationWorker?.runOnce().catch(() => {}), 60_000);
+        // C3: ingest failed_retryable 工作流此前只在进程重启 recover() 时处理（retryDue 全仓零 caller），失败后停滞到下次重启。
+        // 60s 与 #prepare 的 nextRetryAt=now+60s 自洽；retryDue 不吞错，外层 catch 记 retry_failed 可观测，不阻断下一 tick。
+        workflowRetryTimer = setInterval(() => ingestWorkflows.retryDue().catch((error) =>
+          recordEvent("ingest.workflow.retry_failed", { error }, { level: "error" }).catch(() => {}),
+        ), 60_000);
         await recordEvent("syno.initialize.completed", { worker, runtimeMode, state: lifecycleState });
         return core.snapshot();
       })().catch(async (error) => {
@@ -1353,6 +1365,8 @@ function createSynoRuntime(options = {}) {
         channelDeliveryOutboxTimer = null;
         if (reconciliationTimer) clearInterval(reconciliationTimer);
         reconciliationTimer = null;
+        if (workflowRetryTimer) clearInterval(workflowRetryTimer);
+        workflowRetryTimer = null;
         await acceptedRecovery?.stop().catch(() => {});
         await reconciliationWorker?.stop().catch(() => {});
         await channels.stop().catch(() => {});
