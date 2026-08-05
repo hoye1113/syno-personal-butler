@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { serializeForMcp, serializeForToolMessage, redactResultObject, isPlainObject } from "../apps/syno/syno/tool-result-serializer.mjs";
+import { serializeForMcp, serializeForToolMessage, redactResultObject, isResultSafe, isPlainObject } from "../apps/syno/syno/tool-result-serializer.mjs";
+import { inspectRemoteContent } from "../apps/syno/syno/sensitive-content.mjs";
 
 test("serializeForMcp: 数组结果不产 structuredContent，完整结果走 content text", () => {
   const result = [{ path: "vault/note.md", query: "agent" }];
@@ -70,6 +71,21 @@ test("redactResultObject: 含密时返回 {ok:false,error} stub（保对象契�
   assert.equal(out.ok, false);
   assert.equal(out.error.code, "REMOTE_TOOL_RESULT_BLOCKED");
   assert.doesNotMatch(JSON.stringify(out), /abcdefghijklmnop|Authorization|Bearer/);
+});
+
+test("isResultSafe: 截断会漏检的跨边界凭据模式在完整结果上仍被检出 (D1)", () => {
+  // 凭据模式埋在长文本中段——truncate-middle（头尾各留、砍中段）会把它切成两半，
+  // 截断后的 head/tail 段都不再含完整模式 → inspectRemoteContent 漏检 → 泄密。
+  // isResultSafe 在【完整、未截断】文本上判定，必须命中（否则 tool-loop-agent 的截断门失效）。
+  // padding 用「空格 + 凭据」保证 \bauthorization 有词边界（紧贴 x 会让 \b 失配而漏检）。
+  const padding = "x".repeat(30_000);
+  const result = { log: `${padding} Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456 ${padding}` };
+  assert.equal(isResultSafe(result), false);
+  // 对照：模拟旧顺序「先截断再脱敏」的 head 段——不含完整凭据模式 → 误判 safe（证明必须先判定再截断）。
+  const headSegment = result.log.slice(0, 10_000);
+  assert.equal(inspectRemoteContent(JSON.stringify({ log: headSegment })).safe, true);
+  // 干净结果判 true。
+  assert.equal(isResultSafe({ log: "一切正常，无敏感信息" }), true);
 });
 
 test("isPlainObject: 仅字面量对象为 true，数组/null/原始值/类实例(Date/Map/Set/Error) 为 false", () => {

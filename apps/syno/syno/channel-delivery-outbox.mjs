@@ -36,6 +36,11 @@ function backoff(attempts, baseMs) {
   return Math.min(15 * 60_000, baseMs * (2 ** Math.min(8, Math.max(0, attempts - 1))));
 }
 
+// A5：投递后状态投影（onDelivered，如回写 accepted_request/proactive 状态）的重试上限。投影是
+// 「消息已送达后的状态回写」，非送达本身；但仍需终态出口——否则一条永远失败的投影（下游 IO 持续坏）
+// 会被每个 drain tick 无界重试（同「静默无限重试」bug 类）。达上限后停止重选，标 EXHAUSTED 可观测。
+const PROJECTION_MAX_ATTEMPTS = 8;
+
 function eventFile(root, id) { return path.join(root, `${id}.json`); }
 function payloadFile(root, ref) { return path.join(root, `${ref}.dpapi`); }
 function leaseFile(root, id) { return path.join(root, `${id}.lease`); }
@@ -441,12 +446,13 @@ class ChannelDeliveryOutbox {
   async deliverDue(send, { now = this.clock(), limit = 100, onDelivered, onDeliveryUnknown, onFailedRetryable, onFailedTerminal, shouldDeliver } = {}) {
     if (typeof send !== "function") throw new Error("ChannelDeliveryOutbox.deliverDue 需要发送函数");
     const max = Math.max(1, Number(limit) || 100);
-    const report = { scanned: 0, delivered: 0, retryable: 0, terminal: 0, unknown: 0, superseded: 0, projected: 0, projectionFailed: 0 };
+    const report = { scanned: 0, delivered: 0, retryable: 0, terminal: 0, unknown: 0, superseded: 0, projected: 0, projectionFailed: 0, projectionExhausted: 0 };
     while (report.scanned < max) {
       const records = await this.#listUnlocked();
       const projection = typeof onDelivered === "function"
         ? records
           .filter((item) => item.status === "delivered" && !item.projectedAt
+            && (Number(item.projectionAttempts) || 0) < PROJECTION_MAX_ATTEMPTS
             && new Date(item.nextProjectionAt || 0).getTime() <= new Date(now).getTime())
           .sort((a, b) => String(a.deliveredAt || a.updatedAt).localeCompare(String(b.deliveredAt || b.updatedAt)))[0]
         : null;
@@ -463,11 +469,13 @@ class ChannelDeliveryOutbox {
           }));
           report.projected += 1;
         } catch (error) {
+          const exhausted = projectionAttempts >= PROJECTION_MAX_ATTEMPTS;
           await this.processLock.run(() => this.#updateUnlocked(projection.eventId, {
             projectionAttempts,
-            nextProjectionAt: new Date(this.clock().getTime() + backoff(projectionAttempts, this.retryBaseMs)).toISOString(),
-            projectionErrorCode: error?.code || "DELIVERY_PROJECTION_FAILED",
+            nextProjectionAt: exhausted ? null : new Date(this.clock().getTime() + backoff(projectionAttempts, this.retryBaseMs)).toISOString(),
+            projectionErrorCode: exhausted ? "DELIVERY_PROJECTION_EXHAUSTED" : (error?.code || "DELIVERY_PROJECTION_FAILED"),
           }));
+          if (exhausted) report.projectionExhausted += 1;
           report.projectionFailed += 1;
         }
         continue;

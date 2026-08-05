@@ -73,10 +73,12 @@ async function readSecretFromStdin() {
       throw new Error("交互式 Token 输入仅支持 Windows 隐藏输入；其他平台请通过受控标准输入管道传入");
     }
     return new Promise((resolve, reject) => {
+      // B2：Token 经 [Console]::Out 文本层输出，zh-CN 主机默认 GBK 会损坏非 ASCII 字节（与 runDpapi 同坑）。
+      // 只让 Base64 跨过 console 边界：PowerShell 内用 UTF8.GetBytes→ToBase64String，Node 侧 base64 解回 utf8。
       const script = [
         "$secret = Read-Host '请输入 OpenCode Zen Token' -AsSecureString",
         "$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)",
-        "try { [Console]::Out.Write([Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)) }",
+        "try { $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr); [Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($plain))) }",
         "finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }",
       ].join("; ");
       const child = spawn("powershell.exe", ["-NoProfile", "-Command", script], {
@@ -88,7 +90,7 @@ async function readSecretFromStdin() {
       child.stdout.on("data", (chunk) => { value += chunk; });
       child.once("error", reject);
       child.once("exit", (code) => code === 0
-        ? resolve(value.trim())
+        ? resolve(Buffer.from(value.trim(), "base64").toString("utf8"))
         : reject(new Error(`隐藏 Token 输入失败：PowerShell exit ${code}`)));
     });
   }

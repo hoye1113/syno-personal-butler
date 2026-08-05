@@ -73,7 +73,8 @@ function serializeForToolMessage(result, { redact = true, charLimit = null } = {
 }
 
 // Hermes sidecar：外层 bridge adapter 期望对象（非字符串）。unsafe 时返回 {ok:false,error}
-// stub 对象，保对象契约、不 throw。safe 时原样返回 result 引用。
+// stub 对象，不 throw。safe 时原样返回 result 引用——「保对象契约」指 unsafe 分支必返回对象 stub
+// （而非 throw）、且外层 tool_result 信封恒为对象；safe 引用本身可是 object/array/scalar，由 sidecar 承载。
 function redactResultObject(result) {
   const text = JSON.stringify(result);
   return inspectRemoteContent(text).safe
@@ -81,4 +82,11 @@ function redactResultObject(result) {
     : { ok: false, error: { code: "REMOTE_TOOL_RESULT_BLOCKED", message: "工具结果可能包含凭据或敏感信息，已脱敏" } };
 }
 
-export { serializeForMcp, serializeForToolMessage, redactResultObject, isPlainObject };
+// D1：在【完整、未截断】结果上判定安全性。调用方必须在任何截断之前调用：截断（尤其 truncate-middle
+// 砍中段）会把跨边界的凭据模式切成两半，导致截断后的文本不再命中模式而漏检。先过此门，不安全则跳过
+// 截断直接走脱敏串；安全则截断不可能凭空创造凭据形状，可安全截断。
+function isResultSafe(result) {
+  return inspectRemoteContent(JSON.stringify(result ?? {})).safe;
+}
+
+export { serializeForMcp, serializeForToolMessage, redactResultObject, isResultSafe, isPlainObject };

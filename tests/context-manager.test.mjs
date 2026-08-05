@@ -398,6 +398,26 @@ test("stats aggregates compression actions, rotates, and extractions (OBS 3.1)",
   assert.ok(s.lastUpdated, "lastUpdated 已记录");
 });
 
+test("extraction pipeline surfaces a failing callback via onExtractionError without blocking compression (C9)", async () => {
+  const provider = { async complete() { return { message: { content: '{"keep":[1]}' }, model: "fixed" }; } };
+  const errors = [];
+  const cm = new ContextManager({
+    tools: new ToolRegistry([makeTool()]), provider,
+    onExtractValuable: async () => { throw new Error("downstream IO broken"); },
+    onExtractionError: (error, ctx) => errors.push({ message: error.message, action: ctx.action, conversationId: ctx.conversationId }),
+  });
+  const big = "x".repeat(4_000_000);
+  // 压缩必须照常完成——提取是 fire-and-forget，其失败绝不阻塞或污染压缩结果（设计不变量）。
+  await cm.compress(
+    [{ role: "system", content: "sys" }, { role: "user", content: `我决定采用方案A并记录为待办 ${big}` }],
+    { runConfig: { contextLength: 100_000 } },
+  );
+  await cm.drainExtractions();
+  assert.ok(errors.length >= 1, "提取失败须经 onExtractionError 透出（不再被 .catch(()=>{}) 静默吞）");
+  assert.equal(errors[0].message, "downstream IO broken");
+  assert.equal(errors[0].action, "rotate");
+});
+
 test("M2c COST: trackUsage attributes agent token usage (default feature + accumulation + NaN guard)", async () => {
   const cm = new ContextManager({ tools: new ToolRegistry([makeTool()]) });
   const u1 = { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 };

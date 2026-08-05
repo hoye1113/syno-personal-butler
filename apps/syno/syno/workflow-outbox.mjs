@@ -153,6 +153,25 @@ class WorkflowOutbox {
     return records.sort((left, right) => String(left.createdAt).localeCompare(String(right.createdAt)));
   }
 
+  // C8：有界保留——终态记录（delivered/failed_terminal）永不重投，淘汰最旧的以防目录单调膨胀
+  //（否则每个 drain tick 重新读解析所有文件，且诊断切片会被旧记录挤出窗口）。deliverDue 的候选过滤已排除
+  // 这些状态，故淘汰它们对投递安全。镜像 ChannelDeliveryOutbox.retain，按小时节流（见 drainWorkflowOutbox）。
+  async retain({ now = this.clock(), maxAgeMs = 14 * 24 * 60 * 60 * 1000, limit = 200 } = {}) {
+    const terminal = new Set(["delivered", "failed_terminal"]);
+    const cutoff = new Date(now).getTime() - Math.max(0, Number(maxAgeMs) || 0);
+    const records = await this.list({ includeDelivered: true });
+    let removed = 0;
+    for (const record of records) {
+      if (removed >= limit) break;
+      if (!terminal.has(record.status)) continue;
+      const ts = new Date(record.deliveredAt || record.createdAt).getTime();
+      if (!Number.isFinite(ts) || ts > cutoff) continue;
+      try { await fs.rm(this.#file(record.eventId), { force: true }); } catch { /* best-effort：淘汰不阻塞投递 */ }
+      removed += 1;
+    }
+    return { removed };
+  }
+
   async deliverDue(deliver, { limit = 50, onFailedRetryable, onFailedTerminal } = {}) {
     const operation = this.tail.catch(() => {}).then(async () => {
       const now = this.clock();

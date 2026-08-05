@@ -325,6 +325,34 @@ test("a failed delivered projection retries without sending the channel message 
   assert.ok((await outbox.get(created.event.eventId)).projectedAt);
 });
 
+test("a perpetually-failing delivered projection exhausts after maxAttempts and stops re-selecting (A5)", async (t) => {
+  const { root, outbox, clockState } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const created = await outbox.enqueue({
+    ...base, sourceId: "request-projection-exhaust", responseKind: "final",
+    deliveryKey: "projection-exhaust-1", payload: { text: "SEND ONCE" },
+    dueAt: clockState.now.toISOString(),
+  });
+  let projections = 0;
+  const send = async () => ({ delivered: true });
+  const failProjection = async () => { projections += 1; throw Object.assign(new Error("boom"), { code: "PROJECTION_FAILED" }); };
+  // 投影持续失败 8 次（= PROJECTION_MAX_ATTEMPTS）；每次推进伪时钟越过退避窗口（退避上限 15min < 1h）。
+  for (let i = 0; i < 8; i += 1) {
+    clockState.now = new Date(clockState.now.getTime() + 3600_000);
+    await outbox.deliverDue(send, { onDelivered: failProjection });
+  }
+  assert.equal(projections, 8);
+  const record = await outbox.get(created.event.eventId);
+  assert.equal(Number(record.projectionAttempts), 8);
+  assert.equal(record.projectionErrorCode, "DELIVERY_PROJECTION_EXHAUSTED");
+  assert.equal(record.projectedAt, null); // 从未成功投影
+  // 第 9 次：projectionAttempts 已达上限，被过滤排除——不再重选，projections 不增。
+  clockState.now = new Date(clockState.now.getTime() + 3600_000);
+  const again = await outbox.deliverDue(send, { onDelivered: failProjection });
+  assert.equal(projections, 8);
+  assert.equal(again.projectionFailed, 0); // 本轮无投影活动
+});
+
 test("an authenticated Home target update makes target-blocked proactive delivery due immediately", async (t) => {
   const { root, outbox, clockState } = await fixture();
   t.after(() => fs.rm(root, { recursive: true, force: true }));

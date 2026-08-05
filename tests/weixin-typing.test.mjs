@@ -1,4 +1,4 @@
-// 验证微信「正在输入」typing 指示器 + 即时 ack（计划 plan-immutable-fountain.md）。
+// 验证微信「正在输入」typing 指示器 + 即时 ack（feature 见 commit 07ed59f；SYNO_WEIXIN_TYPING 默认开）。
 //
 // 覆盖：
 // - WeixinIlinkClient.getConfig / sendTyping 的 endpoint 与 body 契约（status=1 开始 / 2 停止）

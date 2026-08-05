@@ -504,6 +504,13 @@ function createSynoRuntime(options = {}) {
   // 构造期快照注入，与每 run 冻结的 runConfig 互不冲突（解 ROADMAP §8.1）。
   const contextManager = options.contextManager || new ContextManager({
     provider, credentials, tools, conversationStore: conversations, onExtractValuable,
+    // C9：提取管道 fire-and-forget，异常原被 .catch(()=>{}) 静默吞；此处把被吞的异常落 journal（warning），
+    // 使「有价值内容持续提取失败」可观测。控制流不变（仍 best-effort，绝不阻塞压缩）。
+    onExtractionError: (error, ctx) => recordEvent("context.extraction.failed", {
+      error: { code: error?.code, message: String(error?.message || error).slice(0, 300) },
+      action: ctx?.action,
+      conversationId: ctx?.conversationId,
+    }, { level: "warning" }).catch(() => {}),
     ...(options.contextThresholds ? { thresholds: options.contextThresholds } : {}),
   });
   const agent = options.agent || new ToolLoopAgent({ provider, tools, conversations, contextManager });
@@ -999,6 +1006,13 @@ function createSynoRuntime(options = {}) {
     refreshLifecycleState();
   }
   async function drainWorkflowOutbox() {
+    // C8：有界保留——每小时淘汰终态旧记录，防目录单调膨胀（与 drainChannelDeliveryOutbox 同形）。
+    // 用函数属性节流，避免 15s drain timer 每 tick 触发扫描；best-effort，绝不阻塞投递。
+    const retentionNow = Date.now();
+    if (!drainWorkflowOutbox.retainAt || retentionNow - drainWorkflowOutbox.retainAt > 3600_000) {
+      drainWorkflowOutbox.retainAt = retentionNow;
+      workflowOutbox.retain?.({ now: new Date(retentionNow) }).catch(() => {});
+    }
     return workflowOutbox.deliverDue(async (event) => {
       if (event.targetChannel === "main-session") {
         await cognitiveRuntime.appendSystemEvent?.({
@@ -1031,7 +1045,7 @@ function createSynoRuntime(options = {}) {
       drainChannelDeliveryOutbox.retainAt = retentionNow;
       channelDeliveryOutbox.retain?.({ now: new Date(retentionNow) }).catch(() => {});
     }
-    return channelDeliveryOutbox.deliverDue(async (payload, event) => {
+    const outboxReport = await channelDeliveryOutbox.deliverDue(async (payload, event) => {
       let persistedTarget = null;
       if (event.sourceType === "proactive_bundle") {
         try {
@@ -1168,6 +1182,11 @@ function createSynoRuntime(options = {}) {
         }
       },
     });
+    // A5：投影（onDelivered 状态回写）重试达上限——消息已送达但状态回写持续失败转终态，落 journal 可观测。
+    if (outboxReport?.projectionExhausted) {
+      await recordEvent("channel.outbox.projection_exhausted", { count: outboxReport.projectionExhausted }, { level: "warning" }).catch(() => {});
+    }
+    return outboxReport;
   }
   async function startOpenCodeSecurely({ restart = false } = {}) {
     const status = restart

@@ -159,3 +159,25 @@ test("WorkflowOutbox.list tolerates a corrupt record file without aborting the w
   const report = await outbox.deliverDue(async () => ({ delivered: true }));
   assert.equal(report.delivered, 1);
 });
+
+test("WorkflowOutbox.retain evicts old terminal records and keeps non-terminal ones (C8)", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-workflow-retain-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  let now = new Date("2026-07-28T00:00:00.000Z");
+  const outbox = new WorkflowOutbox({ root, clock: () => now });
+  const delivered = await outbox.enqueue({ workflowId: "w-delivered", eventType: "proposal.ready", ownerKey: "o", targetChannel: "weixin", redactedPayload: { text: "已送达" }, idempotencyKey: "w-delivered:proposal:1" });
+  const terminal = await outbox.enqueue({ workflowId: "w-terminal", eventType: "proposal.ready", ownerKey: "o", targetChannel: "weixin", redactedPayload: { text: "终态" }, idempotencyKey: "w-terminal:proposal:1" });
+  const pending = await outbox.enqueue({ workflowId: "w-pending", eventType: "proposal.ready", ownerKey: "o", targetChannel: "weixin", redactedPayload: { text: "待发" }, idempotencyKey: "w-pending:proposal:1" });
+  // delivered → 送达（终态）；terminal → 结构终态；pending → 保持非终态（failed_retryable）。
+  await outbox.deliverDue(async (event) => {
+    if (event.eventId === terminal.eventId) return { delivered: false, retryable: false, reason: "channel_missing" };
+    if (event.eventId === delivered.eventId) return { delivered: true };
+    return { delivered: false, reason: "later" };
+  });
+  // 推进时钟超过 14 天保留期。
+  now = new Date("2026-08-12T00:00:00.000Z");
+  const result = await outbox.retain();
+  assert.equal(result.removed, 2); // delivered + failed_terminal 被淘汰
+  const left = await outbox.list();
+  assert.deepEqual(left.map((r) => r.eventId), [pending.eventId]); // 非终态保留
+});

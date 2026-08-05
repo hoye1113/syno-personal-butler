@@ -226,6 +226,7 @@ class ContextManager {
     tools,
     conversationStore,
     onExtractValuable = null,
+    onExtractionError = null,
     options = {},
     clock = () => new Date(),
   } = {}) {
@@ -262,6 +263,10 @@ class ContextManager {
     // 回调由 runtime 接到 ingest.receive+propose（走可审批 Job），ContextManager 自身不写 vault。
     this.onExtractValuable = typeof onExtractValuable === "function" ? onExtractValuable : null;
     this.extractMaxPerConversation = Number(options.extractMaxPerConversation) || 5;
+    // C9：提取管道是 fire-and-forget，失败绝不阻塞/污染压缩结果（设计不变量）。但整条管道的异常曾被
+    // .catch(()=>{}) 完全静默——下游回调持续坏时「有价值内容静默丢弃」无任何信号。此钩子把被吞的异常
+    // 透出给 runtime 记 journal（可观测），控制流仍是 best-effort，回调抛错也不影响压缩。
+    this.onExtractionError = typeof onExtractionError === "function" ? onExtractionError : null;
   }
 
   // ---- 对外委托 ----
@@ -562,7 +567,10 @@ class ContextManager {
   // 同步标记 hash（在首个 await 前），保证连续 compress 不会重复判定同一条；整条管道失败被吞，绝不阻塞或污染压缩结果。
   #fireExtraction(action, rest, archivable, conversationId) {
     if (!this.onExtractValuable) return;
-    const promise = this.#runExtraction(action, rest, archivable, conversationId).catch(() => {});
+    const promise = this.#runExtraction(action, rest, archivable, conversationId).catch((error) => {
+      // C9：仍是 best-effort——observability 钩子自身的异常也吞掉，绝不冒泡影响压缩或下一个 tick。
+      try { this.onExtractionError?.(error, { action, conversationId }); } catch { /* 比管道本身更 best-effort */ }
+    });
     this.#active.push(promise);
     promise.finally(() => { this.#active = this.#active.filter((entry) => entry !== promise); });
   }

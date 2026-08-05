@@ -44,6 +44,8 @@ pnpm state:archive -- restore D:\Backups\syno-state-20260717
 - 未完成任务保留到 completed/failed/rejected/canceled 等终态。
 - 删除缓存前验证目标是仓库 `.runtime/` 或明确的 Syno 本地目录，不对宽泛路径递归操作。
 - `.pnpm-store/` 是安装缓存，删除需要按仓库受控执行规则提供精确目标和影响预览。
+- 主动/工作流 outbox 的终态记录（`delivered`/`failed_terminal`）由 `retain()` 按小时节流、超 14 天自动淘汰，目录不再单调膨胀（drain 时 best-effort，不阻塞投递）。
+- 历史上 `proactive.bundle.recovery_failed`（如 f1b29459）刷屏的根因是对账循环重读已损坏的 outbox payload 抛错、每 tick 记一条失败——已由「对账排除 `failed_terminal`（C6）」+「drain 时把结构损坏 payload 转终态（A1）」根治，不再复现。若日志仍见，多为修复前残留记录：把 `state/channel-outbox/<id>.json` 的 status 改 `failed_terminal`，或删除其 `.dpapi` payload 后重启即可。
 
 ## 故障检查顺序
 
@@ -75,7 +77,7 @@ Get-Content -LiteralPath $log.FullName -Tail 80
 
 本机 zh-CN 系统 ACP=936（GBK）。任何 `spawn("powershell.exe" / python / ...)` 后经 `[Console]::In`/`[Console]::Out` 或默认 stdio 文本层往返非 ASCII（中文、emoji）payload 时，PowerShell/Python 的默认编码是 GBK，**双向**都会把 UTF-8 字节转码损坏，且只在下游 `JSON.parse` 抛 `SyntaxError` 时才暴露（静默无报错）。
 
-根治约束：**只让 Base64（7-bit ASCII，所有常见代码页的公共子集）跨过 console/stdio 边界**——Node 侧 `Buffer.from(x,"utf8").toString("base64")` 写入 stdin，脚本内只用 `FromBase64String/ToBase64String`（Python 侧用 `io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")` 或注入 `PYTHONUTF8=1`），绝不调 `UTF8.GetString/GetBytes` 或依赖默认编码。`runDpapi`（`provider-credential-store.mjs`）与 Hermes sidecar 均遵循此约束；新增任何跨进程文本往返必须沿用，否则中文路径会静默损坏。
+根治约束：**只让 Base64（7-bit ASCII，所有常见代码页的公共子集）跨过 console/stdio 边界**——Node 侧 `Buffer.from(x,"utf8").toString("base64")` 写入 stdin，脚本内只用 `FromBase64String/ToBase64String`（Python 侧用 `io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")` 或注入 `PYTHONUTF8=1`），绝不调 `UTF8.GetString/GetBytes` 或依赖默认编码。`runDpapi`（`provider-credential-store.mjs`）、Hermes sidecar 与 `readSecretFromStdin`（交互式 Token 录入）均遵循此约束；新增任何跨进程文本往返必须沿用，否则中文路径会静默损坏。
 
 ### Windows 飞书日历 CLI
 

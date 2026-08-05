@@ -1,4 +1,4 @@
-import { serializeForToolMessage } from "./tool-result-serializer.mjs";
+import { serializeForToolMessage, isResultSafe } from "./tool-result-serializer.mjs";
 
 const DEFAULT_SYSTEM_PROMPT = `你是 Syno，一个主动但克制的知识闭环私人管家。
 你只能使用提供的工具；不能修改源码、配置权限、Provider、Policy 或 ToolRegistry。
@@ -132,10 +132,12 @@ class ToolLoopAgent {
             };
           }
           if (this.contextManager) {
-            result = this.contextManager.truncateToolResult(result, name);
+            // D1：必须先对【完整】结果过脱敏门再截断——截断（truncate-middle 砍中段）会切断跨边界的
+            // 凭据模式，使截断后的文本漏检而泄密。不安全时跳过截断，由 serializeForToolMessage 回灌脱敏串。
+            if (isResultSafe(result)) result = this.contextManager.truncateToolResult(result, name);
           }
           // 统一经序列化层：脱敏（含错误包装 result 的 message）+ 序列化。
-          // 截断已由 contextManager.truncateToolResult 完成；此处不重复截断。
+          // 截断已由 contextManager.truncateToolResult 完成（仅在完整结果安全时）；此处不重复截断。
           const toolMessage = { role: "tool", tool_call_id: call.id, content: serializeForToolMessage(result) };
           conversation.messages.push(toolMessage);
         }
