@@ -497,7 +497,31 @@ class ChannelDeliveryOutbox {
         if (!committedClaim) continue;
         const { claimed } = committedClaim;
         proactiveTargetKey = committedClaim.proactiveTargetKey;
-        const payload = await this.get(candidate.eventId, { includePayload: true });
+        let payload;
+        try {
+          payload = await this.get(candidate.eventId, { includePayload: true });
+        } catch (error) {
+          // payload 加载失败按「结构 vs 瞬时」二分，避免把瞬时 IO 错误判为永久 → 消息丢失：
+          //   结构性（digest 篡改 / JSON 解码失败 / payload 文件缺失）：磁盘字节固定，重试永不成功 → failed_terminal。
+          //   瞬时（IO 冲突 EBUSY/EACCES/EIO、DPAPI 临时失败、payload 文件被临时占用）：→ failed_retryable + 退避，
+          //   与 send 侧 retryable 分支（:530）同形，经 onFailedRetryable 可观测，到期可再次投递。
+          const structural = error?.code === "DELIVERY_PAYLOAD_TAMPERED"
+            || error instanceof SyntaxError
+            || error?.code === "ENOENT";
+          const lastErrorCode = error?.code === "DELIVERY_PAYLOAD_TAMPERED" ? "DELIVERY_PAYLOAD_TAMPERED"
+            : error instanceof SyntaxError ? "DELIVERY_PAYLOAD_DECODE_FAILED"
+            : (error?.code === "ENOENT" ? "DELIVERY_PAYLOAD_MISSING" : "DELIVERY_PAYLOAD_UNAVAILABLE");
+          if (structural) {
+            const settled = await this.#settleClaim(candidate.eventId, lease, { status: "failed_terminal", claim: null, lastErrorCode });
+            if (settled) { try { await onFailedTerminal?.(settled); } catch { /* best-effort：settle 已持久，勿中断批次 */ } report.terminal += 1; }
+            else report.superseded += 1;
+          } else {
+            const settled = await this.#settleClaim(candidate.eventId, lease, { status: "failed_retryable", claim: null, dueAt: new Date(this.clock().getTime() + backoff(claimed.attempts, this.retryBaseMs)).toISOString(), lastErrorCode });
+            if (settled) { try { await onFailedRetryable?.(settled); } catch { /* best-effort：settle 已持久，勿中断批次 */ } report.retryable += 1; }
+            else report.superseded += 1;
+          }
+          continue; // finally 仍会执行 #decrementInFlight + #releaseLease，#settleClaim 已置 claim:null，无孤儿 lease
+        }
         let result;
         try { result = await send(payload.payload, { ...claimed, deliveryTarget: payload.deliveryTarget }); }
         catch (error) {

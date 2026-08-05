@@ -139,6 +139,98 @@ test("failed retryable delivery backs off and terminal failure does not retry", 
   assert.equal((await outbox.get(terminal.event.eventId)).status, "failed_terminal");
 });
 
+test("an undecodable payload settles as failed_terminal instead of infinite retry", async (t) => {
+  const { root, outbox, clockState } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const created = await outbox.enqueue({ ...base, sourceId: "request-corrupt", responseKind: "final", deliveryKey: "corrupt-1", payload: { text: "Will be corrupted" }, dueAt: clockState.now.toISOString() });
+  // Overwrite the on-disk ciphertext so unprotect -> JSON.parse throws inside get(): the
+  // GBK-mojibake / truncated-payload shape. Base64 of "not-valid-json" survives the fake unprotect
+  // and yields a string JSON.parse rejects with SyntaxError. send() must never be reached.
+  await fs.writeFile(
+    path.join(root, "channel-outbox-payloads", `${created.event.payloadRef}.dpapi`),
+    Buffer.from("not-valid-json", "utf8").toString("base64"),
+  );
+  const terminalEvents = [];
+  const report = await outbox.deliverDue(
+    async () => { throw new Error("send must not be called for an undecodable payload"); },
+    { onFailedTerminal: async (event) => { terminalEvents.push(event); } },
+  );
+  assert.equal(report.terminal, 1);
+  assert.equal(report.delivered, 0);
+  const record = await outbox.get(created.event.eventId);
+  assert.equal(record.status, "failed_terminal");
+  assert.equal(record.lastErrorCode, "DELIVERY_PAYLOAD_DECODE_FAILED");
+  assert.equal(terminalEvents.length, 1);
+  assert.equal(terminalEvents[0].eventId, created.event.eventId);
+});
+
+test("a tampered payload settles as failed_terminal with DELIVERY_PAYLOAD_TAMPERED", async (t) => {
+  const { root, outbox, clockState } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const created = await outbox.enqueue({ ...base, sourceId: "request-tamper", responseKind: "final", deliveryKey: "tamper-1", payload: { text: "ORIGINAL" }, dueAt: clockState.now.toISOString() });
+  // Valid JSON but a different body than the digest stamped at enqueue -> digest mismatch at get():221.
+  await fs.writeFile(
+    path.join(root, "channel-outbox-payloads", `${created.event.payloadRef}.dpapi`),
+    `ciphertext:${Buffer.from(JSON.stringify({ text: "TAMPERED" }), "utf8").toString("base64")}`,
+  );
+  const report = await outbox.deliverDue(async () => { throw new Error("send must not be called for a tampered payload"); });
+  assert.equal(report.terminal, 1);
+  const record = await outbox.get(created.event.eventId);
+  assert.equal(record.status, "failed_terminal");
+  assert.equal(record.lastErrorCode, "DELIVERY_PAYLOAD_TAMPERED");
+});
+
+test("a transient payload-load failure settles as failed_retryable and redelivers after recovery", async (t) => {
+  const { root, outbox, clockState } = await fixture({
+    // Simulate a transient IO error (EBUSY) on the first unprotect, then recovery.
+    unprotect: (() => {
+      let calls = 0;
+      return async (value) => {
+        calls += 1;
+        if (calls === 1) { const error = new Error("resource busy"); error.code = "EBUSY"; throw error; }
+        return Buffer.from(String(value).replace(/^ciphertext:/, ""), "base64").toString("utf8");
+      };
+    })(),
+  });
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const created = await outbox.enqueue({ ...base, sourceId: "request-transient", responseKind: "final", deliveryKey: "transient-1", payload: { text: "TRANSIENT" }, dueAt: clockState.now.toISOString() });
+  let sends = 0;
+  const retryableEvents = [];
+  const report = await outbox.deliverDue(
+    async () => { sends += 1; return { delivered: true }; },
+    { onFailedRetryable: async (event) => retryableEvents.push(event) },
+  );
+  // Transient IO must NOT terminalize: get() threw before send, but the event stays retryable (not lost).
+  assert.equal(sends, 0);
+  assert.equal(report.retryable, 1);
+  assert.equal(report.terminal, 0);
+  const record = await outbox.get(created.event.eventId);
+  assert.equal(record.status, "failed_retryable");
+  assert.equal(record.lastErrorCode, "DELIVERY_PAYLOAD_UNAVAILABLE");
+  assert.ok(new Date(record.dueAt).getTime() > clockState.now.getTime());
+  assert.equal(retryableEvents.length, 1);
+
+  // After backoff elapses and IO recovers, the message is delivered — not lost.
+  clockState.now = new Date(record.dueAt);
+  const second = await outbox.deliverDue(async () => { sends += 1; return { delivered: true }; });
+  assert.equal(sends, 1);
+  assert.equal(second.delivered, 1);
+  assert.equal((await outbox.get(created.event.eventId)).status, "delivered");
+});
+
+test("a missing payload file settles as failed_terminal with DELIVERY_PAYLOAD_MISSING", async (t) => {
+  const { root, outbox } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const created = await outbox.enqueue({ ...base, sourceId: "request-missing", responseKind: "final", deliveryKey: "missing-1", payload: { text: "MISSING" }, dueAt: "2026-07-29T00:00:00.000Z" });
+  // Delete the on-disk ciphertext -> get() reads event file ok, then payload readFile throws ENOENT.
+  await fs.rm(path.join(root, "channel-outbox-payloads", `${created.event.payloadRef}.dpapi`));
+  const report = await outbox.deliverDue(async () => { throw new Error("send must not be called for a missing payload"); });
+  assert.equal(report.terminal, 1);
+  const record = await outbox.get(created.event.eventId);
+  assert.equal(record.status, "failed_terminal");
+  assert.equal(record.lastErrorCode, "DELIVERY_PAYLOAD_MISSING");
+});
+
 test("an expired claimed event is reclaimed after a process crash", async (t) => {
   const { root, outbox, clockState } = await fixture();
   t.after(() => fs.rm(root, { recursive: true, force: true }));

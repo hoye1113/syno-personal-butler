@@ -33,9 +33,14 @@ test("Provider credentials separate DPAPI token material from public metadata", 
 });
 
 test("Windows DPAPI adapter protects and restores a UTF-8 value", { skip: process.platform !== "win32" }, async () => {
-  const fixture = "syno-dpapi-roundtrip-凭据";
+  // Long multi-line Chinese + emoji + Windows path + URL: must round-trip byte-exact through the
+  // PowerShell DPAPI bridge on a zh-CN (GBK/ACP=936) host. Regression net for the [Console]
+  // GBK-transcoding bug that corrupted non-ASCII payloads and broke morning reminder delivery.
+  const fixture = "syno-dpapi-roundtrip-凭据\n晨间计划：今日首要任务是处理「主动通道」编码问题。\nevening line with emoji 🎉 and a Windows path C:\\Users\\syno and a url https://example.cn/x?y=1";
   const encrypted = await runDpapi("protect", fixture);
   assert.notEqual(encrypted, fixture);
+  // protect output must be pure Base64 (ASCII) — the codepage-immune transport contract.
+  assert.match(encrypted, /^[A-Za-z0-9+/]+={0,2}$/);
   assert.equal(await runDpapi("unprotect", encrypted), fixture);
 });
 

@@ -26,9 +26,16 @@ function runDpapi(mode, value) {
   if (process.platform !== "win32") throw new Error("DPAPI 凭据存储仅支持 Windows");
   const protect = mode === "protect";
   const loadSecurity = "Add-Type -AssemblyName System.Security;";
+  // 只让 Base64（7-bit ASCII）跨过 PowerShell console 边界。zh-CN 主机 ACP=936，PowerShell 的
+  // [Console]::InputEncoding/OutputEncoding 默认 GBK，原始 UTF-8 经 [Console]::In/Out 会被转码损坏。
+  // Base64 是所有常见代码页的公共子集，过 GBK 不变。
+  //   protect:   stdin = base64(utf8(明文)) -> stdout = base64(密文)
+  //   unprotect: stdin = base64(密文)       -> stdout = base64(utf8(明文))
+  // PowerShell 内只用 FromBase64String/ToBase64String，绝不调 UTF8.GetString/GetBytes。
   const script = protect
-    ? `${loadSecurity}$v=[Console]::In.ReadToEnd();$b=[Text.Encoding]::UTF8.GetBytes($v);$p=[Security.Cryptography.ProtectedData]::Protect($b,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser);[Console]::Out.Write([Convert]::ToBase64String($p))`
-    : `${loadSecurity}$v=[Console]::In.ReadToEnd();$b=[Convert]::FromBase64String($v);$p=[Security.Cryptography.ProtectedData]::Unprotect($b,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser);[Console]::Out.Write([Text.Encoding]::UTF8.GetString($p))`;
+    ? `${loadSecurity}$v=[Console]::In.ReadToEnd();$b=[Convert]::FromBase64String($v);$p=[Security.Cryptography.ProtectedData]::Protect($b,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser);[Console]::Out.Write([Convert]::ToBase64String($p))`
+    : `${loadSecurity}$v=[Console]::In.ReadToEnd();$b=[Convert]::FromBase64String($v);$p=[Security.Cryptography.ProtectedData]::Unprotect($b,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser);[Console]::Out.Write([Convert]::ToBase64String($p))`;
+  const stdinText = protect ? Buffer.from(String(value), "utf8").toString("base64") : String(value);
   return new Promise((resolve, reject) => {
     const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
       stdio: ["pipe", "pipe", "pipe"], windowsHide: true,
@@ -38,8 +45,15 @@ function runDpapi(mode, value) {
     child.stdout.on("data", (chunk) => { stdout += chunk; });
     child.stderr.on("data", (chunk) => { stderr += chunk; });
     child.on("error", reject);
-    child.on("close", (code) => code === 0 ? resolve(stdout) : reject(new Error(`DPAPI ${mode} 失败：${stderr.trim() || `exit ${code}`}`)));
-    child.stdin.end(value);
+    // 若 PowerShell 提前退出（如 -Command 在极端环境被拒），stdin.write/end 触发 EPIPE；
+    // 不挂监听会冒成 unhandled stream error → 可能 crash host。reject 后 close 回调幂等（Promise 已 settled）。
+    child.stdin.on("error", (error) => reject(Object.assign(new Error(`DPAPI ${mode} stdin 写入失败`), { code: "DPAPI_STDIN_ERROR", cause: error })));
+    child.on("close", (code) => {
+      if (code !== 0) { reject(new Error(`DPAPI ${mode} 失败：${stderr.trim() || `exit ${code}`}`)); return; }
+      const out = stdout.trim(); // 纯 base64；trim 掉偶发尾换行，保持密文规范（base64 正则消费方依赖）
+      resolve(protect ? out : Buffer.from(out, "base64").toString("utf8"));
+    });
+    child.stdin.end(stdinText);
   });
 }
 

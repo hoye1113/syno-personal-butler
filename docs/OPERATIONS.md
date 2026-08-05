@@ -71,6 +71,12 @@ Get-Content -LiteralPath $log.FullName -Tail 80
 
 渠道健康 probe 可以在 Worker 运行时直接执行。它优先读取 `http://127.0.0.1:<PORT>/api/syno/channels` 的脱敏状态，返回 `source: running_worker`；仅在本机服务不可达时才启动独立 Adapter。这样不会与微信进程锁竞争，也不会为飞书重复建立长连接。
 
+### zh-CN 主机的 PowerShell/子进程编码陷阱
+
+本机 zh-CN 系统 ACP=936（GBK）。任何 `spawn("powershell.exe" / python / ...)` 后经 `[Console]::In`/`[Console]::Out` 或默认 stdio 文本层往返非 ASCII（中文、emoji）payload 时，PowerShell/Python 的默认编码是 GBK，**双向**都会把 UTF-8 字节转码损坏，且只在下游 `JSON.parse` 抛 `SyntaxError` 时才暴露（静默无报错）。
+
+根治约束：**只让 Base64（7-bit ASCII，所有常见代码页的公共子集）跨过 console/stdio 边界**——Node 侧 `Buffer.from(x,"utf8").toString("base64")` 写入 stdin，脚本内只用 `FromBase64String/ToBase64String`（Python 侧用 `io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")` 或注入 `PYTHONUTF8=1`），绝不调 `UTF8.GetString/GetBytes` 或依赖默认编码。`runDpapi`（`provider-credential-store.mjs`）与 Hermes sidecar 均遵循此约束；新增任何跨进程文本往返必须沿用，否则中文路径会静默损坏。
+
 ### Windows 飞书日历 CLI
 
 当前验收锁定官方 `@larksuite/cli` 1.0.72：
