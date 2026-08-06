@@ -139,8 +139,8 @@ Invoke-RestMethod http://127.0.0.1:8888/api/syno/context/stats
 
 **验证：** `tests/opencode-cognitive-runtime.test.mjs` +3 回归（direct / bridge 两路径「sendMessage 完成先于 deleteSession」、失败 run 仍删；已证 buggy 下两路径 ✖、修复后 ✔）；`pnpm test` 710/710。
 
-**部署状态：** 已 `pnpm windows:restart` 上线（host 新进程、health ok）。**仍待主人端到端复现** —— 重投 `artifact-20260805-b13790f2` 源（`POST /api/syno/intake` channel=web + `Origin: http://127.0.0.1:8888`，或微信重发链接）→ 期望首次 `capture.run.completed`（过往从未成功；测试/复现已证机制，活体尚未确认）。
+**端到端复现（2026-08-06 ✅ 达成）：** 主人微信重发链接（`workflow-b34a192f`），capture **首次完整跑通**——`stage: awaiting_decision`、方案 `ingest-8309e1b7` / 候选 `candidate-07cba99f` / 决策 `decision-42c9a439` 均生成。404 修复活体确认。**附带暴露两个下游问题**：① 确认消息经 workflow-outbox 推送「iLink 接受(ret:0) 但用户端不浮现」——实则②的子症状；② **微信/iLink 只把 `\n\n`（空行）渲染成换行，单 `\n`/`\r\n`/`\r` 全被吞成空格**（三条探测实证），旧确认段内单 `\n` 连列表项 → 用户端 8 条待确认并成一段。
 
-**配套（2026-08-06，commit `c9cf30d`）微信排版改造：** 新增 `weixin-text-format.mjs`（`formatWx` 空行分节 + emoji 锚点 / `stripMarkdown` 微信不渲染 markdown 故剥除 / `clip` 截断）；收录确认/已收录/质量拒收三消息重排、确认消息加「📝 内容要点」块（candidate.title/summary 清洗截断 + canonicalTags，`onProposed` 补接 candidate）；微信出口 `weixin-ilink send` 统一 `stripMarkdown`（对话式长回复/主动提醒的 markdown 不再原样露出）。测试 `tests/weixin-text-format.test.mjs` +7，全量 717/717。
+**配套（2026-08-06）微信排版改造：** 新增 `weixin-text-format.mjs`（`formatWx` 空行分节 + emoji 锚点 / `stripMarkdown` 微信不渲染 markdown 故剥除 / `clip` 截断）；收录确认/已收录/质量拒收三消息重排、确认消息加「📝 内容要点」块（commit `c9cf30d`）。**换行契约修正：** 实测微信只认 `\n\n` 换行后——`formatWx` 出口把每个逻辑行铺成独立空行段（commit `bedd829`）；新增 `wxBreaks` 在 `weixin-ilink send` 出口对**所有**消息（对话式长回复、主动提醒）做 `\n+`→`\n\n` 归一（commit `a96654d`，formatWx 消息幂等）。测试 `tests/weixin-text-format.test.mjs` 8 项，全量 718/718。
 
 **Backlog（仍记，非本轮）：** `opencode-test-supervisor.mjs` `GET /session/{id}` 无分支恒 404（仅屏障方案会踩、本修复不踩，仍潜伏）；fake-supervisor 404-vs-500 语义漂移；`scripts/probe-opencode-server.mjs` securityOk 断言过期。
