@@ -1,8 +1,9 @@
 // 微信文本排版助手。
 //
-// 约束（实测）：微信保留 `\n`（换行）与 `\n\n`（空行），但**不渲染 markdown**——
-// `**` `#` ``` 等标记会原样露出成星号井号，反而更难读。因此管家的用户可见文案：
-//   ① 用空行分段、emoji/短行做视觉锚点（formatWx 负责结构）；
+// 约束（2026-08-06 探测实证）：微信**只把 `\n\n`（空行）渲染成换行**——单 `\n`、`\r\n`、`\r`
+// 全被吞成空格（同一行）；且**不渲染 markdown**——`**` `#` ``` 等标记会原样露出成星号井号。
+// 因此管家的用户可见文案：
+//   ① 每个逻辑行都用空行隔成独立段落、emoji 做视觉锚点（formatWx 负责结构，见文件尾归一化）；
 //   ② 凡可能含 markdown 的内容（LLM 产出、正文摘要）先经 stripMarkdown 清洗。
 //
 // 两个导出：formatWx（结构排版）+ stripMarkdown（markdown→纯文本清洗）+ clip（截断）。
@@ -42,7 +43,9 @@ export function clip(input, maxChars = 120) {
 //     ],
 //     footer: "——————\n回复「确认」保存",
 //   })
-// 规则：每节 = 标题行(icon+heading) + 若干内容行；节与节之间一个空行；空节自动省略。
+// 规则：每节 = 标题行(icon+heading) + 若干内容行；空节自动省略。
+// 出口归一化：标题/各节标题/各内容行/footer 行，全部拆成独立逻辑行、两两之间一个空行
+// （微信只认空行为换行）。调用方传 lines 用单 \n 即可，出口统一铺成 \n\n。
 export function formatWx({ title, sections = [], footer } = {}) {
   const blocks = [];
   if (title && String(title).trim()) blocks.push(String(title).trim());
@@ -62,5 +65,14 @@ export function formatWx({ title, sections = [], footer } = {}) {
     if (blockLines.length) blocks.push(blockLines.join("\n"));
   }
   if (footer && String(footer).trim()) blocks.push(String(footer).trim());
-  return blocks.join("\n\n");
+  // 微信只把 \n\n（空行）渲染成换行；单 \n / \r\n / \r 全被吞成空格（2026-08-06 探测实证）。
+  // 故把每个逻辑行都铺成独立空行段落：拆散所有 \n、逐行 trim、去空行，统一用 \n\n 连接。
+  const lines = [];
+  for (const block of blocks) {
+    for (const line of block.split("\n")) {
+      const trimmed = line.trim();
+      if (trimmed) lines.push(trimmed);
+    }
+  }
+  return lines.join("\n\n");
 }

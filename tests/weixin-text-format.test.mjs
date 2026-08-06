@@ -12,15 +12,19 @@ test("formatWx 用空行分节、emoji 锚点成块", () => {
     ],
     footer: "——————\n回复「确认」",
   });
-  // 标题 / 两节 / 页脚之间各一个空行
+  // 每个逻辑行（标题/节标题/内容行/footer 行）都铺成独立空行段落
   assert.equal(out, [
     "📥 收录方案待确认",
-    "📝 内容要点\n《某文》\n摘要…",
-    "📂 保存位置\nvault/00-Inbox/xx.md",
-    "——————\n回复「确认」",
+    "📝 内容要点",
+    "《某文》",
+    "摘要…",
+    "📂 保存位置",
+    "vault/00-Inbox/xx.md",
+    "——————",
+    "回复「确认」",
   ].join("\n\n"));
-  // 恰好 3 个空行分隔符
-  assert.equal((out.match(/\n\n/g) || []).length, 3);
+  // 8 个逻辑行 → 恰好 7 个空行分隔符
+  assert.equal((out.match(/\n\n/g) || []).length, 7);
 });
 
 test("formatWx 省略空节与空行，heading-only 节也成立", () => {
@@ -32,7 +36,7 @@ test("formatWx 省略空节与空行，heading-only 节也成立", () => {
       { lines: ["🔎 来源　high/verified", "🔁 相似　2 个"] },   // 无标题节
     ],
   });
-  assert.equal(out, "标题\n\n✅ 无额外待确认事项\n\n🔎 来源　high/verified\n🔁 相似　2 个");
+  assert.equal(out, "标题\n\n✅ 无额外待确认事项\n\n🔎 来源　high/verified\n\n🔁 相似　2 个");
 });
 
 test("formatWx 无 title/footer 也能渲染", () => {
