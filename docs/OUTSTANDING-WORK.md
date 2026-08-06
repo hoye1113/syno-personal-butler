@@ -139,6 +139,8 @@ Invoke-RestMethod http://127.0.0.1:8888/api/syno/context/stats
 
 **验证：** `tests/opencode-cognitive-runtime.test.mjs` +3 回归（direct / bridge 两路径「sendMessage 完成先于 deleteSession」、失败 run 仍删；已证 buggy 下两路径 ✖、修复后 ✔）；`pnpm test` 710/710。
 
-**待主人复现验证（端到端，host 无热加载）：** `pnpm windows:restart` → 重投 `artifact-20260805-b13790f2` 源（`POST /api/syno/intake` channel=web + `Origin: http://127.0.0.1:8888`，或微信重发链接）→ 期望首次 `capture.run.completed`（过往从未成功）。
+**部署状态：** 已 `pnpm windows:restart` 上线（host 新进程、health ok）。**仍待主人端到端复现** —— 重投 `artifact-20260805-b13790f2` 源（`POST /api/syno/intake` channel=web + `Origin: http://127.0.0.1:8888`，或微信重发链接）→ 期望首次 `capture.run.completed`（过往从未成功；测试/复现已证机制，活体尚未确认）。
+
+**配套（2026-08-06，commit `c9cf30d`）微信排版改造：** 新增 `weixin-text-format.mjs`（`formatWx` 空行分节 + emoji 锚点 / `stripMarkdown` 微信不渲染 markdown 故剥除 / `clip` 截断）；收录确认/已收录/质量拒收三消息重排、确认消息加「📝 内容要点」块（candidate.title/summary 清洗截断 + canonicalTags，`onProposed` 补接 candidate）；微信出口 `weixin-ilink send` 统一 `stripMarkdown`（对话式长回复/主动提醒的 markdown 不再原样露出）。测试 `tests/weixin-text-format.test.mjs` +7，全量 717/717。
 
 **Backlog（仍记，非本轮）：** `opencode-test-supervisor.mjs` `GET /session/{id}` 无分支恒 404（仅屏障方案会踩、本修复不踩，仍潜伏）；fake-supervisor 404-vs-500 语义漂移；`scripts/probe-opencode-server.mjs` securityOk 断言过期。
