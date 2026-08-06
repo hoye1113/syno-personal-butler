@@ -13,6 +13,15 @@ function slug(value) {
   return String(value || "capture").toLocaleLowerCase("zh-CN").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 60) || "capture";
 }
 
+// 收录笔记文件名（不含 .md）= <base>-<8位hash>。提交校验（validator.mjs）按文件名计长、
+// 上限 maxFilenameLength（无 contract 覆盖、默认 50）；为 hash 后缀预留 9 字符，
+// base 截到 41 以内并去尾连字符，否则长标题收录必在提交时撞长度校验（2026-08-06 实证）。
+function noteFilenameBase(title, artifactId) {
+  const hashSuffix = String(artifactId).slice(-8);
+  const base = slug(title).slice(0, 50 - hashSuffix.length - 1).replace(/-+$/u, "") || "capture";
+  return `${base}-${hashSuffix}`;
+}
+
 function titleFromPrepared(prepared, payload) {
   if (payload.title) return String(payload.title).trim();
   if (prepared.sourceUrl) {
@@ -294,7 +303,7 @@ class IngestService {
     const updateStatus = !sourceMatches.length ? "new" : !priorDigest ? "unknown" : priorDigest === sourceDigest ? "same" : "changed";
     const proposalBase = {
       id: `ingest-${randomUUID().slice(0, 8)}`, candidateId: candidate.id, status: "proposed",
-      suggestedPath: `vault/00-Inbox/${slug(title)}-${id.slice(-8)}.md`, suggestedTags: [],
+      suggestedPath: `vault/00-Inbox/${noteFilenameBase(title, id)}.md`, suggestedTags: [],
       suggestedLinks: matches.slice(0, 3).map((item) => item.path), risk: matches.length ? "merge" : "additive", created: now,
       sourceDescriptor,
       sourceType: String(prepared.sourceType || state.payload.kind || "text"),
@@ -610,4 +619,4 @@ class IngestService {
   }
 }
 
-export { IngestService, isAllowedIngestPath, isAllowedExistingVaultPath, proposalAllowsWriteJob, slug, titleFromPrepared };
+export { IngestService, isAllowedIngestPath, isAllowedExistingVaultPath, proposalAllowsWriteJob, noteFilenameBase, slug, titleFromPrepared };

@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { IngestService, isAllowedIngestPath, isAllowedExistingVaultPath, proposalAllowsWriteJob } from "../apps/syno/syno/ingest-service.mjs";
+import { IngestService, isAllowedIngestPath, isAllowedExistingVaultPath, noteFilenameBase, proposalAllowsWriteJob } from "../apps/syno/syno/ingest-service.mjs";
 import { ClaimEvidenceService } from "../apps/syno/syno/claim-evidence-service.mjs";
 import { GoalService } from "../apps/syno/syno/goal-service.mjs";
 import { LearningService, calibrationFor, reviewIntervalDays } from "../apps/syno/syno/learning-service.mjs";
@@ -150,6 +150,21 @@ test("model-proposed ingest paths cannot target canonical system rules", () => {
   assert.equal(isAllowedIngestPath("vault/99-System/Skills/forged.md"), false);
   assert.equal(isAllowedIngestPath("vault/AGENTS.md"), false);
   assert.equal(isAllowedIngestPath("vault/00-Inbox/../../99-System/forged.md"), false);
+});
+
+test("noteFilenameBase 满足 validator 文件名长度上限（≤50，不含 .md）", () => {
+  // 2026-08-06：长标题收录提交时撞 validator maxFilenameLength(默认50) 致 EXECUTION_FAILED。
+  const long = noteFilenameBase("turn-one-giant-ai-generated-pull-request-to-a-reviewable-stack", "artifact-20260806-2639534a");
+  assert.equal(long, "turn-one-giant-ai-generated-pull-request-2639534a");
+  assert.ok(long.length <= 50, `长度 ${long.length} 应 ≤50`);
+  // 边界：超长英文 / 超长中文 / 空标题，均 ≤50 且无尾连字符、hash 后缀保留
+  for (const title of ["a".repeat(200), "这是一个非常非常长的中文标题".repeat(8), "", "  "]) {
+    const name = noteFilenameBase(title, "artifact-20260806-deadbeef");
+    assert.ok(name.length <= 50, `${JSON.stringify(title.slice(0, 12))} → 长度 ${name.length} 应 ≤50`);
+    assert.ok(!name.endsWith("-"), "不应以连字符结尾");
+    assert.ok(name.endsWith("-deadbeef"), "应保留 8 位 hash 后缀");
+    assert.ok(/^[\p{L}\p{N}-]+$/u.test(name), "应只含字母/数字/连字符");
+  }
 });
 
 test("ingest drops model-proposed relations whose target note cannot be resolved", async (t) => {
