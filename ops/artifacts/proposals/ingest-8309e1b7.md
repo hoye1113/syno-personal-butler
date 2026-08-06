@@ -1,0 +1,203 @@
+---
+id: ingest-8309e1b7
+candidateId: candidate-07cba99f
+status: applied
+suggestedPath: vault/00-Inbox/turn-one-giant-ai-generated-pull-request-2639534a.md
+risk: high
+created: 2026-08-06T03:01:43.469Z
+---
+
+# Ingest proposal: turn-one-giant-ai-generated-pull-request-to-a-reviewable-stack
+
+<!-- syno:json:start -->
+```json
+{
+  "id": "ingest-8309e1b7",
+  "candidateId": "candidate-07cba99f",
+  "status": "applied",
+  "suggestedPath": "vault/00-Inbox/turn-one-giant-ai-generated-pull-request-2639534a.md",
+  "suggestedTags": [
+    "ai_coding",
+    "ai_agent",
+    "article",
+    "skills"
+  ],
+  "suggestedLinks": [
+    "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/3-Next.js 基础/3-1 什么是 Next.js？.md",
+    "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-10 01 · 从一次回答到循环执行.md",
+    "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/3-Next.js 基础/3-7 流式响应实现.md"
+  ],
+  "risk": "high",
+  "created": "2026-08-06T03:01:43.469Z",
+  "sourceDescriptor": {
+    "kind": "url",
+    "originalUrl": "https://github.blog/engineering/turn-one-giant-ai-generated-pull-request-to-a-reviewable-stack/",
+    "canonicalUrl": "https://github.blog/engineering/turn-one-giant-ai-generated-pull-request-to-a-reviewable-stack/",
+    "publisher": "github.blog",
+    "observedAt": "2026-08-06T03:01:42.299Z",
+    "capturedAt": "2026-08-06T03:01:42.299Z",
+    "captureChannel": "weixin",
+    "platformMessageId": "7490965293480173000",
+    "sourceTier": "secondary",
+    "reliability": "unverified",
+    "userSuppliedSource": true,
+    "verificationStatus": "unverified"
+  },
+  "sourceType": "url",
+  "quality": {
+    "status": "accepted",
+    "reasons": [
+      "source_traceability: 官方 GitHub Blog Engineering 文章，作者 Julia Muiruri，发布于 2026-08-04，URL 明确，正文与来源可追溯。",
+      "relevance: 主题落在 AI Agent 时代——编码 Agent 产出 PR 的结构与评审问题，与 vault 主题高度相关。",
+      "retention: 正文给出可复用的分栈工作流、L1-L4 依赖示例、gh-stack 命令与按层评审清单，信息密度足以支撑独立 canonical 笔记。",
+      "limitation_promotional: 文章本质是 GitHub 自家 stacked pull requests 功能的教程/推广型内容，判断带有厂商视角，不视为中立研究。",
+      "factual_status: 专栏自身流程可核验；Gartner 外部数据与 web rebase 行为尚未独立验证，按 unverified/partial 标注。",
+      "duplicate: 现有 dedupeMatches 均为 Loock 课程笔记的弱关键词重叠，未见同源重复。"
+    ]
+  },
+  "materialTier": "A",
+  "canonicalTags": [
+    "ai_coding",
+    "ai_agent",
+    "article",
+    "skills"
+  ],
+  "duplicateAssessment": {
+    "matches": [
+      "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/3-Next.js 基础/3-1 什么是 Next.js？.md",
+      "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-10 01 · 从一次回答到循环执行.md",
+      "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/3-Next.js 基础/3-7 流式响应实现.md",
+      "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/3-Next.js 基础/3-3 路由系统基础.md",
+      "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/3-Next.js 基础/3-10 企业级分层架构.md"
+    ],
+    "sameSource": false,
+    "updateStatus": "new"
+  },
+  "relations": [],
+  "mocChanges": [
+    {
+      "moc": "MOC - Agent Theory and Design",
+      "action": "proposed_add_index_entry",
+      "proposed": true,
+      "note": "若该 MOC 覆盖 coding agent / 交付工作流，可把此笔记加入索引；需用户确认实际 MOC 结构后再执行。"
+    },
+    {
+      "moc": "MOC - Harness Engineering",
+      "action": "proposed_add_index_entry",
+      "proposed": true,
+      "note": "若 Harness 主题涵盖 agent 工作流、代码评审与交付约束，可加入；需确认该 MOC 存在并人工审核，不自动创建。"
+    }
+  ],
+  "claimCandidates": [
+    {
+      "claim": "编码 Agent 的默认产出模式是单次巨型 PR（示例 1000+ 行 diff，作者评审场景为 1721 行），导致难评审、审阅者丢上下文、合并变慢并常常 low-review 落地。",
+      "source_loc": "Introduction / A closer look",
+      "speaker_attribution": "作者 Julia Muiruri（专栏正文）",
+      "voice_basis": "direct_speech",
+      "factual_status": "partial",
+      "source_basis": "column_only",
+      "retention_decision": "retain_as_问题框架"
+    },
+    {
+      "claim": "Stacked pull requests 把单个特性拆成按依赖排序、单关注点、可独立评审的小 PR 链；栈底（base）决定 CI 检查与合并规则评估基准。",
+      "source_loc": "GitHub stacked pull requests / The stack structure",
+      "speaker_attribution": "作者（专栏正文）",
+      "voice_basis": "direct_speech",
+      "factual_status": "verified_in_column",
+      "source_basis": "column_only",
+      "retention_decision": "retain"
+    },
+    {
+      "claim": "评审栈的正确移动方向是『自上而下读上下文、自下而上逐层验收』；栈图为层间导航，评审分布到小规模独立目标上。",
+      "source_loc": "Reviewing and updating the stack",
+      "speaker_attribution": "作者（专栏正文）",
+      "voice_basis": "direct_speech",
+      "factual_status": "verified_in_column",
+      "source_basis": "column_only",
+      "retention_decision": "retain"
+    },
+    {
+      "claim": "Web 端『Rebase stack』按钮在 GitHub 服务器上执行 rebase，会把 committer 重置为点击者、产生未签名提交，并在分支保护要求签名提交时静默破坏；更安全的做法是本地 gh stack rebase + gh stack push。",
+      "source_loc": "Reviewing and updating the stack",
+      "speaker_attribution": "作者（专栏正文）",
+      "voice_basis": "direct_speech",
+      "factual_status": "unverified",
+      "source_basis": "column_only",
+      "retention_decision": "retain_with_caveat"
+    },
+    {
+      "claim": "Gartner 预测编码 Agent 到 2028 年将在每个 SDLC 阶段带来 50% 生产力提升。",
+      "source_loc": "Introduction",
+      "speaker_attribution": "作者引用 Gartner（外部引用）",
+      "voice_basis": "attributed_paraphrase",
+      "factual_status": "unverified",
+      "source_basis": "column_only",
+      "retention_decision": "retain_as_quoted_external_claim"
+    },
+    {
+      "claim": "栈的每一层可由对应领域负责人评审（数据层由数据负责人、UX 层由 UI 负责人），通过按层分配 Agent（data modeler / backend / frontend）实现。",
+      "source_loc": "The stack structure / Layer four",
+      "speaker_attribution": "作者（专栏正文）",
+      "voice_basis": "direct_speech",
+      "factual_status": "verified_in_column",
+      "source_basis": "column_only",
+      "retention_decision": "retain"
+    }
+  ],
+  "evidenceCandidates": [
+    {
+      "evidence": "巨型 PR 示例：1721 行变更；评审者原话『1,721 lines changed!! ... I'll review this later.』",
+      "context": "问题框架中的示意性例子，非真实 PR",
+      "factual_status": "illustrative_example"
+    },
+    {
+      "evidence": "分栈结构表：L1 feat/catalog-data（base: main）-> L2 feat/search-api（依赖 L1）-> L3 feat/chat-grounding（依赖 L2）-> L4 feat/grounded-ui（依赖 L3）",
+      "context": "具体走查模式，展示依赖链",
+      "factual_status": "verified_in_column"
+    },
+    {
+      "evidence": "命令清单：gh extension install github/gh-stack；gh skill install github/gh-stack / npx skills add github/gh-stack；gh init stack；gh stack add；gh stack push；gh stack submit；gh stack rebase；gh stack sync",
+      "context": "安装与操作命令",
+      "factual_status": "verified_in_column"
+    },
+    {
+      "evidence": "分歧行为：越序 push 后 GitHub 标记『Some branches in this stack have diverged and must be rebased』并阻止合并；出现一键 Rebase stack 按钮 vs 本地 gh stack rebase 的取舍",
+      "context": "操作与注意事项证据",
+      "factual_status": "verified_in_column"
+    },
+    {
+      "evidence": "按层评审清单：L1 类型/数据校验/查询助手安全；L2 输入校验/响应契约稳定/错误空态是否下推；L3 每个回答是否追溯真实 API 响应/API 失败或空返回；L4 引用是否链回真实产品/loading-empty-error 状态覆盖",
+      "context": "每层评审要点模式",
+      "factual_status": "verified_in_column"
+    },
+    {
+      "evidence": "演示应用初始状态：mock AI 助手（随机行生成器）、硬编码散落的产品数据、无 catalog 模块/API/数据层",
+      "context": "走查起点上下文",
+      "factual_status": "verified_in_column"
+    }
+  ],
+  "unresolved": [
+    "Gartner『50% 生产力提升（2028）』为外部引用，本专栏未提供原始报告，无法独立核验，仅作检索线索。",
+    "Web 端 Rebase stack 按钮『重置 committer、未签名提交、破坏签名提交分支保护』的行为描述未在 GitHub 官方文档中核验，需对照当前文档确认。",
+    "gh-stack 扩展、gh skill install、npx skills add 等命令与 stacked PR 功能细节可能随版本变化，需按收录日期核验当前版本。",
+    "新标签 code_review、stacked_prs 不在已知 §4 字典中，需走 tags_pending 登记流程，3 个月未审核自动失效。",
+    "vault 内是否已有同 URL 的 canonical 笔记未做全量索引确认；dedupeMatches 均为弱重叠，最终重复判定需人工复核。",
+    "MOC 宿主（MOC - Agent Theory and Design / MOC - Harness Engineering）是否实际存在并覆盖本主题，需用户确认后再更新索引。",
+    "新标签候选（需双审批）：code_review",
+    "新标签候选（需双审批）：stacked_prs"
+  ],
+  "validators": [
+    "GitHub Docs：stacked pull requests 与 gh-stack CLI 行为",
+    "GitHub Blog 原页与作者 Julia Muiruri（来源追溯）",
+    "Gartner 原始报告/新闻稿（50% 生产力提升引用核验）",
+    "vault §4 tag 字典与 tags_pending 登记区",
+    "vault MOC 索引（确认宿主 MOC 是否存在）",
+    "vault 全量索引（最终重复判定）"
+  ],
+  "sourceDigest": "e93275517a2eeaeae4736a84d960f3df2e9304c8f623e58645c12d358599ab4e",
+  "existingNoteRef": "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/3-Next.js 基础/3-1 什么是 Next.js？.md",
+  "rulesDigest": "599e0c50d0a1166ff4be65b0d29bbb7a1a29038df5dc2ea3038aa3b50df37c31",
+  "proposalDigest": "7c2c0c21e801f6c7d8d1e6fae3a4ab5199e85368d3d65d898679b99ec952fb32"
+}
+```
+<!-- syno:json:end -->
