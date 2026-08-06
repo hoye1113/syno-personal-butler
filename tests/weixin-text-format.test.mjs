@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { clip, formatWx, stripMarkdown } from "../apps/syno/syno/weixin-text-format.mjs";
+import { clip, formatWx, stripMarkdown, wxBreaks } from "../apps/syno/syno/weixin-text-format.mjs";
 
 test("formatWx 用空行分节、emoji 锚点成块", () => {
   const out = formatWx({
@@ -64,6 +64,14 @@ test("stripMarkdown 保留换行、不误伤数字列表与乘号", () => {
   assert.equal(stripMarkdown("价格 5*3=15"), "价格 5*3=15");
   // 段落换行保留（不因清洗丢结构）
   assert.equal(stripMarkdown("段一\n\n段二"), "段一\n\n段二");
+});
+
+test("wxBreaks 把单换行铺成空行段落、\\r\\n/\\r 归一、已是空行则幂等", () => {
+  assert.equal(wxBreaks("甲\n乙"), "甲\n\n乙");                 // 单 \n → 空行
+  assert.equal(wxBreaks("甲\r\n乙\r丙"), "甲\n\n乙\n\n丙");     // \r\n / \r 归一
+  assert.equal(wxBreaks("甲\n\n乙"), "甲\n\n乙");               // 已是空行 → 幂等
+  assert.equal(wxBreaks("甲\n\n\n乙"), "甲\n\n乙");             // 3+ 空行压一
+  assert.equal(wxBreaks("单行"), "单行");                       // 无换行原样
 });
 
 test("clip 截断到指定字数并加省略号，短文本原样、空白压缩", () => {

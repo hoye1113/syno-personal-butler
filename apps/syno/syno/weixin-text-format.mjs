@@ -33,6 +33,13 @@ export function clip(input, maxChars = 120) {
   return `${text.slice(0, maxChars).replace(/[，。；、,;.\s]+$/u, "")}…`;
 }
 
+// 出口换行归一化：微信只把空行渲染成换行（单 \n / \r\n / \r 全被吞成空格）。
+// 把每段换行统一铺成 \n\n——formatWx 排好的消息已是 \n\n（幂等 no-op）；对话式长回复、
+// 主动提醒里的单 \n 也铺成独立段落、不再并段。在 weixin-ilink send 出口对所有消息套用。
+export function wxBreaks(input) {
+  return String(input || "").replace(/\r\n?/g, "\n").replace(/\n+/g, "\n\n").trim();
+}
+
 // 结构化排版：
 //   formatWx({
 //     title: "📥 收录方案待确认",
