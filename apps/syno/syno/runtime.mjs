@@ -632,6 +632,15 @@ function createSynoRuntime(options = {}) {
               messageId: `capture:${workflow.id}:${workflow.attempts?.prepare || 0}:${index + 1}`,
               allowedTools: [],
               ephemeralSession: true,
+              // 收录 run 事件（含失败时的 attempts 明细）此前无人接收、整段丢失；
+              // 落 journal 后才能看到「第几个 chunk、哪个模型、什么失败」。
+              onEvent: (event) => recordEvent(`capture.${event?.type || "run.unknown"}`, {
+                runId: event?.runId,
+                workflowId: workflow.id,
+                artifactId: workflow.artifactId,
+                chunk: index + 1,
+                ...(event?.data && typeof event.data === "object" ? event.data : {}),
+              }, event?.type === "run.failed" ? { level: "error" } : undefined),
             }),
           });
           const parsed = parseStructuredModelOutput(result.text);
@@ -889,11 +898,20 @@ function createSynoRuntime(options = {}) {
         artifactId: workflow?.artifactId,
         stage: workflow?.stage,
         ...(data && typeof data === "object" ? { data } : {}),
-        error: error ? { code: error.code || "INGEST_WORKFLOW_FAILED", message: error.message } : undefined,
+        // 2026-08-05：attempts（含截断 detail）一并落 journal——此前白名单只留 code+message，
+        // 「模型尝试全部失败」实为 1 次 43ms 的 HTTP_404 却无从取证。
+        error: error ? {
+          code: error.code || "INGEST_WORKFLOW_FAILED",
+          message: error.message,
+          ...(Array.isArray(error.attempts) && error.attempts.length ? { attempts: error.attempts } : {}),
+        } : undefined,
       }, error ? { level: "error" } : undefined);
       if (type === "workflow.failed" || type === "workflow.reported") {
+        const attemptSummary = Array.isArray(error?.attempts) && error.attempts.length
+          ? `\n诊断：${error.attempts.map((item) => `${item.modelId}→${item.failureCode || item.status}(${item.elapsedMs}ms)`).join("；").slice(0, 200)}`
+          : "";
         const text = type === "workflow.failed"
-          ? `收录 ${workflow.id} 未完成：${error?.message || workflow.lastError?.message || "未知错误"}`
+          ? `收录 ${workflow.id} 未完成：${error?.message || workflow.lastError?.message || "未知错误"}${attemptSummary}`
           : [
             result?.completionStatus === "complete"
               ? `收录已完成：${result?.path || "知识记录已写入"}。`

@@ -434,6 +434,80 @@ test("OpenCode model fallback is deterministic and stops after an irreversible t
   });
 });
 
+test("OpenCodeHttpClient retains a truncated response body on HTTP errors", async () => {
+  // 2026-08-05 收录 404 瞬败：响应体是区分「路由未命中」与「handler 报错」的唯一证据。
+  const payload = JSON.stringify({ name: "NotFoundError", data: { message: "session missing" } });
+  const credentials = async () => ({ origin: "http://127.0.0.1:4318", username: "opencode", password: "pw" });
+  const client = new OpenCodeHttpClient({
+    credentials,
+    fetchImpl: async () => new Response(payload, { status: 404, headers: { "Content-Type": "application/json" } }),
+  });
+  await assert.rejects(client.sendMessage("ses_missing", { parts: [] }), (error) => {
+    assert.equal(error.status, 404);
+    assert.ok(error.responseBody.includes("session missing"));
+    return true;
+  });
+
+  const oversized = new OpenCodeHttpClient({
+    credentials,
+    fetchImpl: async () => new Response("x".repeat(5_000), { status: 500 }),
+  });
+  await assert.rejects(oversized.health(), (error) => {
+    assert.equal(error.status, 500);
+    assert.equal(error.responseBody.length, 1_000);
+    return true;
+  });
+});
+
+test("failed attempts retain the diagnostic detail (404 breaks the chain immediately)", async (t) => {
+  const root = await temporaryRoot(t);
+  const bindings = new OpenCodeSessionBindingStore({ file: path.join(root, "bindings.json") });
+  const runtime = new OpenCodeCognitiveRuntime({
+    bindings,
+    client: {
+      async createSession() { return { id: "session-detail" }; },
+      async sendMessage() {
+        throw Object.assign(new Error("missing"), { status: 404, responseBody: JSON.stringify({ error: "not found", hint: "session" }) });
+      },
+    },
+  });
+  await assert.rejects(runtime.run({ text: "hi" }, { ownerKey: "owner", threadKey: "main" }), (error) => {
+    assert.equal(error.code, "OPENCODE_ATTEMPTS_EXHAUSTED");
+    assert.equal(error.attempts.length, 1);
+    assert.equal(error.attempts[0].failureCode, "HTTP_404");
+    assert.ok(error.attempts[0].detail.includes("not found"));
+    return true;
+  });
+  // lastAttempts（GET /api/syno/opencode 的数据源）同样带 detail，无需等 journal。
+  assert.ok(runtime.lastAttempts[0].detail.includes("not found"));
+});
+
+test("empty responses surface the embedded provider error as attempt detail", async (t) => {
+  // 实测形态（2026-08-05 探针）：key 未注入时 1.18.2 返回 200 + 内嵌 error 部件、无 text。
+  const root = await temporaryRoot(t);
+  const bindings = new OpenCodeSessionBindingStore({ file: path.join(root, "bindings.json") });
+  const calls = [];
+  const runtime = new OpenCodeCognitiveRuntime({
+    bindings,
+    client: {
+      async createSession() { return { id: "session-embedded" }; },
+      async abortSession() {},
+      async sendMessage(_id, payload) {
+        calls.push(payload.model.modelID);
+        if (calls.length === 1) {
+          return { info: { role: "assistant" }, error: { name: "APIError", data: { message: "Authorization Required", statusCode: 401, isRetryable: false } } };
+        }
+        return { parts: [{ type: "text", text: "ok" }] };
+      },
+    },
+  });
+  const result = await runtime.run({ text: "hi" }, { ownerKey: "owner", threadKey: "main" });
+  assert.equal(result.text, "ok");
+  assert.equal(calls.length, 2);
+  assert.equal(result.attempts[0].failureCode, "OPENCODE_EMPTY_RESPONSE");
+  assert.ok(result.attempts[0].detail.includes("APIError 401"));
+});
+
 test("qualified model strings carry their provider across the fallback chain", async (t) => {
   // 2026-07-31 Owner 决策：主链 deepseek 官方（自有 key），opencode 免费档兜底。
   // providerID 必须从 qualifiedModel 解析，不能继续硬编码 "opencode"。

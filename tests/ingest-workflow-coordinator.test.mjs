@@ -269,6 +269,45 @@ test("remote analysis blocks secrets found in outbound metadata before calling t
   assert.equal((await store.get(receipt.workflow.id)).stage, "failed_terminal");
 });
 
+test("workflow.failed forwards model attempt diagnostics to onEvent", async (t) => {
+  // runtime.mjs 的 journal sink 依赖这个契约：error.attempts 必须原样到达 onEvent。
+  const { scheduled, ingest, store } = await fixture(t);
+  ingest.propose = async (artifactId) => ({
+    candidate: { id: `candidate-${artifactId}` },
+    proposal: {
+      id: `proposal-${artifactId}`, sourceType: "text", sourceDigest: "a".repeat(64),
+      proposalDigest: "b".repeat(64),
+    },
+  });
+  ingest.readArtifact = async () => ({ id: "artifact", title: "t", body: "ordinary body", relationCandidates: [] });
+  const attempts = [{
+    modelId: "deepseek/deepseek-v4-flash", elapsedMs: 43, status: "failed",
+    failureCode: "HTTP_404", detail: "{\"error\":\"not found\"}",
+  }];
+  const events = [];
+  const coordinator = new IngestWorkflowCoordinator({
+    ingest,
+    store,
+    schedule: (work) => scheduled.push(work),
+    contextCompiler: { async compile() { return { rulesDigest: "d".repeat(64) }; } },
+    async analyze() {
+      throw Object.assign(new Error("OpenCode 模型尝试全部失败"), {
+        code: "OPENCODE_ATTEMPTS_EXHAUSTED", retryable: false, attempts,
+      });
+    },
+    onEvent: async (event) => { events.push(event); },
+  });
+  const receipt = await coordinator.receive(
+    { kind: "text", value: "ordinary body" },
+    { ownerKey: "owner", channel: "web", messageId: "attempts-forward" },
+  );
+  await scheduled.shift()();
+  assert.equal((await store.get(receipt.workflow.id)).stage, "failed_terminal");
+  const failed = events.find((event) => event.type === "workflow.failed");
+  assert.ok(failed, "workflow.failed event emitted");
+  assert.deepEqual(failed.error.attempts, attempts);
+});
+
 test("decide binds an Owner decision to the durable Workflow", async (t) => {
   const { scheduled, ingest, store } = await fixture(t);
   ingest.revise = async (artifactId) => ({

@@ -35,6 +35,11 @@ function parseQualifiedModel(qualifiedModel) {
   return { providerID: value.slice(0, slash), modelID: value.slice(slash + 1) };
 }
 const DEFAULT_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
+// 2026-08-05 收录 404 瞬败事故：client 丢弃错误响应体导致根因无法定位。本地 loopback child 的
+// 错误 JSON 不含我方凭据（opencode 不回显请求头），仍截断兜底。ERROR_BODY_PREVIEW_LIMIT 挂在
+// error.responseBody；ATTEMPT_DETAIL_LIMIT 是放进 attempts/journal 的更紧预算。
+const ERROR_BODY_PREVIEW_LIMIT = 1_000;
+const ATTEMPT_DETAIL_LIMIT = 500;
 const DENIED_OPENCODE_TOOLS = Object.freeze([
   "apply_patch", "bash", "batch", "codesearch", "edit", "glob", "grep", "list",
   "multiedit", "question", "read", "task", "todoread", "todowrite", "webfetch",
@@ -370,6 +375,10 @@ class OpenCodeHttpClient {
     if (!response.ok) {
       const error = new Error(`OpenCode 请求失败：${method} ${pathname} -> ${response.status}`);
       error.status = response.status;
+      // 留存截断后的响应体：opencode 的错误 JSON 会指名缺失资源（session/model/路由），
+      // 是区分「路由未命中」与「handler 报错」的唯一证据。
+      const bodyPreview = await response.text().catch(() => "");
+      if (bodyPreview) error.responseBody = bodyPreview.slice(0, ERROR_BODY_PREVIEW_LIMIT);
       throw error;
     }
     if (response.status === 204) return null;
@@ -757,7 +766,19 @@ class OpenCodeCognitiveRuntime {
             }, { signal: controller.signal });
             if (controller.signal.aborted) throw new SchedulerCancellationError();
             const responseBody = responseText(response);
-            if (!responseBody) throw Object.assign(new Error("OpenCode 返回空响应"), { code: "OPENCODE_EMPTY_RESPONSE" });
+            if (!responseBody) {
+              // 实测形态（2026-08-05 探针）：provider 层失败（如 key 未注入）时 1.18.2 返回
+              // 200 + 内嵌 error 部件（{ name, data:{ statusCode, message } }）且无 text——
+              // 空响应不等于无信息，把内嵌错误摘要带进 detail，否则 fallback 全程盲跑。
+              const embedded = response?.error;
+              const embeddedDetail = embedded
+                ? `${embedded.name || "ProviderError"}${embedded.data?.statusCode ? ` ${embedded.data.statusCode}` : ""}: ${String(embedded.data?.message || "").slice(0, 200)}`
+                : "";
+              throw Object.assign(new Error("OpenCode 返回空响应"), {
+                code: "OPENCODE_EMPTY_RESPONSE",
+                ...(embeddedDetail ? { detail: embeddedDetail } : {}),
+              });
+            }
             const text = binding.contextReset
               ? `上下文状态无法确认，已切换到干净新会话。\n\n${responseBody}`
               : responseBody;
@@ -779,7 +800,14 @@ class OpenCodeCognitiveRuntime {
               effectAfter,
               irreversibleEffect: error.irreversibleEffect === true,
             });
-            attempts.push({ modelId: qualifiedModel, elapsedMs: Date.now() - started, status: "failed", failureCode: failureCode(error) });
+            const attemptDetail = String(error.responseBody || error.detail || "").slice(0, ATTEMPT_DETAIL_LIMIT);
+            attempts.push({
+              modelId: qualifiedModel,
+              elapsedMs: Date.now() - started,
+              status: "failed",
+              failureCode: failureCode(error),
+              ...(attemptDetail ? { detail: attemptDetail } : {}),
+            });
             if (controller.signal.aborted) {
               await run.abortPromise;
               if (run.status === "cancel_unknown") {
