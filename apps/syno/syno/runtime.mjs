@@ -55,6 +55,7 @@ import { ToolLoopExecutor } from "./tool-loop-executor.mjs";
 import { ToolRegistry } from "./tool-registry.mjs";
 import { TodayService } from "./today-service.mjs";
 import { WeixinIlinkAdapter, envToggle } from "./weixin-ilink.mjs";
+import { clip, formatWx, stripMarkdown } from "./weixin-text-format.mjs";
 import { VaultMigrationService } from "./vault-migration-service.mjs";
 import { WindowsServiceManager } from "./windows-service-manager.mjs";
 import { WindowsServiceControl } from "./windows-service-control.mjs";
@@ -780,13 +781,16 @@ function createSynoRuntime(options = {}) {
   ingestWorkflows.configure?.({
     browserCapture,
     browserRuntime: cognitiveRuntime,
-    onProposed: async ({ workflow, proposal, action: selectedAction }) => {
+    onProposed: async ({ workflow, candidate, proposal, action: selectedAction }) => {
       if (!proposalAllowsWriteJob(proposal)) {
-        const summary = [
-          `Syno 建议拒收：${proposal.suggestedPath}`,
-          ...(proposal.quality.reasons || []),
-          "该方案不会创建写入 Job。若仍需保留，请补充来源或重新提交并说明保留理由。",
-        ].join("\n");
+        const summary = formatWx({
+          title: "🚫 Syno 建议拒收",
+          sections: [
+            { icon: "📂", heading: "方案", lines: [proposal.suggestedPath] },
+            { icon: "⚠️", heading: "原因", lines: (proposal.quality.reasons || []).map((reason) => `· ${reason}`) },
+          ],
+          footer: "——————\n该方案不会写入笔记。若仍需保留，请补充来源或重新提交并说明保留理由。",
+        });
         for (const targetChannel of [workflow.originChannel, "main-session"]) {
           await workflowOutbox.enqueue({
             workflowId: workflow.id,
@@ -826,11 +830,16 @@ function createSynoRuntime(options = {}) {
         // 无冲突：approval:none 已让 host.receive 自动执行并落盘。发"已收录"回执 +
         // 带 diffHash 的审计事件（D2：无确认环节即无物可伪，仅记完整性指纹）。
         await ingestWorkflows.store.update(workflow.id, { stage: "committed", jobId: job.id });
-        const committedSummary = [
-          `已收录：${proposal.suggestedPath}`,
-          `来源状态：${proposal.sourceDescriptor.reliability}/${proposal.sourceDescriptor.verificationStatus}`,
-          job.result?.diffHash ? `写入指纹：${job.result.diffHash}` : "写入指纹：无变更",
-        ].join("\n");
+        const committedSummary = formatWx({
+          title: "✅ 已收录",
+          sections: [
+            { icon: "📂", heading: "保存位置", lines: [proposal.suggestedPath] },
+            { lines: [
+              `🔎 来源　${proposal.sourceDescriptor.reliability} / ${proposal.sourceDescriptor.verificationStatus}`,
+              job.result?.diffHash ? `🔏 写入指纹　${job.result.diffHash}` : "🔏 写入指纹　无变更",
+            ] },
+          ],
+        });
         for (const targetChannel of [workflow.originChannel, "main-session"]) {
           await workflowOutbox.enqueue({
             workflowId: workflow.id,
@@ -866,18 +875,38 @@ function createSynoRuntime(options = {}) {
         artifactId: workflow.artifactId,
       });
       const decisionPresentation = await pendingDecisions.present({ ownerKey: workflow.ownerKey, threadKey: workflow.threadKey, channel: workflow.originChannel, businessVersion: proposal.proposalDigest });
-      const summary = [
-        `收录方案需要确认：${proposal.suggestedPath}`,
-        `来源状态：${proposal.sourceDescriptor.reliability}/${proposal.sourceDescriptor.verificationStatus}`,
-        `重复候选：${proposal.duplicateAssessment.matches.length} 个`,
-        proposal.unresolved.length ? `待确认：${proposal.unresolved.join("；")}` : "没有额外待确认事项",
-        proposal.risk === "additive"
-          ? `回复“确认”新建笔记，或回复“修改：……”/“拒绝”。`
-          : `当前方式：${action}。可回复“分开保存”“追加来源”“仅关联”切换方式，再回复“确认”。`,
-        ...(decisionPresentation.decisions.length > 1
-          ? [`当前待确认事项编号：${decisionPresentation.decisions.map((item, index) => `${index + 1}.${item.jobId}`).join("、")}；请回复“确认 1/2…”。`]
-          : []),
-      ].join("\n");
+      // 微信排版：空行分节 + emoji 锚点；「内容要点」块让主人直接看到要收录的内容
+      // （candidate.summary 是正文前 280 字切片，含 markdown/frontmatter，先清洗再截断）。
+      const previewLines = [];
+      if (candidate?.title) previewLines.push(`《${stripMarkdown(candidate.title)}》`);
+      if (candidate?.summary) previewLines.push(clip(stripMarkdown(candidate.summary), 120));
+      if (Array.isArray(proposal.canonicalTags) && proposal.canonicalTags.length) {
+        previewLines.push(`🏷 ${proposal.canonicalTags.join(" ")}`);
+      }
+      const footerLines = ["——————"];
+      if (proposal.risk === "additive") {
+        footerLines.push("回复「确认」新建笔记", "「修改：…」调整　·　「拒绝」放弃");
+      } else {
+        footerLines.push(`方式：${action}（可回复「分开保存」「追加来源」「仅关联」切换）`, "确定后回复「确认」");
+      }
+      if (decisionPresentation.decisions.length > 1) {
+        footerLines.push(`待确认编号：${decisionPresentation.decisions.map((item, index) => `${index + 1}.${item.jobId}`).join("、")} → 回复「确认 1/2…」`);
+      }
+      const summary = formatWx({
+        title: "📥 收录方案待确认",
+        sections: [
+          ...(previewLines.length ? [{ icon: "📝", heading: "内容要点", lines: previewLines }] : []),
+          { icon: "📂", heading: "保存位置", lines: [proposal.suggestedPath] },
+          { lines: [
+            `🔎 来源可信度　${proposal.sourceDescriptor.reliability} / ${proposal.sourceDescriptor.verificationStatus}`,
+            `🔁 相似笔记　${proposal.duplicateAssessment.matches.length} 个`,
+          ] },
+          proposal.unresolved.length
+            ? { icon: "⚠️", heading: "待你确认", lines: proposal.unresolved.map((item) => `· ${item}`) }
+            : { icon: "✅", heading: "无额外待确认事项", lines: [] },
+        ],
+        footer: footerLines.join("\n"),
+      });
       for (const targetChannel of [workflow.originChannel, "main-session"]) {
         await workflowOutbox.enqueue({
           workflowId: workflow.id,

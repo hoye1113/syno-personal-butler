@@ -6,6 +6,7 @@ import QRCode from "qrcode";
 import { PATHS, resolveInside } from "./paths.mjs";
 import { runDpapi } from "./provider-credential-store.mjs";
 import { redactString } from "./runtime-journal.mjs";
+import { stripMarkdown } from "./weixin-text-format.mjs";
 
 const DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com/";
 const DEFAULT_CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c/";
@@ -491,7 +492,10 @@ class WeixinIlinkAdapter {
     const contextToken = message.contextToken || this.contexts.get(toUserId);
     if (!toUserId || !contextToken) return { delivered: false, reason: "no_active_context" };
     const deliveryKey = message.deliveryKey || message.idempotencyKey || null;
-    const result = await this.client.sendText({ toUserId, contextToken, text: String(message.text || message.body || ""), ...(deliveryKey ? { clientId: String(deliveryKey) } : {}) });
+    // 微信不渲染 markdown（** # ``` 原样露出成星号井号），统一在出口清洗为纯文本；
+    // 空行/换行保留，已用 formatWx 排好的消息无 markdown 可剥、是 no-op。
+    const text = stripMarkdown(String(message.text || message.body || ""));
+    const result = await this.client.sendText({ toUserId, contextToken, text, ...(deliveryKey ? { clientId: String(deliveryKey) } : {}) });
     const explicitFailure = (result.ret !== undefined && Number(result.ret) !== 0)
       || (result.errcode !== undefined && Number(result.errcode) !== 0);
     const accepted = result.message_id !== undefined || Number(result.ret) === 0;

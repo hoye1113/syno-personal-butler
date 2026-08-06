@@ -1,0 +1,66 @@
+// 微信文本排版助手。
+//
+// 约束（实测）：微信保留 `\n`（换行）与 `\n\n`（空行），但**不渲染 markdown**——
+// `**` `#` ``` 等标记会原样露出成星号井号，反而更难读。因此管家的用户可见文案：
+//   ① 用空行分段、emoji/短行做视觉锚点（formatWx 负责结构）；
+//   ② 凡可能含 markdown 的内容（LLM 产出、正文摘要）先经 stripMarkdown 清洗。
+//
+// 两个导出：formatWx（结构排版）+ stripMarkdown（markdown→纯文本清洗）+ clip（截断）。
+
+// 保守的 markdown→纯文本清洗。目标是去掉微信里只会原样露出的标记，**不**改动语义内容。
+// 顺序有讲究：先代码围栏（保住代码内容、只去围栏），再行内 code，再标题/粗斜体/链接/列表。
+export function stripMarkdown(input) {
+  let text = String(input || "");
+  // 代码围栏 ```lang ... ``` → 保留内部内容（去掉围栏与语言标注）
+  text = text.replace(/```[a-zA-Z]*\r?\n?([\s\S]*?)```/g, (_m, inner) => inner.replace(/\s+$/u, ""));
+  text = text.replace(/`([^`]*)`/g, "$1");                    // 行内 `code`
+  text = text.replace(/^#{1,6}\s+/gm, "");                    // # 标题
+  text = text.replace(/\*\*([^*]+)\*\*/g, "$1");              // **粗体**
+  text = text.replace(/__([^_]+)__/g, "$1");                  // __粗体__
+  text = text.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1$2");      // *斜体*（避免误吃 ** 残留）
+  text = text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, "$1（$2）"); // [文字](链接) → 文字（链接）
+  text = text.replace(/^\s{0,3}[-*+]\s+/gm, "· ");            // - / * / + 列表 → ·
+  text = text.replace(/^\s*>\s?/gm, "");                      // > 引用
+  text = text.replace(/\n{3,}/g, "\n\n");                     // 3+ 连续换行压成一个空行
+  return text.trim();
+}
+
+// 截断到 maxChars 字（按字符），尽量在换行/标点处收束，超长加省略号。用于内容预览。
+export function clip(input, maxChars = 120) {
+  const text = String(input || "").replace(/\s+/gu, " ").trim();
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars).replace(/[，。；、,;.\s]+$/u, "")}…`;
+}
+
+// 结构化排版：
+//   formatWx({
+//     title: "📥 收录方案待确认",
+//     sections: [
+//       { icon: "📝", heading: "内容要点", lines: ["《标题》", "摘要…", "🏷 标签"] },
+//       { icon: "📂", heading: "保存位置", lines: ["vault/00-Inbox/xx.md"] },
+//       { lines: ["🔎 来源可信度　high/verified", "🔁 相似笔记　2 个"] },   // 无标题节
+//     ],
+//     footer: "——————\n回复「确认」保存",
+//   })
+// 规则：每节 = 标题行(icon+heading) + 若干内容行；节与节之间一个空行；空节自动省略。
+export function formatWx({ title, sections = [], footer } = {}) {
+  const blocks = [];
+  if (title && String(title).trim()) blocks.push(String(title).trim());
+  for (const section of sections) {
+    if (!section) continue;
+    // icon 只作 heading 的装饰：没有 heading 时忽略 icon（避免渲染出孤零零一个表情符号的废节）。
+    const headingText = section.heading && String(section.heading).trim() ? String(section.heading).trim() : "";
+    const head = headingText
+      ? [section.icon, headingText].filter((x) => x && String(x).trim()).map(String).join(" ")
+      : "";
+    const body = (Array.isArray(section.lines) ? section.lines : [])
+      .map((line) => String(line ?? ""))
+      .filter((line) => line.trim() !== "");
+    const blockLines = [];
+    if (head) blockLines.push(head);
+    blockLines.push(...body);
+    if (blockLines.length) blocks.push(blockLines.join("\n"));
+  }
+  if (footer && String(footer).trim()) blocks.push(String(footer).trim());
+  return blocks.join("\n\n");
+}
