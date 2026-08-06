@@ -857,13 +857,36 @@ class OpenCodeCognitiveRuntime {
         throw exhausted;
         };
 
-        if (!allowedTools.length) return executeModels();
-        run.status = "waiting_bridge";
-        const bridgeTicket = this.bridgeScheduler.enqueue("syno-tool-bridge", executeModels);
-        run.bridgeTicket = bridgeTicket;
-        return bridgeTicket.promise;
+        let modelPromise;
+        if (!allowedTools.length) {
+          modelPromise = executeModels();
+        } else {
+          run.status = "waiting_bridge";
+          const bridgeTicket = this.bridgeScheduler.enqueue("syno-tool-bridge", executeModels);
+          run.bridgeTicket = bridgeTicket;
+          modelPromise = bridgeTicket.promise;
+        }
+        if (context.ephemeralSession === true) {
+          // Ephemeral sessions are DELETEd on release, so the release must NOT overtake
+          // the model run. Previously release ran in the try/finally below before the model
+          // run finished — for the capture path (allowedTools:[] → direct executeModels call)
+          // executeModels yields at `await sendMessage`, then the finally fires release and
+          // sends DELETE while sendMessage's response is still pending; the opencode child
+          // removes the session before sendMessage finishes → 404 "Session not found" on
+          // every capture. (Non-empty allowedTools is worse: executeModels is microtask-
+          // deferred by the bridge scheduler, so DELETE is sent before sendMessage starts.)
+          // Chain the release after the model run settles so DELETE only fires once
+          // sendMessage has completed. Ephemeral sessions are throwaway (a retry mints a new
+          // one), so we always delete after the run — never preserve — to avoid leaking
+          // orphan sessions that no cleanup path tracks. (Persistent leases release in the
+          // finally below — a binding-lock release with no opencode DELETE — unchanged.)
+          return modelPromise.finally(() => sessionLease.release());
+        }
+        return modelPromise;
       } finally {
-        await sessionLease.release({ preserve: context.ephemeralSession === true && run.sessionStateKnown === SESSION_STATE_KNOWN.UNKNOWN });
+        if (context.ephemeralSession !== true) {
+          await sessionLease.release({ preserve: false });
+        }
       }
     });
     run.sessionTicket = sessionTicket;

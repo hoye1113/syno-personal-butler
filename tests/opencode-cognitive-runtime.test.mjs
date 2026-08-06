@@ -749,6 +749,93 @@ test("ephemeral capture Session never becomes a formal Binding and is deleted af
   assert.equal(await runtime.bindings.active("owner", "capture:artifact-ephemeral"), null);
 });
 
+test("ephemeral capture defers session deletion until after sendMessage completes (direct path)", async (t) => {
+  // 真实收录路径：allowedTools:[] → L860 直接调用 executeModels。回归 404 根因——
+  // release(DELETE) 曾在 finally 里跑在 sendMessage 完成之前，child 在 sendMessage
+  // 用 session 前删掉它。不变量：sendMessage 必须先完成，DELETE 才能发。
+  const root = await temporaryRoot(t);
+  const log = [];
+  const runtime = new OpenCodeCognitiveRuntime({
+    bindings: new OpenCodeSessionBindingStore({ file: path.join(root, "bindings.json") }),
+    client: {
+      async createSession() { return { id: "ephemeral-direct" }; },
+      sendMessage() {
+        log.push("sendMessage:call");
+        // 异步 resolve 模拟 HTTP 往返：buggy 代码里 release 会在 resolve 之前跑。
+        return new Promise((resolve) => setTimeout(() => {
+          log.push("sendMessage:resolve");
+          resolve({ parts: [{ type: "text", text: "captured" }] });
+        }, 5));
+      },
+      async deleteSession() { log.push("deleteSession:call"); },
+    },
+  });
+  await runtime.run({ text: "capture" }, {
+    ownerKey: "owner",
+    threadKey: "capture:artifact-direct",
+    allowedTools: [],
+    ephemeralSession: true,
+  });
+  const resolveAt = log.indexOf("sendMessage:resolve");
+  const deleteAt = log.indexOf("deleteSession:call");
+  assert.notEqual(resolveAt, -1, "sendMessage 应已完成");
+  assert.notEqual(deleteAt, -1, "ephemeral session 应在 run 后被删除");
+  assert.ok(resolveAt < deleteAt, `sendMessage 必须先于 deleteSession 完成（实际顺序: ${log.join(" → ")}）`);
+});
+
+test("ephemeral capture defers session deletion until after sendMessage completes (bridge path)", async (t) => {
+  // 非空 allowedTools → L862 bridge 路径：executeModels 被 microtask 延迟，buggy 代码里
+  // DELETE 在 sendMessage 甚至未开始时即发出。同一不变量。
+  const root = await temporaryRoot(t);
+  const log = [];
+  const tools = { list: () => [{ name: "syno_knowledge_search" }], bindContext() { return () => {}; } };
+  const runtime = new OpenCodeCognitiveRuntime({
+    tools,
+    bindings: new OpenCodeSessionBindingStore({ file: path.join(root, "bindings.json") }),
+    client: {
+      async createSession() { return { id: "ephemeral-bridge" }; },
+      sendMessage() {
+        log.push("sendMessage:call");
+        return new Promise((resolve) => setTimeout(() => {
+          log.push("sendMessage:resolve");
+          resolve({ parts: [{ type: "text", text: "captured" }] });
+        }, 5));
+      },
+      async deleteSession() { log.push("deleteSession:call"); },
+    },
+  });
+  await runtime.run({ text: "capture" }, {
+    ownerKey: "owner",
+    threadKey: "capture:artifact-bridge",
+    allowedTools: ["syno_knowledge_search"],
+    ephemeralSession: true,
+  });
+  const resolveAt = log.indexOf("sendMessage:resolve");
+  const deleteAt = log.indexOf("deleteSession:call");
+  assert.ok(resolveAt < deleteAt, `sendMessage 必须先于 deleteSession 完成（实际顺序: ${log.join(" → ")}）`);
+});
+
+test("ephemeral session is still deleted after a failed run", async (t) => {
+  // run 失败（sendMessage 抛）时，release 仍须在 model run 落定后跑、清理 session。
+  const root = await temporaryRoot(t);
+  const deleted = [];
+  const runtime = new OpenCodeCognitiveRuntime({
+    bindings: new OpenCodeSessionBindingStore({ file: path.join(root, "bindings.json") }),
+    client: {
+      async createSession() { return { id: "ephemeral-failed" }; },
+      async sendMessage() { throw Object.assign(new Error("boom"), { status: 500 }); },
+      async deleteSession(id) { deleted.push(id); },
+    },
+  });
+  await assert.rejects(runtime.run({ text: "capture" }, {
+    ownerKey: "owner",
+    threadKey: "capture:artifact-failed",
+    allowedTools: [],
+    ephemeralSession: true,
+  }), (error) => error.code === "OPENCODE_ATTEMPTS_EXHAUSTED" || error.code === "OPENCODE_ABORT_UNKNOWN");
+  assert.deepEqual(deleted, ["ephemeral-failed"], "失败的 ephemeral run 仍应删除 session（不泄漏）");
+});
+
 test("capture sessions expire after seven days while main sessions retain thirty days", async (t) => {
   const root = await temporaryRoot(t);
   let now = new Date("2026-07-01T00:00:00Z");

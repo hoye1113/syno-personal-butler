@@ -124,3 +124,21 @@ node --test tests/eval/handoff-drift.eval.mjs  # on-demand：depth 1/2/3/5 全�
 pnpm windows:status               # 期望 running=true, webUrl=…:8888
 Invoke-RestMethod http://127.0.0.1:8888/api/syno/context/stats
 ```
+
+---
+
+## 8. 最新（2026-08-06）— 收录 404 根因修复（release-ordering）
+
+**事故（2026-08-05）：** 收录（capture）workflow 恒 `OPENCODE_ATTEMPTS_EXHAUSTED`，sendMessage 43ms 拿 `HTTP_404 {"name":"NotFoundError","data":{"message":"Session not found: ses_…"}}`，capture 从未成功过。
+
+**根因（经生产活体时间线 + microtask 实证坐实；**非**持久化竞态）：** `apps/syno/syno/opencode-cognitive-runtime.mjs` `run()` 的 session-callback 里，`finally { await sessionLease.release() }` 的 release（对 ephemeral = `deleteSession`）**跑在 model run（sendMessage）完成之前**。真实收录走 L860 直接调用路径（`runtime.mjs:633` `allowedTools:[]` → `!allowedTools.length` → `return executeModels()`）：executeModels 同步跑到 `await sendMessage` 发请求后 yield，随后 finally 同步发 **DELETE（仍早于 sendMessage 响应回来）** → DELETE 与 sendMessage 同时在飞，child 在 sendMessage 完成前删 session → sendMessage `Session.get` → NotFound → 404。（非空 allowedTools 的 L862 bridge 路径更糟：executeModels 被 `CancellableKeyedScheduler.#drain` 的 `Promise.resolve().then` 延迟一个 microtask，DELETE 在 sendMessage 未开始时即发。）持久聊天正常：持久 lease 的 release 只解 binding 锁、不 DELETE；`#acquireEphemeralSession` 是唯一「release 即 delete」的 lease。JS 语义：`try { return promise } finally { await cleanup() }` 里 cleanup 在 promise 落定前跑。复现脚本 `D:\tmp\opc-diag\microtask-repro{,-L860,-fixed}.mjs`（一次性、不进仓）。
+
+**修复：** ephemeral 的 release 从同步 finally 移出，链到 `modelPromise.finally(() => sessionLease.release())`——DELETE 必在 sendMessage 完成后才发；持久路径 finally 不变（只解锁、无 DELETE）。ephemeral 恒删（不 preserve，避免泄漏无 cleanup 路径追踪的 orphan）。**不加** create 落库屏障（前提「持久化竞态」已证伪、屏障无效且会逼出 `opencode-test-supervisor.mjs` 的 GET-404 缺陷搞坏 test-mode）。新 memory `syno-capture-404-release-ordering`。
+
+**本轮上线遥测（commit `341a97c`）：** `OpenCodeHttpClient.#request` !ok 分支挂 `error.responseBody`（截断）；attempt 带 `detail`（responseBody / 空响应内嵌 provider error）；capture `onEvent` 接 journal（`capture.run.started/failed` 带 attempts）、`workflow.failed` 的 `error.attempts`。
+
+**验证：** `tests/opencode-cognitive-runtime.test.mjs` +3 回归（direct / bridge 两路径「sendMessage 完成先于 deleteSession」、失败 run 仍删；已证 buggy 下两路径 ✖、修复后 ✔）；`pnpm test` 710/710。
+
+**待主人复现验证（端到端，host 无热加载）：** `pnpm windows:restart` → 重投 `artifact-20260805-b13790f2` 源（`POST /api/syno/intake` channel=web + `Origin: http://127.0.0.1:8888`，或微信重发链接）→ 期望首次 `capture.run.completed`（过往从未成功）。
+
+**Backlog（仍记，非本轮）：** `opencode-test-supervisor.mjs` `GET /session/{id}` 无分支恒 404（仅屏障方案会踩、本修复不踩，仍潜伏）；fake-supervisor 404-vs-500 语义漂移；`scripts/probe-opencode-server.mjs` securityOk 断言过期。
