@@ -73,7 +73,10 @@ class SynoToolBridge {
   effectVersion() { return this.effectCounter; }
 
   bindContext(context) {
-    if (this.activeContext) throw bridgeError("SYNO_BRIDGE_CONTEXT_BUSY", "Syno Tool Bridge 正在处理另一个会话");
+    // 桥忙是瞬时条件（持有方 release 即恢复）：必须挂 retryable。coordinator 主路径只对
+    // retryable === true 走 failed_retryable + 60s 退避（maxPrepareAttempts=8 封顶升终态）；
+    // 未挂标记时收录撞槽一次即 failed_terminal（2026-08-07 生产事故）。
+    if (this.activeContext) throw Object.assign(bridgeError("SYNO_BRIDGE_CONTEXT_BUSY", "Syno Tool Bridge 正在处理另一个会话"), { retryable: true });
     this.activeContext = Object.freeze({
       ownerKey: String(context.ownerKey || this.ownerKey),
       threadKey: String(context.threadKey || "main"),

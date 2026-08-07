@@ -185,6 +185,26 @@ test("SynoToolBridge rejects a valid tool omitted from the run-scoped capability
   assert.match(response.error.message, /TOOL_NOT_ALLOWED/);
 });
 
+test("SynoToolBridge marks CONTEXT_BUSY retryable so a transient collision reaches the retry path", async () => {
+  const bridge = new SynoToolBridge({ tools: registry(), token: "bridge-secret" });
+  const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "holder" });
+  let busy;
+  try {
+    bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "contender" });
+  } catch (error) {
+    busy = error;
+  }
+  release();
+  // 桥忙是瞬时条件（持有方 release 即恢复）：ingest-workflow-coordinator 主路径只在
+  // error.retryable === true 时走 failed_retryable + 60s 退避（maxPrepareAttempts=8 封顶），
+  // 否则一次即判 failed_terminal。2026-08-07 生产事故：bridgeError 未挂标记，收录撞槽一次即终态。
+  assert.equal(busy?.code, "SYNO_BRIDGE_CONTEXT_BUSY");
+  assert.equal(busy?.retryable, true);
+  // release 后必须能重新绑上——「忙」确实瞬时，重试有意义。
+  const again = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "after-release" });
+  again();
+});
+
 test("SynoToolBridge rejects tool calls without an active Syno conversation", async () => {
   const bridge = new SynoToolBridge({ tools: registry(), token: "bridge-secret" });
   const response = await bridge.handle({

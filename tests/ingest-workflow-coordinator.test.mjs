@@ -5,6 +5,8 @@ import path from "node:path";
 import test from "node:test";
 
 import { IngestWorkflowCoordinator, IngestWorkflowStore } from "../apps/syno/syno/ingest-workflow-coordinator.mjs";
+import { SynoToolBridge } from "../apps/syno/syno/syno-tool-bridge.mjs";
+import { ToolRegistry } from "../apps/syno/syno/tool-registry.mjs";
 
 async function fixture(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-ingest-workflow-"));
@@ -736,6 +738,41 @@ test("R2: re-publish branch caps retryable publish failures at maxPrepareAttempt
     }
   }
   // 第 7 次重发布（prepare 累计至 8）命中上限 → 终态。
+  assert.equal(workflow.stage, "failed_terminal");
+  assert.equal(workflow.lastError.code, "INGEST_PREPARE_EXHAUSTED");
+  assert.equal(workflow.attempts.prepare, 8);
+  assert.equal((await coordinator.retryDue(10)).processed, 0);
+});
+
+test("bridge CONTEXT_BUSY is retryable: failed_retryable first, capped terminal at maxPrepareAttempts", async (t) => {
+  const { ingest, coordinator } = await fixture(t);
+  // 用真实 SynoToolBridge 产出错误对象，而不是手造 { retryable: true }——
+  // 2026-08-07 生产事故正是 bridgeError 没挂 retryable、收录撞槽一次即判 failed_terminal；
+  // 手造错误会绕过这个回归点（R2 用例只证明了「带标记的错误」走封顶机制）。
+  const bridge = new SynoToolBridge({ tools: new ToolRegistry([]), token: "test" });
+  const release = bridge.bindContext({ messageId: "holder" });
+  let busyError;
+  try { bridge.bindContext({ messageId: "contender" }); } catch (error) { busyError = error; }
+  release();
+  ingest.propose = async () => { throw busyError; };
+  const receipt = await coordinator.receive(
+    { kind: "text", value: "bridge busy capture" },
+    { ownerKey: "owner", channel: "weixin", messageId: "bridge-busy" },
+  );
+
+  let workflow;
+  for (let i = 0; i < 8; i += 1) {
+    workflow = await coordinator.retry(receipt.workflow.id);
+    if (i < 7) {
+      // 前 7 次：瞬时撞槽必须走 retryable 路径——不判死、带 60s 退避、计数自增。
+      assert.equal(workflow.stage, "failed_retryable");
+      assert.equal(workflow.lastError.code, "SYNO_BRIDGE_CONTEXT_BUSY");
+      assert.equal(workflow.lastError.retryable, true);
+      assert.ok(workflow.nextRetryAt);
+      assert.equal(workflow.attempts.prepare, i + 1);
+    }
+  }
+  // 持续占桥 8 次仍不可恢复 → 诚实升终态（不无限重投），retryDue 不再拾取。
   assert.equal(workflow.stage, "failed_terminal");
   assert.equal(workflow.lastError.code, "INGEST_PREPARE_EXHAUSTED");
   assert.equal(workflow.attempts.prepare, 8);
