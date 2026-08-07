@@ -57,6 +57,28 @@ pnpm state:archive -- restore D:\Backups\syno-state-20260717
 5. 运行针对性测试后再跑完整测试。
 6. 生成 `BugReport` 或 `ImprovementProposal`；不要让 Agent 修改源码绕过故障。
 
+收录工作流终态审计（只读，不改任何状态）：
+
+```powershell
+pnpm audit:ingest            # 按 错误码 × retryable × fetchMethod 聚类
+pnpm audit:ingest --all      # 展开单条样例，含候选/方案/Job 引用
+```
+
+`OPENCODE_ATTEMPTS_EXHAUSTED` / `OPENCODE_ABORT_UNKNOWN` / `OPENCODE_NOT_RUNNING` /
+`PROVIDER_RATE_LIMITED` 已改成**降级而非终态**：模型不可用时保留 propose 已产出的基础方案，
+把「远程语义分析未完成，请人工确认」写进 unresolved，经 onProposed 转入
+`awaiting_decision` 回主人手工决定，不再把整个收录流程锁进 `failed_terminal`。
+这类 workflow 仍在 `listPending` 可见、可 approve/reject，不发 `workflow.failed`。
+只有非模型类错误（契约校验、浏览器捕获、远程内容安全检查等）才照旧走 failed/terminal。
+
+注意：模型能力错误**一次失败即降级**，不经过 coordinator 级 60s 重试——OpenCode
+运行时已先对模型链做过多轮 fallback，到达协调器时通常已确认耗尽；立即回到主人
+决策可避免重复消耗整条模型链。若需要为瞬时抖动保留少量重试缓冲，可在此处调整。
+
+当来源正文被 CSS 噪声污染时，`fetchSourceText` 会抛「来源正文疑似 CSS 噪声，低质量」，
+命中 `empty_or_low_quality` 的浏览器兜底（`fetchMethod=kimi_webbridge`），不再把样式表收进笔记。
+浏览器兜底返回的正文同样过噪声门（`applyBrowserSnapshot` 二次检查），双重防护。
+
 运行日志按天写入 JSONL，默认保留 14 天，覆盖 Syno 初始化、OpenCode
 配置/进程/健康/退出、渠道启动，以及消息的附件、决策、收录和 Runtime
 阶段。日志只记录渠道、消息 ID、Artifact/Job/Run ID、状态和脱敏错误，不保存

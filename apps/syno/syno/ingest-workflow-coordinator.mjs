@@ -8,6 +8,15 @@ import { inspectRemoteContent } from "./sensitive-content.mjs";
 import { buildSourceDescriptor } from "./source-descriptor.mjs";
 
 const TERMINAL_STAGES = new Set(["reported", "failed_terminal", "rejected", "superseded"]);
+// A3：模型耗尽/不可用的错误码。这些错误发生在 analyze 阶段，此时 propose 已产出基础方案——
+// 不值得把整个收录流程锁进 failed_terminal（10 条历史 workflow 都是这形态），
+// 而是降级：把「模型不可用」写成 unresolved，经 onProposed 走 awaiting_decision 回主人。
+const MODEL_CAPABILITY_ERRORS = new Set([
+  "OPENCODE_ATTEMPTS_EXHAUSTED",
+  "OPENCODE_ABORT_UNKNOWN",
+  "OPENCODE_NOT_RUNNING",
+  "PROVIDER_RATE_LIMITED",
+]);
 const PENDING_STAGES = new Set([
   "received", "extracting", "classifying", "proposed", "awaiting_decision",
   "approved", "executing", "validating", "committed", "indexed", "failed_retryable",
@@ -449,8 +458,8 @@ class IngestWorkflowCoordinator {
         nextRetryAt: undefined,
         lastError: undefined,
       });
+      let result;
       try {
-        let result;
         await this.onEvent?.({
           type: "capture.direct.started",
           workflow: started,
@@ -514,13 +523,22 @@ class IngestWorkflowCoordinator {
         await this.onProposed?.({ workflow: proposed, candidate: result.candidate, proposal: result.proposal });
         return proposed;
       } catch (error) {
+        // A3：模型能力错误（耗尽/退出/限流）发生在远程语义分析阶段，此时 propose 已产出基础方案。
+        // 不再把整个收录流程锁进 failed_terminal（历史 10 条 workflow 都是这一形态），而是降级：
+        // 基础方案 + unresolved 说明一起经 onProposed → awaiting_decision 回到主人，人工决定
+        // 收录/修改/拒绝；不进入失败状态机，也不再继续消耗 prepare 次数（剩余重试被放弃）。
+        const degraded = result?.proposal && MODEL_CAPABILITY_ERRORS.has(String(error.code || ""))
+          ? await this.#degradeAfterModelCapabilityFailure(id, started, result, error)
+          : null;
+        if (degraded) return degraded;
         const retryable = error.retryable === true;
+        const degradeNote = error._degradeFailed ? `（且降级收录本身失败：${error._degradeFailed}）` : "";
         // R2：attempts.prepare 已在上方 started 自增并持久；读其值判上限，达阈值升终态（不重复自增）。
         const prepareAttempts = Number(started.attempts?.prepare || 0);
         const exhausted = retryable && prepareAttempts >= this.maxPrepareAttempts;
         const failed = await this.store.update(id, {
           stage: exhausted ? "failed_terminal" : (retryable ? "failed_retryable" : "failed_terminal"),
-          lastError: { code: exhausted ? "INGEST_PREPARE_EXHAUSTED" : (error.code || "INGEST_PREPARE_FAILED"), message: error.message, retryable },
+          lastError: { code: exhausted ? "INGEST_PREPARE_EXHAUSTED" : (error.code || "INGEST_PREPARE_FAILED"), message: `${error.message}${degradeNote}`, retryable },
           ...(error.browserStatus ? { browserStatus: error.browserStatus } : {}),
           ...(error.browserSessionId ? { browserSessionId: error.browserSessionId } : {}),
           ...(error.requestedUrl ? { requestedUrl: error.requestedUrl } : {}),
@@ -536,6 +554,37 @@ class IngestWorkflowCoordinator {
       return await operation;
     } finally {
       if (this.inFlight.get(id) === operation) this.inFlight.delete(id);
+    }
+  }
+
+  async #degradeAfterModelCapabilityFailure(id, started, base, error) {
+    const note = `远程语义分析因模型不可用未完成（${error.code}），请人工确认是否收录`;
+    try {
+      const degraded = await this.ingest.enrichProposal(started.artifactId, {
+        unresolved: [...new Set([...(base.proposal.unresolved || []), note])],
+      }, { rulesDigest: base.proposal.rulesDigest || "" });
+      const schema = await this.store.update(id, {
+        stage: "proposed",
+        sourceType: String(degraded.proposal.sourceType || started.sourceType),
+        candidateId: degraded.candidate?.id || base.candidate?.id,
+        proposalId: degraded.proposal.id,
+        ...(degraded.proposal.rulesDigest ? { rulesDigest: degraded.proposal.rulesDigest } : {}),
+        ...(degraded.proposal.sourceDigest ? { sourceDigest: degraded.proposal.sourceDigest } : {}),
+        ...(degraded.proposal.proposalDigest ? { proposalDigest: degraded.proposal.proposalDigest } : {}),
+      });
+      // 降级不发 workflow.failed：报错保留在 journal 事件里，让 onProposed 走 awaiting_decision。
+      await this.onEvent?.({
+        type: "workflow.degraded",
+        workflow: schema,
+        error,
+        data: { reason: "model_capability", proposalId: degraded.proposal.id },
+      });
+      await this.onProposed?.({ workflow: schema, candidate: degraded.candidate || base.candidate, proposal: degraded.proposal });
+      return schema;
+    } catch (degradeError) {
+      // 降级本身失败（enrichProposal 被 mock/state 丢失）时，退回原失败路径，绝不让 workflow 悬空。
+      error._degradeFailed = degradeError?.message || String(degradeError);
+      return null;
     }
   }
 

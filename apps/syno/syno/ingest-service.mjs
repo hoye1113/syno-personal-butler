@@ -6,6 +6,7 @@ import { IntakeService } from "./intake.mjs";
 import { parseRecord, writeRecord } from "./markdown-record.mjs";
 import { PATHS } from "./paths.mjs";
 import { validateContractRecord } from "./schema-registry.mjs";
+import { hasSourceNoise } from "./source-fetcher.mjs";
 import { buildSourceDescriptor } from "./source-descriptor.mjs";
 import { classifyTags } from "./canonical-tags.mjs";
 
@@ -254,6 +255,7 @@ class IngestService {
     if (state.payload?.kind !== "url") throw Object.assign(new Error("只有 URL 收录可以使用浏览器正文"), { code: "INGEST_BROWSER_SOURCE_INVALID" });
     const text = String(snapshot.content || snapshot.text || "").trim();
     if (!text) throw Object.assign(new Error("浏览器没有返回可读取正文"), { code: "INGEST_BROWSER_CONTENT_EMPTY" });
+    if (hasSourceNoise(text)) throw Object.assign(new Error("浏览器正文疑似 CSS 噪声，低质量"), { code: "INGEST_BROWSER_CONTENT_NOISE", retryable: false });
     if (Buffer.byteLength(text, "utf8") > 2 * 1024 * 1024) throw Object.assign(new Error("浏览器正文超过 2 MB 限制"), { code: "INGEST_BROWSER_CONTENT_TOO_LARGE" });
     const browserSnapshot = {
       url: String(snapshot.finalUrl || snapshot.url || state.payload.value || ""),

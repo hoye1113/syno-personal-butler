@@ -84,6 +84,29 @@ function requestOnce(url, address, { timeoutMs = 15_000, maxBytes = MAX_SOURCE_B
   });
 }
 
+const CSS_AT_RULE = /@(?:(?:-webkit-|-moz-|-o-)?(?:media|keyframes|supports|font-face|import|charset)|container|page)\b/gi;
+const CSS_PROP_HINT = /(?:z-index|box-sizing|mask-image|mask-mode|background-color|border-radius|min-height|min-width|max-height|max-width|overflow(!|:)|position\s*:|display\s*:|!important|var\(--|@font-face)/gi;
+const NOISE_MIN_CHARS = 1_200;
+const NOISE_LONG_LINE = 300;
+const NOISE_LONG_SHARE = 0.15;
+const NOISE_MIN_AT_RULES = 1;
+const NOISE_MIN_PROP_HINTS = 12;
+
+// 判定正文是否被外部样式表/页面脚本噪声主导（github.blog 2026-08-06 实测泄漏形态）：
+// 泄漏的 CSS 以极长单行（minified）穿透 extractReadableText 的 <style> 剥离，正文充满
+// @media/@keyframes 与样式属性。正常正文（含格式化代码块）不会同时命中「长行占比高」+
+// 「CSS 特征标记多」两个条件。
+function hasSourceNoise(value) {
+  const text = String(value || "");
+  if (text.length < NOISE_MIN_CHARS || !/[{}\s]/u.test(text)) return false;
+  const atRuleCount = (text.match(CSS_AT_RULE) || []).length;
+  const propCount = (text.match(CSS_PROP_HINT) || []).length;
+  if (!(atRuleCount >= NOISE_MIN_AT_RULES || propCount >= NOISE_MIN_PROP_HINTS)) return false;
+  let longChars = 0;
+  for (const line of text.split("\n")) if (line.length > NOISE_LONG_LINE) longChars += line.length;
+  return longChars / text.length >= NOISE_LONG_SHARE;
+}
+
 function extractReadableText(raw, contentType = "") {
   const text = String(raw || "").replace(/^\uFEFF/, "");
   if (!/html|xhtml/i.test(contentType) && !/<(?:html|body|article|main)[\s>]/i.test(text)) {
@@ -124,6 +147,7 @@ async function fetchSourceText(value, options = {}) {
     }
     const readable = extractReadableText(response.body.toString("utf8"), contentType);
     if (!readable) throw new Error("来源没有可读取正文");
+    if (hasSourceNoise(readable)) throw new Error("来源正文疑似 CSS 噪声，低质量");
     return {
       url: url.toString(),
       contentType: contentType || "text/plain",
@@ -140,6 +164,7 @@ export {
   MAX_SOURCE_TEXT,
   extractReadableText,
   fetchSourceText,
+  hasSourceNoise,
   isPrivateAddress,
   requestOnce,
   resolvePublicAddress,

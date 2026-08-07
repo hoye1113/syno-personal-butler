@@ -218,6 +218,38 @@ test("URL preparation automatically assigns OpenCode to the WebBridge after dire
   assert.ok(events.includes("capture.browser.completed"));
 });
 
+test("URL sources whose正文 is CSS noise fall back to WebBridge with empty_or_low_quality", async (t) => {
+  const { scheduled, store } = await fixture(t);
+  let proposes = 0;
+  const ingest = {
+    async receive(payload) { return { artifact: { id: "artifact-noise", kind: payload.kind, dedupeKey: "noise-key" }, proposalPending: true }; },
+    async readArtifact() { return { id: "artifact-noise", source: "https://example.com/css-leak" }; },
+    async applyBrowserSnapshot(id, observation) { return { id, observation }; },
+    async propose() {
+      proposes += 1;
+      if (proposes === 1) throw new Error("来源正文疑似 CSS 噪声，低质量");
+      return { candidate: { id: "candidate-noise" }, proposal: { id: "proposal-noise", sourceType: "url", sourceDigest: "a".repeat(64), proposalDigest: "b".repeat(64) } };
+    },
+  };
+  const browserCapture = {
+    authorize() { return { browserSessionId: "syno-capture-workflow-noise" }; },
+    observation() { return { status: "completed", finalUrl: "https://example.com/css-leak", content: "browser content", contentDigest: "c".repeat(64), browserSessionId: "syno-capture-workflow-noise" }; },
+  };
+  const coordinator = new IngestWorkflowCoordinator({
+    ingest,
+    store,
+    schedule: (work) => scheduled.push(work),
+    browserCapture,
+    browserRuntime: { async run() {} },
+  });
+  const receipt = await coordinator.receive({ kind: "url", value: "https://example.com/css-leak" }, { ownerKey: "owner", channel: "web", messageId: "noise-1" });
+  await scheduled.shift()();
+  const workflow = await coordinator.status(receipt.workflow.id);
+  assert.equal(workflow.stage, "proposed");
+  assert.equal(workflow.fetchMethod, "kimi_webbridge");
+  assert.equal(workflow.fallbackReason, "empty_or_low_quality");
+});
+
 test("URL safety failures never escalate to the browser fallback", async (t) => {
   const { scheduled, store } = await fixture(t);
   let browserRuns = 0;
@@ -271,6 +303,92 @@ test("remote analysis blocks secrets found in outbound metadata before calling t
   assert.equal((await store.get(receipt.workflow.id)).stage, "failed_terminal");
 });
 
+test("model capability failures degrade to a proposed decision instead of failed_terminal", async (t) => {
+  const { scheduled, ingest, store } = await fixture(t);
+  ingest.propose = async (artifactId) => ({
+    candidate: { id: `candidate-${artifactId}` },
+    proposal: {
+      id: `proposal-${artifactId}`, sourceType: "text", sourceDigest: "a".repeat(64),
+      proposalDigest: "b".repeat(64), unresolved: [],
+    },
+  });
+  ingest.readArtifact = async () => ({ id: "artifact", title: "t", body: "ordinary body", relationCandidates: [] });
+  ingest.enrichProposal = async (artifactId, analysis) => ({
+    candidate: { id: `candidate-${artifactId}` },
+    proposal: {
+      id: `proposal-${artifactId}`, sourceType: "text", sourceDigest: "a".repeat(64),
+      proposalDigest: "c".repeat(64), unresolved: analysis.unresolved, rulesDigest: "d".repeat(64),
+    },
+  });
+  const events = [];
+  const republished = [];
+  const coordinator = new IngestWorkflowCoordinator({
+    ingest,
+    store,
+    schedule: (work) => scheduled.push(work),
+    contextCompiler: { async compile() { return { rulesDigest: "d".repeat(64) }; } },
+    async analyze() {
+      throw Object.assign(new Error("OpenCode 模型尝试全部失败"), {
+        code: "OPENCODE_ATTEMPTS_EXHAUSTED", retryable: false,
+        attempts: [{ modelId: "deepseek/deepseek-v4-flash", elapsedMs: 43, status: "failed", failureCode: "HTTP_429" }],
+      });
+    },
+    onEvent: async (event) => { events.push(event); },
+    async onProposed(input) { republished.push(input); },
+  });
+  const receipt = await coordinator.receive(
+    { kind: "text", value: "ordinary body" },
+    { ownerKey: "owner", channel: "web", messageId: "capability-degrade" },
+  );
+  await scheduled.shift()();
+  const workflow = await store.get(receipt.workflow.id);
+  assert.equal(workflow.stage, "proposed");
+  assert.equal(workflow.proposalId, "proposal-" + workflow.artifactId);
+  assert.ok(!workflow.lastError, "degraded workflows do not carry a terminal lastError");
+  const degraded = events.find((event) => event.type === "workflow.degraded");
+  assert.ok(degraded, "workflow.degraded event emitted");
+  assert.equal(degraded.data.reason, "model_capability");
+  assert.equal(republished.length, 1, "onProposed re-published the degraded proposal");
+  assert.equal(republished[0].proposal.proposalDigest, "c".repeat(64));
+  assert.ok(republished[0].proposal.unresolved.some((item) => /模型不可用/u.test(item)));
+  assert.equal((await coordinator.listPending("owner")).length, 1);
+});
+
+test("provider rate limiting degrades to awaiting human decision, not exhausted", async (t) => {
+  // 防御性用例：生产限流（HTTP 429）最终以 OPENCODE_ATTEMPTS_EXHAUSTED 形态抛出，
+  // PROVIDER_RATE_LIMITED 暂无从真实路径产生；此用例验证的是降级分支对限流码同样生效，
+  // 而非已实测的生产限流形态（后者由上方 OPENCODE_ATTEMPTS_EXHAUSTED 用例覆盖）。
+  const { scheduled, ingest, store } = await fixture(t);
+  ingest.propose = async (artifactId) => ({
+    candidate: { id: `candidate-${artifactId}` },
+    proposal: { id: `proposal-${artifactId}`, sourceType: "text", sourceDigest: "a".repeat(64), proposalDigest: "b".repeat(64) },
+  });
+  ingest.readArtifact = async () => ({ id: "artifact", title: "t", body: "ordinary body", relationCandidates: [] });
+  ingest.enrichProposal = async (artifactId, analysis) => ({
+    candidate: { id: `candidate-${artifactId}` },
+    proposal: { id: `proposal-${artifactId}`, sourceType: "text", sourceDigest: "a".repeat(64), proposalDigest: "c".repeat(64), unresolved: analysis.unresolved },
+  });
+  let exhaustedEvents = 0;
+  const coordinator = new IngestWorkflowCoordinator({
+    ingest,
+    store,
+    schedule: (work) => scheduled.push(work),
+    contextCompiler: { async compile() { return { rulesDigest: "d".repeat(64) }; } },
+    async analyze() {
+      throw Object.assign(new Error("Provider 限流"), { code: "PROVIDER_RATE_LIMITED", retryable: true });
+    },
+    onEvent: async (event) => { if (event.type === "workflow.failed") exhaustedEvents += 1; },
+  });
+  const receipt = await coordinator.receive(
+    { kind: "text", value: "rate limited" },
+    { ownerKey: "owner", channel: "web", messageId: "rate-limited" },
+  );
+  await scheduled.shift()();
+  const workflow = await store.get(receipt.workflow.id);
+  assert.equal(workflow.stage, "proposed");
+  assert.equal(exhaustedEvents, 0, "rate-limited workflows must not emit workflow.failed");
+});
+
 test("workflow.failed forwards model attempt diagnostics to onEvent", async (t) => {
   // runtime.mjs 的 journal sink 依赖这个契约：error.attempts 必须原样到达 onEvent。
   const { scheduled, ingest, store } = await fixture(t);
@@ -293,8 +411,8 @@ test("workflow.failed forwards model attempt diagnostics to onEvent", async (t) 
     schedule: (work) => scheduled.push(work),
     contextCompiler: { async compile() { return { rulesDigest: "d".repeat(64) }; } },
     async analyze() {
-      throw Object.assign(new Error("OpenCode 模型尝试全部失败"), {
-        code: "OPENCODE_ATTEMPTS_EXHAUSTED", retryable: false, attempts,
+      throw Object.assign(new Error("OpenCode 模型返回无效 Contract"), {
+        code: "OPENCODE_CONTRACT_INVALID", retryable: true, attempts,
       });
     },
     onEvent: async (event) => { events.push(event); },
@@ -304,7 +422,7 @@ test("workflow.failed forwards model attempt diagnostics to onEvent", async (t) 
     { ownerKey: "owner", channel: "web", messageId: "attempts-forward" },
   );
   await scheduled.shift()();
-  assert.equal((await store.get(receipt.workflow.id)).stage, "failed_terminal");
+  assert.equal((await store.get(receipt.workflow.id)).stage, "failed_retryable");
   const failed = events.find((event) => event.type === "workflow.failed");
   assert.ok(failed, "workflow.failed event emitted");
   assert.deepEqual(failed.error.attempts, attempts);
