@@ -10,7 +10,7 @@ link_status: connected
 source_path: "02-Resources/哲学与自我认知/MOC - AI 时代个人发展与组织.md"
 source_sha256: "6772b35b7aacb54474f617f756fcc209b430ad3248c28c25e6a2d15098dbd32f"
 migration_id: "migration-20260720-64e79771"
-updated: 2026-07-03
+updated: 2026-08-13
 ---
 
 # MOC - AI 时代个人发展与组织
@@ -204,8 +204,29 @@ updated: 2026-07-03
 | [[Peter Yang-Hermes 打造 24 小时数字员工]] | Peter Yang：Hermes 部署为 24h 幕僚长——Mac Mini 常开、Telegram、soul.md 个性、Google Workspace、Cron 主动例行 |
 | [[Hyperframes-HeyGen 用 HTML 代码做 AI 视频]] | Hyperframes(HeyGen)：用 HTML 生成 AI 视频，website-to-video 技能、frame.md 视觉规范、Studio 代码diff协同、与 Hermes 整合 |
 
+### Easonlee B 站专栏精华（canonical v2，2026-08-13 批量收录）
+
+| 文章 | 核心主题 |
+|------|---------|
+| [[黄仁勋-成就英伟达的心态]] | Jensen：英伟达核心心态——韧性、长期主义、第一性原理 |
+| [[Arize创始人Jason-如何开发自我改进的Agent]] | Arize Jason：在线评估叠加追踪，驱动 Agent 自我改进闭环 |
+| [[Claude Code成员Tariq-40分钟讲清楚Loop Engineering]] | Tariq：Claude Code 的 Loop Engineering 与 Compound 任务管理 |
+| [[Whatnot CPO-产品经理不该成为团队的默认配置]] | Tom Verrilli：PM 跟着问题流动而非按人头配置，资深 PM 做 IC |
+| [[Alexandr Wang-智能普及之后愿景成为瓶颈]] | Alexandr Wang：智能普及之后，愿景与抱负成为瓶颈 |
+| [[Anthropic Labs负责人Mike Krieger-构建AI原生产品的两个思想实验]] | Mike Krieger：构建 AI 原生产品的两个思想实验 |
+| [[OpenAI研究主管Mark Chen-研究品味是人类的终极壁垒]] | Mark Chen：研究品味是人类的终极壁垒，评测团队隔离防刷榜 |
+| [[OpenAI研究员Noam Brown-测试时算力让评估与安全失效]] | Noam Brown：测试时算力让评估与安全框架失效，时间是瓶颈 |
+| [[Dan Koe-理解人性是抗AI淘汰的终极元技能]] | Dan Koe：理解人性是抗 AI 淘汰的元技能（三大张力+五大杠杆）|
+| [[生物医学家Derya-AI模拟生命与科学3.0]] | Derya：AI 建模生物复杂性，数字孪生与科学 3.0 智能体闭环 |
+| [[USV合伙人Mike Mignano-应用层时代与智能体利益对齐]] | Mike Mignano：应用层黄金时代，初创拉满 token，智能体利益对齐 |
+| [[Riley Brown-Fable 5与Paper的智能体原生设计流]] | Riley Brown：Claude Code+Paper 智能体原生设计流，MCP 控制画布一键部署 |
+| [[SpaceX早期投资人Steve Jurvetson-AI未来三年与指数变革]] | Steve Jurvetson：130 年算力指数是颠覆根基，自主强化学习是突破口 |
+| [[a16z合伙人-智能体时代的无头软件与企业粘性]] | a16z：智能体时代无头软件，企业粘性在固化业务逻辑与合规 |
+| [[Cognition的Jared-智能体构建原则与云端异步协同]] | Cognition Jared：智能体构建原则，云端异步主从协同多智能体 |
+| [[Together AI Rishabh-实时语音智能体的架构与工程权衡]] | Together AI Rishabh：实时语音智能体流水线架构与延迟工程权衡 |
+
 ## 维护
 
-- **总笔记数**：9 核心 + 79 行业观点/访谈（2026-07-15 从原 Agent Theory 总览 S-tier 迁入）
-- **最后更新**：2026-07-15（从原 Agent Theory 总览迁入行业观点/访谈 S-tier，dedup 后 +N 篇）
+- **总笔记数**：9 核心 + 86 行业观点/访谈（2026-08-13 复核目录实数；Easonlee B 站专栏精华批量收录 +16，原 79 为 2026-07-15 迁入基数）
+- **最后更新**：2026-08-13（批量收录 Easonlee B 站专栏精华 16 篇并补登 S-tier 索引）
 - **入选标准**：笔记主题直接讨论"AI 时代下的人/职业/组织/自我认知"（不是 Agent 本身的实现细节）
