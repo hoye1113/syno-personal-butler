@@ -321,16 +321,16 @@ def validate_note_text(text: str, sources_read: set[str] | None = None) -> dict[
                 errors.append("editorial_summary answers must use 专栏整理")
 
         if material == "S":
-            for required in ("限制与边界", "知识连接"):
-                if not re.search(rf"^##\s+{required}\s*$", body, re.MULTILINE):
-                    errors.append(f"S notes require section: {required}")
+            for required in ('限制与边界', '知识连接'):
+                if not re.search(rf'^##\s+{required}\s*$', body, re.MULTILINE):
+                    errors.append(f'S notes require section: {required}')
             knowledge = _section(body, "知识连接")
-            has_link = bool(re.search(r"\[\[[^]]+\]\]", knowledge))
+            has_link = bool(re.search(r'\[\[[^]]+\]\]', knowledge))
             has_typed = _has_typed_relation(knowledge)
             if has_link and not has_typed:
-                errors.append("knowledge links must use an allowed typed relation")
+                errors.append('knowledge links must use an allowed typed relation')
             if not has_typed and fm.get("status") != "orphan":
-                errors.append("S notes require a typed knowledge relation or status: orphan")
+                errors.append('S notes require a typed knowledge relation or status: orphan')
 
             # Locked template v2.1 (①④⑤ hard gate; ③ timestamps stay skipped):
             for heading, content in _content_chapters(body):

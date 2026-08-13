@@ -186,4 +186,4 @@ S级必须有 `知识连接`；不得只放裸 wikilink。没有真实关系时�
 python 99-System/scripts/bilibili-opus-validate.py <note> --vault-root <vault> --sources-read column
 ```
 
-确定性验证通过后，Agent 还必须确认保留覆盖、声音安全、问题独立、数字语境、限制保留、关系质量和讨论就绪。任一关键项失败或 unresolved 非空时报告 `incomplete`。
+确定性验证通过后，Agent 还必须确认保留覆盖、声音安全、问题独立、数字语境、限制保留、关系质量和讨论就绪。任一关键项失败或 unresolved 非空时报告 `incomplete`。S 级正文的 locked 排版（①核心判断前置、④导读核心主张、⑤唯一金句）由 validator 强制：①④缺失及⑤缺失均为 error（⑤重复为 warning），META 节（开场/摘要/限制与边界/知识连接/来源说明/来源声明）豁免①。

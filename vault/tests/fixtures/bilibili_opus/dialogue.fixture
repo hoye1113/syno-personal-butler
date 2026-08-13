@@ -30,6 +30,11 @@ unresolved_facts:
 # DeepMind团队：当数百万Agent相遇
 
 > Hannah Fry 通过追问，让 Nenad Tomašev 展开委派、信任和多 Agent 安全边界。
+>
+> **核心主张：Agent 规模化首先改变的是委派与信任结构，而不是单体能力。**
+
+> 多方互动会产生单体测试没有覆盖的协同行为。
+> ——Nenad Tomašev
 
 ## 开场
 
@@ -38,6 +43,8 @@ unresolved_facts:
 **Nenad Tomašev：** 委派关系会从单条链路变成网络，信任和责任也随之变复杂。
 
 ## 01 为什么规模会改变安全问题？
+
+**核心判断：单体 Agent 的护栏不能直接复制到百万级网络，协同行为是新增的风险面。**
 
 **Hannah Fry：** 单个 Agent 的护栏为什么不能直接复制到数百万 Agent？
 

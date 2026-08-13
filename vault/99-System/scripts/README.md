@@ -169,7 +169,7 @@ ingest reconcile
 | `vault-audit.py` | 全库审计 |
 | `vault-search.py` | 知识库混合检索（BM25 + tag 分面，向量预留） |
 | `bilibili-source-inventory.py` | Recastory 素材动态发现与全量统计 |
-| `bilibili-opus-validate.py` | B站图文专栏 v2 字段、声音、类型化关系、v1 兼容与完成门 |
+| `bilibili-opus-validate.py` | B站图文专栏 v2 字段、声音、类型化关系、S 级 locked 排版（①④⑤）、v1 兼容与完成门 |
 | `bilibili-note-validate.py` | 单篇双轴收录契约校验 |
 | `bilibili-trust-audit.py` | 存量来源可信度风险评分与首批队列 |
 | `agent-contract-check.py` | Agent 控制面与平台适配检查 |

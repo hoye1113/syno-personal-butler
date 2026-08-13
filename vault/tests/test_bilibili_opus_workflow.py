@@ -47,6 +47,11 @@ verification_basis:
 # {title}
 
 > 人物、主题、核心问题和阅读导航。
+>
+> **核心主张：机制理解先于结论复述，专栏的价值在于讲清机制。**
+
+> 金句样板一句，供锁定模板校验。
+> ——讲者
 
 ## 开场
 
@@ -55,6 +60,8 @@ verification_basis:
 **讲者：** 因为它影响 Agent 的实际工作方式。
 
 ## 01 为什么机制比结论重要？
+
+**核心判断：机制决定结论的适用边界，先看机制再看结论。**
 
 **编者问：** 核心机制是什么？
 
@@ -224,6 +231,65 @@ class OpusWorkflowTests(unittest.TestCase):
         text = self.note().replace("**支持**", "**相似**")
         result = self.module.validate_note_text(text)
         self.assertIn("knowledge links must use an allowed typed relation", result["errors"])
+
+    def test_locked_gate_requires_chapter_core_judgment(self):
+        text = self.note().replace("**核心判断：机制决定结论的适用边界，先看机制再看结论。**\n\n", "")
+        result = self.module.validate_note_text(text)
+        self.assertIn(
+            "S notes require 核心判断 at the start of chapter: 01 为什么机制比结论重要？",
+            result["errors"],
+        )
+
+    def test_locked_gate_requires_leading_claim(self):
+        text = self.note().replace(">\n> **核心主张：机制理解先于结论复述，专栏的价值在于讲清机制。**\n", "")
+        result = self.module.validate_note_text(text)
+        self.assertIn("S notes require a 核心主张 line in the leading blockquote", result["errors"])
+
+    def test_locked_gate_requires_pull_quote(self):
+        text = self.note().replace("> 金句样板一句，供锁定模板校验。\n> ——讲者\n", "")
+        result = self.module.validate_note_text(text)
+        self.assertIn("S notes require a pull-quote attribution line (> ——姓名)", result["errors"])
+
+    def test_locked_gate_duplicate_pull_quote_only_warns(self):
+        text = self.note() + "\n> 又一金句。\n> ——另一位\n"
+        result = self.module.validate_note_text(text)
+        self.assertEqual(result["status"], "complete", result["errors"])
+        self.assertTrue(any("pull-quote should be unique" in w for w in result["warnings"]))
+
+    def test_locked_gate_container_judges_children_not_container(self):
+        container = (
+            "## 对话实录\n\n"
+            "### 合规子节\n\n**核心判断：子节已前置判断。**\n\n问答。\n\n"
+            "### 缺标记子节\n\n**讲者：** 没有前置判断。\n\n"
+        )
+        text = self.note().replace("## 限制与边界", container + "## 限制与边界")
+        result = self.module.validate_note_text(text)
+        self.assertIn("S notes require 核心判断 at the start of chapter: 缺标记子节", result["errors"])
+        self.assertFalse(any("对话实录" in e for e in result["errors"]))
+
+    def test_locked_gate_flat_section_cannot_pass_vacuously(self):
+        flat = "## 核心对话\n\n**讲者：** 没有任何前置判断。\n\n"
+        text = self.note().replace("## 限制与边界", flat + "## 限制与边界")
+        result = self.module.validate_note_text(text)
+        self.assertIn("S notes require 核心判断 at the start of chapter: 核心对话", result["errors"])
+
+    def test_locked_gate_meta_sections_are_exempt(self):
+        result = self.module.validate_note_text(self.note())
+        self.assertTrue(result["checks"]["locked_layout"])
+        self.assertFalse(any("开场" in e or "来源说明" in e for e in result["errors"]))
+
+    def test_locked_gate_skips_non_s_material(self):
+        text = self.note(
+            material_tier="A", source_form="lecture", form="lecture",
+            fidelity="none", question_source="none", voice_basis="attributed_paraphrase",
+        ).replace(
+            "**核心判断：机制决定结论的适用边界，先看机制再看结论。**\n\n", ""
+        ).replace(
+            "> 金句样板一句，供锁定模板校验。\n> ——讲者\n", ""
+        )
+        result = self.module.validate_note_text(text)
+        self.assertEqual(result["status"], "complete", result["errors"])
+        self.assertIsNone(result["checks"]["locked_layout"])
 
     def test_rejects_moderator_and_unknown_labels(self):
         result = self.module.validate_note_text(self.note() + "\nModerator：问题\nunknown：追问\n")
