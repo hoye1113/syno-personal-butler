@@ -852,7 +852,7 @@
       const lastModel = status.cognitive?.lastAttempts?.slice(-1)[0]?.modelId;
       hint.textContent = !configured
         ? "需要配置 OpenCode Zen Token；本地收录回执、澄清解析、搜索与提醒仍可使用。"
-        : healthy ? `OpenCode 1.18.2 正常运行${lastModel ? `；最近模型 ${lastModel}` : ""}。` : `Token 已加密保存；AI 内核状态：${status.supervisor?.state || "未就绪"}。`;
+        : healthy ? `OpenCode${status.supervisor?.version ? ` ${status.supervisor.version}` : ""} 正常运行${lastModel ? `；最近模型 ${lastModel}` : ""}。` : `Token 已加密保存；AI 内核状态：${status.supervisor?.state || "未就绪"}。`;
       setSettingStatus("#synoSettingAi", healthy ? "已连接" : configured ? "需重启" : "未连接", healthy);
       setupState.ai = configured && healthy;
       setHealthIssue("provider", healthy ? "" : configured ? "OpenCode AI 内核未就绪" : "OpenCode Zen Token 尚未配置");

@@ -10,7 +10,6 @@ import { PATHS } from "./paths.mjs";
 import { RuntimeJournal } from "./runtime-journal.mjs";
 
 const execFileAsync = promisify(execFile);
-const LOCKED_OPENCODE_VERSION = "1.18.2";
 const DEFAULT_OPENCODE_PORT = 4318;
 
 function runtimeError(code, message, details) {
@@ -86,9 +85,13 @@ async function resolveOpenCodeBinary({ candidates, versionOf = defaultVersionOf 
       rejected.push({ path: executable, reason: "missing" });
       continue;
     }
-    const version = await versionOf(executable);
-    if (version !== LOCKED_OPENCODE_VERSION) {
-      throw runtimeError("OPENCODE_VERSION_MISMATCH", `OpenCode 版本不兼容：需要 ${LOCKED_OPENCODE_VERSION}，实际 ${version}`, { executable, version });
+    // 版本仅用于记录与展示，不再作为可用性闸门（Owner 决策：只要存在可信
+    // opencode 二进制即可使用，能否真正运行交由 spawn + health 实测）。
+    let version = null;
+    try {
+      version = await versionOf(executable);
+    } catch {
+      version = null;
     }
     return { executable, version, rejected };
   }
@@ -316,9 +319,6 @@ class OpenCodeSupervisor {
       });
       if (!response.ok) throw runtimeError("OPENCODE_HEALTH_FAILED", `OpenCode 健康检查返回 ${response.status}`);
       const report = await response.json();
-      if (report.version && report.version !== LOCKED_OPENCODE_VERSION) {
-        throw runtimeError("OPENCODE_VERSION_DRIFT", `OpenCode 运行版本漂移：${report.version}`);
-      }
       return { ...this.status(), healthy: report.healthy === true, remote: { healthy: report.healthy === true, version: report.version || null } };
     } catch (error) {
       return { ...this.status(), healthy: false, error: { code: error.code || "OPENCODE_HEALTH_FAILED", message: error.message } };
@@ -424,7 +424,6 @@ export {
   DEFAULT_OPENCODE_PORT,
   defaultDeepseekKeyLoader,
   discoverOpenCodeCandidates,
-  LOCKED_OPENCODE_VERSION,
   OpenCodeSupervisor,
   isMiseShim,
   resolveOpenCodeBinary,

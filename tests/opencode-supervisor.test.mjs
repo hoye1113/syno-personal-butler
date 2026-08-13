@@ -10,7 +10,6 @@ import { RuntimeJournal } from "../apps/syno/syno/runtime-journal.mjs";
 import {
   defaultDeepseekKeyLoader,
   discoverOpenCodeCandidates,
-  LOCKED_OPENCODE_VERSION,
   minimalChildEnvironment,
   OpenCodeSupervisor,
   resolveOpenCodeBinary,
@@ -36,7 +35,7 @@ test("OpenCode binary resolver rejects mise shims and resolves a real installati
 
   const result = await resolveOpenCodeBinary({
     candidates: [shim, cmd],
-    versionOf: async (candidate) => candidate === executable ? LOCKED_OPENCODE_VERSION : "unexpected",
+    versionOf: async (candidate) => candidate === executable ? "1.18.2" : "unexpected",
   });
 
   assert.equal(result.executable, executable);
@@ -148,16 +147,15 @@ test("OpenCodeSupervisor prefers an explicit DEEPSEEK_API_KEY over the stored cr
   assert.equal(children[0].options.env.DEEPSEEK_API_KEY, "explicit-env-key");
 });
 
-test("OpenCode binary resolver fails closed for an incompatible version", async (t) => {
+test("OpenCode binary resolver accepts any version (version lock removed per Owner decision)", async (t) => {
   const root = await temporaryRoot(t);
   const executable = path.join(root, "node_modules", "opencode-ai", "bin", "opencode.exe");
   await fs.mkdir(path.dirname(executable), { recursive: true });
   await fs.writeFile(executable, "real");
 
-  await assert.rejects(
-    resolveOpenCodeBinary({ candidates: [executable], versionOf: async () => "1.19.0" }),
-    (error) => error.code === "OPENCODE_VERSION_MISMATCH",
-  );
+  const result = await resolveOpenCodeBinary({ candidates: [executable], versionOf: async () => "1.19.0" });
+  assert.equal(result.executable, executable);
+  assert.equal(result.version, "1.19.0");
 });
 
 test("OpenCode discovery derives the real executable beside the active mise Node without directory enumeration", async (t) => {

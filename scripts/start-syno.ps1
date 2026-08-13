@@ -94,30 +94,53 @@ function Adopt-HealthyHost {
 Set-Location -LiteralPath $resolvedRoot
 Remove-Item Env:SYNO_WEB_ONLY -ErrorAction SilentlyContinue
 
-# A Web-triggered installation may occur while the current interactive Host still
-# owns the loopback port. Keep the scheduled task alive, then take over as soon as
-# that Host exits, instead of creating a crashing duplicate process.
+# Supervise the host for the lifetime of this task. Task Scheduler's
+# RestartOnFailure is inert in this Windows build (verified empirically: neither
+# exit 1 nor STATUS_CONTROL_C_EXIT 0xC000013A triggers a restart), so a crashed
+# host never returns and proactive push silently dies. The launcher must
+# self-supervise: respawn any abnormally exited child after a backoff, and exit
+# only on a graceful shutdown (code 0). A persistent failure (e.g. a bad config
+# that keeps crashing node) respawns once per backoff indefinitely by design --
+# giving up would mean permanent downtime, and RestartOnFailure can no longer be
+# relied on to recover -- but every attempt is logged (launcher.host_crashed) so
+# the loop is observable, not silent. Because this wrapper owns the host's
+# lifetime, a durable stop must terminate the scheduled task: Stop-ScheduledTask
+# kills this wrapper and skips the finally/respawn path, whereas killing only the
+# host pid (Stop-SynoHost) just triggers a respawn after the backoff. All managed
+# stop paths already pair the two.
+$restartBackoffSeconds = 60
 while ($true) {
-  $health = $null
-  try {
-    $health = Invoke-RestMethod -Uri "http://127.0.0.1:$synoPort/api/syno/health" -Method Get -TimeoutSec 2
-  } catch { break }
-  if (-not (Test-SynoHealthResponse $health $repoFingerprint)) { throw "Port $synoPort is occupied by an unknown service" }
-  Write-SynoLauncherLog "launcher.health_ok" @{ listenerPid = (Get-NetTCPConnection -LocalAddress "127.0.0.1" -LocalPort $synoPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess }
-  Adopt-HealthyHost
-  Start-Sleep -Seconds 5
-}
-
-$child = Start-Process -FilePath $resolvedNode -ArgumentList @("`"$server`"") -WorkingDirectory $resolvedRoot -WindowStyle Hidden -PassThru
-Write-HostOwnership $child "owned"
-try {
-  $child.WaitForExit()
-  $exitCode = $child.ExitCode
-} finally {
-  if (Test-Path -LiteralPath $pidFile) {
-    $ownership = Get-Content -LiteralPath $pidFile -Raw | ConvertFrom-Json
-    $recordedStartedAt = if ($ownership.startedAt -is [DateTime]) { $ownership.startedAt.ToUniversalTime().ToString("o") } else { [string]$ownership.startedAt }
-    if ($ownership.pid -eq $child.Id -and $recordedStartedAt -eq $child.StartTime.ToUniversalTime().ToString("o")) { Remove-Item -LiteralPath $pidFile -Force }
+  # If a healthy Syno Host already owns the loopback port -- at startup (a
+  # Web-triggered interactive install still running) or after a crash+backoff
+  # (a manual start during the window) -- adopt and watch it instead of spawning
+  # a competing process that would lose the bind. Watch until that host goes
+  # away, then fall through to spawn our own.
+  while ($true) {
+    $health = $null
+    try {
+      $health = Invoke-RestMethod -Uri "http://127.0.0.1:$synoPort/api/syno/health" -Method Get -TimeoutSec 2
+    } catch { break }
+    if (-not (Test-SynoHealthResponse $health $repoFingerprint)) { throw "Port $synoPort is occupied by an unknown service" }
+    Write-SynoLauncherLog "launcher.health_ok" @{ listenerPid = (Get-NetTCPConnection -LocalAddress "127.0.0.1" -LocalPort $synoPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess }
+    Adopt-HealthyHost
+    Start-Sleep -Seconds 5
   }
+
+  # Port is free (or its owner just exited): spawn our own host and wait on it.
+  $child = Start-Process -FilePath $resolvedNode -ArgumentList @("`"$server`"") -WorkingDirectory $resolvedRoot -WindowStyle Hidden -PassThru
+  Write-HostOwnership $child "owned"
+  Write-SynoLauncherLog "launcher.host_started" @{ pid = $child.Id }
+  try {
+    $child.WaitForExit()
+    $exitCode = $child.ExitCode
+  } finally {
+    if (Test-Path -LiteralPath $pidFile) {
+      $ownership = Get-Content -LiteralPath $pidFile -Raw | ConvertFrom-Json
+      $recordedStartedAt = if ($ownership.startedAt -is [DateTime]) { $ownership.startedAt.ToUniversalTime().ToString("o") } else { [string]$ownership.startedAt }
+      if ($ownership.pid -eq $child.Id -and $recordedStartedAt -eq $child.StartTime.ToUniversalTime().ToString("o")) { Remove-Item -LiteralPath $pidFile -Force }
+    }
+  }
+  if ($exitCode -eq 0) { exit 0 }
+  Write-SynoLauncherLog "launcher.host_crashed" @{ pid = $child.Id; exitCode = $exitCode; backoffSeconds = $restartBackoffSeconds }
+  Start-Sleep -Seconds $restartBackoffSeconds
 }
-exit $exitCode

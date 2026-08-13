@@ -6,7 +6,7 @@ import process from "node:process";
 
 import { OpenCodeCredentialStore } from "../apps/syno/syno/opencode-credential-store.mjs";
 import { BrowserCaptureAdapter } from "../apps/syno/syno/browser-capture-adapter.mjs";
-import { discoverOpenCodeCandidates, LOCKED_OPENCODE_VERSION, resolveOpenCodeBinary } from "../apps/syno/syno/opencode-supervisor.mjs";
+import { discoverOpenCodeCandidates, resolveOpenCodeBinary } from "../apps/syno/syno/opencode-supervisor.mjs";
 import { DEFAULT_WEB_PORT, PATHS } from "../apps/syno/syno/paths.mjs";
 
 const REQUIRED_SKILLS = ["capture", "knowledge", "learn", "review", "create", "maintain", "web-capture"];
@@ -62,7 +62,6 @@ async function doctor({
   checks.push({ name: "security", ok: true, loopbackOnly: true, builtinsDenied: true, dynamicMcp: false, autoUpdate: false });
   return {
     ok: checks.every((item) => item.ok),
-    lockedVersion: LOCKED_OPENCODE_VERSION,
     checks,
   };
 }
