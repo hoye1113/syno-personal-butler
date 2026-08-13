@@ -645,16 +645,27 @@ function createSynoRuntime(options = {}) {
             }),
           });
           const parsed = parseStructuredModelOutput(result.text);
+          // The model frequently echoes fields from the artifact metadata it was handed
+          // (e.g. risk) or invents plausible ones (e.g. sourceDescriptor). BASE_OUTPUT_SCHEMA
+          // is strict (additionalProperties:false), so any extra top-level key is rejected
+          // as OPENCODE_INVALID_CONTRACT and retried forever. Ingest analysis only consumes
+          // the keys declared in outputSchema.properties (enrichProposal never reads
+          // risk/sourceDescriptor), so strip unknown top-level keys before validating to
+          // tolerate LLM output drift.
+          const allowedKeys = bundle.outputSchema.properties ? Object.keys(bundle.outputSchema.properties) : null;
+          const sanitized = allowedKeys
+            ? Object.fromEntries(Object.entries(parsed).filter(([key]) => allowedKeys.includes(key)))
+            : parsed;
           const errors = [];
-          validateValue(parsed, bundle.outputSchema, "$", errors);
+          validateValue(sanitized, bundle.outputSchema, "$", errors);
           if (errors.length) {
             throw Object.assign(new Error(`OpenCode 收录分析 Contract 校验失败：${errors.join("；")}`), {
               code: "OPENCODE_INVALID_CONTRACT",
               retryable: true,
             });
           }
-          await captureChunks.complete(manifest.manifestId, chunkRecord.chunkId, parsed);
-          analyses.push(parsed);
+          await captureChunks.complete(manifest.manifestId, chunkRecord.chunkId, sanitized);
+          analyses.push(sanitized);
         } catch (error) {
           await captureChunks.fail(manifest.manifestId, chunkRecord.chunkId, error, { terminal: error.retryable !== true });
           throw error;
