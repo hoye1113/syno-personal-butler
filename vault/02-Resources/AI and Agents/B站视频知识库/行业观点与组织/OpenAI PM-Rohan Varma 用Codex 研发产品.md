@@ -39,8 +39,15 @@ verification_basis:
 # OpenAI PM-Rohan Varma 用Codex 研发产品
 
 > 来源：B 站专栏（Easonlee 的 AI 笔记转述 Rohan Varma 与 Peter Yang 的英文对谈）。`source_form: dialogue`（嘉宾 Rohan Varma + 主持人 Peter Yang 真实对谈），`dialogue_fidelity: source`，`question_source: column`，`voice_basis: direct_speech`，`verification_scope: column_only`，含未独立核验的量化表述（见限制与边界）。未读取图片、未使用 ASR/Recastory/transcript。
+>
+> **核心主张：Codex 正倒置产品开发生命周期——先做出 MVP 再决定发什么，PM 退到前期战略与后期推向市场两端；自配置自删的触发器自动化、Imagegen 极速原型与 Goal 模式，让职业生涯几乎所有事都能立刻托付执行。**
+
+> 把目标设定在比你想象中还要夸张十倍、看似不可能的事情上——它大概能帮你完成其中的 90%。
+> ——Rohan Varma
 
 ## 核心对话
+
+**核心判断：Codex 从执行与协作两个维度重塑 PM 工作流——海量信息 20 分钟掌握、产出物大量自动化、开发周期被倒置为「先建 MVP 再决策」；PM 的价值收敛到梳理核心问题、设定护栏与推向市场。**
 
 **Peter Yang（主持人）：** 我做了十多年 PM，以前大量时间花在改 Google 文档、做规划、开对齐会。Codex 是怎么从根本上改变你作为 PM 的工作方式的？
 

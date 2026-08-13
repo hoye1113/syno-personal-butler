@@ -39,8 +39,15 @@ verification_basis:
 # Cerebras CEO-Andrew Feldman AI不是泡沫而是缺货
 
 > 来源：B 站专栏（Easonlee 的 AI 笔记转述 Andrew Feldman 与 Harry Stebbings 的英文对谈）。`source_form: dialogue`（嘉宾 Andrew Feldman + 主持人 Harry Stebbings 真实对谈），`dialogue_fidelity: source`，`question_source: column`，`voice_basis: direct_speech`，`verification_scope: column_only`，含大量未独立核验的量化表述（见限制与边界）。未读取图片、未使用 ASR/Recastory/transcript。
+>
+> **核心主张：AI 不是泡沫而是严重的供应滞后——基础设施建设落后于需求，250 亿美元积压订单、HBM 由三家垄断成长期瓶颈；对难题而言速度的价值没有上限、慢速推理的市场为零；能源与许可正取代技术成为数据中心的核心约束。**
+
+> 慢速搜索的市场是零——没人接受慢速互联网；为什么推理会有所不同？慢速推理的市场也将为零。
+> ——Andrew Feldman
 
 ## 核心对话
+
+**核心判断：过去的泡沫是「建好了用户会来」，现在的 AI 恰恰相反——基础设施建设滞后于需求；HBM 短缺将长期化，而 Cerebras 用 SRAM 路线避开瓶颈；对难题而言速度的价值没有上限，先赢一个大客户才有资格赢下一个。**
 
 **Harry Stebbings（主持人）：** Cerebras 刚上市，史上最大半导体 IPO，股价 185 涨到 311 美元、募资超 55 亿。一面是泡沫论，一面是黄仁勋说 2030 年前在 AI 基础设施花 3-4 万亿美元——怎么平衡？
 
@@ -63,6 +70,8 @@ verification_basis:
 **Andrew Feldman（嘉宾）：** 关于大客户集中：一年前我和 G42 有 10 亿交易被说集中，一年后带 200 多亿（OpenAI）合同回来，还是被说集中、只是客户变了。要拥有众多大客户，先赢一个、深度学习如何服务顶级客户，才有资格赢下一个。
 
 ## 其余要点（据专栏重点速览）
+
+**核心判断：正文对谈之外还有三个补充判断——能源与许可已取代技术成为数据中心核心挑战、限制对华售尖端芯片符合美战略利益、多吉瓦级建设心态已从妄想变为平常。**
 
 - **能源与许可已取代技术成为数据中心核心挑战**：AI 本质是把电力转智能，供电定胜负；需透明化、自建电网/变电站消除社区阻力。
 - **限制对华售尖端芯片符合美战略利益**：以台积电、ASML 等关键节点管理瓶颈，借《芯片法案》夺回封装与制造生态优势。
