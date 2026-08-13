@@ -30,6 +30,9 @@ NOISE_LINES = (
     "关注UP主", "关注 UP 主", "点赞", "投币", "收藏", "评论区", "展位",
     "没有更多评论", "分享至", "投诉或建议",
 )
+# Locked-template (v2.1) sections that never require 核心判断: navigation,
+# summary, and provenance blocks. Everything else is a content chapter.
+LOCKED_META_SECTIONS = {"开场", "摘要", "限制与边界", "知识连接", "来源说明", "来源声明"}
 
 
 def parse_frontmatter(text: str) -> dict[str, object]:
@@ -141,6 +144,47 @@ def _has_typed_relation(section: str) -> bool:
         section,
         re.MULTILINE,
     ))
+
+
+def _content_chapters(body: str) -> list[tuple[str, str]]:
+    """Chapters that must start with 核心判断 under the locked v2.1 template.
+
+    A content chapter is any ``##``/``###`` section outside LOCKED_META_SECTIONS.
+    When a ``##`` section is a pure container (its body is split into ``###``
+    children, e.g. ``## 对话实录``), the children are the chapters; a flat
+    ``##`` section is a chapter itself, so content cannot dodge the rule by
+    hiding behind an unnumbered or container-style heading.
+    """
+    heads = [
+        (m.group(1), m.group(2).strip(), m.start(), m.end())
+        for m in re.finditer(r"(?m)^(#{2,3})[ \t]+([^\n]+)$", body)
+    ]
+    chapters: list[tuple[str, str]] = []
+    i = 0
+    while i < len(heads):
+        level, heading, _start, end = heads[i]
+        if level == "###":
+            # Orphan ### (no enclosing ##): evaluate as its own chapter.
+            cend = heads[i + 1][2] if i + 1 < len(heads) else len(body)
+            if heading not in LOCKED_META_SECTIONS:
+                chapters.append((heading, body[end:cend]))
+            i += 1
+            continue
+        j = i + 1
+        children: list[tuple[str, str]] = []
+        while j < len(heads) and heads[j][0] == "###":
+            cend = heads[j + 1][2] if j + 1 < len(heads) else len(body)
+            children.append((heads[j][1], body[heads[j][3]:cend]))
+            j += 1
+        if children:
+            for child_heading, child_content in children:
+                if child_heading not in LOCKED_META_SECTIONS:
+                    chapters.append((child_heading, child_content))
+        elif heading not in LOCKED_META_SECTIONS:
+            cend = heads[i + 1][2] if i + 1 < len(heads) else len(body)
+            chapters.append((heading, body[end:cend]))
+        i = j
+    return chapters
 
 
 def validate_note_text(text: str, sources_read: set[str] | None = None) -> dict[str, object]:
@@ -287,6 +331,19 @@ def validate_note_text(text: str, sources_read: set[str] | None = None) -> dict[
                 errors.append("knowledge links must use an allowed typed relation")
             if not has_typed and fm.get("status") != "orphan":
                 errors.append("S notes require a typed knowledge relation or status: orphan")
+
+            # Locked template v2.1 (①④⑤ hard gate; ③ timestamps stay skipped):
+            for heading, content in _content_chapters(body):
+                first = next((line.strip() for line in content.splitlines() if line.strip()), "")
+                if not re.match(r"\*\*核心判断[：:]", first):
+                    errors.append(f"S notes require 核心判断 at the start of chapter: {heading}")
+            if not re.search(r"^>[ \t]*\*\*核心主张[：:]", body, re.MULTILINE):
+                errors.append("S notes require a 核心主张 line in the leading blockquote")
+            attributions = re.findall(r"^>[ \t]*——[ \t]*\S", body, re.MULTILINE)
+            if not attributions:
+                errors.append("S notes require a pull-quote attribution line (> ——姓名)")
+            elif len(attributions) > 1:
+                warnings.append(f"pull-quote should be unique; found {len(attributions)} attribution lines")
         elif not re.search(r"\[\[[^]]+\]\]", body) and fm.get("status") != "orphan":
             errors.append("note requires a wikilink or status: orphan")
     elif not re.search(r"\[\[[^]]+\]\]", body) and fm.get("status") != "orphan":
@@ -328,6 +385,9 @@ def validate_note_text(text: str, sources_read: set[str] | None = None) -> dict[
             "discussion_readiness": None,
             "frontmatter": not any(error.startswith("missing frontmatter") for error in errors),
             "wikilinks": bool(re.search(r"\[\[[^]]+\]\]", body)) or fm.get("status") == "orphan",
+            "locked_layout": (
+                not any("核心判断" in error or "核心主张" in error or "attribution" in error for error in errors)
+            ) if is_v2 and material == "S" else None,
         },
         "errors": errors,
         "warnings": warnings,
