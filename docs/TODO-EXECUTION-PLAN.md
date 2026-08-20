@@ -103,34 +103,31 @@ implementation:
 - OpenCode 负责对话上下文、压缩、意图理解、Skill 选择和工具规划。
 - Syno 负责 Owner 身份、渠道去重、来源、任务、决策、权限、受控写入和事实源。
 - Web 是可选控制台，不是普通收录、询问或决策的强制入口。
-- OpenCode 不得直接读取仓库、写文件、执行 Shell/Git、修改源码、分享会话、启动子 Agent 或动态加载 MCP。
+- Harness 聊天可使用沙箱 `workspace-write` 工具；收录分析 sidecar 无 bash/fs/web。知识写入、改源码仍必须经过 ToolRegistry、Policy、Job、隔离 worktree、validators 和 GitGuard。禁止动态 MCP。
 - 任意写入仍必须经过 ToolRegistry、Policy、Job、隔离 worktree、validators 和 GitGuard。
 
 ## 3. 不可变运行契约
 
 ### 3.1 唯一运行时
 
-- 产品运行时目标是唯一启用 `OpenCodeCognitiveRuntime`。
-- 原生 `ToolLoopAgent` 只在 R6 真实验收前作为非活动迁移回滚实现，绝不自动回退。
-- Hermes、旧 OpenCode/Claude Executor 不得进入产品对话路径。
-- OpenCode 失败后，自由对话和 LLM Job 等待；本地收录回执、决策解析、搜索和状态查询继续工作。
+- 产品运行时唯一启用 `DeepSeekHarnessCognitiveRuntime`。
+- OpenCode、Hermes、原生 Agent 和旧 Executor 已删除，不得回退。
+- Harness 失败后，自由对话和 LLM Job 等待；本地收录回执、决策解析、搜索和状态查询继续工作。
 
 ### 3.2 模型链
 
 固定顺序：
 
-1. `opencode/mimo-v2.5-free`
-2. `opencode/deepseek-v4-flash-free`
-3. `opencode/laguna-s-2.1-free`
+1. `deepseek/deepseek-v4-flash`
+2. `deepseek/deepseek-chat`
 
 只有不可用、限流、连接失败、超时、5xx、空响应或契约失败，且本次尝试未产生不可逆副作用时，Syno 才可确定性尝试下一模型。模型不能选择模型、Provider 或回退目标；全部失败进入 `waiting_provider`。
 
 ### 3.3 凭据与隐私
 
-- Zen Token 使用 Windows DPAPI 独立保存在 `%LOCALAPPDATA%\Syno\credentials`。
-- 不读取、复制或依赖用户全局 OpenCode `auth.json`。
-- Token 只通过子进程环境提供，并由内联配置的环境变量引用；不进入命令行、仓库、状态元数据、日志或 OpenCode profile。
-- 免费模型默认只接收当前任务必要的限长知识片段；敏感笔记不出本机。
+- DeepSeek API Key 优先读 host 环境变量 `DEEPSEEK_API_KEY`；缺省时 supervisor 只读本机已有 deepseek 凭据条目并注入子进程环境。
+- Key 不进入命令行、仓库、状态元数据、日志或设置页回显。
+- 模型默认只接收当前任务必要的限长知识片段；敏感笔记不出本机。
 
 ## 4. 阶段状态
 
@@ -138,9 +135,9 @@ implementation:
 
 已实现：
 
-- `pnpm opencode:doctor/status/restart/configure`
-- 真实二进制发现、shim 拒绝、版本锁定、项目 Agent/Skills 检查和脱敏凭据状态。
-- 根 `AGENTS.md` 已切换为三模型固定链与无 Claude/原生回退规则。
+- `pnpm harness:doctor/status`
+- sidecar 启动入口、cordis 配置、项目 Agent/Skills 检查和脱敏凭据状态。
+- 根 `AGENTS.md` 已切换为 DeepSeek 官方两档固定链，无 OpenCode/Claude/原生回退。
 
 验收：
 
@@ -161,7 +158,7 @@ implementation:
 - `pnpm start:test` 会在测试环境联启 Syno Host 与 Fake OpenCode；生产环境无法启用 Fake Supervisor。
 - 2026-07-28 真实探针确认：认证成功、Session create/abort/delete 成功、`syno` MCP connected、禁止内置工具可调用数为 0。
 - Windows 安装器通过 `Syno.WindowsTaskXml.psm1` 对导出的 Task Scheduler XML 做保护与闭环验证：只允许一个登录触发器，固定 `PT30S` 延迟，并锁定执行身份、命令、参数、工作目录、单实例、隐藏、无限执行和每分钟重启。重注册后必须再次导出验证，既有健康任务也只有在同一 XML 契约通过后才能复用。
-- 已修复 Host 初始化与 OpenCode MCP 的循环等待：只有 `/api/syno/opencode/mcp` 可在 bootstrap 阶段绕过 `synoReady`，其他 Syno API 仍等待完整初始化。
+- 已修复 Host 初始化与 Tool Bridge 的循环等待：只有 `/api/syno/bridge/mcp` 可在 bootstrap 阶段绕过 `synoReady`，其他 Syno API 仍等待完整初始化。
 - 运行日志写入 `%LOCALAPPDATA%\Syno\logs`：按日 JSONL、14 天保留、字段递归脱敏、不记录消息正文，覆盖初始化、OpenCode、渠道与消息工作流阶段。
 - 2026-07-28 真实复验确认 Host 8888、OpenCode 4318、1.18.2、凭据、静态 MCP、微信和飞书启动健康；真实模型回答内容仍由主人验收。
 
@@ -189,7 +186,7 @@ implementation:
 
 已实现：
 
-- `.opencode/agents/syno.md`。
+- `config/deepseek-harness/syno-agent.md`。
 - 六个薄 Skills：capture、knowledge、learn、review、create、maintain。
 - 唯一静态 MCP `syno`，底层工具名由 Bridge 映射为最终 `syno_*`。
 - `syno_workflow_context` 从 canonical Skill 读取规则，不复制第二套知识语义。
@@ -252,7 +249,7 @@ implementation:
 
 仍需：
 
-1. 主人运行 `pnpm opencode:doctor`，确认一次性迁移后的凭据状态。
+1. 主人运行 `pnpm harness:doctor`，确认 DeepSeek key 与 sidecar 可启动。
 2. 主人运行 `pnpm start`，用非敏感内容完成真实模型与提示注入探针。
 3. 已完成 `pnpm windows:install`、`pnpm windows:status` 和 `pnpm windows:restart` 的真实验收：任务定义固定、真实 node.exe、健康与持续 Running 均通过；仅保留下次登录冷启动验证。
 4. 完成微信、飞书、Web 跨渠道上下文和工具调用验收。
@@ -420,7 +417,7 @@ normal_conversation
 新增项目 Skill：
 
 ```text
-.opencode/skills/syno-web-capture/SKILL.md
+config/deepseek-harness/skills/syno-web-capture/SKILL.md
 ```
 
 它是全局
@@ -490,7 +487,7 @@ IngestWorkflowCoordinator 判定 direct HTTP 失败
 - 其他 `syno-*` Skill 即使可被发现，也不能获得未在本次请求开放的工具；Skill 内容本身不能扩大权限。
 - 全局 `kimi-webbridge` 不加入允许名单；项目适配 Skill 名称保持 `syno-*`，符合现有安全契约。
 
-项目 Skill 记录上游名称、观察到的版本、源文件 SHA-256 和适配日期。`opencode:doctor` 比较已安装全局 Skill/daemon/extension 与项目适配版本；发现漂移只报告 `review_required`，不得运行时自动复制或覆盖。
+项目 Skill 记录上游名称、观察到的版本、源文件 SHA-256 和适配日期。`harness:doctor` 检查项目 Skill 可发现性；发现漂移只报告，不得运行时自动复制或覆盖。
 
 完成门槛：项目 Skill、工具权限和 OpenCode 请求契约已由自动测试覆盖；真实 OpenCode 页面抓取仍列入 P4.7 主人验收。
 
@@ -624,7 +621,7 @@ capture.browser.session_closed
 
 - 每条事件记录 `workflowId`、失败分类、耗时、尝试次数、final URL 的安全摘要、内容 digest 和投递状态；禁止记录正文、Token、Cookie、页面存储或 Basic Auth。
 - `syno_capture_status` 和渠道状态回复展示“正在直接抓取 / 正在尝试浏览器 / 等待你完成验证 / 正在生成收录建议 / 等待确认”等人话阶段。
-- `pnpm opencode:doctor` 或新增只读诊断项检查项目 `syno-web-capture` 可发现性、全局 Kimi Skill 上游摘要、WebBridge daemon、扩展连接、版本兼容和动作 allowlist，不尝试复制、安装或修复。
+- `pnpm harness:doctor` 检查项目 `syno-web-capture` 可发现性；不尝试复制、安装或修复全局浏览器 Skill。
 - Web 高级诊断页可查看浏览器兜底健康和最近失败分类；Today 正常时不增加技术噪声。
 - Outbox 保证 Proposal、交互请求、失败和完成事件最终送回原渠道；同一 eventId 不重复展示。
 

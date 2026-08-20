@@ -18,8 +18,8 @@ pnpm start
 ## 核心约束
 
 - Markdown 是唯一长期事实源；索引和数据库都是可重建缓存。
-- 产品只启用 `OpenCodeCognitiveRuntime`；Syno 按固定三模型链确定性尝试，绝不自动切换 Provider、Runtime 或升级到另一个 Agent。
-- 固定版本 Hermes 已因越出唯一 Chat Completions Provider 表面而淘汰，不接触真实 Token，也不是可选运行时。
+- 产品只启用 `DeepSeekHarnessCognitiveRuntime`；模型链固定为 `deepseek/deepseek-v4-flash` → `deepseek/deepseek-chat`。绝不自动切换 Provider、Runtime 或升级到另一个 Agent。
+- OpenCode 与 Hermes 已从产品路径删除，不是可选运行时。
 - 读取可直接执行；任何写入先形成 Job，并在隔离 worktree 中产生可审计差异。
 - 删除、覆盖、移动、新 MOC、新 tag 与代码修改在隔离工作区自动执行，并产生可审计差异。
 - 新增与修改均在隔离工作区自动执行；高风险写入经 validator 与 GitGuard 兜底，整理冲突时暂停澄清。

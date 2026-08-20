@@ -1,6 +1,6 @@
 # Deterministic policy
 
-Syno enables exactly one product `CognitiveRuntime`. The default implementation is `OpenCodeCognitiveRuntime`; the native implementation remains inactive only until the R6 evidence gate and is never an automatic fallback. Syno owns the fixed model chain and may advance only for an enumerated transient/contract failure before any irreversible effect. The model never chooses a provider, model, permission, risk level, approval count, wake-up time or retry escalation.
+Syno enables exactly one product `CognitiveRuntime`: `DeepSeekHarnessCognitiveRuntime`. There is no OpenCode, Claude or native rollback path. Syno owns the fixed model chain and may advance only for an enumerated transient/contract failure before any irreversible effect. The model never chooses a provider, model, permission, risk level, approval count, wake-up time or retry escalation.
 
 | Action | Execution | Workspace | Notes |
 |---|---|---|---|

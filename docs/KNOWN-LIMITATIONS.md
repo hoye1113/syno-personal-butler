@@ -25,9 +25,10 @@ Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导�
 ## 运行时限制
 
 - 仅支持 Windows；Provider Token、微信 Bot/回复上下文和飞书 App Secret 使用当前 Windows 用户的 DPAPI，不可作为跨用户可移植凭据。
-- 只启用 OpenCode Provider；Syno 按固定三模型链确定性尝试。仅在枚举的瞬态/契约失败且尚无不可逆副作用时尝试下一模型，不切换 Provider 或 Runtime。
-- Hermes `0.18.2` 因会访问 Chat Completions 以外的模型元数据路径而被淘汰；Hermes sidecar 代码仅保留审计和回归用途，不可选用。
-- OpenCode/模型不可用时，本地搜索、收录回执、任务、提醒与决策解析继续工作；需要模型的 Job 保留为 `waiting_provider`，不会自动换 Provider 或原生 Agent。
+- 只启用 DeepSeek Harness SDK sidecar，模型链只有 `deepseek/deepseek-v4-flash` → `deepseek/deepseek-chat`。仅在枚举的瞬态/契约失败且尚无不可逆副作用时尝试下一模型，不切换 Runtime，不回退到其它 Agent。
+- DeepSeek Harness 克隆默认在 `D:\workSpace\git_clone_test\deepseek-harness`（可用 `SYNO_DSH_ROOT` 覆盖）。sidecar 通过 `tsx` 跑 `dsh-jsonrpc-agent` 源码入口；自动测试走 `tests/support/fake-dsh-jsonrpc-agent.mjs`。不要把 Harness 源码 vendoring 进本仓库。
+- OpenCode 与 Hermes 已从产品路径删除。
+- 模型不可用时，本地搜索、收录回执、任务、提醒与决策解析继续工作；需要模型的 Job 保留为 `waiting_provider`，不会自动换 Provider 或原生 Agent。
 - Syno 不能修改自身源码；只能产生 `BugReport`、`ImprovementProposal` 和 SettingsRegistry 白名单内的偏好变更。
 
 ## 数据与渠道限制
@@ -47,5 +48,5 @@ Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导�
 
 ## 兼容性债务
 
-- 原生 Provider/ToolLoopAgent/ContextManager/ConversationStore、旧 OpenCode/Claude Executor 和 Hermes 代码在 R6 真实验收门槛前保留，但全部不是活动回退路径。达到门槛后应删除，而不是长期维护第二套 Agent。
+- `ProviderClient` / `ConversationStore` / `ApprovalAdvisor` 仍服务非认知本地路径。OpenCode、Hermes 与死执行器已删除。
 - 当前事实记录以 Markdown/JSON 契约版本 1 为基线；未来破坏性契约变更必须新增显式迁移器，不能原地静默升级。

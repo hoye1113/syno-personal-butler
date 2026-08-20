@@ -20,11 +20,11 @@
 
 ## 执行器
 
-- 产品只启用 `OpenCodeCognitiveRuntime`；原生 Agent 在真实验收完成前仅作为非活动迁移回滚实现，禁止自动回退。
-- 模型链固定为 `deepseek/deepseek-v4-flash`、`deepseek/deepseek-chat`（2026-07-31 Owner 决策：免费档持续 429 限流；key 来源 = host 环境变量 `DEEPSEEK_API_KEY` 优先，缺省时 supervisor 自动读用户本机 opencode 凭据存储 `~/.local/share/opencode/auth.json` 的 deepseek 条目注入子进程，零手工配置），兜底 `opencode/mimo-v2.5-free`、`opencode/deepseek-v4-flash-free`、`opencode/laguna-s-2.1-free`。
+- 产品只启用 `DeepSeekHarnessCognitiveRuntime`。不得选择或回退到 OpenCode、Claude Code 或原生 Agent。
+- 模型链固定为 DeepSeek 官方两档：`deepseek/deepseek-v4-flash` → `deepseek/deepseek-chat`。Adapter 为 `deepseek-harness-sdk`（CognitiveRuntime v3）。key 来源 = host 环境变量 `DEEPSEEK_API_KEY` 优先，缺省时 supervisor 读用户本机已有 deepseek 凭据（`~/.local/share/opencode/auth.json` 的 deepseek 条目）注入子进程。根路径由 `SYNO_DSH_ROOT` 指定（默认见 `docs/OPERATIONS.md`）；不要把 Harness 源码 vendoring 进本仓库。
 - 仅在不可用、限流、连接失败、超时、5xx、空响应或契约校验失败，且本次尝试尚未产生不可逆副作用时，才由 Syno 按上述顺序确定性回退。
-- OpenCode Agent 不得选择模型、Provider 或回退目标；全部失败时进入 `waiting_provider`，不得升级到 Claude Code 或原生 Agent。
-- OpenCode 只能使用项目内 `syno-*` Skills 和静态 `syno_*` Tool Bridge；禁止直接读写仓库、执行 Shell/Git、分享会话、启动子 Agent或动态加载 MCP。
+- Agent 不得选择模型、Provider 或回退目标；全部失败时进入 `waiting_provider`。禁止动态 MCP。
+- Harness 聊天会话允许沙箱 `workspace-write` 下的终端、工作区写盘和 `web_fetch`，并继续暴露 `syno_*` Bridge。收录分析 / 浏览器兜底使用 `syno-capture.cordis.yml`（无 bash/fs/web）。知识写入、覆盖 canonical 笔记、改 `apps/` 源码仍走 Job / Proposal / `policy.allowSelfModify`。
 
 ## 源码修改原则
 
@@ -56,7 +56,7 @@
 - PowerShell 脚本内只用 `[Convert]::FromBase64String`/`ToBase64String`，绝不调 `UTF8.GetString/GetBytes` 或依赖默认编码。
 - Python sidecar 用 `io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", line_buffering=True, write_through=True)` 包裹协议 stdio（须在 `sys.stdout=sys.stderr` 重定向之前取 `buffer`），reader 侧同包 stdin；并让 bridge 经 `processBootstrapEnv` 注入 `PYTHONUTF8=1` / `PYTHONIOENCODING=utf-8` 作双保险。
 
-参考实现：`runDpapi`（`apps/syno/syno/provider-credential-store.mjs`，Base64 传输）、Hermes sidecar（`scripts/sidecars/hermes_runtime.py` + `apps/syno/syno/hermes-sidecar-bridge.mjs`，UTF-8 字节层 + `PYTHONUTF8`）。运维侧说明见 `docs/OPERATIONS.md`「zh-CN 主机的 PowerShell/子进程编码陷阱」。新增跨进程文本往返必须有对应测试覆盖中文路径（参考 `tests/hermes-sidecar-bridge.test.mjs` 的 Python 集成用例）。
+参考实现：`runDpapi`（`apps/syno/syno/provider-credential-store.mjs`，Base64 传输）、DeepSeek Harness JSON-RPC sidecar（`apps/syno/syno/deepseek-harness-jsonrpc-client.mjs`，UTF-8 字节层）。运维侧说明见 `docs/OPERATIONS.md`「zh-CN 主机的 PowerShell/子进程编码陷阱」。新增跨进程文本往返必须有对应测试覆盖中文路径（参考 `tests/deepseek-harness-jsonrpc-client.test.mjs`）。
 
 ## 知识任务
 

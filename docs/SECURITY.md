@@ -2,11 +2,11 @@
 
 ## Cognitive runtime boundary
 
-Only one `CognitiveRuntime` may be active. `OpenCodeCognitiveRuntime` fails closed unless Terminal, direct file/source writes, model selection, sharing, dynamic MCP and delegation are disabled, and its visible Syno tool list matches the static bridge allowlist. OpenCode runs in an isolated empty workspace and receives explicit per-message tool denials in addition to global configuration denial. It never receives filesystem, Shell, Git, approval or configuration authority; tool requests return to Node for schema validation, Policy, Approval and GitGuard. Runtime failure is persisted and never triggers a silent runtime or provider fallback.
+Only one `CognitiveRuntime` may be active: `DeepSeekHarnessCognitiveRuntime`. Chat may use sandboxed `workspace-write` tools plus the static `syno_*` bridge; capture/ingest analysis uses a second sidecar with no bash/fs/web. `sourceWrite`, dynamic MCP, model self-selection and silent runtime fallback remain forbidden. Tool requests that hit `syno_*` return to Node for schema validation, Policy, Approval and GitGuard via `POST /api/syno/bridge/mcp`. Runtime failure is persisted and never triggers a silent fallback.
 
-The supervised OpenCode child is version-locked to 1.18.2, listens only on `127.0.0.1:4318`, requires a random per-process Basic Auth password and is terminated only through its owned PID tree. The mise shim is never a valid launch target. Zen credentials are independently DPAPI-protected; the decrypted token is referenced through child-process environment-backed inline configuration and never appears in arguments, repository state, OpenCode auth files or API output.
+The supervised Harness sidecar is launched from `SYNO_DSH_ROOT`, receives `DEEPSEEK_API_KEY` only through the child environment, and is terminated only through its owned PID tree. Credentials never appear in arguments, repository state or API output.
 
-Interactive CLI credential entry uses a no-echo Windows secure prompt. Legacy conversation migration admits only a redacted summary and recent Owner messages; tool/system/assistant turns, private/sensitive markers and credential-like patterns are excluded. Model fallback aborts the current OpenCode request first and is disabled if abort cannot be confirmed or any validated write attempt occurred.
+Conversation migration admits only a redacted summary and recent Owner messages; tool/system/assistant turns, private/sensitive markers and credential-like patterns are excluded. Model fallback aborts the current request first and is disabled if abort cannot be confirmed or any validated write attempt occurred.
 
 - Localhost only; non-loopback HTTP requests are rejected for mutation routes.
 - Secrets never live in the repository.
@@ -21,7 +21,7 @@ Interactive CLI credential entry uses a no-echo Windows secure prompt. Legacy co
 - Executor prompts are written to a local task file; user text is never interpolated into a shell command.
 - The product model receives only ToolRegistry tools. It never receives shell, arbitrary filesystem, browser, direct Git, direct Markdown-write or source-edit capabilities.
 - Provider credentials use Windows DPAPI under `%LOCALAPPDATA%\Syno\credentials`; the API and logs expose only `configured` status and non-secret metadata.
-- Provider failure is fail-closed: the provider and runtime never change. Syno may try the next member of the fixed three-model OpenCode chain only for enumerated transient/contract errors before side effects; otherwise the LLM job waits durably.
+- Provider failure is fail-closed: the provider and runtime never change. Syno may try the next member of the fixed DeepSeek chain only for enumerated transient/contract errors before side effects; otherwise the LLM job waits durably.
 - Background and manual recovery of a `waiting_provider` Job share one process/file lock and atomically transition it to `running`; a second caller cannot execute the same Job.
 - HTTP responses set a restrictive CSP, MIME sniffing protection, frame denial and referrer/permissions policies.
 - Weixin Bot Token and reply context tokens use Windows DPAPI under the credentials root; only cursor and deduplication markers enter non-credential state archives. Legacy plaintext credential JSON is migrated once and rewritten without secrets. Polling uses an inter-process lock, durable cursor ordering and post-delivery deduplication. Attachments accept only exact Tencent CDN hosts, are streamed with a 10 MB plaintext limit, decrypt the protocol's validated AES-128-ECB key when present, then pass signature/MIME checks and remain unread in quarantine. Missing `full_url` may only fall back to the fixed official Tencent CDN path.

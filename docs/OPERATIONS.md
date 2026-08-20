@@ -64,14 +64,14 @@ pnpm audit:ingest            # 按 错误码 × retryable × fetchMethod 聚类
 pnpm audit:ingest --all      # 展开单条样例，含候选/方案/Job 引用
 ```
 
-`OPENCODE_ATTEMPTS_EXHAUSTED` / `OPENCODE_ABORT_UNKNOWN` / `OPENCODE_NOT_RUNNING` /
-`PROVIDER_RATE_LIMITED` 已改成**降级而非终态**：模型不可用时保留 propose 已产出的基础方案，
+`HARNESS_ATTEMPTS_EXHAUSTED` / `HARNESS_ABORT_UNKNOWN` / `HARNESS_NOT_RUNNING` /
+`PROVIDER_RATE_LIMITED`（以及历史 `OPENCODE_*` 记录）已改成**降级而非终态**：模型不可用时保留 propose 已产出的基础方案，
 把「远程语义分析未完成，请人工确认」写进 unresolved，经 onProposed 转入
 `awaiting_decision` 回主人手工决定，不再把整个收录流程锁进 `failed_terminal`。
 这类 workflow 仍在 `listPending` 可见、可 approve/reject，不发 `workflow.failed`。
 只有非模型类错误（契约校验、浏览器捕获、远程内容安全检查等）才照旧走 failed/terminal。
 
-注意：模型能力错误**一次失败即降级**，不经过 coordinator 级 60s 重试——OpenCode
+注意：模型能力错误**一次失败即降级**，不经过 coordinator 级 60s 重试——Harness
 运行时已先对模型链做过多轮 fallback，到达协调器时通常已确认耗尽；立即回到主人
 决策可避免重复消耗整条模型链。若需要为瞬时抖动保留少量重试缓冲，可在此处调整。
 
@@ -79,7 +79,7 @@ pnpm audit:ingest --all      # 展开单条样例，含候选/方案/Job 引用
 命中 `empty_or_low_quality` 的浏览器兜底（`fetchMethod=kimi_webbridge`），不再把样式表收进笔记。
 浏览器兜底返回的正文同样过噪声门（`applyBrowserSnapshot` 二次检查），双重防护。
 
-运行日志按天写入 JSONL，默认保留 14 天，覆盖 Syno 初始化、OpenCode
+运行日志按天写入 JSONL，默认保留 14 天，覆盖 Syno 初始化、Harness
 配置/进程/健康/退出、渠道启动，以及消息的附件、决策、收录和 Runtime
 阶段。日志只记录渠道、消息 ID、Artifact/Job/Run ID、状态和脱敏错误，不保存
 主人对话正文；`Token`、`Authorization`、Cookie、密码、API Key 和带凭据 URL
@@ -100,7 +100,7 @@ Get-Content -LiteralPath $log.FullName -Tail 80
 
 本机 zh-CN 系统 ACP=936（GBK）。任何 `spawn("powershell.exe" / python / ...)` 后经 `[Console]::In`/`[Console]::Out` 或默认 stdio 文本层往返非 ASCII（中文、emoji）payload 时，PowerShell/Python 的默认编码是 GBK，**双向**都会把 UTF-8 字节转码损坏，且只在下游 `JSON.parse` 抛 `SyntaxError` 时才暴露（静默无报错）。
 
-根治约束：**只让 Base64（7-bit ASCII，所有常见代码页的公共子集）跨过 console/stdio 边界**——Node 侧 `Buffer.from(x,"utf8").toString("base64")` 写入 stdin，脚本内只用 `FromBase64String/ToBase64String`（Python 侧用 `io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")` 或注入 `PYTHONUTF8=1`），绝不调 `UTF8.GetString/GetBytes` 或依赖默认编码。`runDpapi`（`provider-credential-store.mjs`）、Hermes sidecar 与 `readSecretFromStdin`（交互式 Token 录入）均遵循此约束；新增任何跨进程文本往返必须沿用，否则中文路径会静默损坏。
+根治约束：**只让 Base64（7-bit ASCII，所有常见代码页的公共子集）跨过 console/stdio 边界**——Node 侧 `Buffer.from(x,"utf8").toString("base64")` 写入 stdin，脚本内只用 `FromBase64String/ToBase64String`（Python 侧用 `io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")` 或注入 `PYTHONUTF8=1`），绝不调 `UTF8.GetString/GetBytes` 或依赖默认编码。`runDpapi`（`provider-credential-store.mjs`）与 Harness JSON-RPC sidecar 均遵循此约束；新增任何跨进程文本往返必须沿用，否则中文路径会静默损坏。
 
 ### Windows 飞书日历 CLI
 
@@ -134,11 +134,21 @@ Codex 完成 `docs/TODO-EXECUTION-PLAN.md` 的 P1–P3，并明确交付“自�
 启动与诊断：
 
 ```powershell
-pnpm opencode:doctor
+pnpm harness:doctor
 pnpm start
-pnpm opencode:status
+pnpm harness:status
 pnpm windows:status
 ```
+
+产品只走 DeepSeek Harness。普通启动不需要再设环境变量：
+
+```powershell
+# 可选：$env:SYNO_DSH_ROOT = "D:\workSpace\git_clone_test\deepseek-harness"
+pnpm harness:doctor
+pnpm start
+```
+
+`harness:doctor` 不把密钥写进输出。协议冒烟用 `pnpm probe:harness`（假 sidecar + 中文 UTF-8）。
 
 主人验收清单：
 
@@ -150,7 +160,7 @@ pnpm windows:status
 6. 从微信发起，在飞书查询或确认，验证同一 Owner 的跨渠道连续性。
 7. 累计完成 30 条跨渠道消息、10 组多轮追问和 5 次 ToolRegistry 调用。
 8. 对已收录知识做一次 teach-back，确认“已收录”不会自动提高掌握度，只有主人证据会推进学习状态。
-9. 已执行真实 Windows 任务安装、状态和受控重启；仍需在下次登录后确认 Syno Host、OpenCode 子进程和未完成 Workflow 共同恢复。
+9. 已执行真实 Windows 任务安装、状态和受控重启；仍需在下次登录后确认 Syno Host、Harness sidecar 和未完成 Workflow 共同恢复。
 
 每项至少记录：
 
