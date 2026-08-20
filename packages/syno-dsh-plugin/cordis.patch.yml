@@ -35,3 +35,16 @@
 - id: approval
   config:
     policy: never
+
+# workspace-write + never is not a stock preset (stock workspace-write asks).
+# Name that pair as the only table entry so permission-presets can boot without
+# exposing /permission switches to ask or danger-full-access.
+- id: permission
+  config:
+    defaultPreset: workspace-write
+    presets:
+      workspace-write:
+        sandbox: workspace-write
+        approval: never
+        name: workspace-write
+        description: Isolated workspace writes without approval prompts.

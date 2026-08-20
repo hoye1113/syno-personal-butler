@@ -1,11 +1,60 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import http from "node:http";
 import test from "node:test";
 
 import { DeepSeekHarnessWebClient } from "../apps/syno/syno/deepseek-harness-web-client.mjs";
 
-function sseFrame(payload) {
-  return `data: ${JSON.stringify({ type: "server-request", rpcId: `evt-${Date.now()}`, payload })}\n\n`;
+const WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+function eventEnvelope(payload) {
+  return JSON.stringify({
+    type: "server-request",
+    rpcId: `evt-${Date.now()}`,
+    method: payload.type,
+    payload,
+  });
+}
+
+function wsTextFrame(text) {
+  const payload = Buffer.from(text, "utf8");
+  let header;
+  if (payload.length < 126) {
+    header = Buffer.alloc(2);
+    header[0] = 0x81;
+    header[1] = payload.length;
+  } else if (payload.length < 65536) {
+    header = Buffer.alloc(4);
+    header[0] = 0x81;
+    header[1] = 126;
+    header.writeUInt16BE(payload.length, 2);
+  } else {
+    header = Buffer.alloc(10);
+    header[0] = 0x81;
+    header[1] = 127;
+    header.writeBigUInt64BE(BigInt(payload.length), 2);
+  }
+  return Buffer.concat([header, payload]);
+}
+
+function acceptWebSocket(req, socket) {
+  const key = req.headers["sec-websocket-key"];
+  const accept = createHash("sha1").update(`${key}${WS_GUID}`).digest("base64");
+  socket.write(
+    "HTTP/1.1 101 Switching Protocols\r\n"
+    + "Upgrade: websocket\r\n"
+    + "Connection: Upgrade\r\n"
+    + `Sec-WebSocket-Accept: ${accept}\r\n`
+    + "\r\n",
+  );
+  return {
+    send(payload) {
+      socket.write(wsTextFrame(eventEnvelope(payload)));
+    },
+    end() {
+      socket.end();
+    },
+  };
 }
 
 function rpcOk(rpcId, value) {
@@ -15,18 +64,13 @@ function rpcOk(rpcId, value) {
 function startFakeWeb({ onPrompt, selectModel } = {}) {
   let hostStream;
   let muxStream;
+  const state = { rejectMux: false };
+  const sockets = new Set();
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, "http://127.0.0.1");
-    if (url.pathname === "/api/events.host") {
-      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
-      res.write(":\n\n");
-      hostStream = res;
-      return;
-    }
-    if (url.pathname === "/api/events.mux") {
-      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
-      res.write(":\n\n");
-      muxStream = res;
+    if (url.pathname === "/api/events.host" || url.pathname === "/api/events.mux") {
+      res.writeHead(426, { connection: "Upgrade", upgrade: "websocket" });
+      res.end("upgrade required");
       return;
     }
     let body = "";
@@ -58,13 +102,13 @@ function startFakeWeb({ onPrompt, selectModel } = {}) {
             onPrompt({ sessionId, hostStream, muxStream });
             return;
           }
-          hostStream?.write(sseFrame({ type: "host/session-status", sessionId, running: true }));
-          muxStream?.write(sseFrame({
+          hostStream?.send({ type: "host/session-status", sessionId, running: true });
+          muxStream?.send({
             type: "session/event",
             sessionId,
             event: { type: "assistant/message", data: { message: { content: [{ type: "text", text: "web-hello" }] } } },
-          }));
-          hostStream?.write(sseFrame({ type: "host/session-status", sessionId, running: false }));
+          });
+          hostStream?.send({ type: "host/session-status", sessionId, running: false });
         }, 20);
         return;
       }
@@ -72,14 +116,35 @@ function startFakeWeb({ onPrompt, selectModel } = {}) {
       res.end("{}");
     });
   });
+  server.on("upgrade", (req, socket) => {
+    sockets.add(socket);
+    socket.on("close", () => sockets.delete(socket));
+    const url = new URL(req.url, "http://127.0.0.1");
+    if (url.pathname === "/api/events.host") {
+      hostStream = acceptWebSocket(req, socket);
+      return;
+    }
+    if (url.pathname === "/api/events.mux") {
+      if (state.rejectMux) {
+        socket.destroy();
+        return;
+      }
+      muxStream = acceptWebSocket(req, socket);
+      return;
+    }
+    socket.destroy();
+  });
   return new Promise((resolve) => {
     server.listen(0, "127.0.0.1", () => {
       resolve({
         server,
         port: server.address().port,
+        state,
         close() {
           hostStream?.end();
           muxStream?.end();
+          for (const socket of sockets) socket.destroy();
+          sockets.clear();
           server.close();
         },
       });
@@ -105,8 +170,8 @@ test("DeepSeekHarnessWebClient runTurn waits for idle and reads assistant text",
 test("DeepSeekHarnessWebClient settles on running-then-idle even without assistant text", async (t) => {
   const fake = await startFakeWeb({
     onPrompt({ sessionId, hostStream }) {
-      hostStream?.write(sseFrame({ type: "host/session-status", sessionId, running: true }));
-      hostStream?.write(sseFrame({ type: "host/session-status", sessionId, running: false }));
+      hostStream?.send({ type: "host/session-status", sessionId, running: true });
+      hostStream?.send({ type: "host/session-status", sessionId, running: false });
     },
   });
   t.after(() => fake.close());
@@ -124,7 +189,7 @@ test("DeepSeekHarnessWebClient settles on running-then-idle even without assista
   assert.ok(Date.now() - started < 700);
 });
 
-test("DeepSeekHarnessWebClient keeps SSE streams after initializeTimeoutMs", async (t) => {
+test("DeepSeekHarnessWebClient keeps event streams after initializeTimeoutMs", async (t) => {
   const fake = await startFakeWeb();
   t.after(() => fake.close());
   const client = new DeepSeekHarnessWebClient({
@@ -166,4 +231,25 @@ test("DeepSeekHarnessWebClient fails the turn when selectModel is unavailable", 
     (error) => error.code === "HARNESS_MODEL_SELECT_FAILED" && error.retryable === true,
   );
   assert.equal(notices[0]?.event, "harness.web.select_model.failed");
+});
+
+test("DeepSeekHarnessWebClient retries event streams after a partial connect failure", async (t) => {
+  const fake = await startFakeWeb();
+  t.after(() => fake.close());
+  fake.state.rejectMux = true;
+  const client = new DeepSeekHarnessWebClient({
+    origin: `http://127.0.0.1:${fake.port}`,
+    cwd: "/tmp/workspace",
+    initializeTimeoutMs: 5_000,
+    turnTimeoutMs: 5_000,
+  });
+  t.after(() => client.close());
+  await assert.rejects(
+    () => client.initialize({ cwd: "/tmp/workspace", provider: "deepseek-official", model: "deepseek-v4-flash" }),
+    (error) => error.code === "HARNESS_TRANSPORT_ERROR" || error.code === "HARNESS_NOT_RUNNING",
+  );
+  fake.state.rejectMux = false;
+  await client.initialize({ cwd: "/tmp/workspace", provider: "deepseek-official", model: "deepseek-v4-flash" });
+  const result = await client.runTurn("syno-retry-streams", [{ type: "text", text: "你好" }]);
+  assert.equal(result.finalResponse, "web-hello");
 });

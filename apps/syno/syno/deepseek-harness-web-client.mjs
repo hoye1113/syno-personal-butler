@@ -39,10 +39,16 @@ function toPromptContent(contentBlocks) {
   return content;
 }
 
-function unwrapSseData(raw) {
+function unwrapEventFrame(raw) {
   const parsed = JSON.parse(raw);
   if (isRecord(parsed) && parsed.type === "server-request" && isRecord(parsed.payload)) return parsed.payload;
   return parsed;
+}
+
+function wsUrl(origin, pathname) {
+  const url = new URL(pathname, `${String(origin).replace(/\/+$/, "")}/`);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return url.toString();
 }
 
 class DeepSeekHarnessWebClient {
@@ -52,6 +58,7 @@ class DeepSeekHarnessWebClient {
     pid = null,
     kill,
     fetchImpl = fetch,
+    webSocketImpl = globalThis.WebSocket,
     requestTimeoutMs = 180_000,
     initializeTimeoutMs = 30_000,
     turnTimeoutMs,
@@ -63,6 +70,7 @@ class DeepSeekHarnessWebClient {
     this.pid = pid;
     this.kill = typeof kill === "function" ? kill : () => {};
     this.fetchImpl = fetchImpl;
+    this.webSocketImpl = webSocketImpl;
     this.requestTimeoutMs = requestTimeoutMs;
     this.initializeTimeoutMs = initializeTimeoutMs;
     this.turnTimeoutMs = turnTimeoutMs ?? requestTimeoutMs;
@@ -73,6 +81,7 @@ class DeepSeekHarnessWebClient {
     this.createdSessions = new Set();
     this.listeners = new Set();
     this.streamAbort = null;
+    this.sockets = new Set();
   }
 
   subscribe(listener) {
@@ -170,7 +179,7 @@ class DeepSeekHarnessWebClient {
   async close() {
     if (this.closed) return;
     this.closed = true;
-    this.streamAbort?.abort();
+    this.#closeSockets();
     this.initialized = false;
   }
 
@@ -258,88 +267,115 @@ class DeepSeekHarnessWebClient {
     throw lastError || runtimeError("HARNESS_NOT_RUNNING", "DeepSeek Harness Web 未就绪", { retryable: true });
   }
 
+  #closeSockets() {
+    this.streamAbort?.abort();
+    this.streamAbort = null;
+    for (const socket of this.sockets) {
+      try { socket.close(); } catch {}
+    }
+    this.sockets.clear();
+  }
+
   async #ensureStreams() {
     if (this.streamAbort) return;
     this.streamAbort = new AbortController();
-    await Promise.all([
-      this.#openSse("/api/events.host", this.streamAbort.signal, (frame) => {
-        if (frame?.type === "host/session-status") {
-          this.#emit({
-            method: "session.status",
-            params: { sessionId: frame.sessionId, status: frame.running === true ? "running" : "idle" },
-          });
-        }
-      }),
-      this.#openSse("/api/events.mux", this.streamAbort.signal, (frame) => {
-        if (frame?.type === "session/event") {
-          this.#emit({
-            method: "session.event",
-            params: { sessionId: frame.sessionId, event: frame.event },
-          });
-        }
-      }),
-    ]);
+    try {
+      await Promise.all([
+        this.#openEventStream("/api/events.host", this.streamAbort.signal, (frame) => {
+          if (frame?.type === "host/session-status") {
+            this.#emit({
+              method: "session.status",
+              params: { sessionId: frame.sessionId, status: frame.running === true ? "running" : "idle" },
+            });
+          }
+        }),
+        this.#openEventStream("/api/events.mux", this.streamAbort.signal, (frame) => {
+          if (frame?.type === "session/event") {
+            this.#emit({
+              method: "session.event",
+              params: { sessionId: frame.sessionId, event: frame.event },
+            });
+          }
+        }),
+      ]);
+    } catch (error) {
+      this.#closeSockets();
+      throw error;
+    }
   }
 
   #emit(notification) {
     for (const listener of this.listeners) listener(notification);
   }
 
-  async #openSse(pathname, signal, onFrame) {
+  async #openEventStream(pathname, signal, onFrame) {
+    if (typeof this.webSocketImpl !== "function") {
+      throw runtimeError("HARNESS_TRANSPORT_ERROR", "当前运行时没有 WebSocket，无法连接 dsh web 事件流");
+    }
     const connectAbort = new AbortController();
     const timer = setTimeout(() => connectAbort.abort(), this.initializeTimeoutMs);
     timer.unref?.();
-    const onOuter = () => connectAbort.abort();
     if (signal.aborted) connectAbort.abort();
-    else signal.addEventListener("abort", onOuter, { once: true });
-    let response;
-    try {
-      response = await this.fetchImpl(`${this.origin}${pathname}`, { signal: connectAbort.signal });
-      clearTimeout(timer);
-    } catch (error) {
-      clearTimeout(timer);
-      signal.removeEventListener("abort", onOuter);
-      if (connectAbort.signal.aborted && !signal.aborted) {
-        throw runtimeError("HARNESS_NOT_RUNNING", `${pathname} SSE 连接超时`, { retryable: true });
+    else signal.addEventListener("abort", () => connectAbort.abort(), { once: true });
+    const ws = new this.webSocketImpl(wsUrl(this.origin, pathname));
+    this.sockets.add(ws);
+    ws.addEventListener("message", (event) => {
+      try {
+        onFrame(unwrapEventFrame(String(event.data ?? "")));
+      } catch {
+        // One corrupt frame must not kill the stream.
       }
-      throw runtimeError("HARNESS_TRANSPORT_ERROR", error.message || `${pathname} SSE 失败`, { retryable: true });
-    }
-    if (!response.ok || !response.body) {
-      signal.removeEventListener("abort", onOuter);
-      throw runtimeError("HARNESS_TRANSPORT_ERROR", `${pathname} SSE HTTP ${response.status || "no-body"}`, { retryable: true });
-    }
-    void this.#pumpSse(response.body, signal, onFrame);
-  }
-
-  async #pumpSse(body, signal, onFrame) {
-    const reader = body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
+    });
     try {
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) return;
-        buffer += decoder.decode(value, { stream: true });
-        let boundary;
-        while ((boundary = buffer.indexOf("\n\n")) !== -1) {
-          const chunk = buffer.slice(0, boundary);
-          buffer = buffer.slice(boundary + 2);
-          const data = chunk.split("\n").filter((line) => line.startsWith("data: ")).map((line) => line.slice(6)).join("");
-          if (!data) continue;
-          try {
-            onFrame(unwrapSseData(data));
-          } catch {
-            // One corrupt frame must not kill the stream.
-          }
+      await new Promise((resolve, reject) => {
+        const fail = (error) => {
+          clearTimeout(timer);
+          ws.removeEventListener("open", onOpen);
+          ws.removeEventListener("error", onError);
+          connectAbort.signal.removeEventListener("abort", onAbort);
+          reject(error);
+        };
+        const onOpen = () => {
+          clearTimeout(timer);
+          ws.removeEventListener("error", onError);
+          connectAbort.signal.removeEventListener("abort", onAbort);
+          resolve();
+        };
+        const onError = () => fail(runtimeError("HARNESS_TRANSPORT_ERROR", `${pathname} WebSocket 失败`, { retryable: true }));
+        const onAbort = () => {
+          fail(runtimeError(
+            signal.aborted ? "HARNESS_TRANSPORT_ERROR" : "HARNESS_NOT_RUNNING",
+            signal.aborted ? `${pathname} WebSocket 已中止` : `${pathname} WebSocket 连接超时`,
+            { retryable: true },
+          ));
+        };
+        if (connectAbort.signal.aborted) {
+          onAbort();
+          return;
         }
-      }
-    } catch (error) {
-      if (signal.aborted || this.closed) return;
-      this.#emit({
-        method: "session.status",
-        params: { sessionId: "", status: "idle", error: error.message },
+        ws.addEventListener("open", onOpen, { once: true });
+        ws.addEventListener("error", onError, { once: true });
+        connectAbort.signal.addEventListener("abort", onAbort, { once: true });
       });
+    } catch (error) {
+      this.sockets.delete(ws);
+      try { ws.close(); } catch {}
+      throw error;
     }
+    const closeSocket = () => {
+      try { ws.close(); } catch {}
+      this.sockets.delete(ws);
+    };
+    signal.addEventListener("abort", closeSocket, { once: true });
+    ws.addEventListener("close", () => {
+      this.sockets.delete(ws);
+      if (!signal.aborted && !this.closed) {
+        this.#emit({
+          method: "session.status",
+          params: { sessionId: "", status: "idle", error: `${pathname} WebSocket closed` },
+        });
+      }
+    }, { once: true });
   }
 }
 

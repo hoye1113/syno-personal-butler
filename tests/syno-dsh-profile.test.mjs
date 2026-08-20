@@ -35,6 +35,11 @@ test("Host-generated syno profile pins bundles and forbids marketplace add", asy
   assert.match(synoPatch, /Do not run/);
   assert.doesNotMatch(synoPatch, /sk-[A-Za-z0-9]/);
   assert.match(pluginPatch, /searchProvider: deepseek-official/);
+  assert.match(pluginPatch, /defaultPreset: workspace-write/);
+  assert.match(pluginPatch, /policy: never/);
+  assert.doesNotMatch(pluginPatch, /sandbox: danger-full-access/);
+  assert.doesNotMatch(pluginPatch, /sandbox: read-only/);
+  assert.doesNotMatch(pluginPatch, /approval: ask/);
   assert.doesNotMatch(pluginPatch, /dsh plugin add/);
   assert.equal(lab.dsh.profile.allowMarketplaceAdd, true);
   assert.ok(!lab.dependencies?.["@syno/dsh-plugin"]);
