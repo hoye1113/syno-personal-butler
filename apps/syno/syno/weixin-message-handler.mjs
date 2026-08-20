@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { PATHS, resolveInside } from "./paths.mjs";
+import { isImageMime } from "./image-mime.mjs";
 
 function parseWeixinApproval(text) {
   const match = /^批准\s+(job-\d{8}-[a-f0-9]{8})\s+([a-f0-9]{6})$/iu.exec(String(text || "").trim());
@@ -61,7 +62,12 @@ function createWeixinMessageHandler({
       if (artifacts.length) {
         const receipts = [];
         const rejected = [];
+        let skippedImages = 0;
         for (const artifact of artifacts) {
+          if (isImageMime(artifact?.mime) && artifact.rejected !== true) {
+            skippedImages += 1;
+            continue;
+          }
           try {
             const payload = await artifactToIntakePayload(artifact, { quarantineRoot });
             const receipt = await ingest.receive(payload, { channel: "weixin", ownerId: message.senderId });
@@ -70,6 +76,9 @@ function createWeixinMessageHandler({
           } catch (error) {
             rejected.push(error.message);
           }
+        }
+        if (!receipts.length && skippedImages && !rejected.length) {
+          return { text: "图片已隔离。请通过主对话渠道识图；明确说「收录」才会把识图结果送进知识库方案。" };
         }
         if (!receipts.length) return { text: `附件未进入收录队列：${rejected.join("；") || "没有通过安全检查"}` };
         const ids = receipts.map((receipt) => receipt.artifact.id);

@@ -46,6 +46,7 @@ const BRIDGE_TOOL_NAMES = new Set([
   "jobs.list",
   "jobs.submit",
   "settings.adjust",
+  "image.read",
   "browser.status",
   "browser.navigate",
   "browser.snapshot",

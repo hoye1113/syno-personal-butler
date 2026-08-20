@@ -25,6 +25,7 @@ const FALLBACK_TOOLS = Object.freeze([
   ["jobs_list", "List Syno jobs"],
   ["jobs_submit", "Submit a Syno job"],
   ["settings_adjust", "Adjust Syno settings"],
+  ["image_read", "Read an isolated image via Host vision"],
   ["browser_status", "Browser capture status"],
   ["browser_navigate", "Browser navigate"],
   ["browser_snapshot", "Browser snapshot"],

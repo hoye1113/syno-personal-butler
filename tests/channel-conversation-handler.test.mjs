@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import { ChannelConversationHandler } from "../apps/syno/syno/channel-conversation-handler.mjs";
+import { IsolatedImageStore } from "../apps/syno/syno/isolated-image-store.mjs";
+import { createGlyphPng } from "../apps/syno/syno/image-png.mjs";
 
 test("ChannelConversationHandler routes ordinary cross-channel messages to one Owner main session", async () => {
   const runs = [];
@@ -621,3 +626,168 @@ test("read-link rule stays off for long residuals, multiple URLs and local-only 
   assert.equal(calls.length, 0);
   assert.equal(model.length, 3);
 });
+
+test("ChannelConversationHandler sends images to chat vision instead of ingest", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "syno-channel-image-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const png = createGlyphPng("SYNO42");
+  const file = path.join(root, "shot.png");
+  await writeFile(file, png);
+  const runs = [];
+  const handler = new ChannelConversationHandler({
+    runtime: { async run(request) { runs.push(request); return { text: "图是绿色字母" }; } },
+    core: {},
+    ingest: { async receive() { throw new Error("image must not ingest"); }, async propose() {} },
+    pendingDecisions: {},
+    attachmentToPayload: async () => { throw new Error("image must not convert to intake"); },
+    imageStore: new IsolatedImageStore({ quarantineRoots: [root] }),
+    visionClient: { async read() { throw new Error("Flash should call syno_image_read, not the handler"); } },
+  });
+  const response = await handler.handle({
+    id: "wx-img-1",
+    ownerKey: "owner",
+    senderId: "owner",
+    channel: "weixin",
+    text: "这是什么",
+    artifacts: [{ path: file, mime: "image/png", isolated: true, autoRead: false, size: png.length }],
+  });
+  assert.equal(response.text, "图是绿色字母");
+  assert.equal(runs.length, 1);
+  assert.match(runs[0].text, /syno_image_read/);
+  assert.match(runs[0].text, /artifactId/);
+});
+
+test("ChannelConversationHandler still ingests PDF/text attachments", async () => {
+  const received = [];
+  const handler = new ChannelConversationHandler({
+    runtime: { async run() { throw new Error("model must not run"); } },
+    core: {},
+    ingest: {
+      async receive(payload) { received.push(payload); return { artifact: { id: "pdf-1" } }; },
+      async propose() {},
+    },
+    pendingDecisions: {},
+    attachmentToPayload: async () => ({ kind: "pdf", name: "a.pdf" }),
+  });
+  const response = await handler.handle({
+    id: "wx-pdf",
+    ownerKey: "owner",
+    senderId: "owner",
+    channel: "weixin",
+    text: "看这个",
+    artifacts: [{ mime: "application/pdf", isolated: true, autoRead: false, path: "doc.pdf" }],
+  });
+  assert.match(response.text, /pdf-1/);
+  assert.equal(received[0].kind, "pdf");
+});
+
+test("ChannelConversationHandler turns explicit 收录 plus image into text intake", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "syno-channel-vision-ingest-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const png = createGlyphPng("SYNO42");
+  const file = path.join(root, "shot.png");
+  await writeFile(file, png);
+  const received = [];
+  const handler = new ChannelConversationHandler({
+    runtime: { async run() { throw new Error("model must not run for ingest"); } },
+    core: {},
+    ingest: {
+      async receive(payload) { received.push(payload); return { artifact: { id: "vision-text-1" } }; },
+      async propose() {},
+    },
+    pendingDecisions: {},
+    attachmentToPayload: async () => { throw new Error("must not use binary image intake"); },
+    imageStore: new IsolatedImageStore({ quarantineRoots: [root] }),
+    visionClient: {
+      async read({ question }) {
+        assert.match(question, /收录/);
+        return { ocr: "SYNO42", layout: "row", summary: "green", answer: "green", uncertain: [] };
+      },
+    },
+  });
+  const response = await handler.handle({
+    id: "wx-img-ingest",
+    ownerKey: "owner",
+    senderId: "owner",
+    channel: "weixin",
+    text: "收录这张图",
+    artifacts: [{ path: file, mime: "image/png", isolated: true, autoRead: false, size: png.length }],
+  });
+  assert.match(response.text, /vision-text-1/);
+  assert.equal(received[0].kind, "text");
+  assert.match(received[0].value, /<untrusted-vision>/);
+  assert.match(received[0].value, /SYNO42/);
+});
+
+test("ChannelConversationHandler reports retryable vision failure without inventing pixels", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "syno-channel-vision-fail-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const png = createGlyphPng("SYNO42");
+  const file = path.join(root, "shot.png");
+  await writeFile(file, png);
+  const received = [];
+  const queued = [];
+  const handler = new ChannelConversationHandler({
+    runtime: { async run() { throw new Error("model must not run"); } },
+    core: {
+      async execute(request, context) {
+        queued.push({ request, context });
+        return { job: { id: "job-vision-retry", status: "waiting_provider" } };
+      },
+    },
+    ingest: { async receive(payload) { received.push(payload); return { artifact: { id: "nope" } }; }, async propose() {} },
+    pendingDecisions: {},
+    attachmentToPayload: async () => { throw new Error("no"); },
+    imageStore: new IsolatedImageStore({ quarantineRoots: [root] }),
+    visionClient: {
+      async read() {
+        throw Object.assign(new Error("timeout"), { code: "VISION_TIMEOUT", retryable: true });
+      },
+    },
+  });
+  const response = await handler.handle({
+    id: "wx-img-timeout",
+    ownerKey: "owner",
+    senderId: "owner",
+    channel: "weixin",
+    text: "收录这张图",
+    artifacts: [{ path: file, mime: "image/png", isolated: true, autoRead: false, size: png.length }],
+  });
+  assert.equal(received.length, 0);
+  assert.equal(queued.length, 1);
+  assert.equal(queued[0].request.intent, "chat");
+  assert.match(response.text, /识图暂时失败，已排队重试：job-vision-retry/);
+});
+
+test("ChannelConversationHandler does not treat image captions as approval replies", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "syno-channel-image-approve-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const png = createGlyphPng("SYNO42");
+  const file = path.join(root, "shot.png");
+  await writeFile(file, png);
+  let parsed = false;
+  const runs = [];
+  const handler = new ChannelConversationHandler({
+    runtime: { async run(request) { runs.push(request); return { text: "已看图" }; } },
+    core: { async approve() { throw new Error("must not approve"); } },
+    ingest: { async receive() { throw new Error("image must not ingest"); }, async propose() {} },
+    pendingDecisions: { async parse() { parsed = true; throw new Error("must not parse"); } },
+    attachmentToPayload: async () => { throw new Error("image must not convert to intake"); },
+    imageStore: new IsolatedImageStore({ quarantineRoots: [root] }),
+    visionClient: { async read() { throw new Error("Flash should call syno_image_read"); } },
+  });
+  const response = await handler.handle({
+    id: "wx-img-approve",
+    ownerKey: "owner",
+    senderId: "owner",
+    channel: "weixin",
+    text: "可以",
+    privateConversation: true,
+    artifacts: [{ path: file, mime: "image/png", isolated: true, autoRead: false, size: png.length }],
+  });
+  assert.equal(parsed, false);
+  assert.equal(response.text, "已看图");
+  assert.equal(runs.length, 1);
+  assert.match(runs[0].text, /syno_image_read/);
+});
+
