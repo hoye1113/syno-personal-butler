@@ -54,3 +54,48 @@ test("empty assistant text is observable as a completed idle turn", async (t) =>
   const turn = await client.runTurn("session-empty", [{ type: "text", text: "x" }]);
   assert.equal(turn.finalResponse, "");
 });
+
+test("a non-JSON stdout line does not fail in-flight RPC", async (t) => {
+  const { child, client } = startFake({ DSH_FAKE_GARBAGE_LINE: "1" });
+  t.after(async () => {
+    await client.close();
+    if (child.exitCode === null) child.kill();
+    await new Promise((resolve) => child.once("exit", resolve));
+  });
+  const identity = await client.initialize({
+    cwd: process.cwd(),
+    provider: "deepseek-official",
+    model: "deepseek-v4-flash",
+  });
+  assert.equal(identity.serverInfo.name, "deepseek-harness-sdk-runtime");
+  assert.equal(client.stderrTail.some((line) => line.startsWith("invalid-json:")), true);
+});
+
+test("sidecar exit after prompt rejects the in-flight turn", async (t) => {
+  const { child, client } = startFake({ DSH_FAKE_EXIT_AFTER_PROMPT: "1" });
+  t.after(async () => {
+    await client.close().catch(() => {});
+    if (child.exitCode === null) child.kill();
+    await new Promise((resolve) => child.once("exit", resolve));
+  });
+  await client.initialize({ cwd: process.cwd(), provider: "deepseek-official", model: "deepseek-v4-flash" });
+  await assert.rejects(
+    () => client.runTurn("session-dead", [{ type: "text", text: "x" }]),
+    (error) => error.code === "HARNESS_TRANSPORT_CLOSED",
+  );
+});
+
+test("a turn without idle times out instead of hanging", async (t) => {
+  const { child, client } = startFake({ DSH_FAKE_HANG_AFTER_PROMPT: "1" });
+  client.turnTimeoutMs = 80;
+  t.after(async () => {
+    await client.close();
+    if (child.exitCode === null) child.kill();
+    await new Promise((resolve) => child.once("exit", resolve));
+  });
+  await client.initialize({ cwd: process.cwd(), provider: "deepseek-official", model: "deepseek-v4-flash" });
+  await assert.rejects(
+    () => client.runTurn("session-hang", [{ type: "text", text: "x" }]),
+    (error) => error.code === "HARNESS_TURN_TIMEOUT",
+  );
+});

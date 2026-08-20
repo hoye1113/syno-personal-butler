@@ -67,6 +67,9 @@ rl.on("line", (line) => {
   const method = message.method;
   const params = message.params || {};
   if (method === "initialize") {
+    if (process.env.DSH_FAKE_GARBAGE_LINE === "1") {
+      process.stdout.write("this is not json\n");
+    }
     if (process.env.DSH_FAKE_FAIL_INIT === "1") {
       send({ jsonrpc: "2.0", id, error: { code: -32000, message: "fake initialize failed" } });
       return;
@@ -83,6 +86,13 @@ rl.on("line", (line) => {
     const messageId = `fake-msg-${Date.now()}`;
     send({ jsonrpc: "2.0", id, result: { messageId } });
     send(inboxEvent(sessionId, messageId));
+    if (process.env.DSH_FAKE_EXIT_AFTER_PROMPT === "1") {
+      process.exit(0);
+      return;
+    }
+    if (process.env.DSH_FAKE_HANG_AFTER_PROMPT === "1") {
+      return;
+    }
     if (process.env.DSH_FAKE_EMPTY === "1") {
       send(idleEvent(sessionId));
       return;

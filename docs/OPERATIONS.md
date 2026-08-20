@@ -5,11 +5,11 @@
 - Git 跟踪：`vault/`、`ops/`、`contracts/`、应用源码与文档。
 - 本地可重建：`.runtime/` 的索引、锁、队列快照、投递通知和临时状态。
 - 本地敏感：`%LOCALAPPDATA%\Syno\credentials` 的 DPAPI 凭据；严禁复制到仓库、日志或工单。
-- 本地持久：对话、等待重试的 Job、未完成摄取状态。清理前先停 Worker 并备份。
+- 本地持久：对话、等待重试的 Job、未完成摄取状态。清理前先停 Syno Host 并备份。
 
 ## 备份
 
-1. 停止 Syno Web/Worker，确认没有 `running` Job。
+1. 停止 Syno Host（Windows 任务或 `pnpm start` 进程），确认没有 `running` Job。
 2. 记录当前 Git commit 和 `git status --short`；未跟踪的用户资料不得遗漏。
 3. 备份仓库的 `vault/`、`ops/` 与配置文档。
 4. 对本机状态做加密备份；DPAPI 凭据只能在同一 Windows 用户上下文恢复。Token 更推荐在新机器重新输入。
@@ -27,7 +27,7 @@ pnpm state:archive -- restore D:\Backups\syno-state-20260717
 
 完整测试包含一次使用隔离 `SYNO_LOCAL_DATA` 的 CLI 端到端演练：创建等待 Provider 的 Job 与对话状态，依次执行 backup、verify、restore，并验证二次恢复因目标非空而失败。该测试不会访问真实 `%LOCALAPPDATA%\Syno`。
 
-2026-07-20 封板演练在确认 0 个 `running` Job 后短暂停止 Worker，将真实非凭据状态备份到 `C:\tmp\syno-state-final-bc5937b`：52 项，`credentialsIncluded=false`，manifest SHA-256 为 `DE0AD96C68170CA10498721C53F625A8405205DA912E095C2EFD026F70DAD969`。归档在全新隔离根恢复成功，第二次恢复按预期拒绝；随后 Worker 重启，微信与飞书探针均从 `running_worker` 返回连接健康。
+2026-07-20 封板演练在确认 0 个 `running` Job 后短暂停止当时的 Worker 进程（现已并入 Host），将真实非凭据状态备份到 `C:\tmp\syno-state-final-bc5937b`：52 项，`credentialsIncluded=false`，manifest SHA-256 为 `DE0AD96C68170CA10498721C53F625A8405205DA912E095C2EFD026F70DAD969`。归档在全新隔离根恢复成功，第二次恢复按预期拒绝；随后 Host 重启，微信与飞书探针均从 `running_worker` 返回连接健康。
 
 ## 恢复与回滚
 
@@ -94,7 +94,7 @@ $log = Get-ChildItem "$env:LOCALAPPDATA\Syno\logs\syno-runtime-*.jsonl" |
 Get-Content -LiteralPath $log.FullName -Tail 80
 ```
 
-渠道健康 probe 可以在 Worker 运行时直接执行。它优先读取 `http://127.0.0.1:<PORT>/api/syno/channels` 的脱敏状态，返回 `source: running_worker`；仅在本机服务不可达时才启动独立 Adapter。这样不会与微信进程锁竞争，也不会为飞书重复建立长连接。
+渠道健康 probe 可以在 Host 运行时直接执行。它优先读取 `http://127.0.0.1:<PORT>/api/syno/channels` 的脱敏状态，返回 `source: running_worker`（历史字段名，表示本机 Host 渠道进程在线）；仅在本机服务不可达时才启动独立 Adapter。这样不会与微信进程锁竞争，也不会为飞书重复建立长连接。
 
 ### zh-CN 主机的 PowerShell/子进程编码陷阱
 
@@ -140,15 +140,17 @@ pnpm harness:status
 pnpm windows:status
 ```
 
-产品只走 DeepSeek Harness。普通启动不需要再设环境变量：
+产品只走 DeepSeek Harness。启动前必须设置 `SYNO_DSH_ROOT` 为本机 `deepseek-harness` 克隆的绝对路径；未设置时 sidecar 拒绝启动。
 
 ```powershell
-# 可选：$env:SYNO_DSH_ROOT = "D:\workSpace\git_clone_test\deepseek-harness"
+$env:SYNO_DSH_ROOT = "<absolute-path-to-deepseek-harness>"
 pnpm harness:doctor
 pnpm start
 ```
 
 `harness:doctor` 不把密钥写进输出。协议冒烟用 `pnpm probe:harness`（假 sidecar + 中文 UTF-8）。
+
+Chat sidecar 的 `web_search` 走 Harness 克隆内的 `@deepseek-ai/dsh-web-search-deepseek`（Anthropic 兼容 Messages API，复用已注入的 `DEEPSEEK_API_KEY`，不读 `DEEPSEEK_BASE_URL`）。不要对 sidecar 执行 `dsh plugin add`，也不要从 [dsh-plugin.org](https://dsh-plugin.org/plugins?q=search) 装社区搜索插件。收录分析 profile 仍然没有 web。
 
 主人验收清单：
 

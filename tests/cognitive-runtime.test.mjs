@@ -26,6 +26,18 @@ test("CognitiveRuntime v3 allows sandboxed terminal write but still forbids sour
   assert.throws(() => assertCognitiveCapabilities({ ...report, dynamicMcp: true }), /dynamicMcp/);
   assert.throws(() => assertCognitiveCapabilities({ ...report, sourceWrite: true }), /sourceWrite/);
   assert.throws(() => assertCognitiveCapabilities({ ...report, models: ["deepseek/deepseek-v4-flash", "opencode/mimo-v2.5-free"] }), /模型链/);
+  assert.throws(() => assertCognitiveCapabilities({
+    version: 2,
+    adapter: "opencode-cli-server",
+    agentCount: 1,
+    provider: "opencode",
+    models: ["deepseek/deepseek-v4-flash"],
+    agentSelectableModel: false,
+    providerFallback: false,
+    dynamicMcp: false,
+    sourceWrite: false,
+    tools: [],
+  }), /v2/);
 });
 
 test("CognitiveRuntime rejects every forbidden control or direct-I/O capability", () => {

@@ -49,8 +49,12 @@ test("cordis configs live in the Syno repo and never inline API keys", async () 
   assert.doesNotMatch(chat, /danger-full-access/);
   assert.match(chat, /syno-tool-bridge-plugin/);
   assert.match(chat, /dsh-tool-bash-persistent|dsh-tool-pwsh-persistent/);
+  assert.match(chat, /dsh-web-search-deepseek/);
+  assert.match(chat, /searchProvider: deepseek-official/);
+  assert.match(chat, /search: true/);
+  assert.doesNotMatch(chat, /dsh-web-search-exa|dsh-web-search-perplexity/);
   assert.match(capture, /toolBash: false/);
-  assert.doesNotMatch(capture, /dsh-tool-bash|dsh-tool-fs|dsh-tool-web/);
+  assert.doesNotMatch(capture, /dsh-tool-bash|dsh-tool-fs|dsh-tool-web|dsh-web-search/);
   for (const text of [chat, capture]) {
     assert.doesNotMatch(text, /sk-[A-Za-z0-9]/);
     assert.match(text, /apiKeyEnv: DEEPSEEK_API_KEY/);
@@ -106,15 +110,26 @@ test("DeepSeekHarnessSupervisor injects DEEPSEEK_API_KEY into a replaced child e
   await supervisor.start("chat", { model: "deepseek-v4-flash" });
   assert.equal(spawnedEnv.DEEPSEEK_API_KEY, "stored-key");
   assert.equal(spawnedEnv.SYNO_BRIDGE_TOKEN, "bridge-token");
+  assert.equal(spawnedEnv.DSH_CWD, path.join(root, "workspace", "chat"));
+  assert.notEqual(spawnedEnv.DSH_CWD, supervisor.repoRoot);
   assert.equal(spawnedEnv.FEISHU_APP_SECRET, undefined);
   assert.equal(spawnedEnv.SYNO_OPENCODE_API_KEY, undefined);
   assert.equal(supervisor.status("chat").ready, true);
+});
+
+test("launch discovery requires SYNO_DSH_ROOT when not using a fake agent", async () => {
+  await assert.rejects(
+    () => resolveHarnessLaunch({ dshRoot: "", fakeAgent: "" }),
+    (error) => error.code === "HARNESS_SETUP_REQUIRED" && /SYNO_DSH_ROOT/.test(error.message),
+  );
 });
 
 test("harness doctor reports cordis configs and never dumps keys", async () => {
   const report = await doctor();
   assert.equal(report.checks.find((item) => item.name === "syno-cordis").ok, true);
   assert.equal(report.checks.find((item) => item.name === "sandbox").mode, "workspace-write");
+  assert.equal(report.checks.find((item) => item.name === "sandbox").workspace, "isolated-local-root");
+  assert.equal(Object.hasOwn(report, "defaultDshRoot"), false);
   const serialized = JSON.stringify(report);
   assert.doesNotMatch(serialized, /sk-[A-Za-z0-9]/);
   assert.equal(Object.hasOwn(report, "DEEPSEEK_API_KEY"), false);

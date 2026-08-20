@@ -2,7 +2,7 @@
 
 ## Cognitive runtime boundary
 
-Only one `CognitiveRuntime` may be active: `DeepSeekHarnessCognitiveRuntime`. Chat may use sandboxed `workspace-write` tools plus the static `syno_*` bridge; capture/ingest analysis uses a second sidecar with no bash/fs/web. `sourceWrite`, dynamic MCP, model self-selection and silent runtime fallback remain forbidden. Tool requests that hit `syno_*` return to Node for schema validation, Policy, Approval and GitGuard via `POST /api/syno/bridge/mcp`. Runtime failure is persisted and never triggers a silent fallback.
+Only one `CognitiveRuntime` may be active: `DeepSeekHarnessCognitiveRuntime`. Chat may use sandboxed `workspace-write` tools (shell, filesystem, web-search, web-fetch) only inside an isolated profile workspace under the Host local data root — not the git repository. Capture/ingest analysis uses a second sidecar with no bash/fs/web. Chat `web_search` is pinned to in-tree `@deepseek-ai/dsh-web-search-deepseek` and reuses the sidecar `DEEPSEEK_API_KEY`; community hub search plugins are not installed into the sidecar. `vault/`, `ops/`, and `apps/` writes still go through the static `syno_*` bridge, Policy, Approval and GitGuard via `POST /api/syno/bridge/mcp`. `sourceWrite`, dynamic MCP, model self-selection and silent runtime fallback remain forbidden. Runtime failure is persisted and never triggers a silent fallback.
 
 The supervised Harness sidecar is launched from `SYNO_DSH_ROOT`, receives `DEEPSEEK_API_KEY` only through the child environment, and is terminated only through its owned PID tree. Credentials never appear in arguments, repository state or API output.
 
@@ -19,7 +19,7 @@ Conversation migration admits only a redacted summary and recent Owner messages;
 - Existing-file changes, deletion, rename and sensitive paths are promoted from the actual Git diff to a pinned second approval.
 - Git staging receives an explicit path list and rejects paths outside allowed roots.
 - Executor prompts are written to a local task file; user text is never interpolated into a shell command.
-- The product model receives only ToolRegistry tools. It never receives shell, arbitrary filesystem, browser, direct Git, direct Markdown-write or source-edit capabilities.
+- Chat may use sandboxed `workspace-write` tools (shell, filesystem, web-search, web-fetch) only inside the isolated Harness workspace (`%LOCALAPPDATA%\Syno\harness\workspace\<profile>`). Product knowledge and source edits still go through ToolRegistry, Policy, Job, isolated worktree, validators and GitGuard. The model does not receive Git, source-edit, or repository-root filesystem tools.
 - Provider credentials use Windows DPAPI under `%LOCALAPPDATA%\Syno\credentials`; the API and logs expose only `configured` status and non-secret metadata.
 - Provider failure is fail-closed: the provider and runtime never change. Syno may try the next member of the fixed DeepSeek chain only for enumerated transient/contract errors before side effects; otherwise the LLM job waits durably.
 - Background and manual recovery of a `waiting_provider` Job share one process/file lock and atomically transition it to `running`; a second caller cannot execute the same Job.

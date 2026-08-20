@@ -21,10 +21,10 @@
 ## 执行器
 
 - 产品只启用 `DeepSeekHarnessCognitiveRuntime`。不得选择或回退到 OpenCode、Claude Code 或原生 Agent。
-- 模型链固定为 DeepSeek 官方两档：`deepseek/deepseek-v4-flash` → `deepseek/deepseek-chat`。Adapter 为 `deepseek-harness-sdk`（CognitiveRuntime v3）。key 来源 = host 环境变量 `DEEPSEEK_API_KEY` 优先，缺省时 supervisor 读用户本机已有 deepseek 凭据（`~/.local/share/opencode/auth.json` 的 deepseek 条目）注入子进程。根路径由 `SYNO_DSH_ROOT` 指定（默认见 `docs/OPERATIONS.md`）；不要把 Harness 源码 vendoring 进本仓库。
+- 模型链固定为 DeepSeek 官方两档：`deepseek/deepseek-v4-flash` → `deepseek/deepseek-chat`。Adapter 为 `deepseek-harness-sdk`（CognitiveRuntime v3）。key 来源 = host 环境变量 `DEEPSEEK_API_KEY` 优先，缺省时 supervisor 读用户本机已有 deepseek 凭据（`~/.local/share/opencode/auth.json` 的 deepseek 条目）注入子进程。根路径必须由 `SYNO_DSH_ROOT` 指定（说明见 `docs/OPERATIONS.md`）；不要把 Harness 源码 vendoring 进本仓库。
 - 仅在不可用、限流、连接失败、超时、5xx、空响应或契约校验失败，且本次尝试尚未产生不可逆副作用时，才由 Syno 按上述顺序确定性回退。
 - Agent 不得选择模型、Provider 或回退目标；全部失败时进入 `waiting_provider`。禁止动态 MCP。
-- Harness 聊天会话允许沙箱 `workspace-write` 下的终端、工作区写盘和 `web_fetch`，并继续暴露 `syno_*` Bridge。收录分析 / 浏览器兜底使用 `syno-capture.cordis.yml`（无 bash/fs/web）。知识写入、覆盖 canonical 笔记、改 `apps/` 源码仍走 Job / Proposal / `policy.allowSelfModify`。
+- Harness 聊天会话允许沙箱 `workspace-write` 下的终端、工作区写盘、`web_search` 和 `web_fetch`，并继续暴露 `syno_*` Bridge。搜索后端固定为官方 `@deepseek-ai/dsh-web-search-deepseek`（复用 `DEEPSEEK_API_KEY`），不安装社区 hub 插件或动态 MCP。收录分析 / 浏览器兜底使用 `syno-capture.cordis.yml`（无 bash/fs/web）。知识写入、覆盖 canonical 笔记、改 `apps/` 源码仍走 Job / Proposal / `policy.allowSelfModify`。
 
 ## 源码修改原则
 

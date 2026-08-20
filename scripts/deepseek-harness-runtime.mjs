@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 
 import {
   CONFIG_FILES,
-  DEFAULT_DSH_ROOT,
   defaultDshRoot,
   REPO_CONFIG_DIR,
   resolveHarnessLaunch,
@@ -71,13 +70,16 @@ async function doctor({
     name: "sandbox",
     ok: true,
     mode: "workspace-write",
+    workspace: "isolated-local-root",
     dangerFullAccess: false,
     dynamicMcp: false,
   });
+  const configuredRoot = defaultDshRoot();
   return {
     ok: checks.filter((item) => item.name !== "deepseek-key").every((item) => item.ok),
     runtime: process.env.SYNO_COGNITIVE_RUNTIME || "deepseek-harness",
-    defaultDshRoot: DEFAULT_DSH_ROOT,
+    dshRootConfigured: Boolean(configuredRoot),
+    ...(configuredRoot ? { dshRoot: configuredRoot } : {}),
     checks,
   };
 }

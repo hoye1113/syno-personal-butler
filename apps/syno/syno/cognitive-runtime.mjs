@@ -12,7 +12,11 @@ function capabilityError(message) {
 }
 
 function assertCognitiveCapabilities(report, { expectedTools } = {}) {
-  if (!report || ![1, 2, 3].includes(report.version) || report.agentCount !== 1) throw capabilityError("CognitiveRuntime 必须声明单一 Agent 的受支持能力清单");
+  if (!report || report.agentCount !== 1) throw capabilityError("CognitiveRuntime 必须声明单一 Agent 的受支持能力清单");
+  if (report.version === 2) {
+    throw capabilityError("CognitiveRuntime v2（OpenCode）已移除，产品只接受 v3 DeepSeek Harness");
+  }
+  if (![1, 3].includes(report.version)) throw capabilityError("CognitiveRuntime 必须声明单一 Agent 的受支持能力清单");
   if (report.version === 3) {
     if (report.adapter !== "deepseek-harness-sdk" || typeof report.provider !== "string" || !report.provider) {
       throw capabilityError("CognitiveRuntime v3 必须使用受控 DeepSeek Harness SDK Adapter");
@@ -22,23 +26,6 @@ function assertCognitiveCapabilities(report, { expectedTools } = {}) {
     }
     if (!Array.isArray(report.models) || !report.models.length || report.models.some((model) => !/^deepseek\/\S+$/.test(String(model)))) {
       throw capabilityError("CognitiveRuntime v3 模型链必须是 DeepSeek 官方 deepseek/<model>");
-    }
-    const tools = [...new Set((report.tools || []).map(String))].sort();
-    if (expectedTools) {
-      const expected = [...new Set(expectedTools.map(String))].sort();
-      if (JSON.stringify(tools) !== JSON.stringify(expected)) throw capabilityError(`CognitiveRuntime 工具清单不匹配：${tools.join(", ")}`);
-    }
-    return Object.freeze({ ...report, models: Object.freeze([...report.models]), tools: Object.freeze(tools) });
-  }
-  if (report.version === 2) {
-    for (const name of ["agentSelectableModel", "providerFallback", "directFileAccess", "terminal", "sourceWrite", "dynamicMcp"]) {
-      if (report[name] !== false) throw capabilityError(`CognitiveRuntime v2 禁止能力未关闭：${name}`);
-    }
-    // 2026-07-31 宪法修订（AGENTS.md 执行器节）：模型链允许跨提供商（deepseek 官方主链 +
-    // opencode 免费档兜底），不变的约束是受控 adapter 与"<provider>/<model>"定形链。
-    if (report.adapter !== "opencode-cli-server" || typeof report.provider !== "string" || !report.provider) throw capabilityError("CognitiveRuntime v2 必须使用受控 OpenCode CLI Server Adapter");
-    if (!Array.isArray(report.models) || !report.models.length || report.models.some((model) => !/^[\w-]+\/\S+$/.test(String(model)))) {
-      throw capabilityError("CognitiveRuntime v2 模型链无效");
     }
     const tools = [...new Set((report.tools || []).map(String))].sort();
     if (expectedTools) {

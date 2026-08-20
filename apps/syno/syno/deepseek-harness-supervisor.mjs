@@ -11,7 +11,6 @@ import { RuntimeJournal } from "./runtime-journal.mjs";
 
 const execFileAsync = promisify(execFile);
 const REPO_CONFIG_DIR = path.join(PATHS.repoRoot, "config", "deepseek-harness");
-const DEFAULT_DSH_ROOT = "D:\\workSpace\\git_clone_test\\deepseek-harness";
 const HARNESS_PROFILES = Object.freeze(["chat", "capture"]);
 const CONFIG_FILES = Object.freeze({
   chat: "syno-chat.cordis.yml",
@@ -23,7 +22,8 @@ function runtimeError(code, message, details) {
 }
 
 function defaultDshRoot() {
-  return path.resolve(process.env.SYNO_DSH_ROOT || DEFAULT_DSH_ROOT);
+  const raw = String(process.env.SYNO_DSH_ROOT || "").trim();
+  return raw ? path.resolve(raw) : "";
 }
 
 function defaultKillTree(pid) {
@@ -91,6 +91,11 @@ async function resolveHarnessLaunch({
     } catch {
       rejected.push({ path: executable, reason: "missing" });
     }
+  }
+  if (!dshRoot) {
+    throw runtimeError("HARNESS_SETUP_REQUIRED", "未设置 SYNO_DSH_ROOT；请指向本机 deepseek-harness 克隆（见 docs/OPERATIONS.md）", {
+      rejected,
+    });
   }
   const packaged = path.join(dshRoot, "packages", "examples", "jsonrpc-demo", "lib", "packaged-bin.js");
   const builtBin = path.join(dshRoot, "packages", "examples", "jsonrpc-demo", "lib", "bin.js");
@@ -249,11 +254,12 @@ class DeepSeekHarnessSupervisor {
     const deepseekKey = process.env.DEEPSEEK_API_KEY || (this.deepseekKeyLoader ? await this.deepseekKeyLoader() : "");
     const sessionRoot = path.join(this.localRoot, "sessions", profile);
     const homeRoot = path.join(this.localRoot, "home");
-    await Promise.all([sessionRoot, homeRoot].map((directory) => fs.mkdir(directory, { recursive: true })));
+    const workspaceRoot = path.join(this.localRoot, "workspace", profile);
+    await Promise.all([sessionRoot, homeRoot, workspaceRoot].map((directory) => fs.mkdir(directory, { recursive: true })));
     const env = {
       ...harnessChildEnvironment(process.env),
       DSH_CORDIS_CONFIG: configPath,
-      DSH_CWD: this.repoRoot,
+      DSH_CWD: workspaceRoot,
       DSH_HOME: homeRoot,
       DSH_SESSION_ROOT: sessionRoot,
       DSH_SYSTEM_PROMPT: persona,
@@ -299,7 +305,7 @@ class DeepSeekHarnessSupervisor {
     });
     try {
       await client.initialize({
-        cwd: this.repoRoot,
+        cwd: workspaceRoot,
         provider,
         model,
       });
@@ -354,7 +360,6 @@ class DeepSeekHarnessSupervisor {
 
 export {
   CONFIG_FILES,
-  DEFAULT_DSH_ROOT,
   DeepSeekHarnessSupervisor,
   HARNESS_PROFILES,
   REPO_CONFIG_DIR,

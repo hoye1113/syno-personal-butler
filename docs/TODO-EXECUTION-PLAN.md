@@ -103,7 +103,7 @@ implementation:
 - OpenCode 负责对话上下文、压缩、意图理解、Skill 选择和工具规划。
 - Syno 负责 Owner 身份、渠道去重、来源、任务、决策、权限、受控写入和事实源。
 - Web 是可选控制台，不是普通收录、询问或决策的强制入口。
-- Harness 聊天可使用沙箱 `workspace-write` 工具；收录分析 sidecar 无 bash/fs/web。知识写入、改源码仍必须经过 ToolRegistry、Policy、Job、隔离 worktree、validators 和 GitGuard。禁止动态 MCP。
+- Harness 聊天可使用沙箱 `workspace-write` 工具，但工作区是 Host 本地数据目录下的隔离 profile，不是 git 仓库根；收录分析 sidecar 无 bash/fs/web。知识写入、改源码仍必须经过 ToolRegistry、Policy、Job、隔离 worktree、validators 和 GitGuard。禁止动态 MCP。
 - 任意写入仍必须经过 ToolRegistry、Policy、Job、隔离 worktree、validators 和 GitGuard。
 
 ## 3. 不可变运行契约

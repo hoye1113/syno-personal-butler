@@ -148,6 +148,7 @@ test("retryable failure shuts down the sidecar then falls back to deepseek-chat"
   assert.deepEqual(result.attempts.map((item) => item.status), ["failed", "completed"]);
   assert.equal(supervisor.stops.includes("chat"), true);
   assert.equal(retryableFailure({ code: "HARNESS_EMPTY_RESPONSE" }), true);
+  assert.equal(retryableFailure({ code: "HARNESS_TURN_TIMEOUT" }), true);
 });
 
 test("ephemeral capture sessions do not persist bindings and still bind the Tool Bridge", async (t) => {

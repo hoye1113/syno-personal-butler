@@ -39,6 +39,7 @@ class DeepSeekHarnessJsonRpcClient {
     kill,
     requestTimeoutMs = 180_000,
     initializeTimeoutMs = 30_000,
+    turnTimeoutMs,
     stderrTailLimit = 400,
   } = {}) {
     if (!stdin || !stdout) throw new Error("DeepSeekHarnessJsonRpcClient 缺少 stdio");
@@ -49,8 +50,10 @@ class DeepSeekHarnessJsonRpcClient {
     this.kill = typeof kill === "function" ? kill : () => {};
     this.requestTimeoutMs = requestTimeoutMs;
     this.initializeTimeoutMs = initializeTimeoutMs;
+    this.turnTimeoutMs = turnTimeoutMs ?? requestTimeoutMs;
     this.stderrTailLimit = stderrTailLimit;
     this.pending = new Map();
+    this.openTurns = new Set();
     this.listeners = new Set();
     this.stderrTail = [];
     this.decoder = new StringDecoder("utf8");
@@ -65,10 +68,10 @@ class DeepSeekHarnessJsonRpcClient {
     this.onEnd = () => {
       this.buffer += this.decoder.end();
       this.#drain();
-      this.#failPending(runtimeError("HARNESS_TRANSPORT_CLOSED", "DeepSeek Harness JSON-RPC 输入已关闭", { retryable: true }));
+      this.#failTransport(runtimeError("HARNESS_TRANSPORT_CLOSED", "DeepSeek Harness JSON-RPC 输入已关闭", { retryable: true }));
     };
     this.onError = (error) => {
-      this.#failPending(runtimeError("HARNESS_TRANSPORT_ERROR", error.message || "DeepSeek Harness stdio 错误", { retryable: true }));
+      this.#failTransport(runtimeError("HARNESS_TRANSPORT_ERROR", error.message || "DeepSeek Harness stdio 错误", { retryable: true }));
     };
     this.stdout.on("data", this.onData);
     this.stdout.on("end", this.onEnd);
@@ -121,10 +124,13 @@ class DeepSeekHarnessJsonRpcClient {
     let messageId = "";
     return new Promise((resolve, reject) => {
       let settled = false;
+      let timer;
       const result = () => ({ sessionId, finalResponse: finalResponse(events), events, notifications });
       const finish = (error, value) => {
         if (settled) return;
         settled = true;
+        this.openTurns.delete(turn);
+        if (timer) clearTimeout(timer);
         unsubscribe();
         if (signal) signal.removeEventListener("abort", onAbort);
         if (error) reject(error);
@@ -136,9 +142,16 @@ class DeepSeekHarnessJsonRpcClient {
       const considerIdle = (notification) => notification.method === "session.status"
         && notification.params.sessionId === sessionId
         && notification.params.status === "idle";
+      // dsh-jsonrpc-agent 把 agent 生命周期写成 session.status，不把 assistant/message
+      // 归属于某次 prompt。成功 settle 必须 inbox receipt + idle；中途 assistant 帧可能只是工具循环的一段。
       const maybeSettle = () => {
         if (!received || !messageId) return;
         if (notifications.some(considerIdle)) finish(null, result());
+      };
+      const turn = {
+        onTransport(error) {
+          finish(error);
+        },
       };
       const unsubscribe = this.subscribe((notification) => {
         const params = notification.params || {};
@@ -151,6 +164,15 @@ class DeepSeekHarnessJsonRpcClient {
         }
         maybeSettle();
       });
+      this.openTurns.add(turn);
+      if (this.closed) {
+        finish(runtimeError("HARNESS_TRANSPORT_CLOSED", "DeepSeek Harness JSON-RPC 客户端已关闭", { retryable: true }));
+        return;
+      }
+      timer = setTimeout(() => {
+        finish(runtimeError("HARNESS_TURN_TIMEOUT", "DeepSeek Harness turn 等待 session.status=idle 超时", { retryable: true }));
+      }, this.turnTimeoutMs);
+      timer.unref?.();
       if (signal?.aborted) {
         onAbort();
         return;
@@ -198,7 +220,7 @@ class DeepSeekHarnessJsonRpcClient {
     this.stdout.off("data", this.onData);
     this.stdout.off("end", this.onEnd);
     this.stdout.off("error", this.onError);
-    this.#failPending(runtimeError("HARNESS_TRANSPORT_CLOSED", "DeepSeek Harness JSON-RPC 客户端已关闭", { retryable: true }));
+    this.#failTransport(runtimeError("HARNESS_TRANSPORT_CLOSED", "DeepSeek Harness JSON-RPC 客户端已关闭", { retryable: true }));
     try {
       this.stdin.end();
     } catch {}
@@ -224,7 +246,8 @@ class DeepSeekHarnessJsonRpcClient {
     try {
       frame = JSON.parse(line);
     } catch {
-      this.#failPending(runtimeError("HARNESS_PROTOCOL_INVALID_JSON", "DeepSeek Harness 返回了无效 JSON", { retryable: true }));
+      this.stderrTail.push(`invalid-json:${line.slice(0, 200)}`);
+      if (this.stderrTail.length > this.stderrTailLimit) this.stderrTail.shift();
       return;
     }
     if (!isRecord(frame)) return;
@@ -261,6 +284,17 @@ class DeepSeekHarnessJsonRpcClient {
       pending.reject(error);
     }
     this.pending.clear();
+  }
+
+  #failTurns(error) {
+    const turns = [...this.openTurns];
+    this.openTurns.clear();
+    for (const turn of turns) turn.onTransport(error);
+  }
+
+  #failTransport(error) {
+    this.#failPending(error);
+    this.#failTurns(error);
   }
 }
 
