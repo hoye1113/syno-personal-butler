@@ -6,11 +6,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { buildClaudeArgs, runProcess } from "../apps/syno/syno/executors.mjs";
+import { runProcess } from "../apps/syno/syno/process-runner.mjs";
 import { assertJsonMutation, assertSameOriginMutation, securityHeaders } from "../apps/syno/syno/http-security.mjs";
 import { assertRegisteredOperation, buildOperationRequest, intentForOperation } from "../apps/syno/syno/operation-registry.mjs";
 import { OutputService } from "../apps/syno/syno/output-service.mjs";
-import { buildOpenCodeMigrationContext, remoteSafeJobSummary, routeSynoApi } from "../apps/syno/syno/runtime.mjs";
+import { buildConversationMigrationContext, remoteSafeJobSummary, routeSynoApi } from "../apps/syno/syno/runtime.mjs";
 import { ConversationStore } from "../apps/syno/syno/conversation-store.mjs";
 import { validateValue } from "../apps/syno/syno/settings-registry.mjs";
 import { backupState, restoreState, verifyArchive } from "../apps/syno/syno/state-archive.mjs";
@@ -21,7 +21,7 @@ import { frontmatterData } from "../apps/syno/syno/validator.mjs";
 const execFileAsync = promisify(execFile);
 
 test("legacy conversation migration excludes tool output, private turns, and secrets", () => {
-  const migrated = buildOpenCodeMigrationContext({
+  const migrated = buildConversationMigrationContext({
     summaries: [{ summary: "此前讨论 Agent；api_key = super-secret-value" }],
     messages: [
       { role: "tool", content: "完整本地知识正文不应外发" },
@@ -123,16 +123,6 @@ test("runtime Contract validation rejects malformed records", async () => {
   }), /Contract 校验失败/);
 });
 
-test("Claude escalation is customization-free and MCP-empty", () => {
-  const args = buildClaudeArgs({ profile: "syno-read", decision: { allowedRoots: [] }, request: {} });
-  for (const flag of ["--safe-mode", "--no-chrome", "--disable-slash-commands", "--no-session-persistence", "--strict-mcp-config"]) {
-    assert.ok(args.includes(flag), flag);
-  }
-  assert.equal(args[args.indexOf("--permission-mode") + 1], "dontAsk");
-  assert.deepEqual(JSON.parse(args[args.indexOf("--mcp-config") + 1]), { mcpServers: {} });
-  assert.equal(args.includes("--model"), false);
-});
-
 test("Windows cmd launch preserves spaced arguments", { skip: process.platform !== "win32" }, async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-cmd-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
@@ -189,33 +179,32 @@ test("an ingest action that mutates an existing note is deterministically high r
   assert.equal(intentForOperation("ingest.apply", { decision: { action: "link-only" } }), "overwrite_note");
 });
 
-test("OpenCode Web API exposes redacted status, fixed restart, credential save, and authenticated MCP only", async () => {
+test("Harness Web API exposes status, restart, and authenticated Bridge MCP only", async () => {
   const calls = [];
   const runtime = {
-    runtimeMode: "opencode",
-    openCodeSupervisor: {
-      async health() { return { healthy: true, state: "running", pid: 42 }; },
+    runtimeMode: "deepseek-harness",
+    harnessSupervisor: {
+      async health() { return { healthy: true, state: "running" }; },
     },
-    async restartOpenCode() { calls.push("restart"); return { state: "running" }; },
-    openCodeCredentials: {
-      async status() { return { configured: true, provider: "opencode" }; },
-      async save(token) { calls.push(["save", token]); return { configured: true, provider: "opencode" }; },
-    },
-    openCodeCognitiveRuntime: {
-      lastAttempts: [{ modelId: "opencode/mimo-v2.5-free", status: "completed" }],
-      capabilities() { return { version: 2, adapter: "opencode-cli-server" }; },
+    async restartHarness() { calls.push("restart"); return { state: "running" }; },
+    harnessCognitiveRuntime: {
+      lastAttempts: [{ modelId: "deepseek/deepseek-v4-flash", status: "completed" }],
+      capabilities() { return { version: 3, adapter: "deepseek-harness-sdk" }; },
     },
     toolBridge: {
       async handle(input) { calls.push(["mcp", input.authorization]); return { jsonrpc: "2.0", id: 1, result: {} }; },
     },
   };
-  const status = await routeSynoApi(runtime, { method: "GET" }, new URL("http://localhost/api/syno/opencode"), async () => ({}));
-  assert.equal(status.credential.configured, true);
-  assert.equal(Object.hasOwn(status.credential, "token"), false);
-  await routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/opencode/restart"), async () => ({}));
-  await routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/opencode/credential"), async () => ({ token: "secret-from-test" }));
-  await routeSynoApi(runtime, { method: "POST", headers: { authorization: "Bearer bridge" } }, new URL("http://localhost/api/syno/opencode/mcp"), async () => ({ jsonrpc: "2.0", id: 1, method: "ping" }));
-  assert.deepEqual(calls, ["restart", ["save", "secret-from-test"], "restart", ["mcp", "Bearer bridge"]]);
+  const status = await routeSynoApi(runtime, { method: "GET" }, new URL("http://localhost/api/syno/harness"), async () => ({}));
+  assert.equal(status.capabilities.adapter, "deepseek-harness-sdk");
+  assert.equal(Object.hasOwn(status, "credential"), false);
+  await routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/harness/restart"), async () => ({}));
+  await routeSynoApi(runtime, { method: "POST", headers: { authorization: "Bearer bridge" } }, new URL("http://localhost/api/syno/bridge/mcp"), async () => ({ jsonrpc: "2.0", id: 1, method: "ping" }));
+  assert.deepEqual(calls, ["restart", ["mcp", "Bearer bridge"]]);
+  await assert.rejects(
+    routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/opencode/credential"), async () => ({ token: "secret-from-test" })),
+    /未知 Syno API/,
+  );
 });
 
 test("Syno health identifies the product, protocol and exact repository without exposing its path", async () => {

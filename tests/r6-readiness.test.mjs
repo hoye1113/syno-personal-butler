@@ -25,7 +25,7 @@ function evidence() {
       worktree: "clean",
     },
     runtimeReadOnly: {
-      opencode: { ready: true, healthy: true },
+      harness: { ready: true, healthy: true },
       weixin: { ok: true },
       feishu: { ok: true },
       windowsTask: { installed: true, running: true },

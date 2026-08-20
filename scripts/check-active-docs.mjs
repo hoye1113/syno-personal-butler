@@ -9,7 +9,7 @@ const activeFiles = [
   "docs/POLICY.md",
   "docs/KNOWN-LIMITATIONS.md",
   "docs/TODO-EXECUTION-PLAN.md",
-  ".opencode/agents/syno.md",
+  "config/deepseek-harness/syno-agent.md",
 ];
 const forbidden = [
   "产品只启用原生 `ToolLoopAgent`",

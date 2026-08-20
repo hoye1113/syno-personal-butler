@@ -12,6 +12,9 @@ const TERMINAL_STAGES = new Set(["reported", "failed_terminal", "rejected", "sup
 // 不值得把整个收录流程锁进 failed_terminal（10 条历史 workflow 都是这形态），
 // 而是降级：把「模型不可用」写成 unresolved，经 onProposed 走 awaiting_decision 回主人。
 const MODEL_CAPABILITY_ERRORS = new Set([
+  "HARNESS_ATTEMPTS_EXHAUSTED",
+  "HARNESS_ABORT_UNKNOWN",
+  "HARNESS_NOT_RUNNING",
   "OPENCODE_ATTEMPTS_EXHAUSTED",
   "OPENCODE_ABORT_UNKNOWN",
   "OPENCODE_NOT_RUNNING",

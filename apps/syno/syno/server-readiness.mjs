@@ -1,7 +1,7 @@
 const BOOTSTRAP_ROUTES = new Set([
   "/api/syno/health",
   "/api/syno/readiness",
-  "/api/syno/opencode/mcp",
+  "/api/syno/bridge/mcp",
 ]);
 
 function requiresSynoReady(pathname) {

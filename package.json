@@ -6,7 +6,6 @@
   "scripts": {
     "start": "node apps/syno/server.mjs",
     "start:test": "node scripts/start-test-host.mjs",
-    "worker": "node apps/syno/worker.mjs",
     "test": "node --test --test-concurrency=1 apps/syno/tests/*.test.mjs tests/*.test.mjs",
     "verify": "node scripts/verify-repository.mjs && node scripts/check-active-docs.mjs",
     "check:docs": "node scripts/check-active-docs.mjs",
@@ -21,15 +20,11 @@
     "install:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/manage-windows-task.ps1 -Action Install",
     "probe:weixin": "node scripts/probe-weixin.mjs",
     "probe:feishu": "node scripts/probe-feishu.mjs",
-    "probe:hermes": "node scripts/probe-hermes.mjs",
-    "probe:hermes-sidecar": "node scripts/probe-hermes-sidecar.mjs",
     "probe:provider-real": "node scripts/probe-provider-real.mjs",
-    "opencode:doctor": "node scripts/opencode-runtime.mjs doctor",
-    "syno:doctor": "node scripts/syno-doctor.mjs",
-    "opencode:status": "node scripts/opencode-runtime.mjs status",
-    "opencode:restart": "node scripts/opencode-runtime.mjs restart",
-    "opencode:configure": "node scripts/opencode-runtime.mjs configure",
-    "probe:opencode-server": "node scripts/probe-opencode-server.mjs"
+    "harness:doctor": "node scripts/deepseek-harness-runtime.mjs doctor",
+    "harness:status": "node scripts/deepseek-harness-runtime.mjs status",
+    "probe:harness": "node scripts/probe-harness.mjs",
+    "syno:doctor": "node scripts/syno-doctor.mjs"
   },
   "engines": {
     "node": ">=22"

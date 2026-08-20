@@ -657,15 +657,11 @@
         <details id="synoAiSettings" class="setting-detail">
           <summary>AI 服务常用设置</summary>
           <p id="synoProviderHint" class="form-hint" aria-live="polite"></p>
-          <div class="syno-job-actions"><button id="synoOpenCodeRestart" class="ghost-btn" type="button">重启 AI 内核</button></div>
+          <p>认知内核是 DeepSeek Harness（deepseek-v4-flash → deepseek-chat）。密钥只从本机环境变量或已有凭据注入，设置页不回显。</p>
+          <div class="syno-job-actions"><button id="synoHarnessRestart" class="ghost-btn" type="button">重启 AI 内核</button></div>
           <details id="synoAdvancedSettings" class="setting-detail is-advanced">
             <summary>高级设置</summary>
-            <form id="synoProviderForm" class="syno-stack-form">
-              <label class="visually-hidden">OpenCode 账户<input type="text" name="username" value="syno-opencode" autocomplete="username" tabindex="-1" /></label>
-              <label>OpenCode Zen Token<input id="synoOpenCodeToken" type="password" autocomplete="new-password" required placeholder="保存后不会回显" /></label>
-              <p>固定顺序：MiMo v2.5 Free → DeepSeek v4 Flash Free → Laguna S 2.1 Free。仅在连接、限流、超时或契约失败且尚无副作用时切换。</p>
-              <button class="accent-btn" type="submit">安全保存并重启 AI 内核</button>
-            </form>
+            <p>DeepSeek API Key 优先读 host 环境变量 <code>DEEPSEEK_API_KEY</code>；缺省时 supervisor 只读本机已有凭据，不落新文件。</p>
           </details>
         </details>
         <details id="synoWeixinSettings" class="setting-detail"><summary>微信连接</summary><section class="syno-channel-setup" aria-labelledby="synoWeixinTitle"><div><h3 id="synoWeixinTitle">微信 ClawBot 私聊</h3><p id="synoWeixinStatus">未连接。只允许扫码者本人，不启用群聊。</p></div><div class="syno-channel-actions"><button id="synoWeixinLogin" class="ghost-btn" type="button">获取二维码</button><button id="synoWeixinHome" class="ghost-btn" type="button">设为主渠道</button></div><img id="synoWeixinQr" class="syno-weixin-qr" alt="微信 iLink 登录二维码" hidden /></section></details>

@@ -145,9 +145,9 @@ const httpServer = createServer(async (req, res) => {
     // Defense-in-depth default: every browser-facing /api/ mutation must be a same-origin JSON
     // request, not only /api/syno/* — legacy /api/inbox|settings|wiki|topics|notes|memory|lark
     // routes otherwise rely on assertLocalRequest alone, which validates Origin only when present
-    // and never requires it. The OpenCode MCP bridge is machine-to-machine JSON-RPC driven by the
-    // opencode subprocess (no browser Origin), so it stays on loopback-only and is exempt.
-    if (url.pathname.startsWith("/api/") && req.method !== "GET" && url.pathname !== "/api/syno/opencode/mcp") {
+    // and never requires it. The Syno Tool Bridge is machine-to-machine JSON-RPC driven by the
+    // Harness sidecar (no browser Origin), so it stays on loopback-only and is exempt.
+    if (url.pathname.startsWith("/api/") && req.method !== "GET" && url.pathname !== "/api/syno/bridge/mcp") {
       assertJsonMutation(req);
       assertSameOriginMutation(req);
     }

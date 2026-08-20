@@ -80,7 +80,7 @@ class SynoToolBridge {
     this.activeContext = Object.freeze({
       ownerKey: String(context.ownerKey || this.ownerKey),
       threadKey: String(context.threadKey || "main"),
-      channel: String(context.channel || "opencode"),
+      channel: String(context.channel || "harness"),
       messageId: String(context.messageId || context.runId || ""),
       allowedTools: new Set((context.allowedTools || []).map(normalizeAllowedToolName)),
       ...(context.browserWorkflowId ? { browserWorkflowId: String(context.browserWorkflowId) } : {}),

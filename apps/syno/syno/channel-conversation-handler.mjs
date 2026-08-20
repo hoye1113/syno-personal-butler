@@ -523,7 +523,7 @@ class ChannelConversationHandler {
         await this.#record("channel.runtime.completed", { ...trace, runId: result.runId || null });
         return { text: result.text || "Syno 已处理，但没有生成可显示的文本。" };
       } catch (error) {
-        if (error.retryable !== true && error.code !== "OPENCODE_ATTEMPTS_EXHAUSTED") throw error;
+        if (error.retryable !== true && error.code !== "HARNESS_ATTEMPTS_EXHAUSTED" && error.code !== "OPENCODE_ATTEMPTS_EXHAUSTED") throw error;
         if (typeof this.core.execute !== "function") throw error;
         const queued = await this.core.execute({ text, intent: "chat" }, {
           channel: message.channel,

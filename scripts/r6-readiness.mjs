@@ -38,8 +38,8 @@ function automatedGateReport(evidence) {
     && fresh.vaultPython311Unittest?.passed > 0
     && Number(fresh.vaultPython311Unittest?.failed || 0) === 0
     && fresh.worktree === "clean";
-  const runtimePass = runtime.opencode?.ready === true
-    && runtime.opencode?.healthy === true
+  const runtimePass = runtime.harness?.ready === true
+    && runtime.harness?.healthy === true
     && runtime.weixin?.ok === true
     && runtime.feishu?.ok === true
     && runtime.windowsTask?.installed === true

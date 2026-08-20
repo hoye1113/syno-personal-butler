@@ -9,7 +9,8 @@ import { createBrowserCaptureTools } from "./browser-capture-tools.mjs";
 import { ChannelHub, WebChannelAdapter, WindowsNotificationAdapter } from "./channels.mjs";
 import { ChannelConversationHandler } from "./channel-conversation-handler.mjs";
 import { ClaimEvidenceService } from "./claim-evidence-service.mjs";
-import { NativeCognitiveRuntime } from "./cognitive-runtime.mjs";
+import { DeepSeekHarnessCognitiveRuntime, DeepSeekHarnessSessionBindingStore, HARNESS_MODEL_CHAIN, parseHarnessModel } from "./deepseek-harness-cognitive-runtime.mjs";
+import { DeepSeekHarnessSupervisor } from "./deepseek-harness-supervisor.mjs";
 import { ContextManager } from "./context-manager.mjs";
 import { ConversationStore } from "./conversation-store.mjs";
 import { ConversationRouter } from "./conversation-router.mjs";
@@ -27,10 +28,6 @@ import { fetchUrlForChat } from "./fetch-url-tool.mjs";
 import { KnowledgeProfileService } from "./knowledge-profile-service.mjs";
 import { LearningService } from "./learning-service.mjs";
 import { NotificationStore } from "./notification-store.mjs";
-import { assertOpenCodeServerSecurity, OpenCodeCognitiveRuntime, OpenCodeHttpClient, OpenCodeSessionBindingStore } from "./opencode-cognitive-runtime.mjs";
-import { OpenCodeCredentialStore } from "./opencode-credential-store.mjs";
-import { OpenCodeSupervisor } from "./opencode-supervisor.mjs";
-import { OpenCodeTestSupervisor } from "./opencode-test-supervisor.mjs";
 import { OperationExecutor } from "./operation-executor.mjs";
 import { PendingDecisionStore } from "./pending-decision.mjs";
 import { buildOperationRequest } from "./operation-registry.mjs";
@@ -164,7 +161,7 @@ function redactMigrationText(value) {
     .trim();
 }
 
-function buildOpenCodeMigrationContext(conversation) {
+function buildConversationMigrationContext(conversation) {
   if (!conversation) return "";
   const summary = redactMigrationText(conversation.summaries?.slice(-1)[0]?.summary || conversation.handoffContext || "");
   const recent = (conversation.messages || []).filter((message) => message.role === "user").slice(-12)
@@ -187,7 +184,7 @@ function parseStructuredModelOutput(text) {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("结构化结果必须是对象");
     return parsed;
   } catch (error) {
-    throw Object.assign(new Error(`OpenCode 收录分析不是有效 JSON：${error.message}`), { code: "OPENCODE_INVALID_CONTRACT", retryable: true });
+    throw Object.assign(new Error(`收录分析不是有效 JSON：${error.message}`), { code: "CAPTURE_INVALID_CONTRACT", retryable: true });
   }
 }
 
@@ -212,19 +209,30 @@ async function runControlMutation(runtime, operation) {
   return operation();
 }
 
+function resolveCognitiveRuntimeMode(options = {}) {
+  if (options.cognitiveRuntime) return "injected-test";
+  const raw = String(options.cognitiveRuntimeMode || process.env.SYNO_COGNITIVE_RUNTIME || "deepseek-harness").trim().toLowerCase();
+  if (raw === "deepseek-harness" || raw === "harness" || raw === "") return "deepseek-harness";
+  throw Object.assign(new Error(`未知 SYNO_COGNITIVE_RUNTIME：${raw}`), { code: "COGNITIVE_RUNTIME_UNKNOWN" });
+}
+
 function createSynoRuntime(options = {}) {
   let lifecycleState = "starting";
   let initializePromise = null;
   let closePromise = null;
+  const runtimeMode = resolveCognitiveRuntimeMode(options);
   const componentState = {
     store: "starting",
-    openCode: "starting",
+    harness: runtimeMode === "deepseek-harness" ? "starting" : "idle",
     channels: "starting",
   };
   const refreshLifecycleState = () => {
     if (lifecycleState === "stopping") return lifecycleState;
     if (componentState.store !== "ready") lifecycleState = "starting";
-    else if (componentState.openCode === "degraded" || componentState.channels === "degraded") lifecycleState = "degraded";
+    else if (
+      (runtimeMode === "deepseek-harness" && componentState.harness === "degraded")
+      || componentState.channels === "degraded"
+    ) lifecycleState = "degraded";
     else lifecycleState = "ready";
     return lifecycleState;
   };
@@ -517,8 +525,6 @@ function createSynoRuntime(options = {}) {
     ...(options.contextThresholds ? { thresholds: options.contextThresholds } : {}),
   });
   const agent = options.agent || new ToolLoopAgent({ provider, tools, conversations, contextManager });
-  const nativeCognitiveRuntime = new NativeCognitiveRuntime({ agent, tools });
-  const openCodeCredentials = options.openCodeCredentials || new OpenCodeCredentialStore();
   const bridgeToken = options.bridgeToken || randomBytes(32).toString("base64url");
   const toolBridge = options.toolBridge || new SynoToolBridge({
     tools,
@@ -544,40 +550,26 @@ function createSynoRuntime(options = {}) {
         approvalCode: job.approvalCode,
         artifactId: request.artifactId,
       });
-      await pendingDecisions.present({ ownerKey, threadKey, channel: channel || "opencode", businessVersion: decision.businessVersion || "1" });
+      await pendingDecisions.present({ ownerKey, threadKey, channel: channel || "harness", businessVersion: decision.businessVersion || "1" });
     },
   });
-  const fakeOpenCode = process.env.NODE_ENV === "test" && process.env.SYNO_OPENCODE_FAKE_SERVER === "true";
-  const openCodeSupervisor = options.openCodeSupervisor || (fakeOpenCode
-    ? new OpenCodeTestSupervisor({ port: Number(process.env.SYNO_OPENCODE_TEST_PORT || 4318) })
-    : new OpenCodeSupervisor({
+  const fakeHarness = process.env.NODE_ENV === "test" && (process.env.SYNO_HARNESS_FAKE === "true" || Boolean(process.env.SYNO_DSH_FAKE_AGENT));
+  const harnessSupervisor = options.harnessSupervisor || new DeepSeekHarnessSupervisor({
     repoRoot: PATHS.repoRoot,
-    tokenLoader: async () => {
-      const status = await openCodeCredentials.status();
-      return status.configured ? openCodeCredentials.loadToken() : "";
-    },
-    bridgeOrigin: `http://127.0.0.1:${Number(process.env.PORT || DEFAULT_WEB_PORT)}/api/syno/opencode/mcp`,
+    bridgeOrigin: `http://127.0.0.1:${Number(process.env.PORT || DEFAULT_WEB_PORT)}/api/syno/bridge/mcp`,
     bridgeToken,
     journal,
-  }));
-  const openCodeClient = options.openCodeClient || new OpenCodeHttpClient({
-    credentials: async () => openCodeSupervisor.connection(),
+    ...(fakeHarness ? {
+      fakeAgent: process.env.SYNO_DSH_FAKE_AGENT || path.join(PATHS.repoRoot, "tests", "support", "fake-dsh-jsonrpc-agent.mjs"),
+    } : {}),
   });
-  const openCodeBindings = options.openCodeBindings || new OpenCodeSessionBindingStore();
-  const openCodeCognitiveRuntime = options.openCodeCognitiveRuntime || new OpenCodeCognitiveRuntime({
-    client: openCodeClient,
-    bindings: openCodeBindings,
+  const harnessBindings = options.harnessBindings || new DeepSeekHarnessSessionBindingStore();
+  const harnessCognitiveRuntime = options.harnessCognitiveRuntime || new DeepSeekHarnessCognitiveRuntime({
+    supervisor: harnessSupervisor,
+    bindings: harnessBindings,
     tools: toolBridge,
-    migrationLoader: async ({ ownerKey, threadKey }) => {
-      const conversationId = await conversationRouter.resolve({ ownerKey, threadKey });
-      const conversation = await conversations.get(conversationId).catch(() => null);
-      if (!conversation) return null;
-      const text = buildOpenCodeMigrationContext(conversation);
-      return text.trim() ? { conversationId, text } : { conversationId };
-    },
   });
-  const runtimeMode = options.cognitiveRuntime ? "injected-test" : "opencode";
-  const cognitiveRuntime = options.cognitiveRuntime || openCodeCognitiveRuntime;
+  const cognitiveRuntime = options.cognitiveRuntime || harnessCognitiveRuntime;
   ingestWorkflows.configure?.({
     contextCompiler: workflowContextCompiler,
     analyze: async ({ workflow, artifact, bundle }) => {
@@ -648,7 +640,7 @@ function createSynoRuntime(options = {}) {
           // The model frequently echoes fields from the artifact metadata it was handed
           // (e.g. risk) or invents plausible ones (e.g. sourceDescriptor). BASE_OUTPUT_SCHEMA
           // is strict (additionalProperties:false), so any extra top-level key is rejected
-          // as OPENCODE_INVALID_CONTRACT and retried forever. Ingest analysis only consumes
+          // as CAPTURE_INVALID_CONTRACT and retried forever. Ingest analysis only consumes
           // the keys declared in outputSchema.properties (enrichProposal never reads
           // risk/sourceDescriptor), so strip unknown top-level keys before validating to
           // tolerate LLM output drift.
@@ -659,8 +651,8 @@ function createSynoRuntime(options = {}) {
           const errors = [];
           validateValue(sanitized, bundle.outputSchema, "$", errors);
           if (errors.length) {
-            throw Object.assign(new Error(`OpenCode 收录分析 Contract 校验失败：${errors.join("；")}`), {
-              code: "OPENCODE_INVALID_CONTRACT",
+            throw Object.assign(new Error(`收录分析 Contract 校验失败：${errors.join("；")}`), {
+              code: "CAPTURE_INVALID_CONTRACT",
               retryable: true,
             });
           }
@@ -1041,24 +1033,24 @@ function createSynoRuntime(options = {}) {
   let workflowOutboxTimer = null;
   let workflowRetryTimer = null;
   let channelDeliveryOutboxTimer = null;
-  let openCodeRecoveryPromise = null;
-  async function recoverOpenCode() {
-    if (runtimeMode !== "opencode" || componentState.openCode !== "degraded") return;
-    if (openCodeRecoveryPromise) return openCodeRecoveryPromise;
-    openCodeRecoveryPromise = (async () => {
+  let harnessRecoveryPromise = null;
+  async function recoverHarness() {
+    if (runtimeMode !== "deepseek-harness" || componentState.harness !== "degraded") return;
+    if (harnessRecoveryPromise) return harnessRecoveryPromise;
+    harnessRecoveryPromise = (async () => {
       try {
-        await startOpenCodeSecurely();
-        componentState.openCode = "ready";
+        await startHarnessSecurely();
+        componentState.harness = "ready";
         refreshLifecycleState();
-        await recordEvent("syno.opencode.recovered");
+        await recordEvent("syno.harness.recovered");
         await host.retryWaitingProvider();
       } catch (error) {
-        await recordEvent("syno.opencode.recovery_failed", { error }, { level: "error" });
+        await recordEvent("syno.harness.recovery_failed", { error }, { level: "error" });
       } finally {
-        openCodeRecoveryPromise = null;
+        harnessRecoveryPromise = null;
       }
     })();
-    return openCodeRecoveryPromise;
+    return harnessRecoveryPromise;
   }
   async function recoverChannels() {
     const results = await Promise.allSettled([weixin.start(), feishu.start()]);
@@ -1249,19 +1241,13 @@ function createSynoRuntime(options = {}) {
     }
     return outboxReport;
   }
-  async function startOpenCodeSecurely({ restart = false } = {}) {
-    const status = restart
-      ? await openCodeSupervisor.restart()
-      : await openCodeSupervisor.start();
-    try {
-      assertOpenCodeServerSecurity(await openCodeClient.securityStatus({ repoRoot: PATHS.repoRoot }));
-      const bindingRecovery = await openCodeCognitiveRuntime.recoverBindings();
-      await recordEvent("syno.opencode.bindings_recovered", bindingRecovery);
-      return status;
-    } catch (error) {
-      await openCodeSupervisor.stop().catch(() => {});
-      throw error;
-    }
+  async function startHarnessSecurely({ restart = false } = {}) {
+    const route = parseHarnessModel(HARNESS_MODEL_CHAIN[0]);
+    if (restart) await harnessSupervisor.stop("chat");
+    const client = await harnessSupervisor.ensure("chat", route);
+    const bindingRecovery = await harnessCognitiveRuntime.recoverBindings();
+    await recordEvent("syno.harness.bindings_recovered", bindingRecovery);
+    return { ...harnessSupervisor.status("chat"), initialized: client.initialized === true };
   }
 
   const controlMutationLock = options.controlMutationLock || createControlMutationLock();
@@ -1314,11 +1300,9 @@ function createSynoRuntime(options = {}) {
     agent,
     cognitiveRuntime,
     runtimeMode,
-    nativeCognitiveRuntime,
-    openCodeCognitiveRuntime,
-    openCodeSupervisor,
-    openCodeCredentials,
-    openCodeBindings,
+    harnessCognitiveRuntime,
+    harnessSupervisor,
+    harnessBindings,
     toolBridge,
     contextManager,
     settingsRegistry,
@@ -1332,7 +1316,7 @@ function createSynoRuntime(options = {}) {
         proactiveDeliveryConsecutiveFailures,
       };
     },
-    restartOpenCode: () => startOpenCodeSecurely({ restart: true }),
+    restartHarness: () => startHarnessSecurely({ restart: true }),
     async commitMobileDeliveryV2({ ownerAcceptance = false, ingressFrozen = false, evidenceRef = null } = {}) {
       const records = await acceptedRequests?.list({ ownerKey: "local-user", limit: 1000 }) || [];
       const terminal = new Set(["delivered", "canceled", "failed_terminal"]);
@@ -1384,18 +1368,18 @@ function createSynoRuntime(options = {}) {
           await recordEvent("proactive.delivery.seed_failed", { error }, { level: "warning" }).catch(() => {});
         }
         reconciliationWorker?.start();
-        if (runtimeMode === "opencode") {
+        if (runtimeMode === "deepseek-harness") {
           try {
-            await startOpenCodeSecurely();
-            componentState.openCode = "ready";
-            await recordEvent("syno.opencode.ready");
+            await startHarnessSecurely();
+            componentState.harness = "ready";
+            await recordEvent("syno.harness.ready");
           } catch (error) {
-            componentState.openCode = "degraded";
-            await recordEvent("syno.opencode.degraded", { error }, { level: "error" });
-            console.error("[syno] OpenCode 未就绪，LLM Job 将等待 Provider:", String(error?.message || error));
+            componentState.harness = "degraded";
+            await recordEvent("syno.harness.degraded", { error }, { level: "error" });
+            console.error("[syno] DeepSeek Harness 未就绪，LLM Job 将等待 Provider:", String(error?.message || error));
           }
         } else {
-          componentState.openCode = "ready";
+          componentState.harness = "idle";
         }
         if (lifecycleState === "stopping") throw Object.assign(new Error("Syno Runtime 正在停止"), { code: "RUNTIME_STOPPING" });
         // 渠道启动不阻塞本地 Store 恢复；失败会进入 degraded 并由恢复 Timer 重试。
@@ -1428,7 +1412,9 @@ function createSynoRuntime(options = {}) {
               console.error("[syno] proactive.start 降级:", String(error?.message || error));
             });
           channelRecoveryTimer = setInterval(() => recoverChannels().catch(() => {}), 60_000);
-          providerRecoveryTimer = setInterval(() => recoverOpenCode().catch(() => {}), 60_000);
+          providerRecoveryTimer = setInterval(() => {
+            recoverHarness().catch(() => {});
+          }, 60_000);
         }
         workflowOutboxTimer = setInterval(() => drainWorkflowOutbox().catch((error) =>
           recordEvent("ingest.outbox.drain_failed", { error }, { level: "error" }).catch(() => {}),
@@ -1474,7 +1460,7 @@ function createSynoRuntime(options = {}) {
         await acceptedRecovery?.stop().catch(() => {});
         await reconciliationWorker?.stop().catch(() => {});
         await channels.stop().catch(() => {});
-        await openCodeSupervisor.stop().catch(() => {});
+        await harnessSupervisor.stop().catch(() => {});
         await recordEvent("syno.shutdown.completed");
       })();
       return closePromise;
@@ -1511,26 +1497,19 @@ async function routeSynoApi(runtime, req, url, readBody) {
     // 压缩遥测（OBS 3.1）：只读聚合视图，不含凭证。
     return typeof runtime.contextManager?.stats === "function" ? runtime.contextManager.stats() : { ok: false, reason: "context-manager-unavailable" };
   }
-  if (method === "POST" && url.pathname === "/api/syno/opencode/mcp") {
+  if (method === "POST" && url.pathname === "/api/syno/bridge/mcp") {
     return runtime.toolBridge.handle({ authorization: req.headers?.authorization, body: await readBody(req) });
   }
-  if (method === "GET" && url.pathname === "/api/syno/opencode") {
+  if (method === "GET" && url.pathname === "/api/syno/harness") {
     return {
       runtimeMode: runtime.runtimeMode,
-      supervisor: await runtime.openCodeSupervisor.health(),
-      credential: await runtime.openCodeCredentials.status(),
-      capabilities: runtime.openCodeCognitiveRuntime.capabilities(),
-      cognitive: { lastAttempts: runtime.openCodeCognitiveRuntime.lastAttempts || [] },
+      supervisor: await runtime.harnessSupervisor?.health?.() || { ready: false, state: "absent" },
+      capabilities: runtime.harnessCognitiveRuntime?.capabilities?.() || null,
+      cognitive: { lastAttempts: runtime.harnessCognitiveRuntime?.lastAttempts || [] },
     };
   }
-  if (method === "POST" && url.pathname === "/api/syno/opencode/restart") {
-    return runtime.restartOpenCode();
-  }
-  if (method === "POST" && url.pathname === "/api/syno/opencode/credential") {
-    const body = await readBody(req);
-    const status = await runtime.openCodeCredentials.save(body.token);
-    await runtime.restartOpenCode();
-    return status;
+  if (method === "POST" && url.pathname === "/api/syno/harness/restart") {
+    return runtime.restartHarness();
   }
   if (method === "GET" && url.pathname === "/api/syno/windows-service") return runtime.windowsService.status();
   if (method === "POST" && url.pathname === "/api/syno/windows-service/install") return runtime.windowsService.mutate("install", webContext);
@@ -1828,4 +1807,4 @@ async function routeSynoApi(runtime, req, url, readBody) {
   throw error;
 }
 
-export { PUBLIC_COMMAND_INTENTS, buildOpenCodeMigrationContext, createControlMutationLock, createSynoRuntime, createWeixinMessageHandler, parseWeixinApproval, readKnowledgeSnippet, redactMigrationText, remoteSafeJobSummary, routeSynoApi };
+export { PUBLIC_COMMAND_INTENTS, buildConversationMigrationContext, createControlMutationLock, createSynoRuntime, createWeixinMessageHandler, parseWeixinApproval, readKnowledgeSnippet, redactMigrationText, remoteSafeJobSummary, resolveCognitiveRuntimeMode, routeSynoApi };

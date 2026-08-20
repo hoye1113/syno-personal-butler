@@ -9,7 +9,7 @@ test("Web shell exposes the five knowledge-loop areas and always-reachable appro
   const html = await fs.readFile(path.join(root, "apps", "syno", "public", "index.html"), "utf8");
   for (const area of ["Today", "Capture", "Knowledge", "Learn", "Create"]) assert.match(html, new RegExp(`>${area}<`));
   assert.match(html, /data-syno-panel="jobs">任务/);
-  assert.match(html, /id="synoProviderForm"/);
+  assert.match(html, /id="synoHarnessRestart"/);
   assert.match(html, /id="synoLearningForm"/);
   assert.match(html, /id="synoOutputForm"/);
   assert.match(html, /id="synoIntakeProposal"/);
@@ -112,10 +112,10 @@ test("paper-cut guardian is layered and reduced-motion safe", async () => {
   assert.match(css, /:focus-visible/);
 });
 
-test("OpenCode secret form exposes username semantics without exposing a real identity", async () => {
+test("settings page does not expose an OpenCode token form", async () => {
   const html = await fs.readFile(path.join(root, "apps", "syno", "public", "index.html"), "utf8");
-  assert.match(html, /name="username" value="syno-opencode" autocomplete="username"/);
-  assert.match(html, /id="synoOpenCodeToken" type="password"/);
+  assert.match(html, /id="synoHarnessRestart"/);
+  assert.doesNotMatch(html, /id="synoOpenCodeToken"|id="synoProviderForm"|syno-opencode/);
   assert.doesNotMatch(html, /id="synoProviderBaseUrl"|id="synoProviderModel"/);
 });
 
