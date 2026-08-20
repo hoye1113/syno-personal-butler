@@ -12,7 +12,24 @@ function capabilityError(message) {
 }
 
 function assertCognitiveCapabilities(report, { expectedTools } = {}) {
-  if (!report || ![1, 2].includes(report.version) || report.agentCount !== 1) throw capabilityError("CognitiveRuntime 必须声明单一 Agent 的受支持能力清单");
+  if (!report || ![1, 2, 3].includes(report.version) || report.agentCount !== 1) throw capabilityError("CognitiveRuntime 必须声明单一 Agent 的受支持能力清单");
+  if (report.version === 3) {
+    if (report.adapter !== "deepseek-harness-sdk" || typeof report.provider !== "string" || !report.provider) {
+      throw capabilityError("CognitiveRuntime v3 必须使用受控 DeepSeek Harness SDK Adapter");
+    }
+    for (const name of ["agentSelectableModel", "providerFallback", "dynamicMcp", "sourceWrite", "memoryWrite", "yolo", "skillMutation"]) {
+      if (report[name] !== false) throw capabilityError(`CognitiveRuntime v3 禁止能力未关闭：${name}`);
+    }
+    if (!Array.isArray(report.models) || !report.models.length || report.models.some((model) => !/^deepseek\/\S+$/.test(String(model)))) {
+      throw capabilityError("CognitiveRuntime v3 模型链必须是 DeepSeek 官方 deepseek/<model>");
+    }
+    const tools = [...new Set((report.tools || []).map(String))].sort();
+    if (expectedTools) {
+      const expected = [...new Set(expectedTools.map(String))].sort();
+      if (JSON.stringify(tools) !== JSON.stringify(expected)) throw capabilityError(`CognitiveRuntime 工具清单不匹配：${tools.join(", ")}`);
+    }
+    return Object.freeze({ ...report, models: Object.freeze([...report.models]), tools: Object.freeze(tools) });
+  }
   if (report.version === 2) {
     for (const name of ["agentSelectableModel", "providerFallback", "directFileAccess", "terminal", "sourceWrite", "dynamicMcp"]) {
       if (report[name] !== false) throw capabilityError(`CognitiveRuntime v2 禁止能力未关闭：${name}`);
