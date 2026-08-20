@@ -150,7 +150,11 @@ pnpm start
 
 `harness:doctor` 不把密钥写进输出。协议冒烟用 `pnpm probe:harness`（假 sidecar + 中文 UTF-8）。
 
-Chat sidecar 的 `web_search` 走 Harness 克隆内的 `@deepseek-ai/dsh-web-search-deepseek`（Anthropic 兼容 Messages API，复用已注入的 `DEEPSEEK_API_KEY`，不读 `DEEPSEEK_BASE_URL`）。不要对 sidecar 执行 `dsh plugin add`，也不要从 [dsh-plugin.org](https://dsh-plugin.org/plugins?q=search) 装社区搜索插件。收录分析 profile 仍然没有 web。
+生产 chat 由 Host 监督 `dsh --profile syno web`（loopback，默认 `127.0.0.1:3088`，可用 `SYNO_DSH_WEB_PORT` 覆盖），与微信注入同一 Harness Session。Host 会把 `@syno/dsh-plugin` junction/symlink 进 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\node_modules`，不必再跑 `dsh plugin install`。该对话页是特权壳（`approval: never`），不是普通聊天 UI。`http://127.0.0.1:8888` 是控制面。收录分析仍是无 bash/fs/web 的 jsonrpc 第二进程。自动测试 / `SYNO_DSH_FAKE_AGENT` 仍走 jsonrpc fake。紧急回切 chat jsonrpc：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。不要把 jsonrpc sidecar 与生产 `dsh web` 同时接到同一 session。
+
+Chat 的 `web_search` 走官方 `@deepseek-ai/dsh-web-search-deepseek`（复用已注入的 `DEEPSEEK_API_KEY`）。不要对生产 `syno` profile 执行 `dsh plugin add`，也不要从 [dsh-plugin.org](https://dsh-plugin.org/plugins?q=search) 装社区搜索或记忆插件；实验 UI 只用 Host 生成的 `syno-lab` profile（无 Bridge、无 vault 写、无微信）。收录分析 profile 仍然没有 web。
+
+微信图片默认走聊天识图（Host `syno_image_read` → OpenCode Zen HTTP `mimo-v2.5-free`）；PDF/文本附件仍收录。明确说「收录」时，识图 JSON 作为 `kind: text` 进入现有 Intake / Proposal。本地知识搜索仍是 `syno_knowledge_search`。识图失败对微信可见，禁止猜图。
 
 主人验收清单：
 

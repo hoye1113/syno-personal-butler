@@ -9,7 +9,7 @@ OpenCode 负责模型调用、Agent Loop 和 Session 上下文；Syno 负责身�
 
 四类对象不得混用：
 
-- OpenCode Session：多轮模型上下文。
+- Harness Session：多轮模型上下文（生产 chat 由受控 `dsh --profile syno web` 持有；收录分析仍用 jsonrpc sidecar）。
 - Syno Run：一次进程内编排，默认不持久。
 - Job/Workflow：必须跨重启恢复的业务任务。
 - Direct Effect：一次工具调用直接造成、可由现有事实源确认的效果。
@@ -17,7 +17,7 @@ OpenCode 负责模型调用、Agent Loop 和 Session 上下文；Syno 负责身�
 系统保护以下不变量：
 
 1. 任意时刻只有一个生产 Host。
-2. 同一 OpenCode Session 任意时刻只有一个 writer。
+2. 同一 Harness Session 任意时刻只有一个 writer。jsonrpc sidecar 与生产 `dsh web` 不得同时写同一 session。
 3. 工具调用唯一归属于一个 Syno Run。
 4. 同一持久 invocation identity 最多产生一次直接副作用。
 5. `unknown` 只允许只读 reconcile，不允许盲目重试。
