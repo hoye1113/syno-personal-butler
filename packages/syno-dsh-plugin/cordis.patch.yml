@@ -1,0 +1,37 @@
+# Syno production bundle over dsh-base + dsh-web-app.
+# Pin official DeepSeek search, re-enable web_search (web-app disables tool-web),
+# mount the Host Tool Bridge, and keep the sandbox on DSH_CWD.
+# Do not add dsh-plugin.org marketplace packages here.
+
+- insert:
+    - id: syno-tool-bridge
+      name: '@syno/dsh-plugin'
+    - id: web-fetch-http
+      name: '@deepseek-ai/dsh-web-fetch-http'
+
+- id: tool-web
+  disabled: false
+  config:
+    search: true
+    searchTimeoutMs: 60000
+
+- id: web
+  config:
+    searchProvider: deepseek-official
+
+- id: web-search-deepseek
+  config:
+    apiKeyEnv: DEEPSEEK_API_KEY
+
+- id: system-prompt
+  config:
+    persona: !!js process.env.DSH_SYSTEM_PROMPT ?? 'You are Syno.'
+
+- id: sandbox-policy
+  config:
+    mode: workspace-write
+    workspaceRoot: !!js process.env.DSH_CWD ?? process.cwd()
+
+- id: approval
+  config:
+    policy: never

@@ -5,9 +5,15 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { DeepSeekHarnessJsonRpcClient } from "./deepseek-harness-jsonrpc-client.mjs";
+import { DeepSeekHarnessWebClient } from "./deepseek-harness-web-client.mjs";
 import { defaultDeepseekKeyLoader } from "./deepseek-key-loader.mjs";
 import { PATHS } from "./paths.mjs";
 import { RuntimeJournal } from "./runtime-journal.mjs";
+import {
+  DEFAULT_DSH_WEB_PORT,
+  SYNO_PROFILE_NAME,
+  ensureSynoDshProfiles,
+} from "./syno-dsh-profile.mjs";
 
 const execFileAsync = promisify(execFile);
 const REPO_CONFIG_DIR = path.join(PATHS.repoRoot, "config", "deepseek-harness");
@@ -47,6 +53,137 @@ function waitForExit(child, timeoutMs) {
       resolve(code);
     });
   });
+}
+
+function resolveChatSurface({ fake = false, env = process.env } = {}) {
+  if (fake) return "jsonrpc";
+  return String(env.SYNO_DSH_CHAT_SURFACE || "").trim() === "jsonrpc" ? "jsonrpc" : "web";
+}
+
+function dshWebPort(env = process.env) {
+  const raw = Number(env.SYNO_DSH_WEB_PORT || DEFAULT_DSH_WEB_PORT);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_DSH_WEB_PORT;
+}
+
+async function resolveWebLaunch({
+  dshRoot = defaultDshRoot(),
+  nodeExecutable = process.execPath,
+} = {}) {
+  const rejected = [];
+  if (!dshRoot) {
+    throw runtimeError("HARNESS_SETUP_REQUIRED", "未设置 SYNO_DSH_ROOT；请指向本机 deepseek-harness 克隆（见 docs/OPERATIONS.md）", {
+      rejected,
+    });
+  }
+  const nodeModules = path.join(dshRoot, "node_modules");
+  const tsxCli = path.join(dshRoot, "node_modules", "tsx", "dist", "cli.mjs");
+  const cliSrc = path.join(dshRoot, "apps", "cli", "src", "bin.ts");
+  const cliJs = path.join(dshRoot, "apps", "cli", "lib", "bin.js");
+  if (!existsSync(nodeModules)) {
+    return {
+      command: nodeExecutable,
+      argsPrefix: [],
+      cwd: dshRoot,
+      dshRoot,
+      bootable: false,
+      fake: false,
+      kind: "dsh-web",
+      missingInstall: true,
+      rejected: [{ path: nodeModules, reason: "missing" }],
+    };
+  }
+  if (existsSync(cliSrc) && existsSync(tsxCli)) {
+    return {
+      command: nodeExecutable,
+      argsPrefix: [tsxCli, cliSrc],
+      cwd: dshRoot,
+      dshRoot,
+      bootable: true,
+      fake: false,
+      kind: "dsh-web",
+    };
+  }
+  if (existsSync(cliJs)) {
+    return {
+      command: nodeExecutable,
+      argsPrefix: [cliJs],
+      cwd: dshRoot,
+      dshRoot,
+      bootable: true,
+      fake: false,
+      kind: "dsh-web",
+    };
+  }
+  rejected.push({ path: cliSrc, reason: "missing" });
+  return {
+    command: nodeExecutable,
+    argsPrefix: [],
+    cwd: dshRoot,
+    dshRoot,
+    bootable: false,
+    fake: false,
+    kind: "dsh-web",
+    rejected,
+  };
+}
+
+function waitForWebReady(child, { timeoutMs, expectedOrigin }) {
+  return new Promise((resolve, reject) => {
+    let out = "";
+    let settled = false;
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.stdout?.off("data", onData);
+      child.stderr?.off("data", onData);
+      child.off?.("exit", onExit);
+      child.stdout?.removeListener?.("data", onData);
+      child.stderr?.removeListener?.("data", onData);
+      if (error) reject(error);
+      else resolve(value);
+    };
+    const timer = setTimeout(() => {
+      finish(runtimeError("HARNESS_NOT_RUNNING", `dsh web 未在 ${timeoutMs}ms 内就绪`));
+    }, timeoutMs);
+    timer.unref?.();
+    const onData = (chunk) => {
+      out += String(chunk);
+      const match = /dsh web: (http:\/\/[^\s]+)/.exec(out);
+      if (!match?.[1]) return;
+      const advertised = String(match[1]).replace(/\/+$/, "");
+      if (!isLoopbackHttpOrigin(advertised, expectedOrigin)) {
+        finish(runtimeError("HARNESS_ORIGIN_INVALID", `dsh web 广告了非预期地址：${advertised}`));
+        return;
+      }
+      finish(null, expectedOrigin || advertised);
+    };
+    const onExit = (code, signalName) => {
+      finish(runtimeError("HARNESS_EXITED", `dsh web 已退出（code=${code}, signal=${signalName || "none"}）${out ? `：${out.slice(-400)}` : ""}`));
+    };
+    child.stdout?.on("data", onData);
+    child.stderr?.on("data", onData);
+    child.once("exit", onExit);
+  });
+}
+
+function isLoopbackHttpOrigin(origin, expectedOrigin) {
+  let url;
+  try {
+    url = new URL(origin);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "http:") return false;
+  if (!["127.0.0.1", "localhost"].includes(url.hostname)) return false;
+  if (!expectedOrigin) return true;
+  let expected;
+  try {
+    expected = new URL(expectedOrigin);
+  } catch {
+    return false;
+  }
+  return url.port === expected.port;
 }
 
 function harnessChildEnvironment(source = process.env) {
@@ -157,6 +294,7 @@ class DeepSeekHarnessSupervisor {
     bridgeToken,
     fakeAgent = process.env.SYNO_DSH_FAKE_AGENT,
     initializeTimeoutMs = 30_000,
+    webReadyTimeoutMs = null,
   } = {}) {
     this.dshRoot = dshRoot;
     this.repoRoot = repoRoot;
@@ -170,7 +308,11 @@ class DeepSeekHarnessSupervisor {
     this.bridgeToken = bridgeToken;
     this.fakeAgent = fakeAgent;
     this.initializeTimeoutMs = initializeTimeoutMs;
+    this.webReadyTimeoutMs = webReadyTimeoutMs;
     this.launch = null;
+    this.webLaunch = null;
+    this.chatSurface = resolveChatSurface({ fake: Boolean(fakeAgent) });
+    this.webPort = dshWebPort();
     this.slots = new Map();
     this.lastError = null;
   }
@@ -181,6 +323,10 @@ class DeepSeekHarnessSupervisor {
 
   async discover() {
     this.launch = await resolveHarnessLaunch({ dshRoot: this.dshRoot, fakeAgent: this.fakeAgent });
+    this.chatSurface = resolveChatSurface({ fake: this.launch?.fake === true });
+    this.webLaunch = this.chatSurface === "web"
+      ? await resolveWebLaunch({ dshRoot: this.dshRoot })
+      : null;
     return this.status();
   }
 
@@ -194,16 +340,21 @@ class DeepSeekHarnessSupervisor {
         ready: running && slot?.client?.initialized === true && !this.lastError,
         pid: running ? slot.child.pid : null,
         model: slot?.model || null,
+        surface: slot?.surface || (profile === "chat" ? this.chatSurface : "jsonrpc"),
+        origin: slot?.origin || null,
         bootable: this.launch?.bootable !== false,
-        kind: this.launch?.kind || null,
+        kind: slot?.kind || (profile === "chat" && this.chatSurface === "web" ? this.webLaunch?.kind : this.launch?.kind) || null,
         lastError: this.lastError ? { code: this.lastError.code || "HARNESS_RUNTIME_FAILED", message: this.lastError.message } : null,
       };
     }
     return {
       state: [...this.slots.values()].some((slot) => slot.child && slot.child.exitCode === null) ? "running" : this.launch ? "stopped" : "setup_required",
       ready: HARNESS_PROFILES.some((name) => this.status(name).ready),
-      bootable: this.launch?.bootable !== false,
-      kind: this.launch?.kind || null,
+      bootable: this.chatSurface === "web" ? this.webLaunch?.bootable !== false : this.launch?.bootable !== false,
+      kind: this.chatSurface === "web" ? this.webLaunch?.kind || this.launch?.kind : this.launch?.kind || null,
+      chatSurface: this.chatSurface,
+      webOrigin: this.slots.get("chat")?.origin || null,
+      webPort: this.webPort,
       dshRoot: this.dshRoot,
       profiles: Object.fromEntries(HARNESS_PROFILES.map((name) => [name, this.status(name)])),
       lastError: this.lastError ? { code: this.lastError.code || "HARNESS_RUNTIME_FAILED", message: this.lastError.message } : null,
@@ -213,13 +364,18 @@ class DeepSeekHarnessSupervisor {
   async health() {
     const report = this.status();
     const chat = this.status("chat");
-    return { ...report, healthy: chat.ready === true };
+    return {
+      ...report,
+      healthy: chat.ready === true,
+      chatSurface: this.chatSurface,
+      webOrigin: chat.origin || null,
+    };
   }
 
   client(profile = "chat") {
     const slot = this.slots.get(profile);
     if (!slot?.client || slot.child?.exitCode !== null) {
-      throw runtimeError("HARNESS_NOT_RUNNING", `DeepSeek Harness ${profile} sidecar 尚未运行`);
+      throw runtimeError("HARNESS_NOT_RUNNING", `DeepSeek Harness ${profile} 尚未运行`);
     }
     return slot.client;
   }
@@ -236,6 +392,17 @@ class DeepSeekHarnessSupervisor {
 
   async start(profile, { provider = "deepseek-official", model = "deepseek-v4-flash" } = {}) {
     if (!this.launch) await this.discover();
+    if (profile === "chat" && this.chatSurface === "web") {
+      if (this.webLaunch?.bootable === false) {
+        const error = runtimeError("HARNESS_SETUP_REQUIRED", "deepseek-harness 尚未安装依赖（缺少 node_modules）；dsh web 无法启动", {
+          dshRoot: this.dshRoot,
+        });
+        this.lastError = error;
+        await this.#record("harness.start.failed", { profile, error }, { level: "error" });
+        throw error;
+      }
+      return this.#startWeb(profile, { provider, model });
+    }
     if (this.launch.bootable === false && this.launch.fake !== true) {
       const error = runtimeError("HARNESS_SETUP_REQUIRED", "deepseek-harness 尚未安装依赖（缺少 node_modules）；真实 sidecar 无法启动", {
         dshRoot: this.dshRoot,
@@ -244,6 +411,10 @@ class DeepSeekHarnessSupervisor {
       await this.#record("harness.start.failed", { profile, error }, { level: "error" });
       throw error;
     }
+    return this.#startJsonRpc(profile, { provider, model });
+  }
+
+  async #profileEnv(profile, { includeCordisConfig = true } = {}) {
     const configPath = configPathFor(profile, { configDir: this.configDir });
     await fs.access(configPath);
     const pluginPath = path.join(this.configDir, "syno-tool-bridge-plugin.mjs");
@@ -256,9 +427,10 @@ class DeepSeekHarnessSupervisor {
     const homeRoot = path.join(this.localRoot, "home");
     const workspaceRoot = path.join(this.localRoot, "workspace", profile);
     await Promise.all([sessionRoot, homeRoot, workspaceRoot].map((directory) => fs.mkdir(directory, { recursive: true })));
+    if (profile === "chat") await ensureSynoDshProfiles({ homeRoot, repoRoot: this.repoRoot });
     const env = {
       ...harnessChildEnvironment(process.env),
-      DSH_CORDIS_CONFIG: configPath,
+      ...(includeCordisConfig ? { DSH_CORDIS_CONFIG: configPath } : {}),
       DSH_CWD: workspaceRoot,
       DSH_HOME: homeRoot,
       DSH_SESSION_ROOT: sessionRoot,
@@ -270,8 +442,13 @@ class DeepSeekHarnessSupervisor {
       ...(this.bridgeToken ? { SYNO_BRIDGE_TOKEN: this.bridgeToken } : {}),
       ...(deepseekKey ? { DEEPSEEK_API_KEY: deepseekKey } : {}),
     };
+    return { env, configPath, workspaceRoot, homeRoot, sessionRoot };
+  }
+
+  async #startJsonRpc(profile, { provider, model } = {}) {
+    const { env, configPath, workspaceRoot } = await this.#profileEnv(profile);
     const args = [...this.launch.argsPrefix, configPath];
-    await this.#record("harness.start.requested", { profile, model, kind: this.launch.kind });
+    await this.#record("harness.start.requested", { profile, model, kind: this.launch.kind, surface: "jsonrpc" });
     let child;
     try {
       child = this.spawnImpl(this.launch.command, args, {
@@ -279,7 +456,6 @@ class DeepSeekHarnessSupervisor {
         env,
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
-        // env replaces the parent environment entirely (HarnessClient contract).
       });
     } catch (error) {
       this.lastError = error;
@@ -294,7 +470,7 @@ class DeepSeekHarnessSupervisor {
       kill: () => this.killTree(child.pid),
       initializeTimeoutMs: this.initializeTimeoutMs,
     });
-    const slot = { child, client, provider, model, configPath, profile };
+    const slot = { child, client, provider, model, configPath, profile, surface: "jsonrpc", kind: this.launch.kind, origin: null };
     this.slots.set(profile, slot);
     this.lastError = null;
     child.once("exit", (code, signalName) => {
@@ -304,16 +480,81 @@ class DeepSeekHarnessSupervisor {
       void this.#record("harness.child.exit", { profile, pid: child.pid, code, signal: signalName }, { level: code === 0 ? "info" : "error" });
     });
     try {
-      await client.initialize({
-        cwd: workspaceRoot,
-        provider,
-        model,
-      });
-      await this.#record("harness.start.completed", { profile, pid: child.pid, model });
+      await client.initialize({ cwd: workspaceRoot, provider, model });
+      await this.#record("harness.start.completed", { profile, pid: child.pid, model, surface: "jsonrpc" });
       return client;
     } catch (error) {
       this.lastError = error;
       await this.#record("harness.start.failed", { profile, error }, { level: "error" });
+      await this.stop(profile).catch(() => {});
+      throw error;
+    }
+  }
+
+  async #startWeb(profile, { provider, model } = {}) {
+    const { env, workspaceRoot } = await this.#profileEnv(profile, { includeCordisConfig: false });
+    const origin = `http://127.0.0.1:${this.webPort}`;
+    const args = [
+      ...this.webLaunch.argsPrefix,
+      "--profile", SYNO_PROFILE_NAME,
+      "--host", "127.0.0.1",
+      "--port", String(this.webPort),
+      "--no-open",
+    ];
+    await this.#record("harness.start.requested", { profile, model, kind: this.webLaunch.kind, surface: "web", origin });
+    let child;
+    try {
+      child = this.spawnImpl(this.webLaunch.command, args, {
+        cwd: this.webLaunch.cwd,
+        env,
+        stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true,
+      });
+    } catch (error) {
+      this.lastError = error;
+      await this.#record("harness.spawn.failed", { profile, error }, { level: "error" });
+      throw error;
+    }
+    child.once("exit", (code, signalName) => {
+      if (this.slots.get(profile)?.child === child) {
+        this.lastError ||= code === 0 ? null : runtimeError("HARNESS_EXITED", `DeepSeek Harness ${profile} 已退出（code=${code}, signal=${signalName || "none"}）`);
+      }
+      void this.#record("harness.child.exit", { profile, pid: child.pid, code, signal: signalName }, { level: code === 0 ? "info" : "error" });
+    });
+    try {
+      await waitForWebReady(child, {
+        timeoutMs: this.webReadyTimeoutMs ?? Math.max(this.initializeTimeoutMs, 90_000),
+        expectedOrigin: origin,
+      });
+      const client = new DeepSeekHarnessWebClient({
+        origin,
+        cwd: workspaceRoot,
+        pid: child.pid,
+        kill: () => this.killTree(child.pid),
+        initializeTimeoutMs: this.initializeTimeoutMs,
+        onNotice: ({ event, data, options }) => {
+          void this.#record(event, data, options);
+        },
+      });
+      const slot = {
+        child,
+        client,
+        provider,
+        model,
+        profile,
+        surface: "web",
+        kind: this.webLaunch.kind,
+        origin,
+      };
+      this.slots.set(profile, slot);
+      this.lastError = null;
+      await client.initialize({ cwd: workspaceRoot, provider, model });
+      await this.#record("harness.start.completed", { profile, pid: child.pid, model, surface: "web", origin: slot.origin });
+      return client;
+    } catch (error) {
+      this.lastError = error;
+      await this.#record("harness.start.failed", { profile, error }, { level: "error" });
+      if (child?.pid) await this.killTree(child.pid).catch(() => {});
       await this.stop(profile).catch(() => {});
       throw error;
     }
@@ -365,6 +606,11 @@ export {
   REPO_CONFIG_DIR,
   configPathFor,
   defaultDshRoot,
+  dshWebPort,
   harnessChildEnvironment,
+  isLoopbackHttpOrigin,
+  resolveChatSurface,
   resolveHarnessLaunch,
+  resolveWebLaunch,
+  waitForWebReady,
 };

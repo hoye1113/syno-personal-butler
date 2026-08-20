@@ -71,6 +71,8 @@ import { CaptureChunkStore } from "./capture-chunk-store.mjs";
 import { CaptureChunkScheduler } from "./capture-chunk-scheduler.mjs";
 import { mergeCaptureAnalyses, splitSourceText } from "./capture-analysis.mjs";
 import { artifactToIntakePayload, createWeixinMessageHandler, parseWeixinApproval } from "./weixin-message-handler.mjs";
+import { IsolatedImageStore } from "./isolated-image-store.mjs";
+import { OpencodeVisionClient } from "./opencode-vision-client.mjs";
 
 const PUBLIC_COMMAND_INTENTS = Object.freeze({
   search: "search",
@@ -244,6 +246,15 @@ function createSynoRuntime(options = {}) {
   const jobStore = options.jobStore || new JobStore();
   const pendingDecisions = options.pendingDecisions || new PendingDecisionStore();
   const knowledge = options.knowledge || new KnowledgeStore();
+  const imageStore = options.imageStore || new IsolatedImageStore({
+    quarantineRoots: [
+      path.join(PATHS.runtimeRoot, "quarantine", "weixin"),
+      path.join(PATHS.runtimeRoot, "quarantine"),
+    ],
+  });
+  const visionClient = options.visionClient !== undefined
+    ? options.visionClient
+    : new OpencodeVisionClient({ store: imageStore });
   const credentials = options.credentials || new ProviderCredentialStore();
   const provider = options.provider || new ProviderClient({ credentials });
   const conversations = options.conversations || new ConversationStore();
@@ -364,6 +375,28 @@ function createSynoRuntime(options = {}) {
       execute: async ({ query, limit }) => (await knowledge.search(query, { limit: limit || 8 }))
         .filter((item) => item.sensitive !== true)
         .map(({ sensitive, ...item }) => item),
+    },
+    {
+      name: "image.read",
+      description: "读取隔离区内一张图片：OCR、版面、摘要与针对问题的回答。只接受 artifactId 与 question。",
+      risk: "read",
+      permission: "syno-read",
+      retry: "safe",
+      version: "1",
+      inputSchema: {
+        type: "object",
+        required: ["artifactId"],
+        properties: {
+          artifactId: { type: "string", minLength: 1 },
+          question: { type: "string" },
+        },
+        additionalProperties: false,
+      },
+      outputSchema: { type: "object" },
+      execute: async ({ artifactId, question }) => {
+        if (!visionClient) throw Object.assign(new Error("识图通道未就绪"), { code: "VISION_UNAVAILABLE" });
+        return visionClient.read({ artifactId, question });
+      },
     },
     {
       name: "knowledge.read", description: "读取搜索结果中的完整知识笔记", risk: "read", permission: "syno-read", retry: "safe", version: "1",
@@ -777,6 +810,8 @@ function createSynoRuntime(options = {}) {
     mobileDeliveryMode,
     wakeDelivery: () => drainChannelDeliveryOutbox().catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })),
     reviewReminders,
+    imageStore,
+    visionClient,
   });
   if (acceptedRecovery && typeof channelConversationHandler.processAcceptedRequest === "function") {
     acceptedRecovery.processRequest = (request) => channelConversationHandler.processAcceptedRequest(request);
@@ -1304,6 +1339,8 @@ function createSynoRuntime(options = {}) {
     harnessSupervisor,
     harnessBindings,
     toolBridge,
+    imageStore,
+    visionClient,
     contextManager,
     settingsRegistry,
     controlMutationLock,
@@ -1501,9 +1538,11 @@ async function routeSynoApi(runtime, req, url, readBody) {
     return runtime.toolBridge.handle({ authorization: req.headers?.authorization, body: await readBody(req) });
   }
   if (method === "GET" && url.pathname === "/api/syno/harness") {
+    const supervisor = await runtime.harnessSupervisor?.health?.() || { ready: false, state: "absent" };
     return {
       runtimeMode: runtime.runtimeMode,
-      supervisor: await runtime.harnessSupervisor?.health?.() || { ready: false, state: "absent" },
+      supervisor,
+      webOrigin: supervisor.webOrigin || null,
       capabilities: runtime.harnessCognitiveRuntime?.capabilities?.() || null,
       cognitive: { lastAttempts: runtime.harnessCognitiveRuntime?.lastAttempts || [] },
     };

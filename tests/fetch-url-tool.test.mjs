@@ -90,4 +90,6 @@ test("createSynoRuntime registers knowledge.fetch_url and exposes it through the
   assert.equal(tool.risk, "read");
   assert.equal(tool.permission, "syno-read");
   assert.ok(runtime.toolBridge.exposed.has("knowledge_fetch_url"), "桥接应暴露 knowledge_fetch_url");
+  assert.ok(runtime.tools.list().find((item) => item.name === "image.read"), "ToolRegistry 应有 image.read");
+  assert.ok(runtime.toolBridge.exposed.has("image_read"), "桥接应暴露 image_read");
 });

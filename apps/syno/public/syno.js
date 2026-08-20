@@ -849,8 +849,18 @@
       const status = await api("/api/syno/harness");
       const healthy = status.supervisor?.healthy === true;
       const lastModel = status.cognitive?.lastAttempts?.slice(-1)[0]?.modelId || status.supervisor?.profiles?.chat?.model;
+      const webOrigin = status.webOrigin || status.supervisor?.webOrigin;
+      const dshLink = document.querySelector("#synoDshWebLink");
+      if (dshLink) {
+        if (webOrigin) {
+          dshLink.href = webOrigin;
+          dshLink.hidden = false;
+        } else {
+          dshLink.hidden = true;
+        }
+      }
       hint.textContent = healthy
-        ? `DeepSeek Harness 正常运行${lastModel ? `；最近模型 ${lastModel}` : ""}。`
+        ? `DeepSeek Harness 正常运行${lastModel ? `；最近模型 ${lastModel}` : ""}${webOrigin ? `；对话页 ${webOrigin}` : "（当前为 JSON-RPC 测试面）"}。`
         : `DeepSeek Harness 未就绪：${status.supervisor?.lastError?.message || status.supervisor?.state || "未启动"}。本地收录回执、澄清解析、搜索与提醒仍可使用。`;
       setSettingStatus("#synoSettingAi", healthy ? "已连接" : "未连接", healthy);
       setupState.ai = healthy;

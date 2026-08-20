@@ -656,9 +656,13 @@
         </div>
         <details id="synoAiSettings" class="setting-detail">
           <summary>AI 服务常用设置</summary>
+          <p>本页是控制面（凭据、渠道、Policy、诊断）。日常对话在受控 DSH Web（默认 <code>127.0.0.1:3088</code>），与微信注入同一会话。</p>
           <p id="synoProviderHint" class="form-hint" aria-live="polite"></p>
           <p>认知内核是 DeepSeek Harness（deepseek-v4-flash → deepseek-chat）。密钥只从本机环境变量或已有凭据注入，设置页不回显。</p>
-          <div class="syno-job-actions"><button id="synoHarnessRestart" class="ghost-btn" type="button">重启 AI 内核</button></div>
+          <div class="syno-job-actions">
+            <button id="synoHarnessRestart" class="ghost-btn" type="button">重启 AI 内核</button>
+            <a id="synoDshWebLink" class="ghost-btn" href="#" hidden target="_blank" rel="noreferrer">打开 DSH 对话页</a>
+          </div>
           <details id="synoAdvancedSettings" class="setting-detail is-advanced">
             <summary>高级设置</summary>
             <p>DeepSeek API Key 优先读 host 环境变量 <code>DEEPSEEK_API_KEY</code>；缺省时 supervisor 只读本机已有凭据，不落新文件。</p>

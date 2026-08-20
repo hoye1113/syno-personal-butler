@@ -7,7 +7,9 @@ import {
   CONFIG_FILES,
   defaultDshRoot,
   REPO_CONFIG_DIR,
+  resolveChatSurface,
   resolveHarnessLaunch,
+  resolveWebLaunch,
 } from "../apps/syno/syno/deepseek-harness-supervisor.mjs";
 import { DEFAULT_WEB_PORT } from "../apps/syno/syno/paths.mjs";
 
@@ -29,7 +31,7 @@ async function doctor({
   try {
     launch = await resolveHarnessLaunch({ dshRoot, fakeAgent: "" });
     checks.push({
-      name: "sidecar",
+      name: "capture-sidecar",
       ok: launch.bootable === true,
       bootable: launch.bootable === true,
       kind: launch.kind,
@@ -38,7 +40,26 @@ async function doctor({
     });
   } catch (error) {
     checks.push({
-      name: "sidecar",
+      name: "capture-sidecar",
+      ok: false,
+      code: error.code || "HARNESS_SETUP_REQUIRED",
+      message: error.message,
+      dshRoot,
+    });
+  }
+  try {
+    const webLaunch = await resolveWebLaunch({ dshRoot });
+    checks.push({
+      name: "chat-web",
+      ok: webLaunch.bootable === true,
+      bootable: webLaunch.bootable === true,
+      kind: webLaunch.kind,
+      surface: resolveChatSurface({ fake: false }),
+      dshRoot: webLaunch.dshRoot,
+    });
+  } catch (error) {
+    checks.push({
+      name: "chat-web",
       ok: false,
       code: error.code || "HARNESS_SETUP_REQUIRED",
       message: error.message,

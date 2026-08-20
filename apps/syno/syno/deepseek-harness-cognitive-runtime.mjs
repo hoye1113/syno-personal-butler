@@ -356,19 +356,26 @@ class DeepSeekHarnessCognitiveRuntime {
       return true;
     }
     if (!run.abortPromise) {
-      run.abortPromise = this.supervisor.stop(run.profile || "chat")
-        .then(() => {
+      run.abortPromise = (async () => {
+        try {
+          let client;
+          try { client = this.supervisor.client(run.profile || "chat"); } catch { client = null; }
+          if (typeof client?.abortTurn === "function" && run.sessionId) {
+            await client.abortTurn(run.sessionId);
+          } else {
+            await this.supervisor.stop(run.profile || "chat");
+          }
           run.abortConfirmed = true;
           run.sessionStateKnown = SESSION_STATE_KNOWN.CLEAN;
           run.status = "canceled";
-        })
-        .catch((error) => {
+        } catch (error) {
           run.abortConfirmed = false;
           run.sessionStateKnown = SESSION_STATE_KNOWN.UNKNOWN;
           run.status = "cancel_unknown";
           run.abortError = { code: failureCode(error), message: error.message };
           this.sessionScheduler.block(run.sessionKey, "Harness shutdown 未确认");
-        });
+        }
+      })();
     }
     return true;
   }
