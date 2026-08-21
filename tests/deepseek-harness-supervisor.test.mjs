@@ -226,3 +226,55 @@ test("web start failure kills the process tree", async (t) => {
   await assert.rejects(() => supervisor.start("chat"), (error) => error.code === "HARNESS_NOT_RUNNING");
   assert.deepEqual(killed, [4242]);
 });
+
+test("Web supervisor pins the Syno agent preset when initializing the client", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-harness-web-preset-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.mkdir(path.join(root, "node_modules", "tsx", "dist"), { recursive: true });
+  await fs.mkdir(path.join(root, "apps", "cli", "src"), { recursive: true });
+  await fs.mkdir(path.join(root, "packages", "examples", "jsonrpc-demo", "lib"), { recursive: true });
+  await fs.writeFile(path.join(root, "node_modules", "tsx", "dist", "cli.mjs"), "export {}\n");
+  await fs.writeFile(path.join(root, "apps", "cli", "src", "bin.ts"), "export {}\n");
+  await fs.writeFile(path.join(root, "packages", "examples", "jsonrpc-demo", "lib", "packaged-bin.js"), "export {}\n");
+  let child;
+  let initializeOptions;
+  const supervisor = new DeepSeekHarnessSupervisor({
+    dshRoot: root,
+    fakeAgent: "",
+    localRoot: path.join(root, "local"),
+    webReadyTimeoutMs: 1_000,
+    webClientFactory: () => ({
+      initialized: false,
+      async initialize(options) {
+        initializeOptions = options;
+        this.initialized = true;
+      },
+      async shutdown() {
+        if (child.exitCode === null) {
+          child.exitCode = 0;
+          child.emit("exit", 0, null);
+        }
+      },
+      async close() {},
+    }),
+    spawnImpl: () => {
+      child = new EventEmitter();
+      child.pid = 4343;
+      child.stdout = new EventEmitter();
+      child.stderr = new EventEmitter();
+      child.stdin = { destroyed: true };
+      child.exitCode = null;
+      child.killed = false;
+      child.kill = () => {
+        child.killed = true;
+        child.exitCode = 0;
+        child.emit("exit", 0, null);
+      };
+      queueMicrotask(() => child.stdout.emit("data", "dsh web: http://127.0.0.1:3088\n"));
+      return child;
+    },
+  });
+  t.after(() => supervisor.stop().catch(() => {}));
+  await supervisor.start("chat", { model: "deepseek-v4-flash" });
+  assert.equal(initializeOptions?.agentPreset, "syno");
+});

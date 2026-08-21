@@ -64,7 +64,7 @@ function rpcOk(rpcId, value) {
 function startFakeWeb({ onPrompt, selectModel } = {}) {
   let hostStream;
   let muxStream;
-  const state = { rejectMux: false };
+  const state = { rejectMux: false, sessionCreates: [] };
   const sockets = new Set();
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, "http://127.0.0.1");
@@ -83,6 +83,7 @@ function startFakeWeb({ onPrompt, selectModel } = {}) {
         return;
       }
       if (method === "session.create") {
+        state.sessionCreates.push(message);
         res.end(rpcOk(message.rpcId, { sessionId: message.payload.sessionId }));
         return;
       }
@@ -165,6 +166,26 @@ test("DeepSeekHarnessWebClient runTurn waits for idle and reads assistant text",
   await client.initialize({ cwd: "/tmp/workspace", provider: "deepseek-official", model: "deepseek-v4-flash" });
   const result = await client.runTurn("syno-main-test", [{ type: "text", text: "你好" }]);
   assert.equal(result.finalResponse, "web-hello");
+});
+
+test("DeepSeekHarnessWebClient pins the requested agent preset on new sessions", async (t) => {
+  const fake = await startFakeWeb();
+  t.after(() => fake.close());
+  const client = new DeepSeekHarnessWebClient({
+    origin: `http://127.0.0.1:${fake.port}`,
+    cwd: "/tmp/workspace",
+    initializeTimeoutMs: 5_000,
+    turnTimeoutMs: 5_000,
+  });
+  t.after(() => client.close());
+  await client.initialize({
+    cwd: "/tmp/workspace",
+    provider: "deepseek-official",
+    model: "deepseek-v4-flash",
+    agentPreset: "syno",
+  });
+  await client.runTurn("syno-preset", [{ type: "text", text: "你好" }]);
+  assert.equal(fake.state.sessionCreates[0]?.payload.agentPreset, "syno");
 });
 
 test("DeepSeekHarnessWebClient settles on running-then-idle even without assistant text", async (t) => {

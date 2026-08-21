@@ -11,6 +11,7 @@ import { PATHS } from "./paths.mjs";
 import { RuntimeJournal } from "./runtime-journal.mjs";
 import {
   DEFAULT_DSH_WEB_PORT,
+  SYNO_AGENT_PRESET_NAME,
   SYNO_PROFILE_NAME,
   ensureSynoDshProfiles,
 } from "./syno-dsh-profile.mjs";
@@ -286,6 +287,7 @@ class DeepSeekHarnessSupervisor {
     configDir = REPO_CONFIG_DIR,
     localRoot = path.join(PATHS.localDataRoot, "harness"),
     spawnImpl = spawn,
+    webClientFactory = (options) => new DeepSeekHarnessWebClient(options),
     killTree = defaultKillTree,
     deepseekKeyLoader = defaultDeepseekKeyLoader,
     journal = new RuntimeJournal(),
@@ -300,6 +302,7 @@ class DeepSeekHarnessSupervisor {
     this.configDir = configDir;
     this.localRoot = localRoot;
     this.spawnImpl = spawnImpl;
+    this.webClientFactory = webClientFactory;
     this.killTree = killTree;
     this.deepseekKeyLoader = deepseekKeyLoader;
     this.journal = journal;
@@ -525,7 +528,7 @@ class DeepSeekHarnessSupervisor {
         timeoutMs: this.webReadyTimeoutMs ?? Math.max(this.initializeTimeoutMs, 90_000),
         expectedOrigin: origin,
       });
-      const client = new DeepSeekHarnessWebClient({
+      const client = this.webClientFactory({
         origin,
         cwd: workspaceRoot,
         pid: child.pid,
@@ -547,7 +550,7 @@ class DeepSeekHarnessSupervisor {
       };
       this.slots.set(profile, slot);
       this.lastError = null;
-      await client.initialize({ cwd: workspaceRoot, provider, model });
+      await client.initialize({ cwd: workspaceRoot, provider, model, agentPreset: SYNO_AGENT_PRESET_NAME });
       await this.#record("harness.start.completed", { profile, pid: child.pid, model, surface: "web", origin: slot.origin });
       return client;
     } catch (error) {

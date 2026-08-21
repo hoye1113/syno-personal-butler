@@ -238,6 +238,7 @@ implementation:
 本轮已实现：
 
 - 生产 profile 精确 pin 当前可解析的官方 base/web-app 与 `@syno/dsh-plugin`，并由 overlay 挂载官方 schedule function plugin；拒绝生产 marketplace add。
+- 生产 Web 由 Host 生成受控 `syno` agent preset，Supervisor 在 `session.create` 显式绑定 `agentPreset: syno`；JSON-RPC chat 同样启用官方 token-meter、tool-result-pruner、compaction-basic 和 compact command，避免库存 coding persona 或旧 native context 链路进入生产。
 - `syno-lab` 重建时保留 DSH CLI 安装的实验依赖/ bundle，并删除可能遗留的 `@syno/dsh-plugin`。
 - DSH chat 与 Host 共享 10 项 core Bridge 工具集；`tools/list` 和运行时 `tools/call` 双重收窄，Capture 浏览器 allowlist 不受影响。
 - `dsh-mnemon@0.2.13` 仅规划为 lab bundle；Native >=0.2.3、外部 Provider 关闭、敏感数据不进入 Mnemon、不得映射 `vault/ops`。
@@ -246,12 +247,13 @@ implementation:
 
 1. ✅ `SYNO_DSH_ROOT`、Harness build、`harness:doctor`、fake UTF-8 probe 和 real packaged-bin discovery 已通过；生产 Host 在 8888/3088 启动并返回 Web 200。
 2. ✅ `syno-lab` 的 `dsh-mnemon@0.2.13`、`--dump-config` 和隔离 Web 启动已通过；实验 profile 无 Syno Bridge。⚠ Native `mnemon` 未安装，且当前公开 release 不满足 `>=0.2.3`，所以 Status/Runtime/Documents/Recall/Remember/Forget 的 Native 流程仍待合规版本。
+3. ✅ 生产 profile dump 的默认 preset 为 `syno`；真实 DSH Web 的 `agentPreset.list` 和 `session.create(agentPreset: syno)` 已通过，缺省 `SYNO_SKILL_ROOT` 也有安全兜底；本轮未调用真实模型。
 
 仍需主人/本机验收：
 
-3. 完成 Web、微信、飞书共享 main Session、waiting_provider、取消、重启恢复、EffectReceipt、Outbox 和跨渠道工具调用的 R6 真实矩阵。
-4. 完成现有 R6 真实矩阵后，才删除旧认知实现；历史旧会话只按脱敏摘要/最近主人消息迁移，工具输出、system/private 内容和密钥模式不迁移，迁移必须幂等。
-5. Mnemon 进入生产需额外安全审查、固定构建产物、数据边界验证和显式政策批准；未满足前保持 lab-only。
+4. 完成 Web、微信、飞书共享 main Session、waiting_provider、取消、重启恢复、EffectReceipt、Outbox 和跨渠道工具调用的 R6 真实矩阵。
+5. 完成现有 R6 真实矩阵后，才删除旧认知实现；历史旧会话只按脱敏摘要/最近主人消息迁移，工具输出、system/private 内容和密钥模式不迁移，迁移必须幂等。
+6. Mnemon 进入生产需额外安全审查、固定构建产物、数据边界验证和显式政策批准；未满足前保持 lab-only。
 
 ### R6：删除重复实现与封板 — 严格未开始
 

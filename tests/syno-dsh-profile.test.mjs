@@ -24,10 +24,11 @@ test("Host-generated syno profile pins bundles and forbids marketplace add", asy
   const homeRoot = await mkdtemp(path.join(os.tmpdir(), "syno-dsh-home-"));
   t.after(() => rm(homeRoot, { recursive: true, force: true }));
   const repoRoot = path.resolve(".");
-  const { synoDir, labDir } = await ensureSynoDshProfiles({ homeRoot, repoRoot });
+  const { synoDir, labDir, agentPreset } = await ensureSynoDshProfiles({ homeRoot, repoRoot });
   const syno = JSON.parse(await readFile(path.join(synoDir, "package.json"), "utf8"));
   const lab = JSON.parse(await readFile(path.join(labDir, "package.json"), "utf8"));
   const synoPatch = await readFile(path.join(synoDir, "cordis.patch.yml"), "utf8");
+  const agentPresetText = await readFile(agentPreset.presetPath, "utf8");
   const pluginPatch = await readFile(path.join(repoRoot, "packages", "syno-dsh-plugin", "cordis.patch.yml"), "utf8");
   assert.equal(path.basename(synoDir), SYNO_PROFILE_NAME);
   assert.equal(path.basename(labDir), SYNO_LAB_PROFILE_NAME);
@@ -40,6 +41,13 @@ test("Host-generated syno profile pins bundles and forbids marketplace add", asy
   assert.doesNotMatch(JSON.stringify(syno), /dsh-mnemon/);
   assert.equal(syno.dsh.profile.allowMarketplaceAdd, false);
   assert.match(synoPatch, /Do not run/);
+  assert.match(synoPatch, /id: agent-presets[\s\S]*default: syno/);
+  assert.match(synoPatch, /includeUserRoot: true/);
+  assert.match(agentPresetText, /name: '@deepseek-ai\/dsh-persona'/);
+  assert.match(agentPresetText, /process\.env\.DSH_SYSTEM_PROMPT/);
+  assert.match(agentPresetText, /process\.env\.SYNO_SKILL_ROOT \?\? process\.cwd\(\)/);
+  assert.match(agentPresetText, /name: '@deepseek-ai\/dsh-compaction-basic'/);
+  assert.match(agentPresetText, /name: '@deepseek-ai\/dsh-tool-web'/);
   assert.doesNotMatch(synoPatch, /sk-[A-Za-z0-9]/);
   assert.match(pluginPatch, /searchProvider: deepseek-official/);
   assert.match(pluginPatch, /name: '@deepseek-ai\/dsh-schedule'/);
@@ -54,6 +62,16 @@ test("Host-generated syno profile pins bundles and forbids marketplace add", asy
   assert.ok(!lab.dependencies?.["@syno/dsh-plugin"]);
   const resolved = resolveProfilePackage(synoDir, "@syno/dsh-plugin");
   assert.equal(path.normalize(resolved), path.normalize(path.join(repoRoot, "packages", "syno-dsh-plugin", "plugin.mjs")));
+});
+
+test("JSON-RPC chat keeps the official compaction stack", async () => {
+  const chat = await readFile(path.resolve("config/deepseek-harness/syno-chat.cordis.yml"), "utf8");
+  assert.match(chat, /name: '@deepseek-ai\/dsh-token-meter'/);
+  assert.match(chat, /name: '@deepseek-ai\/dsh-compaction-tool-result-pruner'/);
+  assert.match(chat, /name: '@deepseek-ai\/dsh-compaction-basic'/);
+  assert.match(chat, /thresholdRatio: 0\.8/);
+  assert.match(chat, /retainRatio: 0\.16/);
+  assert.match(chat, /name: '@deepseek-ai\/dsh-command-compact'/);
 });
 
 test("syno-lab profile rebuild preserves dsh CLI plugin dependencies without inheriting Syno", async (t) => {

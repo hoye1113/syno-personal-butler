@@ -5,6 +5,7 @@ import path from "node:path";
 const DEFAULT_DSH_WEB_PORT = 3088;
 const SYNO_PROFILE_NAME = "syno";
 const SYNO_LAB_PROFILE_NAME = "syno-lab";
+const SYNO_AGENT_PRESET_NAME = "syno";
 const PRODUCTION_BUNDLES = Object.freeze([
   "@deepseek-ai/dsh-base",
   "@deepseek-ai/dsh-web-app",
@@ -79,6 +80,11 @@ function labProfileManifest({ existingManifest = null } = {}) {
 const PRODUCTION_PATCH = `# Host-generated production overlay.
 # Do not run \`dsh plugin add\` against this profile. Marketplace memory/search
 # plugins are forbidden. Vault writes stay on syno_* → Policy → GitGuard.
+- id: agent-presets
+  config:
+    default: syno
+    includeUserRoot: true
+
 - id: system-prompt
   config:
     persona: !!js process.env.DSH_SYSTEM_PROMPT ?? 'You are Syno.'
@@ -107,6 +113,20 @@ async function writeProfile(directory, manifest, patch) {
   await fs.writeFile(path.join(directory, "cordis.patch.yml"), patch, "utf8");
 }
 
+async function writeSynoAgentPreset(homeRoot, repoRoot) {
+  const presetDir = path.join(homeRoot, ".agent-presets", SYNO_AGENT_PRESET_NAME);
+  const source = path.join(repoRoot, "config", "deepseek-harness", "syno-agent-preset.cordis.yml");
+  await fs.mkdir(presetDir, { recursive: true });
+  await fs.copyFile(source, path.join(presetDir, "agent.cordis.yml"));
+  await fs.writeFile(path.join(presetDir, "preset.yml"), [
+    "name: Syno production",
+    "description: Syno domain agent with the controlled production tool surface.",
+    "order: 0",
+    "",
+  ].join("\n"), "utf8");
+  return { presetDir, presetPath: path.join(presetDir, "agent.cordis.yml") };
+}
+
 async function readExistingManifest(directory) {
   try {
     return JSON.parse(await fs.readFile(path.join(directory, "package.json"), "utf8"));
@@ -125,11 +145,12 @@ async function ensureSynoDshProfiles({
   const profilesRoot = path.join(homeRoot, "profiles");
   const synoDir = path.join(profilesRoot, SYNO_PROFILE_NAME);
   const labDir = path.join(profilesRoot, SYNO_LAB_PROFILE_NAME);
+  const agentPreset = await writeSynoAgentPreset(homeRoot, repoRoot);
   await writeProfile(synoDir, productionProfileManifest({ pluginDir }), PRODUCTION_PATCH);
   await linkPackage(synoDir, "@syno/dsh-plugin", pluginDir);
   const existingLabManifest = await readExistingManifest(labDir);
   await writeProfile(labDir, labProfileManifest({ existingManifest: existingLabManifest }), LAB_PATCH);
-  return { synoDir, labDir, profilesRoot };
+  return { synoDir, labDir, profilesRoot, agentPreset };
 }
 
 function resolveProfilePackage(profileDir, packageName) {
@@ -140,6 +161,7 @@ export {
   DEFAULT_DSH_WEB_PORT,
   LAB_BUNDLES,
   PRODUCTION_BUNDLES,
+  SYNO_AGENT_PRESET_NAME,
   SYNO_LAB_PROFILE_NAME,
   SYNO_PROFILE_NAME,
   ensureSynoDshProfiles,

@@ -1,0 +1,72 @@
+# Syno production Web agent preset.
+# The Web bundle disables model-facing rows behind agent presets. Keep this
+# composition deliberately narrow: Syno owns domain tools, while DSH owns the
+# session, shell/filesystem sandbox, web lookup, skills, jobs, and compaction.
+
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: !!js process.env.DSH_SYSTEM_PROMPT ?? 'You are Syno.'
+
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 65536
+
+- id: tool-bash
+  name: '@deepseek-ai/dsh-tool-bash'
+  disabled: !!js process.platform === 'win32'
+
+- id: tool-pwsh
+  name: '@deepseek-ai/dsh-tool-pwsh'
+  disabled: !!js process.platform !== 'win32'
+
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: false
+
+- id: tool-jobs
+  name: '@deepseek-ai/dsh-tool-jobs'
+
+- id: skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+  config:
+    includeDefaultRoots: false
+    watch: false
+    customSkillDirs:
+      - !!js process.env.SYNO_SKILL_ROOT ?? process.cwd()
+
+- id: tool-skill
+  name: '@deepseek-ai/dsh-tool-skill'
+
+# dsh-base provides the host token meter and session store. The isolated group
+# owns only the per-agent compaction backend and its command/pruner tools.
+- id: compaction
+  name: cordis:group
+  group: true
+  isolate:
+    compaction: true
+    toolResultPruner: true
+  config:
+    - id: compaction-basic
+      name: '@deepseek-ai/dsh-compaction-basic'
+
+    - id: command-compact
+      name: '@deepseek-ai/dsh-command-compact'
+
+    - id: tool-result-pruner
+      name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+      config:
+        thresholdChars: 8192
+        headChars: 4096
+        tailChars: 1024
+
+- id: tool-web
+  name: '@deepseek-ai/dsh-tool-web'
+  config:
+    fetch: false
+    searchTimeoutMs: 60000

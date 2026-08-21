@@ -89,9 +89,14 @@ class DeepSeekHarnessWebClient {
     return () => this.listeners.delete(listener);
   }
 
-  async initialize({ cwd, provider, model } = {}) {
+  async initialize({ cwd, provider, model, agentPreset } = {}) {
     if (cwd) this.cwd = cwd;
-    this.route = { cwd: this.cwd, provider, model };
+    this.route = {
+      cwd: this.cwd,
+      provider,
+      model,
+      ...(agentPreset ? { agentPreset: String(agentPreset) } : {}),
+    };
     await this.#waitReady();
     await this.#ensureStreams();
     this.initialized = true;
@@ -229,6 +234,7 @@ class DeepSeekHarnessWebClient {
       await this.rpc("session.create", {
         sessionId,
         ...(this.cwd ? { cwd: this.cwd } : {}),
+        ...(this.route?.agentPreset ? { agentPreset: this.route.agentPreset } : {}),
       });
     } catch (error) {
       if (!/already|exists|conflict/i.test(error.message)) throw error;

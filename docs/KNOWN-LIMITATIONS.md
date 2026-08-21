@@ -12,7 +12,7 @@
 - 飞书消息已完成 Owner 私聊、真实 ID 重放拒绝与重启恢复；飞书日历已完成 user 授权、主日历 CRUD、错误拒绝与恢复。
 - `0cc2669` 的 fresh clone 已通过 Node 172/172、vault 57/57 和仓库校验；`a4ec17d` 完成最终回归。真实 Windows Web 生命周期与桌面/移动浏览器增量复验通过。当前代码完整 bundle 为 `C:\tmp\syno-repository-backup-a4ec17d.bundle`，SHA-256 见最终验收矩阵。
 
-历史 Provider/旧运行时验收不替代当前 DSH 发布门槛。当前生产只启用 `DeepSeekHarnessCognitiveRuntime`；真实模型、跨渠道计数、提示注入、官方 compaction、Harness 重启恢复和 Windows 登录恢复仍未完成。不得把凭据已配置、自动测试或历史探针证据表述为 DSH 已封板。
+历史 Provider/旧运行时验收不替代当前 DSH 发布门槛。当前生产只启用 `DeepSeekHarnessCognitiveRuntime`；真实模型、跨渠道计数、提示注入、长会话 compaction 行为、Harness 重启恢复和 Windows 登录恢复仍未完成。生产受控 `syno` agent preset、Web `agentPreset: syno` 显式绑定和 JSON-RPC 官方 compaction stack 已实现并通过构建产物级验证，但不能替代真实模型和 Owner 验收。不得把凭据已配置、自动测试或历史探针证据表述为 DSH 已封板。
 
 历史自动门禁数字和旧运行时探针只作为追溯记录；本轮基线为 Node 698 tests / 697 pass / 0 fail / 1 cancelled / exit 1，取消用例已定位并在聚焦修复后归零。当前分支的全量结果必须重新运行，不能复用历史数字。
 
@@ -39,7 +39,7 @@ Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导�
 - Mnemon Native 需要 Windows release 至少 `0.2.3`。外部 Memory Provider 必须关闭，只允许 Runtime Memory、Documents 和本地 Native；Native 缺失时应显示降级状态而不是伪报 Recall/Remember/Forget 成功。
 - Mnemon 数据不是 Syno canonical fact；生产推广需要固定版本/构建产物、敏感数据边界验证、独立安全审查和显式政策批准。
 - 上游当前没有确定性密钥扫描器，故任何 Token、Cookie、私钥或原始敏感日志都不得进入 Mnemon；不得依赖插件自行完成脱敏。
-- 生产 DSH 的 compaction 由当前 `dsh-base` bundle 提供，schedule 由 `@deepseek-ai/dsh-schedule` function plugin 提供；两者都必须在 `SYNO_DSH_ROOT` 的实际构建产物中可解析，缺失时应阻塞启动，不回退到旧 ContextManager 认知链路。
+- 生产 DSH 的 host token meter/session 由当前 `dsh-base` bundle 提供，Web 受控 agent preset 和 JSON-RPC chat 分别挂载官方 compaction-basic、tool-result-pruner、command-compact stack；schedule 由 `@deepseek-ai/dsh-schedule` function plugin 提供。所有包都必须在 `SYNO_DSH_ROOT` 的实际构建产物中可解析，缺失时应阻塞启动，不回退到旧 ContextManager 认知链路。
 
 ## 数据与渠道限制
 

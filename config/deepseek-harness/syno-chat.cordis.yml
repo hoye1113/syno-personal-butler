@@ -130,3 +130,27 @@
   config:
     root: !!js process.env.DSH_SESSION_ROOT ?? './.sessions'
     compression: none
+
+# Official DSH context accounting and compaction. Keep these in the JSON-RPC
+# surface as well as the Web preset so fake/forced-jsonrpc runs do not retain a
+# second native context-management implementation.
+- id: token-meter
+  name: '@deepseek-ai/dsh-token-meter'
+
+- id: tool-result-pruner
+  name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+  config:
+    thresholdChars: 8192
+    headChars: 4096
+    tailChars: 1024
+
+- id: compaction-basic
+  name: '@deepseek-ai/dsh-compaction-basic'
+  config:
+    thresholdRatio: 0.8
+    retainRatio: 0.16
+    maxTokens: 8192
+    compactionRetries: 1
+
+- id: command-compact
+  name: '@deepseek-ai/dsh-command-compact'
