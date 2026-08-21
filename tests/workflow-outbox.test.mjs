@@ -71,6 +71,35 @@ test("WorkflowOutbox settles a non-retryable delivery as failed_terminal and nev
   assert.equal(again.processed, 0);
 });
 
+test("WorkflowOutbox.findLatest returns the newest sanitized event for a Workflow and target", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-workflow-latest-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  let now = new Date("2026-07-28T00:00:00.000Z");
+  const outbox = new WorkflowOutbox({ root, clock: () => now });
+  const first = await outbox.enqueue({
+    workflowId: "workflow-latest", eventType: "proposal.ready", ownerKey: "owner", targetChannel: "weixin",
+    deliveryTarget: { toUserId: "owner", contextToken: "must-not-persist" },
+    redactedPayload: { text: "第一条状态" }, idempotencyKey: "workflow-latest:first",
+  });
+  now = new Date("2026-07-28T00:00:01.000Z");
+  const second = await outbox.enqueue({
+    workflowId: "workflow-latest", eventType: "workflow.reported", ownerKey: "owner", targetChannel: "weixin",
+    deliveryTarget: { toUserId: "owner", contextToken: "must-not-persist" },
+    redactedPayload: { text: "最终状态" }, idempotencyKey: "workflow-latest:second",
+  });
+  await outbox.deliverDue(async (event) => event.eventId === first.eventId
+    ? { delivered: true }
+    : { delivered: false, retryable: true, reason: "offline" });
+
+  const latest = await outbox.findLatest({ workflowId: "workflow-latest", targetChannel: "weixin" });
+  assert.equal(latest.eventId, second.eventId);
+  assert.equal(latest.status, "failed_retryable");
+  assert.equal(latest.redactedPayload.text, "最终状态");
+  assert.equal(latest.deliveryTarget?.contextToken, undefined);
+  const persisted = await fs.readFile(path.join(root, `${first.eventId}.json`), "utf8");
+  assert.doesNotMatch(persisted, /must-not-persist/);
+});
+
 test("WorkflowOutbox treats a thrown deliver without retryable as failed_retryable", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-workflow-throw-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));

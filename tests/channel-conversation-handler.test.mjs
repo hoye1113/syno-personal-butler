@@ -107,6 +107,43 @@ test("ChannelConversationHandler deterministically captures an embedded URL with
   assert.match(model[0], /不要主动调用收录/);
 });
 
+test("ChannelConversationHandler returns the existing Workflow status for a duplicate URL without invoking the model", async () => {
+  let modelRuns = 0;
+  let receives = 0;
+  const targets = [];
+  const handler = new ChannelConversationHandler({
+    runtime: { async run() { modelRuns += 1; throw new Error("duplicate capture must not invoke the model"); } },
+    core: {},
+    ingestWorkflows: {
+      async receive() {
+        receives += 1;
+        return {
+          artifact: { id: "artifact-existing" },
+          workflow: { id: "workflow-existing", stage: "rejected" },
+          duplicate: true,
+        };
+      },
+    },
+    ownerChannelTargets: { async set(ownerKey, channel, target) { targets.push({ ownerKey, channel, target }); } },
+    pendingDecisions: {},
+  });
+
+  const response = await handler.handle({
+    id: "capture-duplicate-1",
+    ownerKey: "owner",
+    senderId: "owner",
+    contextToken: "current-context",
+    channel: "weixin",
+    text: "https://example.com/already-captured",
+  });
+
+  assert.equal(receives, 1);
+  assert.equal(modelRuns, 0);
+  assert.deepEqual(targets, [{ ownerKey: "owner", channel: "weixin", target: { toUserId: "owner", contextToken: "current-context" } }]);
+  assert.equal(response.text, "已存在收录编号：workflow-existing。当前状态：已拒收。");
+  assert.doesNotMatch(response.text, /正在后台安全提取/);
+});
+
 test("ChannelConversationHandler supports local-only personal capture and deterministic status", async () => {
   const calls = [];
   const handler = new ChannelConversationHandler({

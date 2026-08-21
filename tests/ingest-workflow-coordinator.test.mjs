@@ -8,7 +8,7 @@ import { IngestWorkflowCoordinator, IngestWorkflowStore } from "../apps/syno/syn
 import { SynoToolBridge } from "../apps/syno/syno/syno-tool-bridge.mjs";
 import { ToolRegistry } from "../apps/syno/syno/tool-registry.mjs";
 
-async function fixture(t) {
+async function fixture(t, coordinatorOptions = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-ingest-workflow-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const scheduled = [];
@@ -38,8 +38,17 @@ async function fixture(t) {
     ingest,
     store,
     schedule: (work) => scheduled.push(work),
+    ...coordinatorOptions,
   });
   return { root, scheduled, ingest, store, coordinator };
+}
+
+async function waitFor(condition, message) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    if (await condition()) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error(message);
 }
 
 test("receive persists an immediate Workflow receipt and deduplicates a retried platform message", async (t) => {
@@ -55,6 +64,55 @@ test("receive persists an immediate Workflow receipt and deduplicates a retried 
   assert.equal(ingest.receipts, 1);
   assert.equal(scheduled.length, 1);
   assert.equal((await coordinator.status(first.workflow.id)).artifactId, first.artifact.id);
+});
+
+test("duplicate receive notifies the runtime with the existing Workflow and message context", async (t) => {
+  const duplicateNotifications = [];
+  const { coordinator } = await fixture(t, {
+    onDuplicate: async (input) => duplicateNotifications.push(input),
+  });
+  const first = await coordinator.receive(
+    { kind: "url", value: "https://example.com/duplicate-hook" },
+    { ownerKey: "owner", channel: "weixin", threadKey: "main", messageId: "wx-original" },
+  );
+  const replay = await coordinator.receive(
+    { kind: "url", value: "https://example.com/duplicate-hook" },
+    { ownerKey: "owner", channel: "weixin", threadKey: "main", messageId: "wx-replay" },
+  );
+  await waitFor(() => duplicateNotifications.length === 1, "duplicate callback was not scheduled");
+
+  assert.equal(replay.duplicate, true);
+  assert.equal(duplicateNotifications.length, 1);
+  assert.equal(duplicateNotifications[0].workflow.id, first.workflow.id);
+  assert.equal(duplicateNotifications[0].context.messageId, "wx-replay");
+  assert.equal(duplicateNotifications[0].context.channel, "weixin");
+});
+
+test("a quality-rejected Workflow is terminal and is not scheduled again during recovery", async (t) => {
+  const { scheduled, store, coordinator } = await fixture(t);
+  coordinator.configure({
+    onProposed: async ({ workflow }) => store.update(workflow.id, {
+      stage: "rejected",
+      pendingAction: undefined,
+      nextRetryAt: undefined,
+      lastError: undefined,
+    }),
+  });
+  const receipt = await coordinator.receive(
+    { kind: "url", value: "https://example.com/quality-rejected" },
+    { ownerKey: "owner", channel: "weixin", messageId: "quality-rejected-1" },
+  );
+
+  await scheduled.shift()();
+  const rejected = await store.get(receipt.workflow.id);
+  assert.equal(rejected.stage, "rejected");
+  assert.equal(rejected.pendingAction, undefined);
+  assert.equal(rejected.nextRetryAt, undefined);
+  assert.equal(rejected.lastError, undefined);
+
+  const recovered = await coordinator.recover();
+  assert.equal(recovered.scheduled, 0);
+  assert.equal(scheduled.length, 0);
 });
 
 test("receive reuses the same URL or file content across channels and platform messages", async (t) => {

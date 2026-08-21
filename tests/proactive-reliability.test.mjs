@@ -9,6 +9,8 @@ import { ProactiveOrchestrator } from "../apps/syno/syno/proactive-orchestrator.
 import { SignalEngine } from "../apps/syno/syno/signal-engine.mjs";
 import { ChannelDeliveryOutbox } from "../apps/syno/syno/channel-delivery-outbox.mjs";
 import { OwnerChannelTargetStore } from "../apps/syno/syno/proactive-reliability.mjs";
+import { IngestWorkflowCoordinator, IngestWorkflowStore } from "../apps/syno/syno/ingest-workflow-coordinator.mjs";
+import { WorkflowOutbox } from "../apps/syno/syno/workflow-outbox.mjs";
 import { createSynoRuntime, routeSynoApi } from "../apps/syno/syno/runtime.mjs";
 
 async function tempState(t, prefix) {
@@ -1063,6 +1065,260 @@ async function buildDrainRuntime(t, { proactiveResult, terminalResult } = {}) {
   const runtime = createSynoRuntime({ channels, channelDeliveryOutbox: outbox, ownerChannelTargets: targets, acceptedRequests, journal, settingsRegistry });
   return { runtime, outbox, clockState, recorded, sent, acceptedUpdates };
 }
+
+async function buildWorkflowDuplicateRuntime(t, {
+  targetAvailable = true,
+  deliveryResult = { delivered: true, deliveryCapability: "at_least_once" },
+} = {}) {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-workflow-duplicate-runtime-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const workflowOutbox = new WorkflowOutbox({ root: path.join(root, "workflow-outbox") });
+  const ownerChannelTargets = new OwnerChannelTargetStore({
+    root: path.join(root, "targets"),
+    payloadRoot: path.join(root, "target-payloads"),
+    protect: async (value) => value,
+    unprotect: async (value) => value,
+  });
+  if (targetAvailable) {
+    await ownerChannelTargets.set("owner", "weixin", { toUserId: "current-owner", contextToken: "current-context" });
+  }
+  const store = new IngestWorkflowStore({ root: path.join(root, "workflows") });
+  const ingest = {
+    async receive(payload) {
+      return {
+        artifact: { id: "artifact-workflow-duplicate", kind: payload.kind, dedupeKey: payload.value, sourceDescriptor: {} },
+        proposalPending: true,
+      };
+    },
+  };
+  const coordinator = new IngestWorkflowCoordinator({ ingest, store, schedule: () => {} });
+  const sent = [];
+  const channels = {
+    homeChannel: "weixin",
+    async send(message, targets) {
+      sent.push({ message, targets });
+      return Object.fromEntries(targets.map((target) => [target, deliveryResult]));
+    },
+  };
+  const recorded = [];
+  const runtime = createSynoRuntime({
+    channels,
+    workflowOutbox,
+    ownerChannelTargets,
+    ingest,
+    ingestWorkflows: coordinator,
+    cognitiveRuntime: { async appendSystemEvent() {}, async run() { return { text: "unused" }; } },
+    channelDeliveryOutbox: null,
+    acceptedRequests: null,
+    journal: { async record(event, data) { recorded.push({ event, data }); return true; } },
+  });
+  return { coordinator, workflowOutbox, store, sent, recorded };
+}
+
+async function waitForWorkflowDuplicate(condition, message) {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
+    if (await condition()) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error(message);
+}
+
+test("duplicate Workflow delivery hydrates the current encrypted Weixin target and does not replay delivered events", async (t) => {
+  const { coordinator, workflowOutbox, sent } = await buildWorkflowDuplicateRuntime(t);
+  const first = await coordinator.receive(
+    { kind: "url", value: "https://example.com/workflow-target" },
+    { ownerKey: "owner", channel: "weixin", messageId: "wx-original", replyTarget: { toUserId: "stale-owner" } },
+  );
+  await workflowOutbox.enqueue({
+    workflowId: first.workflow.id,
+    eventType: "proposal.ready",
+    ownerKey: "owner",
+    targetChannel: "weixin",
+    threadKey: "main",
+    deliveryTarget: { toUserId: "stale-owner" },
+    redactedPayload: { text: "方案已准备好" },
+    idempotencyKey: `${first.workflow.id}:proposal:ready`,
+  });
+
+  await coordinator.receive(
+    { kind: "url", value: "https://example.com/workflow-target" },
+    { ownerKey: "owner", channel: "weixin", messageId: "wx-duplicate", replyTarget: { toUserId: "stale-owner" } },
+  );
+  await waitForWorkflowDuplicate(() => sent.length === 1, "duplicate Workflow did not wake its pending Outbox");
+  await waitForWorkflowDuplicate(async () => (await workflowOutbox.findLatest({ workflowId: first.workflow.id, targetChannel: "weixin" }))?.status === "delivered", "duplicate Workflow Outbox did not settle as delivered");
+
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].targets[0], "weixin");
+  assert.equal(sent[0].message.toUserId, "current-owner");
+  assert.equal(sent[0].message.contextToken, "current-context");
+  assert.equal((await workflowOutbox.findLatest({ workflowId: first.workflow.id, targetChannel: "weixin" })).status, "delivered");
+
+  await coordinator.receive(
+    { kind: "url", value: "https://example.com/workflow-target" },
+    { ownerKey: "owner", channel: "weixin", messageId: "wx-duplicate", replyTarget: { toUserId: "stale-owner" } },
+  );
+  assert.equal(sent.length, 1, "同一微信消息再次进入不能重复发送已确认的最终事件");
+});
+
+test("Workflow delivery does not send without a current encrypted Weixin target and remains retryable", async (t) => {
+  const { coordinator, workflowOutbox, sent, recorded } = await buildWorkflowDuplicateRuntime(t, { targetAvailable: false });
+  const first = await coordinator.receive(
+    { kind: "url", value: "https://example.com/workflow-target-missing" },
+    { ownerKey: "owner", channel: "weixin", messageId: "wx-missing-original", replyTarget: { toUserId: "stale-owner" } },
+  );
+  await workflowOutbox.enqueue({
+    workflowId: first.workflow.id,
+    eventType: "workflow.reported",
+    ownerKey: "owner",
+    targetChannel: "weixin",
+    redactedPayload: { text: "不可空投" },
+    idempotencyKey: `${first.workflow.id}:reported:missing-target`,
+  });
+  await coordinator.receive(
+    { kind: "url", value: "https://example.com/workflow-target-missing" },
+    { ownerKey: "owner", channel: "weixin", messageId: "wx-missing-duplicate", replyTarget: { toUserId: "stale-owner" } },
+  );
+  await waitForWorkflowDuplicate(async () => (await workflowOutbox.findLatest({ workflowId: first.workflow.id, targetChannel: "weixin" }))?.status === "failed_retryable", "missing target did not remain retryable");
+
+  assert.equal(sent.length, 0);
+  assert.ok(recorded.some((item) => item.event === "ingest.workflow.outbox.target_unavailable" && item.data.status === "target_missing"));
+});
+
+test("runtime quality rejection writes notifications before converging the Workflow to rejected", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-quality-rejection-runtime-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const scheduled = [];
+  const workflowOutbox = new WorkflowOutbox({ root: path.join(root, "workflow-outbox") });
+  const ownerChannelTargets = new OwnerChannelTargetStore({
+    root: path.join(root, "targets"),
+    payloadRoot: path.join(root, "target-payloads"),
+    protect: async (value) => value,
+    unprotect: async (value) => value,
+  });
+  await ownerChannelTargets.set("owner", "weixin", { toUserId: "owner", contextToken: "ctx" });
+  const store = new IngestWorkflowStore({ root: path.join(root, "workflows") });
+  const ingest = {
+    async receive(payload) {
+      return { artifact: { id: "artifact-quality", kind: payload.kind, dedupeKey: payload.value, sourceDescriptor: {} }, proposalPending: true };
+    },
+    async propose() {
+      return {
+        candidate: { id: "candidate-quality" },
+        proposal: {
+          id: "proposal-quality",
+          proposalDigest: "proposal-quality-digest",
+          sourceType: "url",
+          suggestedPath: "vault/00-Inbox/quality.md",
+          quality: { status: "rejected", reasons: ["正文不足，无法形成可靠收录"] },
+        },
+      };
+    },
+  };
+  const coordinator = new IngestWorkflowCoordinator({ ingest, store, schedule: (work) => scheduled.push(work) });
+  const runtime = createSynoRuntime({
+    channels: { homeChannel: "weixin", async send() { return { weixin: { delivered: true } }; } },
+    workflowOutbox,
+    ownerChannelTargets,
+    ingest,
+    ingestWorkflows: coordinator,
+    workflowContextCompiler: { async compile() { return null; } },
+    cognitiveRuntime: { async appendSystemEvent() {}, async run() { return { text: "unused" }; } },
+    channelDeliveryOutbox: null,
+    acceptedRequests: null,
+    journal: { async record() { return true; } },
+  });
+  const receipt = await coordinator.receive(
+    { kind: "url", value: "https://example.com/quality-rejection", analysisMode: "local-only" },
+    { ownerKey: "owner", channel: "weixin", messageId: "wx-quality", replyTarget: { toUserId: "owner" } },
+  );
+  await scheduled.shift()();
+
+  const workflow = await store.get(receipt.workflow.id);
+  assert.equal(workflow.stage, "rejected");
+  assert.equal(workflow.pendingAction, undefined);
+  assert.equal(workflow.nextRetryAt, undefined);
+  assert.equal(workflow.lastError, undefined);
+  assert.equal((await workflowOutbox.findLatest({ workflowId: workflow.id, targetChannel: "weixin" })).status, "pending");
+  assert.equal((await workflowOutbox.findLatest({ workflowId: workflow.id, targetChannel: "main-session" })).status, "pending");
+  assert.equal((await coordinator.recover()).scheduled, 0);
+});
+
+test("duplicate Workflow creates one replay for a terminally failed final event and a safe status event when no final event exists", async (t) => {
+  const failedCase = await buildWorkflowDuplicateRuntime(t);
+  const failedFirst = await failedCase.coordinator.receive(
+    { kind: "url", value: "https://example.com/workflow-terminal-replay" },
+    { ownerKey: "owner", channel: "weixin", messageId: "wx-terminal-original", replyTarget: { toUserId: "stale-owner" } },
+  );
+  const failedEvent = await failedCase.workflowOutbox.enqueue({
+    workflowId: failedFirst.workflow.id,
+    eventType: "workflow.reported",
+    ownerKey: "owner",
+    targetChannel: "weixin",
+    redactedPayload: { text: "最终结果" },
+    idempotencyKey: `${failedFirst.workflow.id}:reported`,
+  });
+  await failedCase.workflowOutbox.deliverDue(async () => ({ delivered: false, retryable: false, reason: "CHANNEL_PERMANENTLY_UNAVAILABLE" }));
+  assert.equal((await failedCase.workflowOutbox.findLatest({ workflowId: failedFirst.workflow.id, targetChannel: "weixin" })).status, "failed_terminal");
+
+  await failedCase.coordinator.receive(
+    { kind: "url", value: "https://example.com/workflow-terminal-replay" },
+    { ownerKey: "owner", channel: "weixin", messageId: "wx-terminal-replay", replyTarget: { toUserId: "stale-owner" } },
+  );
+  await waitForWorkflowDuplicate(async () => {
+    const records = (await failedCase.workflowOutbox.list()).filter((item) => item.workflowId === failedFirst.workflow.id);
+    return records.length === 2 && records.some((item) => item.eventType === "workflow.reported.replay" && item.status === "delivered");
+  }, "failed terminal replay was not delivered");
+  const replayRecords = (await failedCase.workflowOutbox.list()).filter((item) => item.workflowId === failedFirst.workflow.id);
+  assert.equal(replayRecords.length, 2);
+  assert.ok(replayRecords.some((item) => item.eventId === failedEvent.eventId && item.status === "failed_terminal"));
+  assert.ok(replayRecords.some((item) => item.eventType === "workflow.reported.replay" && item.status === "delivered"));
+  assert.equal(failedCase.sent.length, 1);
+  assert.equal(failedCase.sent[0].message.text, "最终结果");
+
+  const failedReplayCase = await buildWorkflowDuplicateRuntime(t, {
+    deliveryResult: { delivered: false, retryable: false, reason: "CHANNEL_PERMANENTLY_UNAVAILABLE" },
+  });
+  const failedReplayFirst = await failedReplayCase.coordinator.receive(
+    { kind: "url", value: "https://example.com/workflow-terminal-replay-idempotent" },
+    { ownerKey: "owner", channel: "weixin", messageId: "wx-terminal-original-2", replyTarget: { toUserId: "stale-owner" } },
+  );
+  await failedReplayCase.workflowOutbox.enqueue({
+    workflowId: failedReplayFirst.workflow.id,
+    eventType: "workflow.reported",
+    ownerKey: "owner",
+    targetChannel: "weixin",
+    redactedPayload: { text: "最终结果" },
+    idempotencyKey: `${failedReplayFirst.workflow.id}:reported`,
+  });
+  await failedReplayCase.workflowOutbox.deliverDue(async () => ({ delivered: false, retryable: false, reason: "CHANNEL_PERMANENTLY_UNAVAILABLE" }));
+  for (const messageId of ["wx-terminal-replay-2", "wx-terminal-replay-2"]) {
+    await failedReplayCase.coordinator.receive(
+      { kind: "url", value: "https://example.com/workflow-terminal-replay-idempotent" },
+      { ownerKey: "owner", channel: "weixin", messageId, replyTarget: { toUserId: "stale-owner" } },
+    );
+    await waitForWorkflowDuplicate(async () => {
+      const records = (await failedReplayCase.workflowOutbox.list()).filter((item) => item.workflowId === failedReplayFirst.workflow.id);
+      return records.length === 2
+        && records.some((item) => item.eventType === "workflow.reported.replay" && item.status === "failed_terminal");
+    }, "same message replay did not settle exactly once");
+  }
+  assert.equal(failedReplayCase.sent.length, 1);
+
+  const statusCase = await buildWorkflowDuplicateRuntime(t);
+  const statusFirst = await statusCase.coordinator.receive(
+    { kind: "url", value: "https://example.com/workflow-status-replay" },
+    { ownerKey: "owner", channel: "weixin", messageId: "wx-status-original", replyTarget: { toUserId: "stale-owner" } },
+  );
+  await statusCase.store.update(statusFirst.workflow.id, { stage: "rejected" });
+  await statusCase.coordinator.receive(
+    { kind: "url", value: "https://example.com/workflow-status-replay" },
+    { ownerKey: "owner", channel: "weixin", messageId: "wx-status-original", replyTarget: { toUserId: "stale-owner" } },
+  );
+  await waitForWorkflowDuplicate(() => statusCase.sent.length === 1, "terminal status replay was not delivered");
+  assert.equal(statusCase.sent.length, 1);
+  assert.match(statusCase.sent[0].message.text, /当前状态：已拒收/);
+  assert.equal((await statusCase.workflowOutbox.findLatest({ workflowId: statusFirst.workflow.id, targetChannel: "weixin" })).eventType, "workflow.status_replay");
+});
 
 test("a persistently rejected proactive bundle exhausts attempts to terminal and raises observable signals", async (t) => {
   const { runtime, outbox, clockState, recorded, sent } = await buildDrainRuntime(t);

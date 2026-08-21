@@ -187,6 +187,7 @@ class IngestWorkflowCoordinator {
     contextCompiler,
     analyze = null,
     onProposed = null,
+    onDuplicate = null,
     onEvent = null,
     decisionExecutor = null,
     reconcileExecution = null,
@@ -202,6 +203,7 @@ class IngestWorkflowCoordinator {
     this.contextCompiler = contextCompiler;
     this.analyze = analyze;
     this.onProposed = onProposed;
+    this.onDuplicate = onDuplicate;
     this.onEvent = onEvent;
     this.decisionExecutor = decisionExecutor;
     this.reconcileExecution = reconcileExecution;
@@ -215,10 +217,11 @@ class IngestWorkflowCoordinator {
     this.receiveTail = Promise.resolve();
   }
 
-  configure({ contextCompiler, analyze, onProposed, onEvent, decisionExecutor, reconcileExecution, browserCapture, browserRuntime } = {}) {
+  configure({ contextCompiler, analyze, onProposed, onDuplicate, onEvent, decisionExecutor, reconcileExecution, browserCapture, browserRuntime } = {}) {
     if (contextCompiler) this.contextCompiler = contextCompiler;
     if (analyze) this.analyze = analyze;
     if (onProposed) this.onProposed = onProposed;
+    if (onDuplicate) this.onDuplicate = onDuplicate;
     if (onEvent) this.onEvent = onEvent;
     if (decisionExecutor) this.decisionExecutor = decisionExecutor;
     if (reconcileExecution) this.reconcileExecution = reconcileExecution;
@@ -260,6 +263,20 @@ class IngestWorkflowCoordinator {
     const existing = await this.store.findByIdempotencyKey(idempotencyKey)
       || await this.store.findBySourceIdentityKey(sourceIdentityKey);
     if (existing) {
+      const duplicateInput = {
+        artifact: { id: existing.artifactId, kind: existing.sourceType },
+        workflow: existing,
+        input,
+        context,
+      };
+      // 重复收录的渠道回执必须先返回；补投只唤醒现有 Outbox，不得阻塞 Handler 等待渠道网络。
+      void Promise.resolve().then(() => this.onDuplicate?.(duplicateInput)).catch(async (error) => {
+        try {
+          await this.onEvent?.({ type: "workflow.duplicate_replay_failed", workflow: existing, error });
+        } catch {
+          // 重复回执已经可以返回，后台补投诊断失败不能制造未处理 rejection。
+        }
+      });
       return {
         artifact: { id: existing.artifactId, kind: existing.sourceType },
         workflow: existing,
@@ -525,7 +542,7 @@ class IngestWorkflowCoordinator {
         });
         await this.onEvent?.({ type: "workflow.proposed", workflow: proposed, proposal: result.proposal });
         await this.onProposed?.({ workflow: proposed, candidate: result.candidate, proposal: result.proposal });
-        return proposed;
+        return await this.store.get(id);
       } catch (error) {
         // A3：模型能力错误（耗尽/退出/限流）发生在远程语义分析阶段，此时 propose 已产出基础方案。
         // 不再把整个收录流程锁进 failed_terminal（历史 10 条 workflow 都是这一形态），而是降级：

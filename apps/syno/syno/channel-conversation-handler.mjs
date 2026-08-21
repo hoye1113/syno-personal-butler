@@ -22,8 +22,11 @@ const WORKFLOW_STATUS_LABELS = Object.freeze({
   validating: "正在校验写入",
   committed: "已写入，正在更新索引",
   indexed: "已更新索引，准备回执",
+  reported: "已完成",
   failed_retryable: "暂时失败，等待重试",
   failed_terminal: "无法继续，需要重新收录",
+  rejected: "已拒收",
+  superseded: "已被新方案替代",
 });
 
 function workflowStatusText(workflow) {
@@ -31,6 +34,17 @@ function workflowStatusText(workflow) {
   if (workflow.browserStatus === "running") return "正在尝试浏览器抓取";
   if (workflow.browserStatus === "completed") return "浏览器内容已读取，正在生成收录方案";
   return WORKFLOW_STATUS_LABELS[workflow.stage] || workflow.stage;
+}
+
+function captureReceiptText(receipt, { attachment = false } = {}) {
+  const workflow = receipt?.workflow;
+  const id = workflow?.id || receipt?.artifact?.id || "未知";
+  if (receipt?.duplicate && workflow) {
+    return `已存在收录编号：${id}。当前状态：${workflowStatusText(workflow)}。`;
+  }
+  return attachment
+    ? `已接收附件，收录编号：${id}。正在后台安全提取、查重并生成收录方案。`
+    : `已接收，收录编号：${id}。正在后台安全提取、查重并生成收录方案。`;
 }
 
 // teach-back 软引导（纯函数，可单测）：有活跃复习时把"现在处于复习窗口"注入会话。
@@ -77,6 +91,7 @@ class ChannelConversationHandler {
   }
 
   async #receive(payload, message) {
+    await this.#rememberChannelTarget(message);
     if (this.ingestWorkflows) {
       return this.ingestWorkflows.receive(payload, {
         ownerKey: message.ownerKey,
@@ -118,6 +133,7 @@ class ChannelConversationHandler {
       else images.push(artifact);
     }
     const ingestIds = [];
+    const ingestReceipts = [];
     const rejected = [];
     if (others.length) {
       if (!this.attachmentToPayload) throw new Error("当前渠道没有附件安全转换器");
@@ -126,6 +142,7 @@ class ChannelConversationHandler {
           const payload = await this.attachmentToPayload(artifact);
           if (localOnly) payload.analysisMode = "local-only";
           const receipt = await this.#receive(payload, { ...message, ownerKey });
+          ingestReceipts.push(receipt);
           ingestIds.push(receipt.workflow?.id || receipt.artifact.id);
         } catch (error) {
           rejected.push(error.message);
@@ -148,6 +165,7 @@ class ChannelConversationHandler {
             });
             if (localOnly) payload.analysisMode = "local-only";
             const receipt = await this.#receive(payload, { ...message, ownerKey });
+            ingestReceipts.push(receipt);
             ingestIds.push(receipt.workflow?.id || receipt.artifact.id);
           } catch (error) {
             await this.#record("channel.vision.failed", {
@@ -173,8 +191,8 @@ class ChannelConversationHandler {
         }
       }
     }
-    const ingestNote = ingestIds.length
-      ? `已接收附件，收录编号：${ingestIds.join("、")}。正在后台安全提取、查重并生成收录方案${rejected.length ? `；另有 ${rejected.length} 个附件未通过检查` : ""}。\n`
+    const ingestNote = ingestReceipts.length
+      ? `${ingestReceipts.map((receipt) => captureReceiptText(receipt, { attachment: true })).join("\n")}${rejected.length ? `；另有 ${rejected.length} 个附件未通过检查` : ""}\n`
       : "";
     if (images.length && !explicitIngest) {
       if (!ingestIds.length && others.length) {
@@ -202,6 +220,24 @@ class ChannelConversationHandler {
       : message.channel === "weixin"
         ? { toUserId: String(message.senderId || ""), contextToken: String(message.contextToken || "") }
         : null;
+  }
+
+  async #rememberChannelTarget(message) {
+    if (!this.ownerChannelTargets?.set || !["weixin", "feishu"].includes(message.channel)) return;
+    const target = this.#deliveryTarget(message);
+    const complete = message.channel === "weixin"
+      ? Boolean(target?.toUserId && target?.contextToken)
+      : Boolean(target?.chatId);
+    if (!complete) return;
+    try {
+      await this.ownerChannelTargets.set(message.ownerKey, message.channel, target);
+    } catch (error) {
+      await this.#record("channel.target.persist_failed", {
+        ownerKey: message.ownerKey,
+        channel: message.channel,
+        error: { code: error.code || "CHANNEL_TARGET_PERSIST_FAILED" },
+      }, { level: "warning" });
+    }
   }
 
   async #persistAccepted(message, trace, text) {
@@ -551,8 +587,7 @@ class ChannelConversationHandler {
           ));
         }
         await this.#record("channel.capture.completed", { ...trace, artifactIds: receipts.map((item) => item.artifact.id), sourceKind: "url" });
-        const ids = receipts.map((item) => item.workflow?.id || item.artifact.id);
-        return { text: `已接收，收录编号：${ids.join("、")}。正在后台安全提取、查重并生成收录方案。` };
+        return { text: receipts.map((receipt) => captureReceiptText(receipt)).join("\n") };
       }
       const personalMatch = /^(?:仅本地\s*)?(?:收录我的想法|记下我的想法)[：:]\s*([\s\S]+)$/u.exec(text);
       if (personalMatch) {

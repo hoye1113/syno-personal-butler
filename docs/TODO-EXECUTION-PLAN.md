@@ -224,7 +224,7 @@ implementation:
 当前自动封闭证据：
 
 - 来源去重、内容更新、最终回执、EvidenceCandidate、DLP、规则 supersede、HTML/DOCX/PDF/URL/Markdown/TXT/personal/local-only 适配均有组合测试；当前 Node 全量 454/454 通过。
-- Outbox 已采用 5 分钟可恢复租约、稳定 eventId/idempotencyKey 和接收方幂等边界；仍保持 durable at-least-once 语义，极窄崩溃窗口的重复通知是已记录的产品限制，不会重复写入或重复触发澄清。
+- Outbox 已采用 5 分钟可恢复租约、稳定 eventId/idempotencyKey 和接收方幂等边界；仍保持 durable at-least-once 语义。Workflow `delivered` 表示 Provider 接受而非主人已读；重复 URL 直接返回已有 Workflow 状态，质量拒收进入 `rejected` 终态，未确认的最终通知按重复消息 ID 只创建一次安全 replay。微信/飞书当前目标在投递时从加密 OwnerChannelTargetStore 恢复，`contextToken` 不进入 Workflow、Outbox 或日志。
 - Bilibili canonical 规则与来源报告已按保守语义实现；未完成语义审阅时明确保持 incomplete，不伪报 verified。
 - Standards、Spec、Security 最新复审均未发现未解决 P0/P1。
 - 当前工作树包含两项主人知识变更，任何测试、暂存和提交都必须继续排除它们。
@@ -623,7 +623,7 @@ capture.browser.session_closed
 - `syno_capture_status` 和渠道状态回复展示“正在直接抓取 / 正在尝试浏览器 / 等待你完成验证 / 正在生成收录建议 / 等待确认”等人话阶段。
 - `pnpm harness:doctor` 检查项目 `syno-web-capture` 可发现性；不尝试复制、安装或修复全局浏览器 Skill。
 - Web 高级诊断页可查看浏览器兜底健康和最近失败分类；Today 正常时不增加技术噪声。
-- Outbox 保证 Proposal、交互请求、失败和完成事件最终送回原渠道；同一 eventId 不重复展示。
+- Outbox 保证 Proposal、交互请求、失败和完成事件最终送回原渠道；同一 eventId 不重复展示。重复 URL 返回既有 Workflow 状态，质量拒收进入 `rejected` 终态；Workflow Outbox 的 `delivered` 是 Provider 接受证据，不是用户可见性证明，微信/飞书目标在投递时从加密 OwnerChannelTargetStore 恢复。
 
 完成门槛：出现问题时可以从日志还原每一步，但不能还原用户正文或凭据；阶段事件、Doctor、状态文案和 Outbox 已接入，真实日志验收仍由主人执行。
 

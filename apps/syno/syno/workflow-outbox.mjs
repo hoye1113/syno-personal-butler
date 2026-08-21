@@ -9,7 +9,20 @@ async function atomicJson(file, value) {
   await fs.mkdir(path.dirname(file), { recursive: true });
   const temporary = `${file}.${process.pid}.${randomUUID()}.tmp`;
   await fs.writeFile(temporary, JSON.stringify(value, null, 2), { encoding: "utf8", mode: 0o600 });
-  await fs.rename(temporary, file);
+  try {
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      try {
+        await fs.rename(temporary, file);
+        return;
+      } catch (error) {
+        const transient = ["EACCES", "EBUSY", "EPERM"].includes(error?.code);
+        if (!transient || attempt === 5) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 10 * (2 ** attempt)));
+      }
+    }
+  } finally {
+    await fs.rm(temporary, { force: true }).catch(() => {});
+  }
 }
 
 function eventIdFor(key) {
@@ -25,6 +38,28 @@ function safePayload(payload) {
   return inspectRemoteContent(text).safe
     ? { text }
     : { text: "Syno 状态已更新；通知内容包含敏感信息，已隐藏，请在本机控制台查看。" };
+}
+
+function safeDeliveryTarget(targetChannel, target) {
+  if (!target || typeof target !== "object" || Array.isArray(target)) return undefined;
+  const allowed = targetChannel === "weixin"
+    ? ["toUserId"]
+    : targetChannel === "feishu"
+      ? ["chatId", "replyTo"]
+      : [];
+  const result = Object.fromEntries(allowed
+    .filter((key) => String(target[key] || ""))
+    .map((key) => [key, String(target[key])]));
+  return Object.keys(result).length ? result : undefined;
+}
+
+function sanitizeRecord(record) {
+  if (!record || typeof record !== "object") return record;
+  const safe = { ...record };
+  const target = safeDeliveryTarget(safe.targetChannel, safe.deliveryTarget);
+  if (target) safe.deliveryTarget = target;
+  else delete safe.deliveryTarget;
+  return safe;
 }
 
 class WorkflowOutbox {
@@ -46,7 +81,7 @@ class WorkflowOutbox {
 
   async #get(eventId) {
     try {
-      return JSON.parse(await fs.readFile(this.#file(eventId), "utf8"));
+      return sanitizeRecord(JSON.parse(await fs.readFile(this.#file(eventId), "utf8")));
     } catch (error) {
       if (error.code === "ENOENT") return null;
       throw error;
@@ -109,6 +144,7 @@ class WorkflowOutbox {
     const existing = await this.#get(eventId);
     if (existing) return existing;
     const now = this.clock().toISOString();
+    const deliveryTarget = safeDeliveryTarget(input.targetChannel, input.deliveryTarget);
     const record = {
       eventId,
       workflowId: String(input.workflowId),
@@ -121,7 +157,7 @@ class WorkflowOutbox {
       attempts: 0,
       nextAttemptAt: now,
       createdAt: now,
-      ...(input.deliveryTarget ? { deliveryTarget: input.deliveryTarget } : {}),
+      ...(deliveryTarget ? { deliveryTarget } : {}),
       idempotencyKey,
     };
     await atomicJson(this.#file(eventId), record);
@@ -148,9 +184,34 @@ class WorkflowOutbox {
         continue;
       }
       if (!includeDelivered && item.status === "delivered") continue;
-      records.push(item);
+      records.push(sanitizeRecord(item));
     }
     return records.sort((left, right) => String(left.createdAt).localeCompare(String(right.createdAt)));
+  }
+
+  async findLatest({ workflowId, targetChannel } = {}) {
+    const workflow = String(workflowId || "");
+    const channel = String(targetChannel || "");
+    if (!workflow || !channel) return null;
+    const records = await this.list({ includeDelivered: true });
+    return records
+      .filter((record) => record.workflowId === workflow && record.targetChannel === channel)
+      .sort((left, right) => {
+        const created = String(right.createdAt).localeCompare(String(left.createdAt));
+        return created || String(right.eventId).localeCompare(String(left.eventId));
+      })[0] || null;
+  }
+
+  async wake(eventId) {
+    const operation = this.tail.catch(() => {}).then(async () => {
+      const current = await this.#get(String(eventId || ""));
+      if (!current || !["pending", "failed_retryable"].includes(current.status)) return current;
+      const awakened = { ...current, nextAttemptAt: this.clock().toISOString() };
+      await atomicJson(this.#file(current.eventId), awakened);
+      return awakened;
+    });
+    this.tail = operation;
+    return operation;
   }
 
   // C8：有界保留——终态记录（delivered/failed_terminal）永不重投，淘汰最旧的以防目录单调膨胀
@@ -186,7 +247,7 @@ class WorkflowOutbox {
         const lease = await this.#acquireLease(item.eventId);
         if (!lease) continue;
         try {
-          const current = await this.#get(item.eventId);
+          const current = sanitizeRecord(await this.#get(item.eventId));
           if (!current || current.status === "delivered" || current.status === "failed_terminal") continue;
           // 镜像 ChannelDeliveryOutbox：deliver 抛错按 retryable（默认）归类，除非显式 retryable:false。
           let result;

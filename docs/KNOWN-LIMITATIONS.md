@@ -44,7 +44,7 @@ Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导�
 ## 数据与渠道限制
 
 - 当前 R4.1–R4.7 工作树已完成全量 Node、vault、Repository verify、fresh clone 和 `git diff --check` 自动门禁；浏览器真实页面、Windows 登录冷启动和微信/飞书设备行为仍由主人 P4 验收。
-- 持久 Outbox 已采用 5 分钟可恢复租约、稳定 eventId/idempotencyKey 和接收方幂等边界，仍按 durable at-least-once 语义设计。若渠道已经接收而进程在送达状态落盘前崩溃，恢复后可能重复通知；这不会重复写入或重复触发澄清，已作为显式产品限制保留。
+- 持久 Outbox 已采用 5 分钟可恢复租约、稳定 eventId/idempotencyKey 和接收方幂等边界，仍按 durable at-least-once 语义设计。Workflow Outbox 的 `delivered` 只证明 Provider 接受请求，不证明主人已读；若渠道已经接收而进程在送达状态落盘前崩溃，恢复后可能重复通知，这不会重复写入或重复触发澄清。重复 URL 会返回已有 Workflow 状态；未确认的最终通知只按重复消息 ID 补投一次，微信/飞书的当前目标（含微信 `contextToken`）只从加密 OwnerChannelTargetStore 恢复，不进入 Workflow、Outbox JSON、日志或记忆。
 - Bilibili 专用 canonical 规则、HTML/DOCX 边界和来源更新组合场景已有 Spec/组合测试；Bilibili 未完成语义审阅时保持 incomplete，不伪报 verified。
 - 当前差异的 Standards、Spec、Security 最终复审均完成，未解决 P0/P1 为 0。
 - 当前项目没有 TypeScript 源码、`tsconfig` 或 `typecheck` 脚本；`pnpm run typecheck` 会返回 `ERR_PNPM_NO_SCRIPT`，JavaScript 语法与行为由 Node 全量测试覆盖。

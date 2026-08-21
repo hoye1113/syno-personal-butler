@@ -816,9 +816,55 @@ function createSynoRuntime(options = {}) {
   if (acceptedRecovery && typeof channelConversationHandler.processAcceptedRequest === "function") {
     acceptedRecovery.processRequest = (request) => channelConversationHandler.processAcceptedRequest(request);
   }
+  async function onDuplicateWorkflow({ workflow, context = {} } = {}) {
+    const targetChannel = String(context.channel || workflow?.originChannel || "");
+    if (!workflow || !["weixin", "feishu"].includes(targetChannel)) return;
+    if (typeof workflowOutbox.findLatest !== "function") return;
+    const latest = await workflowOutbox.findLatest({ workflowId: workflow.id, targetChannel });
+    const messageId = String(context.messageId || "");
+    if (latest?.status === "delivered") return;
+    if (latest && ["pending", "failed_retryable"].includes(latest.status)) {
+      await workflowOutbox.wake?.(latest.eventId);
+      await drainWorkflowOutbox();
+      return;
+    }
+    if (latest?.status === "failed_terminal") {
+      const replayEventType = `${String(latest.eventType || "workflow.reported").replace(/(?:\.replay)+$/u, "")}.replay`;
+      await workflowOutbox.enqueue({
+        workflowId: workflow.id,
+        eventType: replayEventType,
+        ownerKey: workflow.ownerKey,
+        targetChannel,
+        threadKey: workflow.threadKey,
+        redactedPayload: latest.redactedPayload,
+        idempotencyKey: `${workflow.id}:workflow-replay:${targetChannel}:${messageId || "no-message"}`,
+      });
+      await drainWorkflowOutbox();
+      return;
+    }
+    if (["reported", "failed_terminal", "rejected", "superseded"].includes(workflow.stage)) {
+      const labels = {
+        reported: "已完成",
+        failed_terminal: "无法继续，需要重新收录",
+        rejected: "已拒收",
+        superseded: "已被新方案替代",
+      };
+      await workflowOutbox.enqueue({
+        workflowId: workflow.id,
+        eventType: "workflow.status_replay",
+        ownerKey: workflow.ownerKey,
+        targetChannel,
+        threadKey: workflow.threadKey,
+        redactedPayload: { text: `收录 ${workflow.id} 当前状态：${labels[workflow.stage] || workflow.stage}。` },
+        idempotencyKey: `${workflow.id}:status-replay:${targetChannel}:${messageId || "no-message"}`,
+      });
+      await drainWorkflowOutbox();
+    }
+  }
   ingestWorkflows.configure?.({
     browserCapture,
     browserRuntime: cognitiveRuntime,
+    onDuplicate: onDuplicateWorkflow,
     onProposed: async ({ workflow, candidate, proposal, action: selectedAction }) => {
       if (!proposalAllowsWriteJob(proposal)) {
         const summary = formatWx({
@@ -841,12 +887,19 @@ function createSynoRuntime(options = {}) {
             idempotencyKey: `${workflow.id}:quality-rejected:${proposal.proposalDigest}:${targetChannel}`,
           });
         }
+        const rejected = await ingestWorkflows.store.update(workflow.id, {
+          stage: "rejected",
+          pendingAction: undefined,
+          nextRetryAt: undefined,
+          lastError: undefined,
+        });
         await recordEvent("ingest.workflow.quality_rejected", {
           workflowId: workflow.id,
           artifactId: workflow.artifactId,
           proposalId: proposal.id,
+          stage: rejected.stage,
         });
-        return;
+        return rejected;
       }
       const action = selectedAction || (proposal.risk === "additive" ? "create" : "keep-separate");
       // trust-but-clarify：只有系统歧义（撞重复=merge / 有未决事项）才回到人在环；
@@ -1114,14 +1167,55 @@ function createSynoRuntime(options = {}) {
       if (Number(event.attempts || 0) >= WORKFLOW_OUTBOX_MAX_ATTEMPTS) {
         return { delivered: false, retryable: false, reason: "WORKFLOW_DELIVERY_EXHAUSTED" };
       }
+      let deliveryTarget = event.deliveryTarget || {};
+      if (["weixin", "feishu"].includes(event.targetChannel)) {
+        let persistedTarget;
+        try {
+          persistedTarget = await ownerChannelTargets?.get?.(event.ownerKey, event.targetChannel) || null;
+        } catch (error) {
+          await recordEvent("ingest.workflow.outbox.target_unavailable", {
+            workflowId: event.workflowId,
+            eventId: event.eventId,
+            targetChannel: event.targetChannel,
+            status: "target_decrypt_failed",
+            error: { code: error?.code || "CHANNEL_TARGET_UNAVAILABLE" },
+          }, { level: "warning" });
+          return { delivered: false, retryable: true, reason: "CHANNEL_TARGET_UNAVAILABLE" };
+        }
+        if (!persistedTarget) {
+          await recordEvent("ingest.workflow.outbox.target_unavailable", {
+            workflowId: event.workflowId,
+            eventId: event.eventId,
+            targetChannel: event.targetChannel,
+            status: "target_missing",
+          }, { level: "warning" });
+          return { delivered: false, retryable: true, reason: "CHANNEL_TARGET_MISSING" };
+        }
+        deliveryTarget = persistedTarget;
+      }
       const results = await channels.send({
         ...event.redactedPayload,
-        ...(event.deliveryTarget || {}),
+        ...deliveryTarget,
         eventId: event.eventId,
         idempotencyKey: event.idempotencyKey,
       }, [event.targetChannel]);
       const result = results[event.targetChannel] || { delivered: false, retryable: false, reason: "channel_missing" };
       return result;
+    }, {
+      onFailedRetryable: async (event) => recordEvent("ingest.workflow.outbox.delivery_failed_retryable", {
+        workflowId: event.workflowId,
+        eventId: event.eventId,
+        targetChannel: event.targetChannel,
+        attempts: event.attempts,
+        errorCode: event.lastError?.code || null,
+      }, { level: "warning" }),
+      onFailedTerminal: async (event) => recordEvent("ingest.workflow.outbox.delivery_failed_terminal", {
+        workflowId: event.workflowId,
+        eventId: event.eventId,
+        targetChannel: event.targetChannel,
+        attempts: event.attempts,
+        errorCode: event.lastError?.code || null,
+      }, { level: "error" }),
     });
   }
   async function drainChannelDeliveryOutbox({ allowProactiveEventId = null } = {}) {
