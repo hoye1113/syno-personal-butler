@@ -1,5 +1,11 @@
 # Syno 执行语义与移动可靠交付交接（2026-07-29）
 
+> **2026-08-21 当前运行时（先读这个）**
+>
+> 产品只走 `DeepSeekHarnessCognitiveRuntime`。生产 chat = 受控 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`；8888 是控制面。微信与 3088 同一 Harness Session。事件流是 WebSocket（GET `/api/events.*` → 426），不是 SSE。本机 `SYNO_DSH_ROOT` clone 必须 `pnpm run build`。生产 permission 表只准 `workspace-write` + `never`，禁止 `danger-full-access`。完整踩坑：`docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」。根契约：`AGENTS.md`。
+>
+> 下文关于 OpenCode 1.18.2 / 4318 / Zen Token、`codex/exec-p10-r6-seal`、「不要 Push」的条目是历史交接，不再是当前启动或提交规则。当前默认分支是 `main`。
+
 > 2026-08-20 产品认知内核已切到唯一的 `DeepSeekHarnessCognitiveRuntime`。下文关于 OpenCode 1.18.2 / 4318 / Zen Token 的条目是历史背景，不再是当前运行时。
 >
 > 2026-07-30 最新断点已迁移到 `docs/handoff-pr10a-2026-07-30.md`。下一位 Agent 必须优先读取该文件；本文件其余内容仅作为历史背景，分支、HEAD、测试数和待办以新交接为准。
@@ -25,7 +31,7 @@
 
 ## 新对话第一句话
 
-> 完整读取根 `AGENTS.md`、`NEXT_SESSION.md` 和 `docs/TODO-EXECUTION-PLAN.md`。先核对分支、HEAD、工作树与真实测试，再从 `codex/exec-p10-r6-seal` 的 R6 Owner 门禁继续。保留两项主人知识变更；不要修改原 Obsidian 库，不要 reset，不要 `git add -A`，不要 Push。
+> 完整读取根 `AGENTS.md` 和 `docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」。当前内核是 DeepSeek Harness（3088 Web + 8888 控制面），不是 OpenCode。先核对分支、HEAD、`SYNO_DSH_ROOT` 是否已 build、工作树，再动手。不要 `git add -A`。未要求时不要 Push。本文件其余章节是 2026-07 历史交接，不要按其「OpenCode / 4318 / 不要 Push 作为永久规则」执行。
 
 ## 历史基线与兼容信息
 

@@ -1,6 +1,8 @@
 # Syno 执行语义与移动可靠交付：权威执行计划
 
-更新日期：2026-07-29（Asia/Shanghai）
+更新日期：2026-08-21（Asia/Shanghai）
+
+本文后半仍是 2026-07 的 PR-00～PR-10 / OpenCode 执行计划。**当前产品内核已倒转到 DeepSeek Harness**（受控 `dsh --profile syno` Web + 8888 控制面）。启动、构建、WebSocket 事件流、permission 表的硬约束以根 `AGENTS.md` 与 `docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」为准，不要按本节旧 OpenCode sidecar 描述去改运行时。
 
 本文是当前唯一详细执行入口。OpenCode P4 历史、知识闭环 P0–P5 和既有验收记录继续保留在本文后续章节与 `docs/archive/`，但不得覆盖本节的新执行顺序。
 

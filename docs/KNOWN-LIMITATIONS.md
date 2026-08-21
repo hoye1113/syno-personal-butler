@@ -1,6 +1,6 @@
 # Syno 已知限制
 
-更新日期：2026-07-28
+更新日期：2026-08-21
 
 ## 发布门槛状态
 
@@ -26,7 +26,7 @@ Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导�
 
 - 仅支持 Windows；Provider Token、微信 Bot/回复上下文和飞书 App Secret 使用当前 Windows 用户的 DPAPI，不可作为跨用户可移植凭据。
 - 只启用 DeepSeek Harness SDK，模型链只有 `deepseek/deepseek-v4-flash` → `deepseek/deepseek-chat`。仅在枚举的瞬态/契约失败且尚无不可逆副作用时尝试下一模型，不切换 Runtime，不回退到其它 Agent。
-- DeepSeek Harness 克隆路径必须由 `SYNO_DSH_ROOT` 指向本机 checkout；未设置则无法启动。生产 chat 监督 `dsh --profile syno web`（默认 `127.0.0.1:3088`）；该 loopback 对话页是特权壳（`approval: never`），不是 8888 控制面。收录分析仍通过 `tsx` 或 packaged-bin 跑 `dsh-jsonrpc-agent`；自动测试走 `tests/support/fake-dsh-jsonrpc-agent.mjs`。不要把 Harness 源码 vendoring 进本仓库。Chat 沙箱工作区是 `%LOCALAPPDATA%\Syno\harness\workspace\<profile>`，不是 git 仓库根。生产 `syno` profile 禁止市场 `dsh plugin add`；Host 会把 `@syno/dsh-plugin` link 进 profile `node_modules`。
+- DeepSeek Harness 克隆路径必须由 `SYNO_DSH_ROOT` 指向本机 checkout；未设置则无法启动。该 checkout **必须** `pnpm run build`（`lib/` + web dist）；只 install 不够，`harness:doctor` 的 bootable 也不是现网证据。生产 chat 的真实 argv 是 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（`dsh web` = 库存 `--profile web`，不要当生产）。事件通道是 WebSocket（HTTP GET `/api/events.*` 返回 426），不是 SSE。loopback 3088 是特权壳（`approval: never`，permission 表只准 `workspace-write`，禁止 `danger-full-access`），不是 8888 控制面。收录分析仍通过 jsonrpc sidecar；自动测试走 `tests/support/fake-dsh-jsonrpc-agent.mjs`。不要把 Harness 源码 vendoring 进本仓库。Chat 沙箱工作区是 `%LOCALAPPDATA%\Syno\harness\workspace\<profile>`，不是 git 仓库根。生产 `syno` profile 禁止市场 `dsh plugin add`；Host 会把 `@syno/dsh-plugin` link 进 profile `node_modules`。Windows 计划任务默认不注入 `SYNO_DSH_ROOT`。踩坑清单：`docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」。
 - 识图走 Host Zen HTTP（`mimo-v2.5-free`），不进入模型链。OpenCode CLI `--file` 在 v1.18.18 无 `--attach` 时会把本地文件标成 `text/plain`，不能当产品通道。微信图片默认聊天识图；明确「收录」才把识图 JSON 送进 text Intake。网络/超时最多再试 2 次，鉴权失败不重试，失败对微信可见、禁止猜图。
 - Chat `web_search` 已启用，后端固定为官方 DeepSeek 搜索（Anthropic 兼容 Messages + 服务端 `web_search`）。该 seam 没有查询/域名白名单；每次搜索是一次额外模型轮次，比纯检索 API 更重。`web_fetch` 仍是匿名 HTTP(S)，Harness 侧不做 SSRF 过滤。收录分析 sidecar 没有 web。
 - OpenCode 与 Hermes 已从产品路径删除。

@@ -8,10 +8,11 @@ Syno 是一个 Windows 本地运行的主动式知识闭环私人管家。它以
 pnpm install --frozen-lockfile
 pnpm test
 pnpm verify
+$env:SYNO_DSH_ROOT = "<absolute-path-to-deepseek-harness>"
 pnpm start
 ```
 
-浏览器打开 <http://127.0.0.1:8888> 进入控制面（凭据、渠道、Policy）。日常对话在受控 DSH Web（默认 <http://127.0.0.1:3088>），与微信同一会话。Syno 不依赖 Obsidian，也不依赖 OpenClaw。
+`SYNO_DSH_ROOT` 里的 clone 必须先 `pnpm run build`。浏览器打开 <http://127.0.0.1:8888> 进入控制面（凭据、渠道、Policy）。日常对话在受控 DSH Web（默认 <http://127.0.0.1:3088>），与微信同一会话。启动、事件协议和 permission 表的踩坑见 [运维](docs/OPERATIONS.md)。Syno 不依赖 Obsidian，也不依赖 OpenClaw。
 
 首次启动默认使用仓库内的 `vault/`、`ops/content/` 与 `ops/artifacts/inbox/`。token-cloud Provider、飞书和微信均按需配置；未配置时不影响本地知识阅读、任务、提醒与待决策项。
 

@@ -102,6 +102,64 @@ Get-Content -LiteralPath $log.FullName -Tail 80
 
 根治约束：**只让 Base64（7-bit ASCII，所有常见代码页的公共子集）跨过 console/stdio 边界**——Node 侧 `Buffer.from(x,"utf8").toString("base64")` 写入 stdin，脚本内只用 `FromBase64String/ToBase64String`（Python 侧用 `io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")` 或注入 `PYTHONUTF8=1`），绝不调 `UTF8.GetString/GetBytes` 或依赖默认编码。`runDpapi`（`provider-credential-store.mjs`）与 Harness JSON-RPC sidecar 均遵循此约束；新增任何跨进程文本往返必须沿用，否则中文路径会静默损坏。
 
+### DeepSeek Harness 生产 chat（2026-08-21）
+
+产品 chat 已倒转：Web 是 DSH 壳，Syno 是 Cordis 插件 + 8888 控制面。改启动、协议或 permission 前先读本节；不要再起 jsonrpc chat sidecar，也不要把 `dsh web` 当成生产。
+
+**进程与端口**
+
+- `http://127.0.0.1:8888`：Syno Host 控制面（凭据、渠道、Policy、`GET /api/syno/harness`）。
+- `http://127.0.0.1:3088`（`SYNO_DSH_WEB_PORT`）：受控 DSH Web，与微信同一 Harness Session。这是特权壳（`approval: never`），不是 8888 的聊天 UI。能打开该 origin 的本机进程等于该 session 的代理。
+- 收录分析仍是第二进程 jsonrpc（`syno-capture.cordis.yml`，无 bash/fs/web）。禁止 jsonrpc chat 与生产 DSH Web 同时写同一 session。紧急回切：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。
+
+**实际 argv（不要抄错）**
+
+Host 监督的是 **syno profile 上的 Web 表面**，不是 launcher 的 `web` 子命令：
+
+```text
+node …/tsx …/apps/cli/src/bin.ts --profile syno --host 127.0.0.1 --port 3088 --no-open
+```
+
+- `dsh web` = `--profile web`，会启动库存 `web` profile，**不是**生产 `syno`。
+- `dsh --profile syno web` 里的 `web` 会变成 syno profile 的内部参数，不要当启动方式。
+- 手工 `dsh --profile syno` 若没有 Host 注入的 `SYNO_BRIDGE_ORIGIN` / `SYNO_BRIDGE_TOKEN`，`@syno/dsh-plugin` 会直接拒绝加载。
+
+**本机 clone 必须构建**
+
+`SYNO_DSH_ROOT` 指向的 `deepseek-harness` checkout 需要：
+
+```powershell
+cd $env:SYNO_DSH_ROOT
+pnpm install
+pnpm run build
+```
+
+只 `pnpm install` 不够。CLI 可用 tsx 跑源码，但 typert 与 `dsh.client` 包的 `exports` 指向 `lib/*.js`。未 build 时典型失败：`Cannot find module …/typert.host.js`、`MissingClientBundleError`、从 `%LOCALAPPDATA%\Syno\harness\home\profiles\node_modules` 解析到空 `lib/`。
+
+`pnpm harness:doctor` 目前只要看到 clone 的 `node_modules` + CLI 源码就会把 chat-web 标成 bootable，**不能**当作 DSH Web 已能启动。
+
+Windows 计划任务 `start-syno.ps1` **不会**写入 `SYNO_DSH_ROOT`。用户/机器环境变量里没有它时，`pnpm windows:restart` 起的 Host 会 `waiting_provider`。`pnpm start` 必须在该进程环境里设置。
+
+**事件通道是 WebSocket，不是 SSE**
+
+现网 `client-connection` 对 `GET /api/events.host` 与 `/api/events.mux` 返回 **426 Upgrade Required**。Host 客户端（`apps/syno/syno/deepseek-harness-web-client.mjs`）必须用 `ws://127.0.0.1:3088/api/events.*`。不要把 SSE GET 加回去；假服务器应对 GET 回 426、对 upgrade 推 `server-request` JSON 文本帧。
+
+**permission 表只准一档**
+
+`workspace-write` + `approval: never` 不是 DSH 库存 preset（库存 `workspace-write` 是 `ask`）。必须在 `packages/syno-dsh-plugin/cordis.patch.yml` 里显式 `defaultPreset: workspace-write`，且 `presets` **只**含这一条（`sandbox: workspace-write` + `approval: never`）。缺省时 boot 报：`composed sandbox and approval defaults match no preset`。
+
+禁止再往生产表加 `danger-full-access` 或 `read-only`/`ask`。`/permission` UI 与 `/permission <name>` 会按表切换：全盘访问会离开 `DSH_CWD`，绕过 `syno_*` + Policy + GitGuard；`ask` 会让微信回合卡在没有审批 UI 的地方。`tests/syno-dsh-profile.test.mjs` 锁住生产 patch 不含 `sandbox: danger-full-access`。
+
+沙箱根是 `%LOCALAPPDATA%\Syno\harness\workspace\chat`，**不是** git 仓库根。
+
+**Profile 由 Host 生成**
+
+`ensureSynoDshProfiles` 每次 chat 启动会重写 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\` 的 manifest / `cordis.patch.yml`，并把 `@syno/dsh-plugin` junction 进 profile `node_modules`。不要对生产 `syno` 跑 `dsh plugin add`。实验只用 `syno-lab`。改完 plugin YAML 后必须重启 Host（8888 与 3088），正在跑的 DSH 进程不会热加载 preset。
+
+**识图在 Host**
+
+微信图片默认 `syno_image_read` → Zen HTTP `mimo-v2.5-free`；Zen key 留在 Host，不进 Harness 子进程。PDF/文本仍收录。明确「收录」才把识图 JSON 当 `kind: text` Intake。
+
 ### Windows 飞书日历 CLI
 
 当前验收锁定官方 `@larksuite/cli` 1.0.72：
@@ -148,9 +206,11 @@ pnpm harness:doctor
 pnpm start
 ```
 
+Clone 还要在 `$env:SYNO_DSH_ROOT` 里 `pnpm run build`，否则 8888 会起来但 3088 起不来。完整踩坑见上文「DeepSeek Harness 生产 chat」。
+
 `harness:doctor` 不把密钥写进输出。协议冒烟用 `pnpm probe:harness`（假 sidecar + 中文 UTF-8）。
 
-生产 chat 由 Host 监督 `dsh --profile syno web`（loopback，默认 `127.0.0.1:3088`，可用 `SYNO_DSH_WEB_PORT` 覆盖），与微信注入同一 Harness Session。Host 会把 `@syno/dsh-plugin` junction/symlink 进 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\node_modules`，不必再跑 `dsh plugin install`。该对话页是特权壳（`approval: never`），不是普通聊天 UI。`http://127.0.0.1:8888` 是控制面。收录分析仍是无 bash/fs/web 的 jsonrpc 第二进程。自动测试 / `SYNO_DSH_FAKE_AGENT` 仍走 jsonrpc fake。紧急回切 chat jsonrpc：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。不要把 jsonrpc sidecar 与生产 `dsh web` 同时接到同一 session。
+生产 chat 由 Host 监督 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（可用 `SYNO_DSH_WEB_PORT` 覆盖），与微信注入同一 Harness Session。Host 会把 `@syno/dsh-plugin` junction/symlink 进 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\node_modules`，不必再跑 `dsh plugin install`。该对话页是特权壳（`approval: never`，permission 表只有 `workspace-write`），不是普通聊天 UI。`http://127.0.0.1:8888` 是控制面。收录分析仍是无 bash/fs/web 的 jsonrpc 第二进程。自动测试 / `SYNO_DSH_FAKE_AGENT` 仍走 jsonrpc fake。紧急回切 chat jsonrpc：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。不要把 jsonrpc sidecar 与生产 DSH Web 同时接到同一 session。不要执行 `dsh web`（那是库存 `--profile web`）。
 
 Chat 的 `web_search` 走官方 `@deepseek-ai/dsh-web-search-deepseek`（复用已注入的 `DEEPSEEK_API_KEY`）。不要对生产 `syno` profile 执行 `dsh plugin add`，也不要从 [dsh-plugin.org](https://dsh-plugin.org/plugins?q=search) 装社区搜索或记忆插件；实验 UI 只用 Host 生成的 `syno-lab` profile（无 Bridge、无 vault 写、无微信）。收录分析 profile 仍然没有 web。
 
