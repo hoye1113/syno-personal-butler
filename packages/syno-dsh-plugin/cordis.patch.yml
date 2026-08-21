@@ -1,11 +1,17 @@
-# Syno production bundle over dsh-base + dsh-web-app.
+# Syno production overlay over the current DSH base/web bundles.
+# dsh-base owns the official compaction backend; schedule is an official
+# function plugin and is mounted here because it is not a profile bundle.
 # Pin official DeepSeek search, re-enable web_search (web-app disables tool-web),
 # mount the Host Tool Bridge, and keep the sandbox on DSH_CWD.
 # Do not add dsh-plugin.org marketplace packages here.
 
 - insert:
+    - id: schedule
+      name: '@deepseek-ai/dsh-schedule'
     - id: syno-tool-bridge
       name: '@syno/dsh-plugin'
+      config:
+        toolSet: core
     - id: web-fetch-http
       name: '@deepseek-ai/dsh-web-fetch-http'
 

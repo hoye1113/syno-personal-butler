@@ -2,9 +2,9 @@
 
 更新日期：2026-08-21（Asia/Shanghai）
 
-本文后半仍是 2026-07 的 PR-00～PR-10 / OpenCode 执行计划。**当前产品内核已倒转到 DeepSeek Harness**（受控 `dsh --profile syno` Web + 8888 控制面）。启动、构建、WebSocket 事件流、permission 表的硬约束以根 `AGENTS.md` 与 `docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」为准，不要按本节旧 OpenCode sidecar 描述去改运行时。
+本文后半包含 2026-07 的历史 PR-00～PR-10 与 OpenCode 记录。**当前活动产品内核是 DeepSeek Harness**（受控 `dsh --profile syno` Web + 8888 控制面）；历史章节只用于追溯，不是当前实现契约。启动、构建、WebSocket 事件流、permission 表的硬约束以根 `AGENTS.md` 与 `docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」为准。
 
-本文是当前唯一详细执行入口。OpenCode P4 历史、知识闭环 P0–P5 和既有验收记录继续保留在本文后续章节与 `docs/archive/`，但不得覆盖本节的新执行顺序。
+本文是当前唯一详细执行入口。历史运行时、知识闭环和既有验收记录继续保留在本文后续章节与 `docs/archive/`，但不得覆盖本节的新执行顺序。
 
 ## 0. 新执行计划（review baseline `567f23d`）
 
@@ -16,9 +16,10 @@ reviewBaseline:
   reviewedAt: 2026-07-29
 
 implementation:
-  branch: codex/exec-p10-r6-seal
-  baseCommit: f9d9206
-  headCommit: 3d67f112d7e7101192f70d89c3ea5f2e99a186b9
+  branch: codex/dsh-hub-slimming
+  baseCommit: cdd93f3
+  headCommit: working-tree
+  status: in_progress
 ```
 
 已完成：PR-00 `codex/exec-p00-contracts`，`567f23d` → `41a324d`，文档、ADR 与迁移策略门禁通过。
@@ -38,7 +39,8 @@ implementation:
 3. PR-04A0～PR-04D：真实身份能力验证、AcceptedRequest、ChannelDeliveryOutbox、原子 Effect Receipt、Unknown Case。
 4. PR-05～PR-06：移动状态、原渠道可靠交付和 Decision 消歧。
 5. PR-07～PR-09：OpenCode Session 安全与 Capture。
-6. PR-10：真实 Owner 验收、Schema 封板和 Legacy 清理。
+6. DSH Hub 瘦身：profile 隔离、core Bridge、ApprovalAdvisor 确定性化。
+7. R6 真实验收完成后，才删除重复认知链路并评估 Mnemon 是否仍保持 lab-only。
 
 硬门禁：
 
@@ -50,51 +52,36 @@ implementation:
 
 详细不可变边界见 ADR 0003–0005。PR-00～PR-03 完整回归和真实本机门禁通过前，不进入移动生产路径切换。
 
-## 当前执行状态（2026-07-29）
+## 当前执行状态（2026-08-21）
 
 - P4.0–P4.6 的实现、自动测试、三轴复审和 Windows 任务安装/受控重启已完成。
-- 当前 Goal 状态为 active：PR-10 readiness 已实现，但 Owner 手机、真实渠道、Windows 冷启动和 Legacy 清理门槛仍未完成；不能用 Fake、探针或单元测试替代。
-- 最近证据（2026-07-29 21:13 CST）：当前提交 Node 523/523、Repository verify 1464 files、active docs 7、Python 3.11 Vault unittest 57/57、`git diff --check` 通过；fresh clone Node 523/523、verify 1461 files、Python 57/57、工作树 clean。Host health/readiness 200/ready，`/api/syno/mobile-delivery` 返回 `mode=legacy`，5 条历史 shadow AcceptedRequest 仍为 accepted，Outbox/Unknown 均为空；OpenCode 1.18.2 healthy，微信/飞书 live probe 均 connected。
-- Windows `Syno` 计划任务经授权 stop/start 后为 `Running`，`legacyTaskDetected=false`；Host lock 通过 Windows 进程启动时间做身份核验并返回 `running`。Windows 下次登录冷启动仍未由 Owner 亲自执行，不能把当前 Running 代替冷启动验收。
-- 工作树当前干净；本轮没有暂存或修改两项主人知识变更，也没有 Push。
-- 不得批准或删除本轮探针留下的待审批/失败 Workflow；其 ID 与处理边界记录在 `NEXT_SESSION.md`。
+- 当前执行分支为 `codex/dsh-hub-slimming`；本轮已完成 profile 隔离、core Bridge 工具集和确定性 ApprovalAdvisor 的自动实现，生产仍不加载 `dsh-mnemon`。
+- 当前 Goal 状态为 active：R6 的 Owner 实测、真实渠道、Windows 冷启动和 Legacy 清理门槛仍未完成；不能用 Fake、探针或单元测试替代。
+- 本轮基线证据：`pnpm test` 为 698 tests / 697 pass / 0 fail / 1 cancelled / exit 1；取消用例是 `web start failure kills the process tree`，根因已定位为 `waitForWebReady` 的 `unref` 超时定时器，后续聚焦回归已恢复为 0 cancelled。
+- 外置 Harness checkout 已配置在 `D:\workSpace\deepseek-harness`，固定 SHA 为 `141eb6fef83422698aef7a981029e843e8161534`；已完成 `pnpm install --frozen-lockfile`、`pnpm run build`、CLI help、profile dump 和 Host 启动验证。
+- 当前变更后的完整 `pnpm test`：702 tests / 702 pass / 0 fail / 0 cancelled / exit 0；`pnpm verify`：Repository verification 1622 files、active docs 7 files；`pnpm check:docs` 通过。
+- `pnpm probe:harness` 使用 fake sidecar 通过 UTF-8 JSON-RPC；`pnpm probe:harness -- --real` 通过 packaged-bin 构建产物发现；`pnpm harness:doctor` 通过并确认 `dynamicMcp:false`、`dangerFullAccess:false`。真实模型调用仍未宣称通过，因为当前环境没有 `DEEPSEEK_API_KEY`。
+- Windows `Syno` 任务的历史安装/受控重启证据仍不能替代下一次登录冷启动；本轮未扩大该范围。
+- 隔离 worktree 当前有本轮源码/文档改动；原 `main` 工作区保持未修改，未暂存、未提交、未 Push。
 
 ## 1. 当前可信基线
 
 - 仓库：`D:\workSpace\syno-personal-butler`
-- 分支：`codex/round3-remediation`
-- 本轮固定起点：`f0333f3`
-- OpenCode 重构实现提交：`5890dad`
-- 当前 HEAD：`f38ab18e6a2e2e09d4e7250ff8b98fc380f8510d`
-- OpenCode CLI 锁定版本：`1.18.2`
-- 真实二进制：
-  `%LOCALAPPDATA%\mise\installs\node\24.13.0\node_modules\opencode-ai\bin\opencode.exe`
-- OpenCode 子进程固定监听 `127.0.0.1:4318`；Syno Host 当前监听端口由现有配置决定。
-- mise shim 在后台启动时曾产生递归进程风暴，生产环境永久禁止直接启动 shim、`.cmd` 或 `.bat`。
-- 本轮开始前 Node 测试 316/316、Repository verify 1326 files。
-- `5890dad` 完成后：Node 370/370、vault pytest 57/57、Repository verify 1358 files。
-- Windows 计划任务 XML 加固后：Node 375/375、vault pytest 57/57、Repository verify 1359 files、`git diff --check` 通过。
-- OpenCode 启动死锁与运行日志修复后：Node 381/381、vault pytest 57/57、Repository verify 1365 files、`git diff --check` 通过。
-- `C:\tmp\syno-fresh-863bcca` 从文档提交前的 `863bcca` 克隆并按锁文件安装：Node 370/370、vault 57/57、Repository verify 1356 files；安装未改变锁文件。
-- 当前工作树全量门禁（2026-07-28）：Node 454/454、vault pytest 57/57、Repository verify 1396 files、`git diff --check` 通过。
-- 2026-07-28 真实直抓回归修复：Node 24 的 pinned DNS `lookup` 回调在 `all` 模式返回数组，OpenRouter 公共页面已成功抓取；新增本地回归测试，避免再次出现 `ERR_INVALID_IP_ADDRESS`。
-- 2026-07-28 真实 WebBridge 复验修复：Kimi `/command` 的 `{ ok, data }` envelope 已在适配器解包；公开知乎 403 页面已验证 `http_forbidden → kimi_webbridge → snapshot_received → awaiting_decision`，真实日志包含 `usedActions: [navigate, snapshot]`。
-- 2026-07-28 Windows 真实任务已完成安装与受控重启：`Syno` 使用真实 `C:\Users\38788\AppData\Local\mise\installs\node\24.13.0\node.exe`（不再使用 mise shim），任务状态在等待 8 秒后仍为 `Running`，Host 健康、PID 所有权记录存在，`legacyTaskDetected=false`；启动器脱敏日志已记录 `launcher.started/health_ok/adopted`。下次 Windows 登录后的冷启动恢复仍待主人验收。
-- 2026-07-28 运行态复核快照（约 22:26 CST）：`Get-ScheduledTask Syno` 当前 `State=Ready`（未运行），`LastRunTime=2026-07-28 20:31:19`、`LastTaskResult=3221225786`（0xC000013A 控制中断退出），`scripts/manage-windows-task.ps1 -Action Status` 同样报告 `running=False`（`installed=true`、`legacyTaskDetected=false`）；8888 上存活的是更早（20:05:47）手动启动的 Host 进程（PID 14368），并非活动任务实例托管。`0xC000013A` 疑似受控重启停止旧实例或任务实例撞上 8888 已被既有 Host 占用所致，根因需主人在冷启动验收中确认；当前 Host 存活 ≠ 任务托管 ≠ 登录恢复。
-- 当前差异 fresh clone `.runtime/p3-fresh-final-1785229932`：Node 433/433、vault pytest 57/57、Repository verify 1378 files；按锁文件安装成功，未包含两项主人知识变更。
-- 工作树中有两项主人知识变更，不属于本轮，禁止覆盖或暂存：
-  - `vault/02-Resources/AI and Agents/MOC - Agent 架构与工程.md`
-  - `vault/02-Resources/AI and Agents/Agent Design & Patterns/当编码不再是瓶颈 - Berkeley RDI 软件自主开发三级框架.md`
-- 主人已明确授权将全局 OpenCode 配置中的可用凭据一次性迁入 Syno DPAPI；产品运行时不会自动读取或依赖全局 `auth.json`。真实免费模型、真实跨渠道对话和真实写入与澄清计数仍未验收。
-- R4.1–R4.7 当前实现位于未提交工作树中；拒绝意图持久化与恢复崩溃窗口已修复，并完成当前差异的全量自动门禁与三轴复审。
-- P1–P3 自动封闭已经完成。P4.0–P4.6 的自然语言路由、项目 Skill、受限 Kimi WebBridge、自动回退、日志/Doctor 和自动测试已经实现并通过本地门禁；P4.7 的真实渠道、浏览器交互、登录后冷启动仍由主人执行。Windows 任务的安装、状态和受控重启已由本轮完成并留有日志证据。
+- 分支：`codex/dsh-hub-slimming`（从 `main` / `cdd93f3` 建立隔离 worktree）。
+- 产品运行时：`DeepSeekHarnessCognitiveRuntime`，固定 `deepseek/deepseek-v4-flash` → `deepseek/deepseek-chat`。
+- 当前 Harness 生产 profile bundle：`@deepseek-ai/dsh-base`、`@deepseek-ai/dsh-web-app`、`@syno/dsh-plugin`；compaction 由 `dsh-base` 提供，`@deepseek-ai/dsh-schedule` 作为官方 function plugin 由 Syno overlay 挂载。
+- 实验 profile：`syno-lab` 保留 DSH CLI 已安装实验依赖；`dsh-mnemon@0.2.13` 只在该 profile，不能访问 Syno Bridge、`vault/ops`、微信或飞书。
+- 本轮修改前的 Node 全量基线为 698 tests / 697 pass / 0 fail / 1 cancelled；修改后必须以当前命令重新取得证据。
+- `git diff --check` 作为本轮源码和文档交付门禁；历史测试数字不替代当前运行证据。
+- 用户级 `SYNO_DSH_ROOT` 已指向上述 checkout；官方 bundle 可解析并已完成生产 Host 启动验证。`mnemon` Native 当前未安装，且公开官方 Windows release 未达到计划要求的 `>=0.2.3`，因此 Native 流程保持阻塞，不用低版本替代。
+- R4.1–R4.7 的既有自动门禁与真实 Owner 证据继续按历史记录使用；本轮只增加 DSH Hub 瘦身接缝，不宣称跨渠道/设备 R6 实测完成。
 
 ## 2. 目标架构
 
 ```text
 微信 / 飞书 / Web
   → ChannelConversationHandler
-  → OpenCode Session
+  → DSH Session / official compaction / ordinary schedule
   → 静态 Syno Tool Bridge
   → ToolRegistry / Policy / Approval / GitGuard
   → vault / ops
@@ -102,8 +89,10 @@ implementation:
 
 职责边界：
 
-- OpenCode 负责对话上下文、压缩、意图理解、Skill 选择和工具规划。
+- DSH 负责会话、上下文压缩、普通同会话调度、Skill 选择和工具规划。
 - Syno 负责 Owner 身份、渠道去重、来源、任务、决策、权限、受控写入和事实源。
+- Syno 的 SignalEngine、PriorityEngine、主动消息预算和 ChannelDeliveryOutbox 负责业务主动运营，不由普通 DSH schedule 替代。
+- 普通 DSH chat 只暴露 core Bridge 工具；`jobs.submit` 是唯一受控写入入口。Capture Session 继续使用 Workflow 签发的浏览器 allowlist。
 - Web 是可选控制台，不是普通收录、询问或决策的强制入口。
 - Harness 聊天可使用沙箱 `workspace-write` 工具，但工作区是 Host 本地数据目录下的隔离 profile，不是 git 仓库根；收录分析 sidecar 无 bash/fs/web。知识写入、改源码仍必须经过 ToolRegistry、Policy、Job、隔离 worktree、validators 和 GitGuard。禁止动态 MCP。
 - 任意写入仍必须经过 ToolRegistry、Policy、Job、隔离 worktree、validators 和 GitGuard。
@@ -113,7 +102,7 @@ implementation:
 ### 3.1 唯一运行时
 
 - 产品运行时唯一启用 `DeepSeekHarnessCognitiveRuntime`。
-- OpenCode、Hermes、原生 Agent 和旧 Executor 已删除，不得回退。
+- OpenCode、Hermes 和原生 Agent 不是产品运行时；旧 Provider/ToolLoop/ContextManager/ConversationStore 路径只有在 R6 真实验收完成后才删除，期间不得作为 Harness fallback。
 - Harness 失败后，自由对话和 LLM Job 等待；本地收录回执、决策解析、搜索和状态查询继续工作。
 
 ### 3.2 模型链
@@ -133,7 +122,7 @@ implementation:
 
 ## 4. 阶段状态
 
-### R0：规格固化与 Doctor — 自动化与本机 Doctor 已完成
+### R0：规格固化与 Doctor — 自动化完成，本机 Harness 待配置
 
 已实现：
 
@@ -144,31 +133,31 @@ implementation:
 验收：
 
 - Doctor 不读取或输出 Token。
-- 路径失效或版本不是 1.18.2 时进入 `setup_required`。
+- `SYNO_DSH_ROOT` 缺失、未 build 或官方 bundle 无法解析时进入 `setup_required`。
 - 不把凭据已配置误报为真实模型或产品验收已完成。
-- 2026-07-28 本机 Doctor 已确认真实 exe 与 1.18.2；主人随后授权完成一次性凭据迁移，下一步由主人重新运行 Doctor 并执行真实模型探针。
+- 本轮不把真实模型调用、Owner 跨设备 R6 或 Native 记忆读写写成已通过；Harness 构建发现和 Host 启动证据与这些验收分开记录。
 
-### R1：Supervisor 与 Server 接缝 — 自动化与真实无模型探针已完成
+### R1：DSH Supervisor 与 Server 接缝 — Harness 构建与 Host 已验证，真实模型待验收
 
 已实现：
 
-- `OpenCodeSupervisor.start/stop/restart/health/status/configure`。
-- loopback、4318、Basic Auth、随机进程密码、独立 profile、固定启动参数。
+- `DeepSeekHarnessSupervisor.start/stop/restart/health/status`。
+- loopback、3088、WebSocket 事件流、独立 profile、固定启动参数。
 - 只终止自有 PID 树；未知进程占端口时拒绝启动。
-- OpenCode 配置显式关闭内置文件、Shell、任务、网络、分享、插件、LSP、formatter 和动态 MCP。
+- DSH cordis 配置固定官方 web/search、workspace-write 权限和 core Bridge；禁止动态 MCP 与 danger-full-access。
 - 真实二进制探针覆盖健康、Session 创建、中止、删除与端口释放。
-- `pnpm start:test` 会在测试环境联启 Syno Host 与 Fake OpenCode；生产环境无法启用 Fake Supervisor。
-- 2026-07-28 真实探针确认：认证成功、Session create/abort/delete 成功、`syno` MCP connected、禁止内置工具可调用数为 0。
+- `pnpm start:test` 会在测试环境联启 Syno Host 与 Fake DSH；生产环境无法启用 Fake Supervisor。
+- 生产真实证据仍待本机 Harness 配置；自动测试覆盖 loopback、Session、工具认证、进程树回收和配置脱敏。
 - Windows 安装器通过 `Syno.WindowsTaskXml.psm1` 对导出的 Task Scheduler XML 做保护与闭环验证：只允许一个登录触发器，固定 `PT30S` 延迟，并锁定执行身份、命令、参数、工作目录、单实例、隐藏、无限执行和每分钟重启。重注册后必须再次导出验证，既有健康任务也只有在同一 XML 契约通过后才能复用。
 - 已修复 Host 初始化与 Tool Bridge 的循环等待：只有 `/api/syno/bridge/mcp` 可在 bootstrap 阶段绕过 `synoReady`，其他 Syno API 仍等待完整初始化。
-- 运行日志写入 `%LOCALAPPDATA%\Syno\logs`：按日 JSONL、14 天保留、字段递归脱敏、不记录消息正文，覆盖初始化、OpenCode、渠道与消息工作流阶段。
-- 2026-07-28 真实复验确认 Host 8888、OpenCode 4318、1.18.2、凭据、静态 MCP、微信和飞书启动健康；真实模型回答内容仍由主人验收。
+- 运行日志写入 `%LOCALAPPDATA%\Syno\logs`：按日 JSONL、14 天保留、字段递归脱敏、不记录消息正文，覆盖初始化、Harness、渠道与消息工作流阶段。
+- 生产 chat 真实复验仍由主人执行；需要确认官方 compaction/schedule 可启动、WebSocket、跨渠道 main Session 和重启恢复。
 
 剩余：
 
-- 在 Windows 登录任务场景下复验 Syno Host 与 OpenCode 子进程共同恢复。
+- 在 Windows 登录任务场景下复验 Syno Host 与 DSH 子进程共同恢复。
 
-### R2：CognitiveRuntime 与 Session — 自动化完成，真实模型待验收
+### R2：CognitiveRuntime 与 DSH Session — 自动化完成，真实模型待验收
 
 已实现：
 
@@ -182,9 +171,9 @@ implementation:
 
 剩余：
 
-- 验证 OpenCode 重启后的上下文恢复与 30 天清理。
+- 验证 Harness 重启后的上下文、PendingDecision 恢复与 30 天清理；确认官方 compaction 保留当前意图和工具调用配对。
 
-### R3：Skills 与 Tool Bridge — 已实现，提示注入实测待完成
+### R3：Skills 与 Tool Bridge — core 工具集已实现，提示注入实测待完成
 
 已实现：
 
@@ -193,6 +182,8 @@ implementation:
 - 唯一静态 MCP `syno`，底层工具名由 Bridge 映射为最终 `syno_*`。
 - `syno_workflow_context` 从 canonical Skill 读取规则，不复制第二套知识语义。
 - Bridge 调用继续经过 ToolRegistry Schema、Policy 和固定 Owner 上下文。
+- 普通 chat 的 core 工具固定为 `workflow.context`、`knowledge.search`、`knowledge.read_snippet`、`today.read`、`capture.start`、`capture.status`、`capture.list_pending`、`jobs.list`、`jobs.submit`、`image.read`；隐藏工具不能通过直接 `tools/call` 绕过。
+- `syno-lab` 保留 DSH CLI 已安装的实验 bundle，`dsh-mnemon@0.2.13` 不访问 Syno Bridge 或 canonical facts。
 - 知识读取为限长 snippet，敏感 frontmatter 默认拒绝。
 
 剩余：
@@ -204,7 +195,7 @@ implementation:
 已实现：
 
 - 微信、飞书统一使用 `ChannelConversationHandler`。
-- 渠道顺序固定为：身份/去重 → 附件 → PendingDecision → 快捷命令 → OpenCode → 回复。
+- 渠道顺序固定为：身份/去重 → 附件 → PendingDecision → 快捷命令 → DSH Session → 回复。
 - `PendingDecision` 支持单一自然澄清、多个决定编号、TTL、重放保护、Owner/thread 绑定。
 - 高风险写入（覆盖/删除/移动/新 MOC/新 tag）在隔离工作区自动执行，绑定 changed paths 和 diff digest，冲突时暂停澄清。
 - `SourceDescriptor` 支持 URL、文件、个人观点和未知来源；Note 初始为 `knowledge_state: captured`。
@@ -222,7 +213,7 @@ implementation:
 
 当前未提交实现已经覆盖：
 
-1. **R4.1 术语与架构**：`CONTEXT.md` 与 ADR 固定 ConversationSession、IngestWorkflow、Artifact、IngestProposal、PendingDecision、KnowledgeRecord，以及“薄 OpenCode Skill + Syno 编译 canonical 上下文”。
+1. **R4.1 术语与架构**：`CONTEXT.md` 与 ADR 固定 ConversationSession、IngestWorkflow、Artifact、IngestProposal、PendingDecision、KnowledgeRecord，以及“薄 DSH Skill + Syno 编译 canonical 上下文”。
 2. **R4.2 持久 Workflow**：具备持久状态机、幂等接收、重启恢复、重试、规则变更 supersede 和终态保留接缝。
 3. **R4.3 Context Compiler**：使用固定 allowlist 编译带 digest 的 WorkflowContextBundle，包含来源适配、上下文预算、长内容分块和远程前 DLP。
 4. **R4.4 Capture Session**：复杂收录使用隔离 capture Session；普通语义分析继续采用最小权限配置，浏览器兜底阶段按上下文启用 `syno-web-capture` 与受限浏览器工具，全文不进入 main Session。
@@ -240,22 +231,27 @@ implementation:
 
 自动封闭已完成；R5/R6 的真实模型、跨渠道、Windows 登录恢复和旧实现删除仍必须等待主人 P4 实测。
 
-### R5：唯一运行时切换 — 代码默认已切换，产品验收未完成
+### R5：DSH 运行时与 Hub 瘦身 — 代码接缝已实现，真实验收未完成
 
-当前代码默认选择 OpenCode Runtime，原生 Runtime 不参与自动回退。Web 已提供：
+当前代码唯一启用 `DeepSeekHarnessCognitiveRuntime`。DSH 负责会话、官方 compaction 和普通同会话 schedule；Syno 保留领域治理内核、SignalEngine 主动运营、Policy/Job/GitGuard、EffectReceipt 和 Outbox。ApprovalAdvisor 已改为只读 artifact 的确定性实现，不再调用 Provider。
 
-- OpenCode 健康、当前尝试和凭据状态。
-- Zen Token 配置入口。
-- OpenCode 重启入口。
-- Provider 不可用时 LLM Job 持久化为 `waiting_provider`，到期后由后台确定性恢复；本地回执、决策解析与状态查询继续可用。
+本轮已实现：
 
-仍需：
+- 生产 profile 精确 pin 当前可解析的官方 base/web-app 与 `@syno/dsh-plugin`，并由 overlay 挂载官方 schedule function plugin；拒绝生产 marketplace add。
+- `syno-lab` 重建时保留 DSH CLI 安装的实验依赖/ bundle，并删除可能遗留的 `@syno/dsh-plugin`。
+- DSH chat 与 Host 共享 10 项 core Bridge 工具集；`tools/list` 和运行时 `tools/call` 双重收窄，Capture 浏览器 allowlist 不受影响。
+- `dsh-mnemon@0.2.13` 仅规划为 lab bundle；Native >=0.2.3、外部 Provider 关闭、敏感数据不进入 Mnemon、不得映射 `vault/ops`。
 
-1. 主人运行 `pnpm harness:doctor`，确认 DeepSeek key 与 sidecar 可启动。
-2. 主人运行 `pnpm start`，用非敏感内容完成真实模型与提示注入探针。
-3. 已完成 `pnpm windows:install`、`pnpm windows:status` 和 `pnpm windows:restart` 的真实验收：任务定义固定、真实 node.exe、健康与持续 Running 均通过；仅保留下次登录冷启动验证。
-4. 完成微信、飞书、Web 跨渠道上下文和工具调用验收。
-5. 复验下次 Windows 登录后 Syno Host 与 OpenCode 子进程共同恢复（当前仍未完成）。
+本轮本机 Harness 证据：
+
+1. ✅ `SYNO_DSH_ROOT`、Harness build、`harness:doctor`、fake UTF-8 probe 和 real packaged-bin discovery 已通过；生产 Host 在 8888/3088 启动并返回 Web 200。
+2. ✅ `syno-lab` 的 `dsh-mnemon@0.2.13`、`--dump-config` 和隔离 Web 启动已通过；实验 profile 无 Syno Bridge。⚠ Native `mnemon` 未安装，且当前公开 release 不满足 `>=0.2.3`，所以 Status/Runtime/Documents/Recall/Remember/Forget 的 Native 流程仍待合规版本。
+
+仍需主人/本机验收：
+
+3. 完成 Web、微信、飞书共享 main Session、waiting_provider、取消、重启恢复、EffectReceipt、Outbox 和跨渠道工具调用的 R6 真实矩阵。
+4. 完成现有 R6 真实矩阵后，才删除旧认知实现；历史旧会话只按脱敏摘要/最近主人消息迁移，工具输出、system/private 内容和密钥模式不迁移，迁移必须幂等。
+5. Mnemon 进入生产需额外安全审查、固定构建产物、数据边界验证和显式政策批准；未满足前保持 lab-only。
 
 ### R6：删除重复实现与封板 — 严格未开始
 
@@ -272,7 +268,7 @@ implementation:
 - 1 次系统控制开关（allowSystemControl）关闭拒绝。
 - 3 次副作用恢复/对账（对应 S1 Effect Receipt，待 S1 落地后补验）。
 - 3 种来源类型的收录。
-- OpenCode 重启后上下文与 PendingDecision 恢复。
+- Harness 重启后 DSH Session 与 PendingDecision 恢复。
 
 满足后才删除原生 `ProviderClient`、`ToolLoopAgent`、`ContextManager`、重复 `ConversationStore`、旧 ExecutorRouter 和非活动 Hermes 代码。删除前后各运行一次完整回归；历史架构决定只留文档。
 

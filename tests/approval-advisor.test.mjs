@@ -57,28 +57,24 @@ test("IngestService.readArtifact throws ARTIFACT_MISSING when absent", async (t)
   await assert.rejects(() => ingest.readArtifact("artifact-missing"), (error) => error.code === "ARTIFACT_MISSING");
 });
 
-test("ApprovalAdvisor.generate reads artifact and enriches reason via Provider (via:butler)", async () => {
-  const calls = [];
-  const provider = { async complete(messages) { calls.push(messages); return { message: { content: "这是一篇 Anthropic Agent 指南，与你的学习目标高度相关，建议收录。" } }; } };
+test("ApprovalAdvisor.generate is deterministic and does not require a Provider", async () => {
   const ingest = { async readArtifact() { return { id: ARTIFACT_ID, title: "Anthropic Agent 工程实战指南", body: "正文", source: "https://mp.weixin.qq.com/s/abc", proposedPath: "vault/00-Inbox/x.md", risk: "additive", dedupeMatches: [] }; } };
-  const advisor = new ApprovalAdvisor({ provider, ingest, clock: () => new Date("2026-07-22T06:00:00Z") });
+  const advisor = new ApprovalAdvisor({ ingest, clock: () => new Date("2026-07-22T06:00:00Z") });
   const advice = await advisor.generate(fakeJob(), { loadRequest: loadRequestFor("create") });
-  assert.equal(advice.via, "butler");
+  assert.equal(advice.via, "deterministic");
   assert.match(advice.whatIsIt, /《Anthropic Agent 工程实战指南》/);
   assert.match(advice.whatIsIt, /微信/);
   assert.equal(advice.recommendation, "approve");
   assert.match(advice.recommendationLabel, /收录/);
-  assert.match(advice.reason, /建议收录/);
+  assert.match(advice.reason, /请求会修改长期事实源/);
   assert.equal(advice.generatedAt, "2026-07-22T06:00:00.000Z");
-  assert.equal(calls.length, 1);
   assert.equal(advice.detail.action, "create");
   assert.equal(advice.caveat, "");
 });
 
 test("ApprovalAdvisor.generate cleans filename-style titles and formats large word counts", async () => {
-  const provider = { async complete() { return { message: { content: "ok" } }; } };
   const ingest = { async readArtifact() { return { id: ARTIFACT_ID, title: "529d70f8-9-Anthropic_Agent_工程实战指南_从入门到生产落地.md", body: "x".repeat(157409), source: "https://mp.weixin.qq.com/s/abc", proposedPath: "vault/00-Inbox/x.md", risk: "additive", dedupeMatches: [] }; } };
-  const advisor = new ApprovalAdvisor({ provider, ingest });
+  const advisor = new ApprovalAdvisor({ ingest });
   const advice = await advisor.generate(fakeJob(), { loadRequest: loadRequestFor("create") });
   assert.match(advice.whatIsIt, /《Anthropic Agent 工程实战指南 从入门到生产落地》/);
   assert.doesNotMatch(advice.whatIsIt, /\.md/);
@@ -87,53 +83,46 @@ test("ApprovalAdvisor.generate cleans filename-style titles and formats large wo
   assert.equal(advice.detail.proposedPath, "vault/00-Inbox/x.md");
 });
 
-test("ApprovalAdvisor.generate falls back to deterministic reason when Provider fails (via:fallback)", async () => {
-  const provider = { async complete() { throw new Error("provider down"); } };
+test("ApprovalAdvisor.generate returns the deterministic reason without a Provider fallback", async () => {
   const ingest = { async readArtifact() { return { id: ARTIFACT_ID, title: "X", body: "b", source: "", proposedPath: "vault/00-Inbox/x.md", risk: "additive", dedupeMatches: [] }; } };
-  const advisor = new ApprovalAdvisor({ provider, ingest });
+  const advisor = new ApprovalAdvisor({ ingest });
   const advice = await advisor.generate(fakeJob({ reason: "请求会修改长期事实源，需要一次审批" }), { loadRequest: loadRequestFor("create") });
-  assert.equal(advice.via, "fallback");
+  assert.equal(advice.via, "deterministic");
   assert.equal(advice.reason, "请求会修改长期事实源，需要一次审批");
   assert.equal(advice.recommendation, "approve");
   assert.equal(advice.caveat, "");
 });
 
-test("ApprovalAdvisor.generate surfaces a dedupe caveat on create-with-matches and keeps it when Provider enriches", async () => {
-  const provider = { async complete() { return { message: { content: "管家解读：内容重复，建议丢弃重复副本。" } }; } };
+test("ApprovalAdvisor.generate surfaces a dedupe caveat deterministically", async () => {
   const ingest = { async readArtifact() { return { id: ARTIFACT_ID, title: "重复篇", body: "b", proposedPath: "vault/00-Inbox/x.md", risk: "merge", dedupeMatches: ["vault/00-Inbox/existing.md"] }; } };
-  const advisor = new ApprovalAdvisor({ provider, ingest });
+  const advisor = new ApprovalAdvisor({ ingest });
   const advice = await advisor.generate(fakeJob(), { loadRequest: loadRequestFor("create") });
-  assert.equal(advice.via, "butler");
-  assert.match(advice.reason, /管家解读/);
+  assert.equal(advice.via, "deterministic");
+  assert.match(advice.reason, /请求会修改长期事实源/);
   assert.match(advice.caveat, /查重命中（1 篇）/);
 });
 
 test("ApprovalAdvisor.generate surfaces a caveat when rejecting a non-duplicate", async () => {
-  const provider = { async complete() { return { message: { content: "ok" } }; } };
   const ingest = { async readArtifact() { return { id: ARTIFACT_ID, title: "唯一篇", body: "b", proposedPath: "", risk: "additive", dedupeMatches: [] }; } };
-  const advisor = new ApprovalAdvisor({ provider, ingest });
+  const advisor = new ApprovalAdvisor({ ingest });
   const advice = await advisor.generate(fakeJob(), { loadRequest: loadRequestFor("reject") });
   assert.match(advice.recommendationLabel, /丢弃/);
   assert.match(advice.caveat, /未命中查重/);
 });
 
 test("ApprovalAdvisor.generate returns minimal advice (no Provider call) for non-ingest operations", async () => {
-  const calls = [];
-  const provider = { async complete() { calls.push(1); return { message: { content: "x" } }; } };
   const ingest = { async readArtifact() { throw new Error("should not be called"); } };
-  const advisor = new ApprovalAdvisor({ provider, ingest });
+  const advisor = new ApprovalAdvisor({ ingest });
   const advice = await advisor.generate(fakeJob({ operation: "goals.create" }), { loadRequest: loadRequestFor("create") });
   assert.equal(advice.via, "minimal");
-  assert.equal(calls.length, 0);
   assert.match(advice.whatIsIt, /goals\.create/);
 });
 
 test("ApprovalAdvisor.generate degrades gracefully when artifact is missing", async () => {
-  const provider = { async complete() { return { message: { content: "x" } }; } };
   const ingest = { async readArtifact() { const error = new Error("missing"); error.code = "ARTIFACT_MISSING"; throw error; } };
-  const advisor = new ApprovalAdvisor({ provider, ingest });
+  const advisor = new ApprovalAdvisor({ ingest });
   const advice = await advisor.generate(fakeJob(), { loadRequest: loadRequestFor("create") });
-  assert.equal(advice.via, "fallback");
+  assert.equal(advice.via, "deterministic");
   assert.match(advice.reason, /原始收录素材已不在本地/);
 });
 
@@ -158,23 +147,19 @@ function inMemoryJobStore(storedJob) {
 }
 
 test("GET /api/syno/jobs/:id/advice generates advice on first open then serves cached", async () => {
-  const providerCalls = [];
-  const provider = { async complete() { providerCalls.push(1); return { message: { content: "建议收录，与目标相关。" } }; } };
   const ingest = { async readArtifact() { return { id: ARTIFACT_ID, title: "T", body: "b", proposedPath: "vault/00-Inbox/t.md", risk: "additive", dedupeMatches: [] }; } };
-  const advisor = new ApprovalAdvisor({ provider, ingest });
+  const advisor = new ApprovalAdvisor({ ingest });
   const store = inMemoryJobStore({ id: "job-20260722-test", intent: "curate_note", status: "awaiting_approval", request: { operation: "ingest.apply" }, decision: { reason: "r", risk: "low" } });
   const runtime = { jobStore: store, approvalAdvisor: advisor };
   const url = () => new URL("http://127.0.0.1/api/syno/jobs/job-20260722-test/advice");
   const readBody = async () => ({});
 
   const first = await routeSynoApi(runtime, { method: "GET" }, url(), readBody);
-  assert.equal(first.advice.via, "butler");
-  assert.equal(providerCalls.length, 1);
+  assert.equal(first.advice.via, "deterministic");
   assert.equal(store.saves.length, 1);
 
   const second = await routeSynoApi(runtime, { method: "GET" }, url(), readBody);
-  assert.equal(second.advice.via, "butler");
-  assert.equal(providerCalls.length, 1);
+  assert.equal(second.advice.via, "deterministic");
   assert.equal(store.saves.length, 1);
 });
 

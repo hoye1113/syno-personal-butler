@@ -122,6 +122,8 @@
 
 - id: syno-tool-bridge
   name: ./syno-tool-bridge-plugin.mjs
+  config:
+    toolSet: core
 
 - id: sessions
   name: '@deepseek-ai/dsh-session-persistence-jsonl'

@@ -35,16 +35,44 @@ function productionProfileManifest({ pluginDir }) {
   };
 }
 
-function labProfileManifest() {
+const PROFILE_DEPENDENCY_SECTIONS = Object.freeze([
+  "dependencies",
+  "devDependencies",
+  "optionalDependencies",
+  "peerDependencies",
+]);
+
+function withoutSynoPlugin(dependencies) {
+  const result = { ...(dependencies || {}) };
+  delete result["@syno/dsh-plugin"];
+  return result;
+}
+
+function uniqueBundles(bundles) {
+  return [...new Set((bundles || []).filter((bundle) => bundle && bundle !== "@syno/dsh-plugin"))];
+}
+
+function labProfileManifest({ existingManifest = null } = {}) {
+  const existing = existingManifest && typeof existingManifest === "object" ? existingManifest : {};
+  const existingDsh = existing.dsh && typeof existing.dsh === "object" ? existing.dsh : {};
+  const existingProfile = existingDsh.profile && typeof existingDsh.profile === "object" ? existingDsh.profile : {};
+  const dependencies = Object.fromEntries(PROFILE_DEPENDENCY_SECTIONS.map((section) => [
+    section,
+    withoutSynoPlugin(existing[section]),
+  ]));
   return {
+    ...existing,
     name: "syno-lab-dsh-profile",
     private: true,
     dsh: {
+      ...existingDsh,
       profile: {
-        bundles: [...LAB_BUNDLES],
+        ...existingProfile,
+        bundles: uniqueBundles([...LAB_BUNDLES, ...(Array.isArray(existingProfile.bundles) ? existingProfile.bundles : [])]),
         allowMarketplaceAdd: true,
       },
     },
+    ...dependencies,
   };
 }
 
@@ -79,6 +107,15 @@ async function writeProfile(directory, manifest, patch) {
   await fs.writeFile(path.join(directory, "cordis.patch.yml"), patch, "utf8");
 }
 
+async function readExistingManifest(directory) {
+  try {
+    return JSON.parse(await fs.readFile(path.join(directory, "package.json"), "utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
 async function ensureSynoDshProfiles({
   homeRoot,
   repoRoot,
@@ -90,7 +127,8 @@ async function ensureSynoDshProfiles({
   const labDir = path.join(profilesRoot, SYNO_LAB_PROFILE_NAME);
   await writeProfile(synoDir, productionProfileManifest({ pluginDir }), PRODUCTION_PATCH);
   await linkPackage(synoDir, "@syno/dsh-plugin", pluginDir);
-  await writeProfile(labDir, labProfileManifest(), LAB_PATCH);
+  const existingLabManifest = await readExistingManifest(labDir);
+  await writeProfile(labDir, labProfileManifest({ existingManifest: existingLabManifest }), LAB_PATCH);
   return { synoDir, labDir, profilesRoot };
 }
 

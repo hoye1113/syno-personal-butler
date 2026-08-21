@@ -154,7 +154,17 @@ Windows 计划任务 `start-syno.ps1` **不会**写入 `SYNO_DSH_ROOT`。用户/
 
 **Profile 由 Host 生成**
 
-`ensureSynoDshProfiles` 每次 chat 启动会重写 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\` 的 manifest / `cordis.patch.yml`，并把 `@syno/dsh-plugin` junction 进 profile `node_modules`。不要对生产 `syno` 跑 `dsh plugin add`。实验只用 `syno-lab`。改完 plugin YAML 后必须重启 Host（8888 与 3088），正在跑的 DSH 进程不会热加载 preset。
+`ensureSynoDshProfiles` 每次 chat 启动会重写 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\` 的 manifest / `cordis.patch.yml`，并把 `@syno/dsh-plugin` junction 进 profile `node_modules`。按当前 Harness checkout 的 manifest，生产 profile 固定 `@deepseek-ai/dsh-base`、`@deepseek-ai/dsh-web-app` 和 `@syno/dsh-plugin`；compaction 由 `dsh-base` 提供，`@deepseek-ai/dsh-schedule` 作为官方 function plugin 由 Syno bundle patch 挂载。若当前 `SYNO_DSH_ROOT` 缺少这些官方包或 schedule 无法解析，启动应失败并报告安装问题，不回退到 Syno 自研上下文链路。不要对生产 `syno` 跑 `dsh plugin add`。
+
+实验只用 `syno-lab`。Host 重建 lab manifest 时会保留 DSH CLI 已安装的 bundle/dependency，并剔除 `@syno/dsh-plugin`，因此不会因生产 Host 重启而丢失实验插件。按 DSH profile 机制安装并锁定 Mnemon：
+
+```powershell
+dsh plugin --profile syno-lab add dsh-mnemon@0.2.13
+```
+
+`dsh-mnemon` 仅用于隔离实验；Windows Mnemon Native 版本至少 `0.2.3`，外部 Memory Provider 必须全部关闭，只使用 Runtime Memory、Documents 与本地 Native。不要把 `vault/` 或 `ops/` 映射为 Mnemon 可写目录，不要放入 Token、Cookie、私钥或原始敏感日志。上游当前没有确定性密钥扫描器；Mnemon 数据不等于 Syno canonical fact。缺少 Native 时，lab 应保持可启动并显示明确降级状态，但不得把插件标记为生产可用。
+
+改完 plugin YAML、profile bundle 或实验插件版本后必须重启 Host（8888 与 3088），正在跑的 DSH 进程不会热加载 preset。生产推广 Mnemon 需要固定版本/构建产物、数据边界验证、独立安全审查和显式政策批准。
 
 **识图在 Host**
 
@@ -208,13 +218,13 @@ pnpm start
 
 Clone 还要在 `$env:SYNO_DSH_ROOT` 里 `pnpm run build`，否则 8888 会起来但 3088 起不来。完整踩坑见上文「DeepSeek Harness 生产 chat」。
 
-`harness:doctor` 不把密钥写进输出。协议冒烟用 `pnpm probe:harness`（假 sidecar + 中文 UTF-8）。
+`harness:doctor` 不把密钥写进输出。协议冒烟用 `pnpm probe:harness`（假 sidecar + 中文 UTF-8）；`pnpm probe:harness -- --real` 只验证真实 Harness 构建产物可发现，完整 sidecar / Tool Bridge 由 Host 启动验收，不在探针中执行模型调用。
 
-生产 chat 由 Host 监督 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（可用 `SYNO_DSH_WEB_PORT` 覆盖），与微信注入同一 Harness Session。Host 会把 `@syno/dsh-plugin` junction/symlink 进 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\node_modules`，不必再跑 `dsh plugin install`。该对话页是特权壳（`approval: never`，permission 表只有 `workspace-write`），不是普通聊天 UI。`http://127.0.0.1:8888` 是控制面。收录分析仍是无 bash/fs/web 的 jsonrpc 第二进程。自动测试 / `SYNO_DSH_FAKE_AGENT` 仍走 jsonrpc fake。紧急回切 chat jsonrpc：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。不要把 jsonrpc sidecar 与生产 DSH Web 同时接到同一 session。不要执行 `dsh web`（那是库存 `--profile web`）。
+生产 chat 由 Host 监督 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（可用 `SYNO_DSH_WEB_PORT` 覆盖），与微信注入同一 Harness Session。Host 会把 `@syno/dsh-plugin` junction/symlink 进 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\node_modules`，不必再跑 `dsh plugin install`。该对话页是特权壳（`approval: never`，permission 表只有 `workspace-write`），不是普通聊天 UI。普通聊天只显示 Bridge core 工具：`workflow.context`、`knowledge.search`、`knowledge.read_snippet`、`today.read`、`capture.start`、`capture.status`、`capture.list_pending`、`jobs.list`、`jobs.submit`、`image.read`；隐藏工具的直接调用仍由 Host 拒绝。Capture Session 继续使用 Workflow 签发的浏览器 allowlist。`http://127.0.0.1:8888` 是控制面。收录分析仍是无 bash/fs/web 的 jsonrpc 第二进程。自动测试 / `SYNO_DSH_FAKE_AGENT` 仍走 jsonrpc fake。紧急回切 chat jsonrpc：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。不要把 jsonrpc sidecar 与生产 DSH Web 同时接到同一 session。不要执行 `dsh web`（那是库存 `--profile web`）。
 
-Chat 的 `web_search` 走官方 `@deepseek-ai/dsh-web-search-deepseek`（复用已注入的 `DEEPSEEK_API_KEY`）。不要对生产 `syno` profile 执行 `dsh plugin add`，也不要从 [dsh-plugin.org](https://dsh-plugin.org/plugins?q=search) 装社区搜索或记忆插件；实验 UI 只用 Host 生成的 `syno-lab` profile（无 Bridge、无 vault 写、无微信）。收录分析 profile 仍然没有 web。
+Chat 的 `web_search` 走官方 `@deepseek-ai/dsh-web-search-deepseek`（复用已注入的 `DEEPSEEK_API_KEY`）；compaction 与普通 schedule 由当前生产 profile 的官方 DSH 层接管（前者来自 `dsh-base`，后者由 `@deepseek-ai/dsh-schedule` function plugin 提供），Syno 的 SignalEngine / PriorityEngine / ChannelDeliveryOutbox 仍负责业务主动运营，不与普通 schedule 混用。不要对生产 `syno` profile 执行 `dsh plugin add`，也不要从 [dsh-plugin.org](https://dsh-plugin.org/plugins?q=search) 装社区搜索或记忆插件；实验 UI 只用 Host 生成的 `syno-lab` profile（无 Bridge、无 vault 写、无微信）。收录分析 profile 仍然没有 web。
 
-微信图片默认走聊天识图（Host `syno_image_read` → OpenCode Zen HTTP `mimo-v2.5-free`）；PDF/文本附件仍收录。明确说「收录」时，识图 JSON 作为 `kind: text` 进入现有 Intake / Proposal。本地知识搜索仍是 `syno_knowledge_search`。识图失败对微信可见，禁止猜图。
+微信图片默认走聊天识图（Host `syno_image_read` → Zen HTTP `mimo-v2.5-free`）；PDF/文本附件仍收录。明确说「收录」时，识图 JSON 作为 `kind: text` 进入现有 Intake / Proposal。本地知识搜索仍是 `syno_knowledge_search`。识图失败对微信可见，禁止猜图。
 
 主人验收清单：
 

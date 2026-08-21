@@ -146,7 +146,6 @@ function waitForWebReady(child, { timeoutMs, expectedOrigin }) {
     const timer = setTimeout(() => {
       finish(runtimeError("HARNESS_NOT_RUNNING", `dsh web 未在 ${timeoutMs}ms 内就绪`));
     }, timeoutMs);
-    timer.unref?.();
     const onData = (chunk) => {
       out += String(chunk);
       const match = /dsh web: (http:\/\/[^\s]+)/.exec(out);

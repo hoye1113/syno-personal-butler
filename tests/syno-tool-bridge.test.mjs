@@ -4,6 +4,7 @@ import test from "node:test";
 import { SynoToolBridge } from "../apps/syno/syno/syno-tool-bridge.mjs";
 import { ToolRegistry } from "../apps/syno/syno/tool-registry.mjs";
 import { createBrowserCaptureTools } from "../apps/syno/syno/browser-capture-tools.mjs";
+import { CORE_CHAT_TOOL_NAMES } from "../config/deepseek-harness/syno-tool-sets.mjs";
 
 function registry() {
   return new ToolRegistry([{
@@ -48,6 +49,46 @@ test("SynoToolBridge exposes only generated syno tools and executes through Tool
   // 完整结果走 content text——LLM 读到的内容不变。
   assert.equal("structuredContent" in called.result, false);
   assert.deepEqual(called.result.content, [{ type: "text", text: JSON.stringify([{ path: "vault/note.md", query: "agent" }]) }]);
+});
+
+test("SynoToolBridge exposedToolNames narrows tools/list and blocks hidden direct calls", async () => {
+  const tools = new ToolRegistry([
+    {
+      name: "knowledge.search",
+      description: "Search",
+      risk: "read",
+      permission: "syno-read",
+      retry: "safe",
+      version: "1",
+      inputSchema: { type: "object", additionalProperties: true },
+      outputSchema: { type: "object" },
+      execute: async () => ({ ok: true }),
+    },
+    {
+      name: "learning.due",
+      description: "Hidden learning",
+      risk: "read",
+      permission: "syno-read",
+      retry: "safe",
+      version: "1",
+      inputSchema: { type: "object", additionalProperties: true },
+      outputSchema: { type: "object" },
+      execute: async () => ({ ok: true }),
+    },
+  ]);
+  const bridge = new SynoToolBridge({ tools, token: "bridge-secret", exposedToolNames: CORE_CHAT_TOOL_NAMES });
+  const listed = await bridge.handle({
+    authorization: "Bearer bridge-secret",
+    body: { jsonrpc: "2.0", id: 1, method: "tools/list" },
+  });
+  assert.deepEqual(listed.result.tools.map((tool) => tool.name), ["knowledge_search"]);
+  const release = bridge.bindContext({ messageId: "hidden-call", allowedTools: ["learning_due"] });
+  const hidden = await bridge.handle({
+    authorization: "Bearer bridge-secret",
+    body: { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "learning_due", arguments: {} } },
+  });
+  release();
+  assert.equal(hidden.error.code, -32601);
 });
 
 test("SynoToolBridge accepts the OpenCode namespaced run capability for its internal MCP name", async () => {

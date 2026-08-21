@@ -13,7 +13,8 @@ import {
   resolveHarnessLaunch,
   waitForWebReady,
 } from "../apps/syno/syno/deepseek-harness-supervisor.mjs";
-import { publicSynoToolName, toBridgeName } from "../config/deepseek-harness/syno-tool-bridge-plugin.mjs";
+import { publicSynoToolName, selectToolDefinitions, toBridgeName } from "../config/deepseek-harness/syno-tool-bridge-plugin.mjs";
+import { CORE_CHAT_TOOL_NAMES } from "../config/deepseek-harness/syno-tool-sets.mjs";
 import { doctor } from "../scripts/deepseek-harness-runtime.mjs";
 
 const fakeAgent = path.resolve("tests/support/fake-dsh-jsonrpc-agent.mjs");
@@ -42,6 +43,16 @@ test("native syno_* names are used instead of MCP prefixes", () => {
   assert.equal(publicSynoToolName("knowledge.search"), "syno_knowledge_search");
   assert.equal(toBridgeName("syno_knowledge_search"), "knowledge_search");
   assert.notEqual(publicSynoToolName("knowledge_search"), "mcp__syno__knowledge_search");
+});
+
+test("core chat tool set is shared by the DSH plugin and excludes hidden domain tools", () => {
+  const definitions = [
+    ...CORE_CHAT_TOOL_NAMES.map((name) => ({ name: name.replaceAll(".", "_"), description: name })),
+    { name: "learning_due", description: "hidden" },
+    { name: "browser_snapshot", description: "capture-only" },
+  ];
+  assert.deepEqual(selectToolDefinitions(definitions, "core").map((tool) => tool.name), CORE_CHAT_TOOL_NAMES.map((name) => name.replaceAll(".", "_")));
+  assert.throws(() => selectToolDefinitions(definitions, "unknown"), /unknown toolSet/);
 });
 
 test("cordis configs live in the Syno repo and never inline API keys", async () => {

@@ -13,6 +13,7 @@ import { BROWSER_TOOL_NAMES } from "./browser-tool-names.mjs";
 import { PATHS } from "./paths.mjs";
 import { ProcessFileLock } from "./process-lock.mjs";
 import { inspectRemoteContent } from "./sensitive-content.mjs";
+import { isCoreChatToolName } from "../../../config/deepseek-harness/syno-tool-sets.mjs";
 
 const HARNESS_ADAPTER = "deepseek-harness-sdk";
 const HARNESS_MODEL_CHAIN = Object.freeze([
@@ -504,9 +505,13 @@ class DeepSeekHarnessCognitiveRuntime {
         const availableTools = this.capabilities().tools;
         const requestedTools = Array.isArray(context.allowedTools) ? new Set(context.allowedTools) : null;
         const browserAuthorized = Boolean(context.browserWorkflowId);
-        const defaultAllowedTools = availableTools.filter((name) => browserAuthorized || !BROWSER_TOOL_NAMES.includes(name));
+        const defaultAllowedTools = profile === "capture"
+          ? (browserAuthorized ? availableTools.filter((name) => BROWSER_TOOL_NAMES.includes(name)) : [])
+          : availableTools.filter((name) => isCoreChatToolName(name));
         const allowedTools = requestedTools
-          ? availableTools.filter((name) => requestedTools.has(name))
+          ? availableTools.filter((name) => requestedTools.has(name) && (profile === "capture"
+            ? (browserAuthorized && BROWSER_TOOL_NAMES.includes(name))
+            : isCoreChatToolName(name)))
           : defaultAllowedTools;
 
         const executeModels = async () => {

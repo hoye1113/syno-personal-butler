@@ -1062,7 +1062,7 @@ function createSynoRuntime(options = {}) {
   const today = options.today || new TodayService({ goals, learning, host, settingsRegistry, signalSources, planner });
   core = new SynoCore({ host, knowledge, notifications, channels, reports, today });
   const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance: knowledgeMaintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery: (deliveryOptions) => drainChannelDeliveryOutbox(deliveryOptions).catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })), recordEvent, onSignalsDelivered: (identities) => reviewReminders.acknowledgeDelivered(identities) });
-  const approvalAdvisor = options.approvalAdvisor || new ApprovalAdvisor({ provider, ingest });
+  const approvalAdvisor = options.approvalAdvisor || new ApprovalAdvisor({ ingest });
   let channelRecoveryTimer = null;
   let providerRecoveryTimer = null;
   let workflowOutboxTimer = null;

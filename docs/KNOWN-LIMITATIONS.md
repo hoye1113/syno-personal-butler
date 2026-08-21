@@ -12,26 +12,34 @@
 - 飞书消息已完成 Owner 私聊、真实 ID 重放拒绝与重启恢复；飞书日历已完成 user 授权、主日历 CRUD、错误拒绝与恢复。
 - `0cc2669` 的 fresh clone 已通过 Node 172/172、vault 57/57 和仓库校验；`a4ec17d` 完成最终回归。真实 Windows Web 生命周期与桌面/移动浏览器增量复验通过。当前代码完整 bundle 为 `C:\tmp\syno-repository-backup-a4ec17d.bundle`，SHA-256 见最终验收矩阵。
 
-旧固定 Provider 的历史验收已经完成，但 OpenCode 重构重新打开了运行时发布门槛。主人已明确授权将全局 OpenCode 配置中的可用凭据一次性迁入 Syno DPAPI，产品运行时不会自动读取或依赖全局 `auth.json`；R5 的真实模型、跨渠道计数、提示注入、OpenCode 重启恢复和 Windows 登录恢复仍未完成。不得把凭据已配置、自动测试或旧 Provider 证据表述为 OpenCode 已封板。
+历史 Provider/旧运行时验收不替代当前 DSH 发布门槛。当前生产只启用 `DeepSeekHarnessCognitiveRuntime`；真实模型、跨渠道计数、提示注入、官方 compaction、Harness 重启恢复和 Windows 登录恢复仍未完成。不得把凭据已配置、自动测试或历史探针证据表述为 DSH 已封板。
 
-OpenCode 已提交基线曾通过 Node 370/370、vault 57/57、Repository verify 1358 files，并通过真实 1.18.2 无模型 Server 探针。当前 R4.1–R4.7 未提交差异已通过 Node 454/454、vault 57/57、Repository verify 1396 files 和三轴最终复审（P0/P1 均为 0）；这些自动证据仍不替代真实 R5/P4 门槛。
+历史自动门禁数字和旧运行时探针只作为追溯记录；本轮基线为 Node 698 tests / 697 pass / 0 fail / 1 cancelled / exit 1，取消用例已定位并在聚焦修复后归零。当前分支的全量结果必须重新运行，不能复用历史数字。
 
 Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导出、保护、重注册并再次导出验证，且健康快路径也必须先通过同一契约。当前真实任务已安装并使用绝对 `node.exe`，受控重启验证时刻曾等待 8 秒仍保持 `Running` 且 Host 健康；安装器还修复了 mise shim 与相对 server 路径接管问题。本次复核（2026-07-28 约 22:26 CST）快照：任务当前 `State=Ready`、未运行，`LastRunTime=2026-07-28 20:31:19`、`LastTaskResult=3221225786`（0xC000013A 控制中断退出），`manage-windows-task -Action Status` 报告 `running=False`，8888 上存活的是更早（20:05:47）手动启动的 Host 进程而非活动任务实例。下次 Windows 登录恢复仍未实测，不能把当前运行态当作冷启动证据；`0xC000013A` 退出根因（疑似受控重启停止旧实例或撞端口占用）需在冷启动验收中确认。
 
-2026-07-28 已修复 OpenCode MCP bootstrap 等待 `synoReady` 导致的启动循环依赖；真实 Host 与 OpenCode Server 已恢复健康，渠道连接正常。运行日志现在按日写入 `%LOCALAPPDATA%\Syno\logs`、保留 14 天并脱敏，但它是诊断记录而不是长期知识或会话事实源；真实模型回答和 Windows 登录恢复仍待主人验收。
+运行日志现在按日写入 `%LOCALAPPDATA%\Syno\logs`、保留 14 天并脱敏，但它是诊断记录而不是长期知识或会话事实源；真实 DSH 模型回答和 Windows 登录恢复仍待主人验收。
 
-当前 OpenCode 提交的 fresh clone 已在 `C:\tmp\syno-fresh-863bcca` 通过 Node 370/370、vault 57/57 和 Repository verify 1356 files。首次纯离线安装因本机 pnpm store 缺少 `mammoth@1.9.1` tarball 失败；随后按未改变的锁文件联网补齐缓存并通过，故“任意机器完全离线安装”不是已保证能力。
+本轮隔离 worktree 依赖安装先因 pnpm store 缺少 `@modelcontextprotocol/sdk` tarball 而离线失败，随后按未改变的锁文件联网补齐并完成定向测试；故“任意机器完全离线安装”不是已保证能力。
 
 ## 运行时限制
 
 - 仅支持 Windows；Provider Token、微信 Bot/回复上下文和飞书 App Secret 使用当前 Windows 用户的 DPAPI，不可作为跨用户可移植凭据。
 - 只启用 DeepSeek Harness SDK，模型链只有 `deepseek/deepseek-v4-flash` → `deepseek/deepseek-chat`。仅在枚举的瞬态/契约失败且尚无不可逆副作用时尝试下一模型，不切换 Runtime，不回退到其它 Agent。
 - DeepSeek Harness 克隆路径必须由 `SYNO_DSH_ROOT` 指向本机 checkout；未设置则无法启动。该 checkout **必须** `pnpm run build`（`lib/` + web dist）；只 install 不够，`harness:doctor` 的 bootable 也不是现网证据。生产 chat 的真实 argv 是 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（`dsh web` = 库存 `--profile web`，不要当生产）。事件通道是 WebSocket（HTTP GET `/api/events.*` 返回 426），不是 SSE。loopback 3088 是特权壳（`approval: never`，permission 表只准 `workspace-write`，禁止 `danger-full-access`），不是 8888 控制面。收录分析仍通过 jsonrpc sidecar；自动测试走 `tests/support/fake-dsh-jsonrpc-agent.mjs`。不要把 Harness 源码 vendoring 进本仓库。Chat 沙箱工作区是 `%LOCALAPPDATA%\Syno\harness\workspace\<profile>`，不是 git 仓库根。生产 `syno` profile 禁止市场 `dsh plugin add`；Host 会把 `@syno/dsh-plugin` link 进 profile `node_modules`。Windows 计划任务默认不注入 `SYNO_DSH_ROOT`。踩坑清单：`docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」。
-- 识图走 Host Zen HTTP（`mimo-v2.5-free`），不进入模型链。OpenCode CLI `--file` 在 v1.18.18 无 `--attach` 时会把本地文件标成 `text/plain`，不能当产品通道。微信图片默认聊天识图；明确「收录」才把识图 JSON 送进 text Intake。网络/超时最多再试 2 次，鉴权失败不重试，失败对微信可见、禁止猜图。
+- 识图走 Host Zen HTTP（`mimo-v2.5-free`），不进入模型链。微信图片默认聊天识图；明确「收录」才把识图 JSON 送进 text Intake。网络/超时最多再试 2 次，鉴权失败不重试，失败对微信可见、禁止猜图。
 - Chat `web_search` 已启用，后端固定为官方 DeepSeek 搜索（Anthropic 兼容 Messages + 服务端 `web_search`）。该 seam 没有查询/域名白名单；每次搜索是一次额外模型轮次，比纯检索 API 更重。`web_fetch` 仍是匿名 HTTP(S)，Harness 侧不做 SSRF 过滤。收录分析 sidecar 没有 web。
-- OpenCode 与 Hermes 已从产品路径删除。
+- OpenCode、Hermes 和原生 Agent 不是产品运行时；旧认知模块的删除仍受 R6 真实验收门禁约束。
 - 模型不可用时，本地搜索、收录回执、任务、提醒与决策解析继续工作；需要模型的 Job 保留为 `waiting_provider`，不会自动换 Provider 或原生 Agent。
 - Syno 不能修改自身源码；只能产生 `BugReport`、`ImprovementProposal` 和 SettingsRegistry 白名单内的偏好变更。
+
+## DSH Hub 与 Mnemon 限制
+
+- `syno-lab` 是唯一实验 profile；`dsh-mnemon@0.2.13` 不加载到生产 `syno`，不接入 Syno Bridge、微信、飞书或 `vault/ops` 写入。
+- Mnemon Native 需要 Windows release 至少 `0.2.3`。外部 Memory Provider 必须关闭，只允许 Runtime Memory、Documents 和本地 Native；Native 缺失时应显示降级状态而不是伪报 Recall/Remember/Forget 成功。
+- Mnemon 数据不是 Syno canonical fact；生产推广需要固定版本/构建产物、敏感数据边界验证、独立安全审查和显式政策批准。
+- 上游当前没有确定性密钥扫描器，故任何 Token、Cookie、私钥或原始敏感日志都不得进入 Mnemon；不得依赖插件自行完成脱敏。
+- 生产 DSH 的 compaction 由当前 `dsh-base` bundle 提供，schedule 由 `@deepseek-ai/dsh-schedule` function plugin 提供；两者都必须在 `SYNO_DSH_ROOT` 的实际构建产物中可解析，缺失时应阻塞启动，不回退到旧 ContextManager 认知链路。
 
 ## 数据与渠道限制
 
@@ -50,5 +58,5 @@ Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导�
 
 ## 兼容性债务
 
-- `ProviderClient` / `ConversationStore` / `ApprovalAdvisor` 仍服务非认知本地路径。OpenCode、Hermes 与死执行器已删除。
+- `ProviderClient` / `ConversationStore` / `ConversationRouter` / `ContextManager` / `ToolLoopAgent` 仍有 legacy 本地调用方；只有 R6 真实矩阵完成后才删除。`ApprovalAdvisor` 已收窄为只依赖 `IngestService` 的确定性模块。
 - 当前事实记录以 Markdown/JSON 契约版本 1 为基线；未来破坏性契约变更必须新增显式迁移器，不能原地静默升级。

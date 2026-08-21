@@ -2,6 +2,16 @@
 
 Syno enables exactly one product `CognitiveRuntime`: `DeepSeekHarnessCognitiveRuntime`. There is no OpenCode, Claude or native rollback path. Syno owns the fixed model chain and may advance only for an enumerated transient/contract failure before any irreversible effect. The model never chooses a provider, model, permission, risk level, approval count, wake-up time or retry escalation.
 
+## DSH Hub boundary
+
+DSH owns the active conversation session, context compaction and ordinary same-session scheduling. Syno remains the domain kernel for `vault/`, `ops/`, `contracts/`, Owner, Policy, Job, Proposal, GitGuard, EffectReceipt and ChannelDeliveryOutbox. DSH Runtime Memory, Documents and any Hub plugin data are convenience context, not Syno canonical facts.
+
+The production profile pins the current official DSH base and web-app bundles plus `@syno/dsh-plugin`; the base supplies compaction and the Syno overlay mounts the official `@deepseek-ai/dsh-schedule` function plugin. It forbids marketplace `dsh plugin add`, dynamic MCP and `danger-full-access`. The `syno-lab` profile is isolated from the production Host: it may retain DSH CLI-installed experimental bundles such as `dsh-mnemon@0.2.13`, but has no Syno Bridge, Vault/ops write path, Weixin or Feishu channel. Mnemon is lab-only until a separate security review and explicit policy change.
+
+Ordinary DSH chat receives only this Bridge core: `workflow.context`, `knowledge.search`, `knowledge.read_snippet`, `today.read`, `capture.start`, `capture.status`, `capture.list_pending`, `jobs.list`, `jobs.submit` and `image.read`. Learning, goals, claims, evidence, settings and mechanical browser tools remain Host capabilities but are not in the default chat directory. `jobs.submit` is the only chat write gateway. The Host intersects requested names with the profile tool set; client-supplied `allowedTools`, profile, permission, authority, Owner or path fields cannot expand it. Capture Sessions use their separately issued browser allowlist.
+
+The Bridge and DSH plugin share the same tool-set names. DSH plugin data must not directly access `vault/`, `ops/`, source code, channel credentials or the delivery Outbox. `dsh-mnemon` external Memory Providers remain disabled; its current upstream package has no deterministic secret scanner, so tokens, cookies, private keys and raw sensitive logs must never be sent to it. Mnemon data is disposable experimental context and must not be promoted as a canonical fact without a Syno Proposal/Job.
+
 | Action | Execution | Workspace | Notes |
 |---|---|---|---|
 | read/search/chat/review | auto | repository | no fact-source writes |

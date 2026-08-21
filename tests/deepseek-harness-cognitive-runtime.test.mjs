@@ -52,7 +52,7 @@ function bridgeTools() {
   const calls = [];
   return {
     calls,
-    list: () => [{ name: "knowledge.search" }, { name: "jobs.submit" }],
+    list: () => [{ name: "knowledge.search" }, { name: "jobs.submit" }, { name: "learning.due" }, { name: "browser.snapshot" }],
     effectVersion: () => 0,
     bindContext: (context) => {
       calls.push({ type: "bind", allowedTools: [...context.allowedTools] });
@@ -130,6 +130,32 @@ test("run binds and releases the Tool Bridge around every model attempt", async 
   assert.equal(result.text, "来自 vault");
   assert.deepEqual(tools.calls.map((item) => item.type), ["bind", "release"]);
   assert.ok(tools.calls[0].allowedTools.includes("syno_knowledge_search"));
+});
+
+test("chat tool requests cannot expand the core set while capture keeps its browser allowlist", async (t) => {
+  const file = await temporaryFile(t);
+  const tools = bridgeTools();
+  const runtime = new DeepSeekHarnessCognitiveRuntime({
+    supervisor: fakeSupervisor({ replies: ["chat", "capture"] }),
+    bindings: new DeepSeekHarnessSessionBindingStore({ file }),
+    tools,
+  });
+  await runtime.run({ text: "hidden" }, {
+    ownerKey: "owner",
+    threadKey: "main",
+    allowedTools: ["syno_learning_due", "syno_browser_snapshot"],
+  });
+  assert.deepEqual(tools.calls[0].allowedTools, []);
+
+  await runtime.run({ text: "browser" }, {
+    ownerKey: "owner",
+    threadKey: "capture:artifact",
+    channel: "capture",
+    allowedTools: ["syno_browser_snapshot", "syno_learning_due"],
+    browserWorkflowId: "workflow-1",
+    ephemeralSession: true,
+  });
+  assert.deepEqual(tools.calls[2].allowedTools, ["syno_browser_snapshot"]);
 });
 
 test("retryable failure shuts down the sidecar then falls back to deepseek-chat", async (t) => {

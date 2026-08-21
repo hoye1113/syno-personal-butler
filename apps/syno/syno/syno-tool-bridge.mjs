@@ -27,6 +27,14 @@ function normalizeAllowedToolName(name) {
   return value.startsWith("syno_") ? value.slice("syno_".length) : value;
 }
 
+function normalizeExposedToolName(name) {
+  const value = String(name || "").trim();
+  if (!value) return "";
+  return value.startsWith("syno_")
+    ? value.slice("syno_".length)
+    : bridgeName(value);
+}
+
 const BRIDGE_TOOL_NAMES = new Set([
   "workflow.context",
   "knowledge.search",
@@ -55,7 +63,7 @@ const BRIDGE_TOOL_NAMES = new Set([
 ]);
 
 class SynoToolBridge {
-  constructor({ tools, token, ownerKey = "local-user", onResult = async () => {}, isRuntimeReady = () => true, effectReceipts = null, reconciliationCases = null, charLimit = null } = {}) {
+  constructor({ tools, token, exposedToolNames = null, ownerKey = "local-user", onResult = async () => {}, isRuntimeReady = () => true, effectReceipts = null, reconciliationCases = null, charLimit = null } = {}) {
     if (!tools || !token) throw new Error("SynoToolBridge 缺少 ToolRegistry 或进程级 Token");
     this.tools = tools;
     this.charLimit = charLimit;
@@ -68,7 +76,13 @@ class SynoToolBridge {
     this.effectCounter = 0;
     this.activeContext = null;
     this.idempotentResults = new Map();
-    this.exposed = new Map(tools.list().filter((tool) => BRIDGE_TOOL_NAMES.has(tool.name)).map((tool) => [bridgeName(tool.name), tool]));
+    const exposedNames = Array.isArray(exposedToolNames)
+      ? new Set(exposedToolNames.map(normalizeExposedToolName).filter(Boolean))
+      : null;
+    this.exposed = new Map(tools.list()
+      .filter((tool) => BRIDGE_TOOL_NAMES.has(tool.name))
+      .filter((tool) => !exposedNames || exposedNames.has(bridgeName(tool.name)))
+      .map((tool) => [bridgeName(tool.name), tool]));
   }
 
   effectVersion() { return this.effectCounter; }
@@ -265,4 +279,4 @@ class SynoToolBridge {
   }
 }
 
-export { BRIDGE_TOOL_NAMES, SynoToolBridge, bridgeName, normalizeAllowedToolName, toolInvocationKey };
+export { BRIDGE_TOOL_NAMES, SynoToolBridge, bridgeName, normalizeAllowedToolName, normalizeExposedToolName, toolInvocationKey };

@@ -1,12 +1,10 @@
 // 收录澄清顾问：trust-but-clarify 下，awaiting_approval 仅由"系统歧义"（收录撞重复/多方案/
 // 信息不足）触发。为这类 Job 生成「这是什么 / 管家说明 / 理由」，帮主人在冲突选项间决策。
 //
-// 设计：确定性底座（读取 artifact 真实字段：标题/来源/路径/查重命中）+ LLM 增强
-// （用管家口吻产出自然语言理由）。LLM 失败/离线 → 回退确定性底座（via:"fallback"），
-// 保证澄清卡片永不为空，符合「Provider 离线时本地继续」。
+// 设计：确定性实现（读取 artifact 真实字段：标题/来源/路径/查重命中），
+// 不调用 Provider，保证澄清卡片可离线、可复现且永不为空。
 //
-// 约束：不创建 Job、不动 git、不起 tool-loop；固定单一 Provider（漂移由 ProviderClient 拒绝），
-// 无模型 fallback；说明始终对齐提交方意图，仅在内容信号冲突时填 caveat（去重命中、唯一内容
+// 约束：不创建 Job、不动 git、不起 tool-loop；说明始终对齐提交方意图，仅在内容信号冲突时填 caveat（去重命中、唯一内容
 // 却要丢弃等），管家不越权改判动作——reject 永远是主人的可选项。
 
 const ACTION_LABELS = Object.freeze({
@@ -16,9 +14,6 @@ const ACTION_LABELS = Object.freeze({
   "link-only": "仅链接",
   "keep-separate": "保持分开",
 });
-
-const ADVISOR_SYSTEM =
-  "你是 Syno 收录澄清顾问。主人正在确认一篇需要澄清的收录候选（可能撞重复、多方案或信息不足）。请用不超过 100 字客观说明：这是什么内容、覆盖了什么、来源与质量如何、对个人知识管理是否有价值。只描述和评价内容本身；不要替主人决定收录或丢弃，也不要建议改用其他动作（如何处理由主人决定）。语气克制、可靠、温暖，用大白话。只输出一段话，不要改写主人原文，不要使用列表符号或标题。";
 
 function actionLabel(action) {
   return ACTION_LABELS[action] || "处理";
@@ -66,9 +61,8 @@ function minimalAdvice(job) {
 }
 
 class ApprovalAdvisor {
-  constructor({ provider, ingest, clock = () => new Date() } = {}) {
-    if (!provider || !ingest) throw new Error("ApprovalAdvisor 缺少 provider 或 ingest");
-    this.provider = provider;
+  constructor({ ingest, clock = () => new Date() } = {}) {
+    if (!ingest) throw new Error("ApprovalAdvisor 缺少 ingest");
     this.ingest = ingest;
     this.clock = clock;
   }
@@ -104,21 +98,20 @@ class ApprovalAdvisor {
           : (job?.decision?.reason || "读取收录素材失败。"),
         detail: { operation: "ingest.apply", action, artifactId, error: error?.code },
         generatedAt: this.clock().toISOString(),
-        via: "fallback",
+        via: "deterministic",
       };
     }
 
     const base = this.#baseAdvice(job, art, action);
-    const enhanced = await this.#enhance(art, action).catch(() => null);
     return {
       whatIsIt: base.whatIsIt,
       recommendation: base.recommendation,
       recommendationLabel: base.recommendationLabel,
-      reason: enhanced?.reason || base.fallbackReason,
+      reason: base.fallbackReason,
       caveat: base.caveat,
       detail: base.detail,
       generatedAt: this.clock().toISOString(),
-      via: enhanced ? "butler" : "fallback",
+      via: "deterministic",
     };
   }
 
@@ -153,21 +146,6 @@ class ApprovalAdvisor {
     return "";
   }
 
-  async #enhance(art, action) {
-    const user = [
-      `标题：${art.title || "（无标题）"}`,
-      `来源：${art.source || "未知"}`,
-      `拟动作：${actionLabel(action)}`,
-      ...(art.dedupeMatches?.length ? [`查重命中已有笔记：${art.dedupeMatches.length} 篇`] : []),
-      `正文片段：${(art.body || "").replace(/\s+/g, " ").trim().slice(0, 1200)}`,
-    ].join("\n");
-    const result = await this.provider.complete(
-      [{ role: "system", content: ADVISOR_SYSTEM }, { role: "user", content: user }],
-      [],
-    );
-    const reason = String(result?.message?.content || "").trim();
-    return reason ? { reason } : null;
-  }
 }
 
 export { ApprovalAdvisor, minimalAdvice, ACTION_LABELS, actionLabel };

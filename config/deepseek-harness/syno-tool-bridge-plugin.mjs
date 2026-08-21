@@ -3,6 +3,8 @@
  * `syno_*` names (not `mcp__syno__*`). Loaded by dsh-jsonrpc-agent from
  * Syno's cordis.yml; talks HTTP JSON-RPC to `/api/syno/bridge/mcp`.
  */
+import { isCoreChatToolName } from "./syno-tool-sets.mjs";
+
 export const name = "syno-tool-bridge";
 export const inject = ["tools"];
 
@@ -32,6 +34,13 @@ const FALLBACK_TOOLS = Object.freeze([
   ["browser_list_tabs", "List browser tabs"],
   ["browser_close_session", "Close a browser session"],
 ]);
+
+function selectToolDefinitions(definitions, toolSet = "all") {
+  const selected = String(toolSet || "all").trim() || "all";
+  if (selected === "all") return [...definitions];
+  if (selected === "core") return definitions.filter((definition) => isCoreChatToolName(definition?.name));
+  throw new Error(`syno-tool-bridge: unknown toolSet ${selected}`);
+}
 
 export function publicSynoToolName(bridgeName) {
   const value = String(bridgeName || "").replaceAll(".", "_");
@@ -92,7 +101,7 @@ function registerTool(ctx, origin, token, definition) {
   });
 }
 
-export async function apply(ctx, _config = {}) {
+export async function apply(ctx, config = {}) {
   const origin = String(process.env.SYNO_BRIDGE_ORIGIN || "").trim();
   const token = String(process.env.SYNO_BRIDGE_TOKEN || "").trim();
   if (!origin || !token) {
@@ -113,5 +122,7 @@ export async function apply(ctx, _config = {}) {
       inputSchema: { type: "object", properties: {}, additionalProperties: true },
     }));
   }
-  for (const tool of listed) registerTool(ctx, origin, token, tool);
+  for (const tool of selectToolDefinitions(listed, config.toolSet)) registerTool(ctx, origin, token, tool);
 }
+
+export { selectToolDefinitions };

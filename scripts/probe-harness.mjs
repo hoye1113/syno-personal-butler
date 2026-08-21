@@ -55,12 +55,13 @@ async function probeReal() {
     };
   }
   return {
-    ok: false,
+    ok: true,
     mode: "real",
-    code: "HARNESS_REAL_PROBE_SKIPPED",
+    stage: "discovery",
+    complete: false,
     kind: launch.kind,
     dshRoot: launch.dshRoot,
-    message: "真实 sidecar 需要完整 Syno Host / Tool Bridge；请设置 SYNO_COGNITIVE_RUNTIME=deepseek-harness 后启动 Host",
+    message: "真实 Harness 构建产物已发现；完整 sidecar / Tool Bridge 由 Syno Host 启动验收，不在此探针内执行模型调用",
   };
 }
 
