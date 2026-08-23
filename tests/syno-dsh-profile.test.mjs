@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -80,6 +80,9 @@ test("syno-lab profile rebuild preserves dsh CLI plugin dependencies without inh
   const repoRoot = path.resolve(".");
   const labDir = path.join(homeRoot, "profiles", SYNO_LAB_PROFILE_NAME);
   await mkdir(labDir, { recursive: true });
+  const stalePluginDir = path.join(labDir, "node_modules", "@syno", "dsh-plugin");
+  await mkdir(stalePluginDir, { recursive: true });
+  await writeFile(path.join(stalePluginDir, "stale.txt"), "stale", "utf8");
   await writeFile(path.join(labDir, "package.json"), `${JSON.stringify({
     name: "dsh-profile",
     private: true,
@@ -93,4 +96,5 @@ test("syno-lab profile rebuild preserves dsh CLI plugin dependencies without inh
   assert.equal(lab.dependencies["dsh-mnemon"], "0.2.13");
   assert.equal(lab.dependencies["@syno/dsh-plugin"], undefined);
   assert.equal(lab.dsh.profile.allowMarketplaceAdd, true);
+  await assert.rejects(() => access(stalePluginDir), { code: "ENOENT" });
 });

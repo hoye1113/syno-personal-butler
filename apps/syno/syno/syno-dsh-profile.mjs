@@ -98,13 +98,20 @@ const LAB_PATCH = `# Experimental DSH Web profile. No Syno Tool Bridge, no vault
 `;
 
 async function linkPackage(profileDir, packageName, targetDir) {
-  const scoped = packageName.startsWith("@") ? packageName.split("/") : [packageName];
-  const destRoot = path.join(profileDir, "node_modules", ...scoped.slice(0, -1));
-  const dest = path.join(destRoot, scoped.at(-1));
-  await fs.mkdir(destRoot, { recursive: true });
+  const dest = packagePath(profileDir, packageName);
+  await fs.mkdir(path.dirname(dest), { recursive: true });
   await fs.rm(dest, { recursive: true, force: true });
   const type = process.platform === "win32" ? "junction" : "dir";
   await fs.symlink(path.resolve(targetDir), dest, type);
+}
+
+function packagePath(profileDir, packageName) {
+  const scoped = packageName.startsWith("@") ? packageName.split("/") : [packageName];
+  return path.join(profileDir, "node_modules", ...scoped);
+}
+
+async function removePackage(profileDir, packageName) {
+  await fs.rm(packagePath(profileDir, packageName), { recursive: true, force: true });
 }
 
 async function writeProfile(directory, manifest, patch) {
@@ -150,6 +157,7 @@ async function ensureSynoDshProfiles({
   await linkPackage(synoDir, "@syno/dsh-plugin", pluginDir);
   const existingLabManifest = await readExistingManifest(labDir);
   await writeProfile(labDir, labProfileManifest({ existingManifest: existingLabManifest }), LAB_PATCH);
+  await removePackage(labDir, "@syno/dsh-plugin");
   return { synoDir, labDir, profilesRoot, agentPreset };
 }
 

@@ -1,6 +1,6 @@
 # Syno 已知限制
 
-更新日期：2026-08-21
+更新日期：2026-08-23
 
 ## 发布门槛状态
 
@@ -14,7 +14,7 @@
 
 历史 Provider/旧运行时验收不替代当前 DSH 发布门槛。当前生产只启用 `DeepSeekHarnessCognitiveRuntime`；真实模型、跨渠道计数、提示注入、长会话 compaction 行为、Harness 重启恢复和 Windows 登录恢复仍未完成。生产受控 `syno` agent preset、Web `agentPreset: syno` 显式绑定和 JSON-RPC 官方 compaction stack 已实现并通过构建产物级验证，但不能替代真实模型和 Owner 验收。不得把凭据已配置、自动测试或历史探针证据表述为 DSH 已封板。
 
-历史自动门禁数字和旧运行时探针只作为追溯记录；本轮基线为 Node 698 tests / 697 pass / 0 fail / 1 cancelled / exit 1，取消用例已定位并在聚焦修复后归零。当前分支的全量结果必须重新运行，不能复用历史数字。
+历史自动门禁数字和旧运行时探针只作为追溯记录；本分支本次按 `package.json` 测试入口执行 Node 714 tests / 714 pass / 0 fail / 0 cancelled / exit 0。该结果只证明自动化门禁，不替代真实 DSH、渠道和 Owner 验收。
 
 Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导出、保护、重注册并再次导出验证，且健康快路径也必须先通过同一契约。当前真实任务已安装并使用绝对 `node.exe`，受控重启验证时刻曾等待 8 秒仍保持 `Running` 且 Host 健康；安装器还修复了 mise shim 与相对 server 路径接管问题。本次复核（2026-07-28 约 22:26 CST）快照：任务当前 `State=Ready`、未运行，`LastRunTime=2026-07-28 20:31:19`、`LastTaskResult=3221225786`（0xC000013A 控制中断退出），`manage-windows-task -Action Status` 报告 `running=False`，8888 上存活的是更早（20:05:47）手动启动的 Host 进程而非活动任务实例。下次 Windows 登录恢复仍未实测，不能把当前运行态当作冷启动证据；`0xC000013A` 退出根因（疑似受控重启停止旧实例或撞端口占用）需在冷启动验收中确认。
 

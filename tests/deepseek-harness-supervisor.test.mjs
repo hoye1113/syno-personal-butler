@@ -46,13 +46,29 @@ test("native syno_* names are used instead of MCP prefixes", () => {
 });
 
 test("core chat tool set is shared by the DSH plugin and excludes hidden domain tools", () => {
+  const knowledgeLoopTools = [
+    "knowledge.fetch_url",
+    "learning.due",
+    "learning.teach_back",
+    "learning.submit",
+  ];
+  assert.deepEqual(CORE_CHAT_TOOL_NAMES.filter((name) => knowledgeLoopTools.includes(name)), knowledgeLoopTools);
   const definitions = [
     ...CORE_CHAT_TOOL_NAMES.map((name) => ({ name: name.replaceAll(".", "_"), description: name })),
-    { name: "learning_due", description: "hidden" },
+    { name: "claims_propose", description: "hidden" },
     { name: "browser_snapshot", description: "capture-only" },
   ];
   assert.deepEqual(selectToolDefinitions(definitions, "core").map((tool) => tool.name), CORE_CHAT_TOOL_NAMES.map((name) => name.replaceAll(".", "_")));
   assert.throws(() => selectToolDefinitions(definitions, "unknown"), /unknown toolSet/);
+});
+
+test("Syno agent instructions match the shared core chat tool set", async () => {
+  const instructions = await fs.readFile(path.resolve("config/deepseek-harness/syno-agent.md"), "utf8");
+  for (const name of CORE_CHAT_TOOL_NAMES) {
+    assert.ok(instructions.includes(`syno_${name.replaceAll(".", "_").replaceAll("-", "_")}`), `提示词缺少 ${name}`);
+  }
+  assert.doesNotMatch(instructions, /不要通过猜测名称调用 learning/);
+  assert.match(instructions, /learning_submit.*待审批/);
 });
 
 test("cordis configs live in the Syno repo and never inline API keys", async () => {

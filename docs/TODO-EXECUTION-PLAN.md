@@ -182,7 +182,7 @@ implementation:
 - 唯一静态 MCP `syno`，底层工具名由 Bridge 映射为最终 `syno_*`。
 - `syno_workflow_context` 从 canonical Skill 读取规则，不复制第二套知识语义。
 - Bridge 调用继续经过 ToolRegistry Schema、Policy 和固定 Owner 上下文。
-- 普通 chat 的 core 工具固定为 `workflow.context`、`knowledge.search`、`knowledge.read_snippet`、`today.read`、`capture.start`、`capture.status`、`capture.list_pending`、`jobs.list`、`jobs.submit`、`image.read`；隐藏工具不能通过直接 `tools/call` 绕过。
+- 普通 chat 的 core 工具固定为 `workflow.context`、`knowledge.search`、`knowledge.read_snippet`、`knowledge.fetch_url`、`today.read`、`learning.due`、`learning.teach_back`、`learning.submit`、`capture.start`、`capture.status`、`capture.list_pending`、`jobs.list`、`jobs.submit`、`image.read`。其中 `learning.submit` 只接收主人原始学习输出并创建待审批的 `learning.evidence.record` Job，不直接写入知识或掌握度；其余隐藏工具不能通过直接 `tools/call` 绕过。
 - `syno-lab` 保留 DSH CLI 已安装的实验 bundle，`dsh-mnemon@0.2.13` 不访问 Syno Bridge 或 canonical facts。
 - 知识读取为限长 snippet，敏感 frontmatter 默认拒绝。
 
@@ -240,7 +240,7 @@ implementation:
 - 生产 profile 精确 pin 当前可解析的官方 base/web-app 与 `@syno/dsh-plugin`，并由 overlay 挂载官方 schedule function plugin；拒绝生产 marketplace add。
 - 生产 Web 由 Host 生成受控 `syno` agent preset，Supervisor 在 `session.create` 显式绑定 `agentPreset: syno`；JSON-RPC chat 同样启用官方 token-meter、tool-result-pruner、compaction-basic 和 compact command，避免库存 coding persona 或旧 native context 链路进入生产。
 - `syno-lab` 重建时保留 DSH CLI 安装的实验依赖/ bundle，并删除可能遗留的 `@syno/dsh-plugin`。
-- DSH chat 与 Host 共享 10 项 core Bridge 工具集；`tools/list` 和运行时 `tools/call` 双重收窄，Capture 浏览器 allowlist 不受影响。
+- DSH chat 与 Host 共享 14 项 core Bridge 工具集；`tools/list` 和运行时 `tools/call` 双重收窄，Capture 浏览器 allowlist 不受影响。`learning.submit` 仍受 Owner 上下文、Schema、Policy 和审批 Job 边界约束。
 - `dsh-mnemon@0.2.13` 仅规划为 lab bundle；Native >=0.2.3、外部 Provider 关闭、敏感数据不进入 Mnemon、不得映射 `vault/ops`。
 
 本轮本机 Harness 证据：

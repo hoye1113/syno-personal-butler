@@ -52,7 +52,16 @@ function bridgeTools() {
   const calls = [];
   return {
     calls,
-    list: () => [{ name: "knowledge.search" }, { name: "jobs.submit" }, { name: "learning.due" }, { name: "browser.snapshot" }],
+    list: () => [
+      { name: "knowledge.search" },
+      { name: "knowledge.fetch_url" },
+      { name: "jobs.submit" },
+      { name: "learning.due" },
+      { name: "learning.teach_back" },
+      { name: "learning.submit" },
+      { name: "claims.propose" },
+      { name: "browser.snapshot" },
+    ],
     effectVersion: () => 0,
     bindContext: (context) => {
       calls.push({ type: "bind", allowedTools: [...context.allowedTools] });
@@ -143,9 +152,21 @@ test("chat tool requests cannot expand the core set while capture keeps its brow
   await runtime.run({ text: "hidden" }, {
     ownerKey: "owner",
     threadKey: "main",
-    allowedTools: ["syno_learning_due", "syno_browser_snapshot"],
+    allowedTools: [
+      "syno_knowledge_fetch_url",
+      "syno_learning_due",
+      "syno_learning_teach_back",
+      "syno_learning_submit",
+      "syno_claims_propose",
+      "syno_browser_snapshot",
+    ],
   });
-  assert.deepEqual(tools.calls[0].allowedTools, []);
+  assert.deepEqual([...tools.calls[0].allowedTools].sort(), [
+    "syno_knowledge_fetch_url",
+    "syno_learning_due",
+    "syno_learning_teach_back",
+    "syno_learning_submit",
+  ].sort());
 
   await runtime.run({ text: "browser" }, {
     ownerKey: "owner",

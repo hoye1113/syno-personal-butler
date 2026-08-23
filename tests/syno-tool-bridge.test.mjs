@@ -65,10 +65,10 @@ test("SynoToolBridge exposedToolNames narrows tools/list and blocks hidden direc
       execute: async () => ({ ok: true }),
     },
     {
-      name: "learning.due",
-      description: "Hidden learning",
-      risk: "read",
-      permission: "syno-read",
+      name: "claims.propose",
+      description: "Hidden claims",
+      risk: "low",
+      permission: "syno-ops",
       retry: "safe",
       version: "1",
       inputSchema: { type: "object", additionalProperties: true },
@@ -82,10 +82,10 @@ test("SynoToolBridge exposedToolNames narrows tools/list and blocks hidden direc
     body: { jsonrpc: "2.0", id: 1, method: "tools/list" },
   });
   assert.deepEqual(listed.result.tools.map((tool) => tool.name), ["knowledge_search"]);
-  const release = bridge.bindContext({ messageId: "hidden-call", allowedTools: ["learning_due"] });
+  const release = bridge.bindContext({ messageId: "hidden-call", allowedTools: ["claims_propose"] });
   const hidden = await bridge.handle({
     authorization: "Bearer bridge-secret",
-    body: { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "learning_due", arguments: {} } },
+    body: { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "claims_propose", arguments: {} } },
   });
   release();
   assert.equal(hidden.error.code, -32601);
