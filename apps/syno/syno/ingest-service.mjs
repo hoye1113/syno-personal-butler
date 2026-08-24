@@ -217,9 +217,15 @@ class IngestService {
   // 按目标笔记路径串行化 append/link 的读-改-写，避免并发收录决策互相覆盖丢失（R3）。
   #targetLocks = new Map();
 
-  constructor({ intake = new IntakeService(), knowledge, opsRoot = PATHS.opsRoot, stateRoot = path.join(PATHS.stateRoot, "ingest"), clock = () => new Date() } = {}) {
+  constructor({ intake = new IntakeService(), knowledge, opsRoot = PATHS.opsRoot, stateRoot = path.join(PATHS.stateRoot, "ingest"), clock = () => new Date(), projectService = null } = {}) {
     if (!knowledge) throw new Error("IngestService 缺少 KnowledgeStore");
-    this.intake = intake; this.knowledge = knowledge; this.opsRoot = opsRoot; this.stateRoot = stateRoot; this.clock = clock;
+    this.intake = intake; this.knowledge = knowledge; this.opsRoot = opsRoot; this.stateRoot = stateRoot; this.clock = clock; this.projectService = projectService;
+  }
+
+  async #validateProject(state) {
+    if (!state?.projectRef) return null;
+    if (!this.projectService) throw Object.assign(new Error("Project 上下文校验服务未配置"), { code: "PROJECT_CONTEXT_UNAVAILABLE" });
+    return this.projectService.validateProjectReference({ ownerKey: state.ownerId, projectRef: state.projectRef });
   }
 
   // 串行化对同一目标文件的写；空闲后清条目防止 Map 无界增长。
@@ -232,7 +238,8 @@ class IngestService {
     return result;
   }
 
-  async receive(payload, { ownerId = "local-user", channel = "web", messageId = "" } = {}) {
+  async receive(payload, { ownerId = "local-user", channel = "web", messageId = "", projectRef = "" } = {}) {
+    await this.#validateProject({ ownerId, projectRef });
     const now = this.clock().toISOString();
     const id = `artifact-${now.slice(0, 10).replaceAll("-", "")}-${randomUUID().slice(0, 8)}`;
     const serialized = JSON.stringify(payload);
@@ -245,7 +252,7 @@ class IngestService {
       dedupeKey: createHash("sha256").update(serialized).digest("hex"),
     };
     const localFile = path.join(this.stateRoot, `${id}.json`);
-    await atomicJson(localFile, { payload, ownerId, channel, messageId, status: "received", created: now, artifact: record });
+    await atomicJson(localFile, { payload, ownerId, channel, messageId, status: "received", created: now, artifact: record, ...(projectRef ? { projectRef } : {}) });
     return { artifact: record, proposalPending: true };
   }
 
@@ -276,6 +283,7 @@ class IngestService {
   async propose(id) {
     const stateFile = path.join(this.stateRoot, `${id}.json`);
     const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
+    await this.#validateProject(state);
     if (state.status === "proposed" && state.candidate && state.proposal) {
       return { candidate: state.candidate, proposal: state.proposal };
     }
@@ -339,6 +347,7 @@ class IngestService {
   async revise(id, revisionRequest) {
     const stateFile = path.join(this.stateRoot, `${id}.json`);
     const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
+    await this.#validateProject(state);
     if (!state.proposal) throw Object.assign(new Error("收录方案尚未生成"), { code: "INGEST_PROPOSAL_MISSING" });
     const revision = String(revisionRequest || "").trim();
     if (!revision) throw Object.assign(new Error("修改要求不能为空"), { code: "INGEST_REVISION_REQUIRED" });
@@ -362,6 +371,7 @@ class IngestService {
     const stateFile = path.join(this.stateRoot, `${id}.json`);
     const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
     if (!state.proposal) throw Object.assign(new Error("收录方案尚未生成"), { code: "INGEST_PROPOSAL_MISSING" });
+    await this.#validateProject(state);
     const allowedRelations = new Set(["supports", "extends", "contradicts", "limits", "depends_on", "applies_to", "example_of"]);
     const relationInputs = Array.isArray(analysis.relations) ? analysis.relations : state.proposal.relations;
     const allowedRelationTargets = new Set(state.candidate?.dedupeMatches || []);
@@ -491,6 +501,7 @@ class IngestService {
   async apply(id, { workspace = PATHS.repoRoot, decision } = {}) {
     const state = JSON.parse(await fs.readFile(path.join(this.stateRoot, `${id}.json`), "utf8"));
     if (!state.proposal) throw Object.assign(new Error("收录方案尚未生成"), { code: "INGEST_PROPOSAL_MISSING" });
+    await this.#validateProject(state);
     const action = String(decision?.action || "");
     if (!action) throw Object.assign(new Error("必须提供显式收录决策"), { code: "INGEST_DECISION_REQUIRED" });
     const allowed = state.proposal.risk === "additive"

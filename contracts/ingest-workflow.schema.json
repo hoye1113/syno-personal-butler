@@ -22,6 +22,7 @@
     "id": { "type": "string", "pattern": "^workflow-[a-zA-Z0-9-]+$" },
     "artifactId": { "type": "string", "minLength": 1 },
     "ownerKey": { "type": "string", "minLength": 1 },
+    "projectRef": { "type": "string", "pattern": "^project-\\d{8}-[a-f0-9]{8}$" },
     "originChannel": { "type": "string", "minLength": 1 },
     "threadKey": { "type": "string", "minLength": 1 },
     "platformMessageId": { "type": "string" },

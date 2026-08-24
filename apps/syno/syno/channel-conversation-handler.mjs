@@ -4,6 +4,7 @@ import { ChannelIntentRouter } from "./channel-intent-router.mjs";
 import { parseRecentReference } from "./recent-interaction.mjs";
 import { isImageMime } from "./image-mime.mjs";
 import { visionResultToIntakePayload } from "./vision-intake.mjs";
+import { parseProjectDirective } from "./project-directive.mjs";
 
 // 链接字符集排除 CJK 与中文/全角标点：微信里链接后紧贴中文是常态，\S+ 会把中文粘进链接——
 // 2026-07-30「<url>；帮我读一下讲了什么」就被整串当裸链接走进了收录管线。
@@ -62,12 +63,13 @@ function buildTeachBackPriming(activeReviews) {
 }
 
 class ChannelConversationHandler {
-  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery, reviewReminders = null, imageStore = null, visionClient = null } = {}) {
+  constructor({ runtime, core, ingest, ingestWorkflows, projects = null, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery, reviewReminders = null, imageStore = null, visionClient = null } = {}) {
     if (!runtime || !core || (!ingest && !ingestWorkflows) || !pendingDecisions) throw new Error("ChannelConversationHandler 缺少 Runtime、Core、IngestWorkflow 或 PendingDecision Store");
     this.runtime = runtime;
     this.core = core;
     this.ingest = ingest;
     this.ingestWorkflows = ingestWorkflows;
+    this.projects = projects;
     this.pendingDecisions = pendingDecisions;
     this.attachmentToPayload = attachmentToPayload;
     this.journal = journal;
@@ -98,6 +100,7 @@ class ChannelConversationHandler {
         channel: message.channel,
         threadKey: message.threadKey || "main",
         messageId: message.id,
+        ...(message.projectRef ? { projectRef: message.projectRef } : {}),
         replyTarget: message.channel === "feishu"
           ? { chatId: String(message.chatId || ""), replyTo: String(message.id || "") }
           : message.channel === "weixin"
@@ -123,7 +126,7 @@ class ChannelConversationHandler {
     return receipt;
   }
 
-  async #handleAttachments({ message, text, localOnly, ownerKey, trace }) {
+  async #handleAttachments({ message, text, localOnly, ownerKey, projectRef, trace }) {
     await this.#record("channel.attachment.requested", { ...trace, count: message.artifacts.length });
     const explicitIngest = EXPLICIT_INGEST_PATTERN.test(text);
     const images = [];
@@ -141,7 +144,7 @@ class ChannelConversationHandler {
         try {
           const payload = await this.attachmentToPayload(artifact);
           if (localOnly) payload.analysisMode = "local-only";
-          const receipt = await this.#receive(payload, { ...message, ownerKey });
+          const receipt = await this.#receive(payload, { ...message, ownerKey, ...(projectRef ? { projectRef } : {}) });
           ingestReceipts.push(receipt);
           ingestIds.push(receipt.workflow?.id || receipt.artifact.id);
         } catch (error) {
@@ -164,7 +167,7 @@ class ChannelConversationHandler {
               name: String(registered.path).replace(/^.*[\\/]/, "") || "image-vision.txt",
             });
             if (localOnly) payload.analysisMode = "local-only";
-            const receipt = await this.#receive(payload, { ...message, ownerKey });
+            const receipt = await this.#receive(payload, { ...message, ownerKey, ...(projectRef ? { projectRef } : {}) });
             ingestReceipts.push(receipt);
             ingestIds.push(receipt.workflow?.id || receipt.artifact.id);
           } catch (error) {
@@ -181,6 +184,7 @@ class ChannelConversationHandler {
                 threadKey: message.threadKey || "main",
                 messageId: message.id,
                 conversationId: message.threadKey || "main",
+                projectRef,
               });
               const queuedId = queued.job?.id || queued.id;
               rejected.push(`识图暂时失败，已排队重试：${queuedId}`);
@@ -366,7 +370,7 @@ class ChannelConversationHandler {
       ownerKey: String(message.ownerKey || "local-user"),
       threadKey: String(message.threadKey || "main"),
     };
-    const text = String(message.text || "").trim();
+    let text = String(message.text || "").trim();
     if (!message.__synoV2Worker && this.mobileDeliveryMode?.is?.("v2")) {
       try {
         return await this.#handleV2(message, trace, text);
@@ -381,6 +385,13 @@ class ChannelConversationHandler {
     try {
       const ownerKey = String(message.ownerKey || "local-user");
       const threadKey = String(message.threadKey || "main");
+      const directive = parseProjectDirective(text);
+      const projectRef = directive.projectRef || "";
+      if (projectRef) {
+        if (!this.projects) throw Object.assign(new Error("Project 上下文校验服务未配置"), { code: "PROJECT_CONTEXT_UNAVAILABLE" });
+        await this.projects.validateProjectReference({ ownerKey, projectRef, forBinding: true });
+        text = directive.textWithoutDirective;
+      }
       const localOnly = /(?:^|\s)仅本地(?:\s|$)/u.test(text);
       if (!message.__synoV2Worker && this.acceptedRequests && trace.messageId) await this.#persistAccepted(message, trace, text);
       await this.#record("channel.message.received", {
@@ -391,7 +402,7 @@ class ChannelConversationHandler {
       // Attachments always become isolated Artifacts before any text is
       // interpreted as an approval command. Embedded content is never authority.
       if (Array.isArray(message.artifacts) && message.artifacts.length) {
-        const attachmentOutcome = await this.#handleAttachments({ message, text, localOnly, ownerKey, trace });
+        const attachmentOutcome = await this.#handleAttachments({ message, text, localOnly, ownerKey, projectRef, trace });
         if (attachmentOutcome.reply) return attachmentOutcome.reply;
         message.__imageArtifacts = attachmentOutcome.imageArtifacts;
         message.__ingestNote = attachmentOutcome.ingestNote;
@@ -583,7 +594,7 @@ class ChannelConversationHandler {
         for (let index = 0; index < targets.length; index += 1) {
           receipts.push(await this.#receive(
             { kind: "url", value: targets[index], ...(localOnly ? { analysisMode: "local-only" } : {}) },
-            { ...message, id: targets.length === 1 ? message.id : `${message.id || "capture"}:${index}`, ownerKey },
+            { ...message, id: targets.length === 1 ? message.id : `${message.id || "capture"}:${index}`, ownerKey, ...(projectRef ? { projectRef } : {}) },
           ));
         }
         await this.#record("channel.capture.completed", { ...trace, artifactIds: receipts.map((item) => item.artifact.id), sourceKind: "url" });
@@ -596,7 +607,7 @@ class ChannelConversationHandler {
           value: personalMatch[1],
           sourceKind: "personal",
           ...(localOnly ? { analysisMode: "local-only" } : {}),
-        }, { ...message, ownerKey });
+        }, { ...message, ownerKey, ...(projectRef ? { projectRef } : {}) });
         return { text: `已接收个人想法，收录编号：${receipt.workflow?.id || receipt.artifact.id}。` };
       }
       // 「读链接」意图（Owner 2026-07-30 二次修订：只读不收录——先读内容，主人自行判断是否收录）：
@@ -642,6 +653,7 @@ class ChannelConversationHandler {
           threadKey,
           channel: message.channel,
           messageId: message.id,
+          projectRef,
         });
         await this.#record("channel.runtime.completed", { ...trace, runId: result.runId || null });
         const prefix = message.__ingestNote ? `${message.__ingestNote}` : "";
@@ -656,6 +668,7 @@ class ChannelConversationHandler {
           threadKey,
           messageId: message.id,
           conversationId: threadKey,
+          projectRef,
         });
         return {
           text: queued.job?.status === "waiting_provider"

@@ -261,11 +261,13 @@ function createSynoRuntime(options = {}) {
   const conversations = options.conversations || new ConversationStore();
   const conversationRouter = options.conversationRouter || new ConversationRouter();
   const settingsRegistry = options.settingsRegistry || new SettingsRegistry();
+  const projects = options.projects || new ProjectService();
   const windowsServiceManager = options.windowsServiceManager || new WindowsServiceManager();
   const windowsService = options.windowsService || new WindowsServiceControl({ manager: windowsServiceManager, jobs: jobStore, settingsRegistry });
   const sourceIntake = options.intake || new IntakeService();
   const browserCapture = options.browserCapture || new BrowserCaptureAdapter();
-  const ingest = options.ingest || new IngestService({ intake: sourceIntake, knowledge });
+  const ingest = options.ingest || new IngestService({ intake: sourceIntake, knowledge, projectService: projects });
+  if (ingest && !ingest.projectService) ingest.projectService = projects;
   const workflowContextCompiler = options.workflowContextCompiler || new WorkflowContextCompiler();
   const workflowOutbox = options.workflowOutbox || new WorkflowOutbox();
   const acceptedRequests = options.acceptedRequests || (process.env.NODE_ENV === "test" ? null : new AcceptedRequestStore());
@@ -346,10 +348,9 @@ function createSynoRuntime(options = {}) {
     providerAvailable: options.captureProviderAvailable || (() => true),
     budget: options.captureBudget ?? Number.POSITIVE_INFINITY,
   });
-  const ingestWorkflows = options.ingestWorkflows || new IngestWorkflowCoordinator({ ingest, contextCompiler: workflowContextCompiler });
+  const ingestWorkflows = options.ingestWorkflows || new IngestWorkflowCoordinator({ ingest, contextCompiler: workflowContextCompiler, projectService: projects });
   const learning = options.learning || new LearningService();
   const outputs = options.outputs || new OutputService();
-  const projects = options.projects || new ProjectService();
   const goals = options.goals || new GoalService({ projectService: projects });
   const claims = options.claims || new ClaimEvidenceService();
   const knowledgeMaintenance = options.knowledgeMaintenance || new KnowledgeMaintenanceSource();
@@ -439,7 +440,7 @@ function createSynoRuntime(options = {}) {
       inputSchema: { type: "object", required: ["knowledgeRef", "inputMode", "rawOutput", "rubric", "selfAssessment"], properties: { knowledgeRef: { type: "string", minLength: 1 }, inputMode: { enum: ["teach-back", "typed", "quiz", "practice", "voice"] }, rawOutput: { type: "string", minLength: 20 }, assistedLevel: { enum: ["none", "prompted", "outlined", "heavily-assisted"] }, selfAssessment: { enum: ["solid", "mostly", "shaky", "lost"] }, rubric: { type: "object", required: ["accurate", "explained", "applied", "discriminated"], properties: { accurate: { type: "number", minimum: 0, maximum: 1 }, explained: { type: "number", minimum: 0, maximum: 1 }, applied: { type: "number", minimum: 0, maximum: 1 }, discriminated: { type: "number", minimum: 0, maximum: 1 } }, additionalProperties: false }, misconceptions: { type: "array", items: { type: "string" } }, isReview: { type: "boolean" } }, additionalProperties: false },
       outputSchema: { type: "object", required: ["id", "status", "requiresApproval"], properties: { id: { type: "string" }, status: { type: "string" }, requiresApproval: { type: "boolean" } } },
       execute: async (input, context) => {
-        const result = await host.receive(buildOperationRequest("learning.evidence.record", { ...input, producer: "user", assistedLevel: input.assistedLevel || "prompted", isReview: input.isReview === true }), { channel: context.channel, senderId: context.ownerId, messageId: context.conversationId });
+        const result = await host.receive(buildOperationRequest("learning.evidence.record", { ...input, producer: "user", assistedLevel: input.assistedLevel || "prompted", isReview: input.isReview === true }), { channel: context.channel, senderId: context.ownerId, ownerKey: context.ownerId, threadKey: context.threadKey, messageId: context.conversationId, conversationId: context.conversationId, projectRef: context.projectRef });
         return { id: result.job.id, status: result.job.status, requiresApproval: result.requiresApproval === true };
       },
     },
@@ -447,7 +448,7 @@ function createSynoRuntime(options = {}) {
       name: "capture.start", description: "立即接收待收录内容并启动可恢复的 IngestWorkflow", risk: "low", permission: "syno-ops", retry: "idempotent", version: "2", approvalBoundary: true,
       inputSchema: { type: "object", required: ["kind", "value"], properties: { kind: { enum: ["url", "text", "markdown", "txt", "personal"] }, value: { type: "string", minLength: 1 }, title: { type: "string" }, filename: { type: "string" }, sourceKind: { enum: ["personal", "unknown"] }, analysisMode: { enum: ["remote", "local-only"] } }, additionalProperties: false },
       outputSchema: { type: "object", required: ["artifact", "workflow", "duplicate"], properties: { artifact: { type: "object" }, workflow: { type: "object" }, duplicate: { type: "boolean" } } },
-      execute: (input, context) => ingestWorkflows.receive(input, { ownerKey: context.ownerId, channel: context.channel, threadKey: "main", messageId: context.conversationId }),
+      execute: (input, context) => ingestWorkflows.receive(input, { ownerKey: context.ownerId, channel: context.channel, threadKey: context.threadKey || "main", messageId: context.conversationId, projectRef: context.projectRef }),
     },
     {
       name: "capture.status", description: "读取 Artifact 安全提取与收录方案状态", risk: "read", permission: "syno-read", retry: "safe", version: "1",
@@ -505,6 +506,7 @@ function createSynoRuntime(options = {}) {
           threadKey: context.threadKey,
           conversationId: context.conversationId,
           messageId: context.conversationId,
+          projectRef: context.projectRef,
         });
         const project = result.job.result?.operationResult?.project || null;
         return {
@@ -536,6 +538,7 @@ function createSynoRuntime(options = {}) {
           threadKey: context.threadKey,
           conversationId: context.conversationId,
           messageId: context.conversationId,
+          projectRef: context.projectRef,
         });
         const project = result.job.result?.operationResult?.project || null;
         return {
@@ -566,7 +569,7 @@ function createSynoRuntime(options = {}) {
       inputSchema: { type: "object", required: ["statement", "stability"], properties: { statement: { type: "string", minLength: 1 }, stability: { enum: ["principle", "model", "practice", "fact", "volatile", "personal"] }, reviewAfter: { type: "string" } }, additionalProperties: false },
       outputSchema: { type: "object", required: ["id", "status", "requiresApproval"], properties: { id: { type: "string" }, status: { type: "string" }, requiresApproval: { type: "boolean" } } },
       execute: async (input, context) => {
-        const result = await host.receive(buildOperationRequest("claims.create", input), { channel: context.channel, senderId: context.ownerId, messageId: context.conversationId });
+        const result = await host.receive(buildOperationRequest("claims.create", input), { channel: context.channel, senderId: context.ownerId, ownerKey: context.ownerId, threadKey: context.threadKey, messageId: context.conversationId, conversationId: context.conversationId, projectRef: context.projectRef });
         return { id: result.job.id, status: result.job.status, requiresApproval: result.requiresApproval === true };
       },
     },
@@ -575,7 +578,7 @@ function createSynoRuntime(options = {}) {
       inputSchema: { type: "object", required: ["claimId", "sourceRef", "sourceTier", "stance", "excerpt"], properties: { claimId: { type: "string" }, sourceRef: { type: "string" }, sourceTier: { enum: ["first-party", "primary", "secondary", "community", "personal"] }, stance: { enum: ["supports", "contradicts", "limits", "context"] }, excerpt: { type: "string" }, observedAt: { type: "string" } }, additionalProperties: false },
       outputSchema: { type: "object", required: ["id", "status", "requiresApproval"], properties: { id: { type: "string" }, status: { type: "string" }, requiresApproval: { type: "boolean" } } },
       execute: async (input, context) => {
-        const result = await host.receive(buildOperationRequest("evidence.candidates.create", input), { channel: context.channel, senderId: context.ownerId, messageId: context.conversationId });
+        const result = await host.receive(buildOperationRequest("evidence.candidates.create", input), { channel: context.channel, senderId: context.ownerId, ownerKey: context.ownerId, threadKey: context.threadKey, messageId: context.conversationId, conversationId: context.conversationId, projectRef: context.projectRef });
         return { id: result.job.id, status: result.job.status, requiresApproval: result.requiresApproval === true };
       },
     },
@@ -597,7 +600,7 @@ function createSynoRuntime(options = {}) {
           report: () => buildOperationRequest("reports.create", { kind: text }),
           output: () => buildOperationRequest("outputs.opportunity.create", { title: text, reason: reason || "基于当前目标和知识缺口", format: "deep-article", priority: 70 }),
         };
-        const result = await host.receive(requests[mode](), { channel: context.channel, senderId: context.ownerId, messageId: context.conversationId });
+        const result = await host.receive(requests[mode](), { channel: context.channel, senderId: context.ownerId, ownerKey: context.ownerId, threadKey: context.threadKey, messageId: context.conversationId, conversationId: context.conversationId, projectRef: context.projectRef });
         return { id: result.job.id, status: result.job.status, requiresApproval: result.requiresApproval === true, approval: result.job.approval };
       },
     },
@@ -683,6 +686,7 @@ function createSynoRuntime(options = {}) {
   const cognitiveRuntime = options.cognitiveRuntime || harnessCognitiveRuntime;
   ingestWorkflows.configure?.({
     contextCompiler: workflowContextCompiler,
+    projectService: projects,
     analyze: async ({ workflow, artifact, bundle }) => {
       const body = String(artifact.body || "");
       const chunks = splitSourceText(body);
@@ -880,6 +884,7 @@ function createSynoRuntime(options = {}) {
     core: channelCore,
     ingest,
     ingestWorkflows,
+    projects,
     pendingDecisions,
     attachmentToPayload: (artifact) => artifactToIntakePayload(artifact),
     journal,
@@ -993,7 +998,10 @@ function createSynoRuntime(options = {}) {
         }), {
           channel: workflow.originChannel,
           senderId: workflow.ownerKey,
+          ownerKey: workflow.ownerKey,
+          threadKey: workflow.threadKey,
           messageId: `ingest-workflow:${workflow.id}:${proposal.proposalDigest}`,
+          projectRef: workflow.projectRef,
           awaitClarification: hasConflict,
         });
       const job = result.job;

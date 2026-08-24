@@ -28,7 +28,7 @@ function diffAssessment(decision, changes = []) {
 }
 
 class AgentHost {
-  constructor({ store, executor, gitGuard, policy = evaluate, validator = validateRepositoryChange, onCommitted = async () => {}, processLockRoot, settingsRegistry = null } = {}) {
+  constructor({ store, executor, gitGuard, policy = evaluate, validator = validateRepositoryChange, onCommitted = async () => {}, processLockRoot, settingsRegistry = null, projectService = null } = {}) {
     if (!store || !executor || !gitGuard) throw new Error("AgentHost 缺少必要 Adapter");
     this.store = store;
     this.executor = executor;
@@ -37,6 +37,7 @@ class AgentHost {
     this.validator = validator;
     this.onCommitted = onCommitted;
     this.settingsRegistry = settingsRegistry;
+    this.projectService = projectService;
     this.activeRuns = new Map();
     this.jobLocks = new Map();
     this.mergeTail = Promise.resolve();
@@ -60,18 +61,28 @@ class AgentHost {
 
   async receive(request, context = {}) {
     const mergedContext = await this.#policyContext(context);
+    const ownerKey = String(mergedContext.ownerKey || "local-user");
+    const projectRef = String(mergedContext.projectRef || "").trim();
+    if (projectRef) {
+      if (!this.projectService) throw Object.assign(new Error("Project 上下文校验服务未配置"), { code: "PROJECT_CONTEXT_UNAVAILABLE" });
+      await this.projectService.validateProjectReference({ ownerKey, projectRef, forBinding: true });
+    }
     const decision = this.policy(request, mergedContext);
     const job = await this.store.create({
       request,
       decision,
       channel: mergedContext.channel || "web",
       senderId: mergedContext.senderId || "local-user",
-      ownerKey: mergedContext.ownerKey || "local-user",
+      ownerKey,
       threadKey: mergedContext.threadKey || "main",
       conversationId: mergedContext.conversationId || "",
       requestKey: mergedContext.messageId ? `${mergedContext.channel || "web"}:${mergedContext.senderId || "local-user"}:${mergedContext.messageId}` : "",
+      projectRef,
     });
     if (job.deduplicated) {
+      if ((job.projectRef || "") !== projectRef) {
+        throw Object.assign(new Error("同一请求身份不能切换 Project 上下文"), { code: "PROJECT_CONTEXT_IDENTITY_CONFLICT" });
+      }
       return { job, deduplicated: true, requiresApproval: job.status === "awaiting_approval" };
     }
     if (decision.allowed === false) {

@@ -47,7 +47,7 @@ class JobStore {
     this.clock = clock;
   }
 
-  async create({ request, decision, channel = "web", senderId = "local-user", ownerKey = "local-user", threadKey = "main", conversationId = "", requestKey = "" }) {
+  async create({ request, decision, channel = "web", senderId = "local-user", ownerKey = "local-user", threadKey = "main", conversationId = "", requestKey = "", projectRef = "" }) {
     if (requestKey) {
       const existing = (await this.list({ limit: 2_000 })).find((job) => job.requestKey === requestKey);
       if (existing) return { ...existing, deduplicated: true };
@@ -69,6 +69,7 @@ class JobStore {
       senderId,
       ownerKey,
       threadKey,
+      ...(projectRef ? { projectRef: String(projectRef) } : {}),
       conversationId: conversationId || undefined,
       requestKey: requestKey || undefined,
       created: now,
@@ -95,7 +96,7 @@ class JobStore {
     await writeRecord(this.filePath(job), job, {
       schema: "job",
       title: `Job ${job.id}`,
-      summaryKeys: ["id", "intent", "status", "profile", "approval", "approvalsReceived", "phase", "risk", "channel", "created", "updated"],
+      summaryKeys: ["id", "intent", "status", "profile", "approval", "approvalsReceived", "phase", "risk", "channel", "ownerKey", "threadKey", "projectRef", "created", "updated"],
     });
     job.recordPath = relativeToRepo(this.filePath(job));
     return job;

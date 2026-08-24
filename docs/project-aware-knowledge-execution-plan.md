@@ -92,7 +92,7 @@ project_refs: ["project-20260824-a1b2c3d4"]
 |---|---|---|
 | Phase 0：Repository Truth & Interface Freeze | DONE | 调用链、契约、分数和停止条件已记录；基线测试与 verify 通过 |
 | Phase 1：Minimal Project Domain | DONE | Project schema/service、Goal 兼容、Project tools 和契约测试完成 |
-| Phase 2：Explicit Project → Job Propagation | PLANNED | 指令解析、可信上下文、Job/child Job 传播和隔离测试完成 |
+| Phase 2：Explicit Project → Job Propagation | DONE | 指令解析、可信上下文、Job/Workflow 传播和隔离测试完成 |
 | Phase 3：Knowledge `project_refs` Round-trip | PLANNED | Workflow → Proposal → Apply → Markdown → reload 全链路完成 |
 | Phase 4：Project-aware Retrieval | PLANNED | boost、无 Project 回归和 Owner 隔离测试完成 |
 | Phase 5：Real DSH MVP Acceptance | DEFERRED | 仅使用真实 DSH/Owner 证据记录召回改善，不用自动化测试冒充验收 |
@@ -153,6 +153,17 @@ Phase 1 已增加 `project.schema.json`，并为新 Goal 增加 optional `ownerK
 
 Phase 0 commit：`5c3b8e2`（`docs: freeze project-aware knowledge interfaces`）。  
 Phase 1 targeted：`node --test tests/project-service.test.mjs`，5/5 passed；完整回归：719/719 passed、0 failed、0 cancelled。`pnpm run verify` 已通过（1636 files），`git diff --check` 已通过。Phase 5 单独记录真实 DSH、Owner 观察、对照实验和未证明项。
+
+Phase 2 已完成显式 Project 上下文传播：
+
+- 新增 `apps/syno/syno/project-directive.mjs`，只解析消息首个非空行的 `/project <projectRef>`，并在格式错误、缺少正文时确定性拒绝。
+- `ChannelConversationHandler` 在进入模型前校验 Owner、Project 存在性和 active 状态，移除指令正文；`runtime.run`、图片/URL/个人想法收录和 provider fallback 均携带可信 projectRef。
+- `DeepSeekHarnessCognitiveRuntime` → `SynoToolBridge.activeContext` → `ToolRegistry` 传递 projectRef；`capture.start`、`jobs.submit` 以及 Project/学习/证据写入工具通过现有 Job 入口继承上下文。
+- `AgentHost` 在 Job 落盘前再次校验 bindable Project，`JobStore` 持久化 optional `projectRef`；同一请求身份切换 Project 会拒绝。
+- `IngestWorkflowCoordinator`、`IngestService` 记录并复验 projectRef；Workflow 的规则替换复制 Project 绑定。Source/idempotency dedupe 以 Project scope 隔离，避免 Project A、Project B 和无 Project 串线。
+- 相关契约更新为 `contracts/job.schema.json`、`contracts/ingest-workflow.schema.json`。
+
+Phase 2 targeted：`node --test tests/project-propagation.test.mjs tests/ingest-workflow-coordinator.test.mjs`，34/34 passed；覆盖 directive、wrong-owner、非 active Project、Job 持久化、Artifact/Workflow、跨 Project dedupe、Tool Bridge active context 和 malformed directive 不进入模型。完整回归与 verify 将在后续阶段完成。
 
 ### Owner 验收证据
 

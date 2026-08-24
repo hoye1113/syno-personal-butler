@@ -17,7 +17,8 @@
     "changedPaths": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
     "advice": { "type": "object", "description": "收录澄清顾问懒加载生成的说明（可选缓存；仅用于系统歧义澄清卡片；含 whatIsIt/recommendation/recommendationLabel/reason/caveat/detail/via/generatedAt）" },
     "ownerKey": { "type": "string" },
-    "threadKey": { "type": "string" }
+    "threadKey": { "type": "string" },
+    "projectRef": { "type": "string", "pattern": "^project-\\d{8}-[a-f0-9]{8}$" }
   },
   "additionalProperties": true
 }
