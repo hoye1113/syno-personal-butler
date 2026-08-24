@@ -56,6 +56,14 @@ Web / Weixin / Feishu / Scheduler
 - `ChannelAdapter.start/stop/send/status` has Web, Windows, Weixin and Fake Adapters.
 - `CalendarAdapter` has Markdown, Lark and Fake Adapters. macOS is deliberately absent.
 
+## Project-aware Knowledge MVP
+
+Project is Syno domain state, stored as durable Markdown records under `ops/projects/<projectRef>.md`. It is a bounded work context with an explicit outcome and done condition, not a PARA folder, Area, Goal parent, task tree, UI entity or DSH Session feature.
+
+The only MVP entry is the server-parsed `/project <projectRef>` directive. The validated `projectRef` travels through the request execution context, Tool Bridge, ToolRegistry, AgentHost, Job, Capture/Ingest Workflow, Proposal and new canonical Note. Project creation and status changes remain Job-bound writes; only `active` Projects can bind new ordinary Jobs, while every lifecycle state may remain referenced by historical Notes.
+
+`DeepSeekHarnessSessionBindingStore` does not inherit Project state. The next message, Session or channel must explicitly provide the directive again. Retrieval receives Project context internally and applies only the fixed same-Project `PROJECT_BOOST = 3`; it does not hard-filter, penalize other Projects or change no-Project search behavior. Existing Notes are not batch-migrated, and existing append/link operations do not rewrite their Project relations in this MVP.
+
 External integrations are true external dependencies. Their transports are injected, and contract tests use Fake Adapters.
 
 ## Transaction boundary

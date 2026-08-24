@@ -9,6 +9,8 @@ const activeFiles = [
   "docs/POLICY.md",
   "docs/KNOWN-LIMITATIONS.md",
   "docs/TODO-EXECUTION-PLAN.md",
+  "docs/INDEX.md",
+  "docs/project-aware-knowledge-execution-plan.md",
   "config/deepseek-harness/syno-agent.md",
 ];
 const forbidden = [
@@ -19,17 +21,26 @@ const forbidden = [
   "双审批",
   "二次审批",
 ];
+const required = new Map([
+  ["docs/INDEX.md", ["Normative", "Historical", "Generated", "project-aware-knowledge-execution-plan.md"]],
+  ["docs/project-aware-knowledge-execution-plan.md", ["projectRef", "PROJECT_BOOST = 3", "DEFERRED_EXISTING_NOTE_PROJECT_LINK", "BLOCKED_DESIGN_DEVIATION"]],
+]);
 
 const violations = [];
+const missing = [];
 for (const relative of activeFiles) {
   const text = await fs.readFile(path.join(root, relative), "utf8");
   for (const phrase of forbidden) {
     if (text.includes(phrase)) violations.push(`${relative}: ${phrase}`);
   }
+  for (const phrase of required.get(relative) || []) {
+    if (!text.includes(phrase)) missing.push(`${relative}: ${phrase}`);
+  }
 }
 
-if (violations.length) {
-  console.error(`Active documentation contains superseded product semantics:\n${violations.join("\n")}`);
+if (violations.length || missing.length) {
+  if (violations.length) console.error(`Active documentation contains superseded product semantics:\n${violations.join("\n")}`);
+  if (missing.length) console.error(`Active documentation is missing required current anchors:\n${missing.join("\n")}`);
   process.exitCode = 1;
 } else {
   console.log(`Active documentation check passed (${activeFiles.length} files).`);

@@ -8,4 +8,5 @@ All directories below are durable Markdown records. Terminal states are retained
 - `memory/`: MemoryProposal records
 - `artifacts/`: intake snapshots and quarantined attachments
 - `events/`: immutable lifecycle events
+- `projects/`: durable Project records at `ops/projects/<projectRef>.md`; terminal records are retained and there is no physical delete
 

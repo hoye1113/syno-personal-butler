@@ -1,5 +1,7 @@
 # Syno 执行语义与移动可靠交付：权威执行计划
 
+> **SUPERSEDED FOR CURRENT PROJECT MVP（2026-08-24）**：本文保留旧 OpenCode/移动可靠交付计划和历史验收记录。当前 Project-aware Knowledge MVP 的唯一执行入口是 [`docs/project-aware-knowledge-execution-plan.md`](project-aware-knowledge-execution-plan.md)；文档分类和权威性见 [`docs/INDEX.md`](INDEX.md)，当前交接见 [`NEXT_SESSION.md`](../NEXT_SESSION.md)。
+
 更新日期：2026-08-21（Asia/Shanghai）
 
 本文后半包含 2026-07 的历史 PR-00～PR-10 与 OpenCode 记录。**当前活动产品内核是 DeepSeek Harness**（受控 `dsh --profile syno` Web + 8888 控制面）；历史章节只用于追溯，不是当前实现契约。启动、构建、WebSocket 事件流、permission 表的硬约束以根 `AGENTS.md` 与 `docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」为准。

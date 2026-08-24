@@ -1,5 +1,7 @@
 # Syno 主动式知识闭环管家：长期执行纲要
 
+> **SUPERSEDED（2026-08-24）**：本文是旧长期执行纲要，不是当前 Project-aware Knowledge MVP 的执行入口。请先阅读 [`docs/project-aware-knowledge-execution-plan.md`](project-aware-knowledge-execution-plan.md)、[`docs/INDEX.md`](INDEX.md) 和根目录 [`NEXT_SESSION.md`](../NEXT_SESSION.md)。本文后续内容仅作历史追溯。
+
 更新日期：2026-07-28（Asia/Shanghai）
 
 本文维护长期产品目标、架构边界和迁移历史摘要。OpenCode 重构的唯一详细任务、公共接口、R0–R6 阶段顺序和验收门槛位于 `docs/TODO-EXECUTION-PLAN.md`；当前执行断点位于根目录 `NEXT_SESSION.md`。旧 P0–P5 计划仅保存在 `docs/archive/`。

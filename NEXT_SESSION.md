@@ -1,5 +1,22 @@
 # Syno 执行语义与移动可靠交付交接（2026-07-29）
 
+## 2026-08-24 当前交接：Project-aware Knowledge MVP
+
+当前唯一执行入口是 [`docs/project-aware-knowledge-execution-plan.md`](docs/project-aware-knowledge-execution-plan.md)；本文下方的 2026-07/08 内容仅作历史背景，不覆盖该执行计划。
+
+- 分支：`feat/project-aware-knowledge-mvp`；基线：`f4997ab`；当前 Phase 4 HEAD：`3362336`。
+- 已提交阶段：Phase 0 `5c3b8e2`、Phase 1 `6ca3dae`、Phase 2 `04a792e`、Phase 3 `b569825`、Phase 4 `3362336`。
+- 当前代码闭环：Project → 显式 `/project <ref>` → trusted execution context → Job/Workflow/Proposal → Note `project_refs` → KnowledgeStore `PROJECT_BOOST = 3`。
+- 最近一次全量自动回归：`pnpm test` 731/731 passed、0 failed、0 cancelled；文档同步后的 `pnpm run verify` 已通过（Repository verification 1640 files、active docs 9），`git diff --check` 已通过。
+- `pnpm harness:doctor` 已通过 Harness chat/capture bootability、Cordis、sandbox 和动态 MCP 禁用检查，但当前没有可用 DeepSeek key；这不是真实模型或召回验收证据。
+- Phase 5 当前为 `DEFERRED`：尚未取得真实 DSH + Owner 的 Project A / 无 Project / Project B 对照证据；自动化测试只证明实现接缝，不证明召回质量改善。
+- 下一步：完成文档同步后的 verify/diff-check；随后由 Owner 在真实 DSH 做相同 query 的三组对照，记录排名、`matchReasons`、Agent 最终上下文和主观改善；不因未证明价值而扩展 Session inheritance、Usage、Health、UI 或迁移。
+- 明确 deferred：Session/跨渠道自动继承、Usage、Learning feedback、Today/Planner 项目化、Area、PARA UI、Project UI、旧 Note 项目关联、Vault/Goal migration。
+- 停止条件：若必须修改全局 `activeProject`、DSH Session Binding Store、模型 projectRef 输入、整个 frontmatter parser、旧 Note 批量迁移，或破坏 Owner 隔离/无 Project baseline，立即在执行计划记录 `BLOCKED_DESIGN_DEVIATION` 并暂停。
+- 本轮不自动 Push 或 merge；提交必须按 Job 声明精确路径暂存。
+
+> 以下历史交接内容保留用于追溯，不是本 Project MVP 的当前分支、HEAD、测试数字或下一步依据。
+
 > **2026-08-21 当前运行时（先读这个）**
 >
 > 产品只走 `DeepSeekHarnessCognitiveRuntime`。生产 chat = 受控 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`；8888 是控制面。微信与 3088 同一 Harness Session。事件流是 WebSocket（GET `/api/events.*` → 426），不是 SSE。本机 `SYNO_DSH_ROOT` clone 必须 `pnpm run build`。生产 permission 表只准 `workspace-write` + `never`，禁止 `danger-full-access`。完整踩坑：`docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」。根契约：`AGENTS.md`。

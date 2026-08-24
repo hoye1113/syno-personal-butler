@@ -12,6 +12,13 @@ Ordinary DSH chat receives this Bridge core: `workflow.context`, `knowledge.sear
 
 The Bridge and DSH plugin share the same tool-set names. DSH plugin data must not directly access `vault/`, `ops/`, source code, channel credentials or the delivery Outbox. `dsh-mnemon` external Memory Providers remain disabled; its current upstream package has no deterministic secret scanner, so tokens, cookies, private keys and raw sensitive logs must never be sent to it. Mnemon data is disposable experimental context and must not be promoted as a canonical fact without a Syno Proposal/Job.
 
+## Project context and isolation
+
+- `ownerKey` is the isolation boundary for Project records and Goal/Job/Workflow/Note references. A `projectRef` from another Owner is rejected before read, bind, Proposal or canonical Note write.
+- `projectRef` is server-owned. The `/project <projectRef>` directive is parsed and validated at chat ingress; the model cannot create, guess, override or submit the identity. `jobs.submit` inherits only the trusted execution context and has no model-facing `projectRef` input.
+- `projects.create` and `projects.update_status` are Job-bound writes through the existing Policy, isolated worktree, validator and GitGuard path. There is no Project delete operation. Only `active` Projects bind new ordinary Jobs; `paused`, `completed` and `abandoned` Projects remain valid historical references.
+- DSH Session state does not automatically inherit Project context. Each message must explicitly bind its Project, and Project context is not a global `activeProject`.
+
 | Action | Execution | Workspace | Notes |
 |---|---|---|---|
 | read/search/chat/review | auto | repository | no fact-source writes |

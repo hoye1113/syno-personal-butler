@@ -2,6 +2,13 @@
 
 更新日期：2026-08-23
 
+## 2026-08-24 Project-aware Knowledge MVP
+
+- Phase 0–4 已完成：Project、显式 `/project <projectRef>`、Job/Workflow/Proposal/Note 传播、`project_refs` round-trip 和同项目 `PROJECT_BOOST = 3` 检索加权均已通过当前自动化测试。
+- 当前自动回归为 Node 731/731；Repository verification 1640 files、active docs 9 files 通过。`pnpm harness:doctor` 只证明 Harness 可启动和安全边界配置正确；当前没有可用 DeepSeek key，也没有 Owner 的真实 DSH 召回对照。
+- Phase 5 仍为 `DEFERRED`：必须由 Owner 在真实 DSH 运行 Project A / 无 Project / Project B 相同 query，对照排名、`matchReasons`、最终上下文和主观改善后，才能宣称 MVP 证明价值。
+- Project 不做 Session、跨消息或跨渠道自动继承；旧 Note 不批量补 `project_refs`；暂停/完成/放弃 Project 不可绑定新 Job，但仍可作为历史 Note 引用。
+
 ## 发布门槛状态
 
 - 当前 Goal 状态为 `blocked`：P4.0–P4.6 已完成，P4.7 的真实渠道、自动执行与澄清、跨渠道连续性、重启恢复和下次 Windows 登录冷启动仍需主人验收；不得把自动测试、探针或当前任务 Running 状态表述为封板。

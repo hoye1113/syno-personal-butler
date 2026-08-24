@@ -144,6 +144,8 @@ pnpm run verify # Repository verification passed (1631 files); active docs 7 fil
 
 Phase 0：`docs/INDEX.md`、`docs/project-aware-knowledge-execution-plan.md`。  
 Phase 1：`contracts/project.schema.json`、`contracts/goal.schema.json`、`apps/syno/syno/project-service.mjs`、`apps/syno/syno/goal-service.mjs`、`apps/syno/syno/validator.mjs`、`apps/syno/syno/policy.mjs`、`apps/syno/syno/operation-registry.mjs`、`apps/syno/syno/runtime.mjs`、`apps/syno/syno/syno-tool-bridge.mjs`、`config/deepseek-harness/syno-tool-sets.mjs`、`config/deepseek-harness/syno-tool-bridge-plugin.mjs`、`config/deepseek-harness/syno-agent.md`、`tests/project-service.test.mjs`。
+Phase 4：`apps/syno/syno/knowledge-store.mjs`、`apps/syno/syno/runtime.mjs`、`tests/project-retrieval.test.mjs`；检索实现提交为 `3362336`。
+文档同步：`docs/ARCHITECTURE.md`、`docs/POLICY.md`、`ops/README.md`、`NEXT_SESSION.md`、`docs/HANDOFF-EXECUTION-PLAN.md`、`docs/TODO-EXECUTION-PLAN.md`、`docs/INDEX.md`、`scripts/check-active-docs.mjs`、本执行计划。
 
 ### 契约变化
 
@@ -183,9 +185,11 @@ Phase 4 已完成 Project-aware Retrieval：
 
 Phase 4 targeted：`node --test tests/project-retrieval.test.mjs`，2/2 passed；覆盖 inline array round-trip、固定加权、Project A/B 隔离、强通用相关性、无 Project baseline 精确回归、模型输入契约隐藏和 wrong-owner 拒绝。真实 DSH 召回质量仍由 Phase 5 现场验收负责。
 
+当前完整回归：Phase 4 后执行 `pnpm test`，731/731 passed、0 failed、0 cancelled。文档同步后的 `pnpm run verify` 已通过：Repository verification 1640 files、active documentation 9 files；`git diff --check` 已通过。`pnpm harness:doctor` 通过 capture/chat bootability、sandbox、Cordis 和动态 MCP 禁用检查，但当前 `deepseek-key.present=false`，因此不能进行真实模型召回对照。
+
 ### Owner 验收证据
 
-DEFERRED。自动化测试不能替代真实 DSH 和 Owner 对 Project A / 无 Project / Project B 的召回对照。
+DEFERRED（不是设计阻塞）。本次执行已验证静态 Tool Bridge/runtime 注入、同项目 boost、无 Project 回归和 wrong-owner 隔离，但没有在真实生产 DSH 上完成 Owner 观察。因此尚未宣称召回质量改善。下一位 Agent/Owner 必须按 Phase 5 使用 Project A、无 Project、Project B 的相同 query 做对照，记录返回排名、`matchReasons`、最终上下文和 Owner 观察；若无法观察到改善，应标记 MVP 未证明价值，不通过新增复杂功能补救。
 
 ### BLOCKED_DESIGN_DEVIATION
 
