@@ -90,8 +90,8 @@ project_refs: ["project-20260824-a1b2c3d4"]
 
 | Phase | 状态 | 退出条件 |
 |---|---|---|
-| Phase 0：Repository Truth & Interface Freeze | IN_PROGRESS | 调用链、契约、分数和停止条件已记录；基线测试与 verify 通过 |
-| Phase 1：Minimal Project Domain | PLANNED | Project schema/service、Goal 兼容、Project tools 和契约测试完成 |
+| Phase 0：Repository Truth & Interface Freeze | DONE | 调用链、契约、分数和停止条件已记录；基线测试与 verify 通过 |
+| Phase 1：Minimal Project Domain | DONE | Project schema/service、Goal 兼容、Project tools 和契约测试完成 |
 | Phase 2：Explicit Project → Job Propagation | PLANNED | 指令解析、可信上下文、Job/child Job 传播和隔离测试完成 |
 | Phase 3：Knowledge `project_refs` Round-trip | PLANNED | Workflow → Proposal → Apply → Markdown → reload 全链路完成 |
 | Phase 4：Project-aware Retrieval | PLANNED | boost、无 Project 回归和 Owner 隔离测试完成 |
@@ -142,15 +142,17 @@ pnpm run verify # Repository verification passed (1631 files); active docs 7 fil
 
 ### 实际修改文件
 
-Phase 0 正在建立；后续按阶段追加精确路径和变更原因。
+Phase 0：`docs/INDEX.md`、`docs/project-aware-knowledge-execution-plan.md`。  
+Phase 1：`contracts/project.schema.json`、`contracts/goal.schema.json`、`apps/syno/syno/project-service.mjs`、`apps/syno/syno/goal-service.mjs`、`apps/syno/syno/validator.mjs`、`apps/syno/syno/policy.mjs`、`apps/syno/syno/operation-registry.mjs`、`apps/syno/syno/runtime.mjs`、`apps/syno/syno/syno-tool-bridge.mjs`、`config/deepseek-harness/syno-tool-sets.mjs`、`config/deepseek-harness/syno-tool-bridge-plugin.mjs`、`config/deepseek-harness/syno-agent.md`、`tests/project-service.test.mjs`。
 
 ### 契约变化
 
-尚未开始；预定变化为 Project、Job、Goal、IngestWorkflow、IngestProposal、Note 的最小 optional/required 字段扩展，详见上面的冻结决策。
+Phase 1 已增加 `project.schema.json`，并为新 Goal 增加 optional `ownerKey`；旧 Goal 仍可读。Project 与 Goal.projectRef 的 Owner 校验由服务端执行。Job、IngestWorkflow、IngestProposal、Note 的 projectRef/project_refs 变化留在后续 Phase。
 
 ### 测试、验收与提交
 
-尚未新增测试或提交。每个阶段完成后记录 targeted/full/verify/diff-check 结果和 commit hash；Phase 5 单独记录真实 DSH、Owner 观察、对照实验和未证明项。
+Phase 0 commit：`5c3b8e2`（`docs: freeze project-aware knowledge interfaces`）。  
+Phase 1 targeted：`node --test tests/project-service.test.mjs`，5/5 passed；完整回归：719/719 passed、0 failed、0 cancelled。`pnpm run verify` 已通过（1636 files），`git diff --check` 已通过。Phase 5 单独记录真实 DSH、Owner 观察、对照实验和未证明项。
 
 ### Owner 验收证据
 
@@ -159,4 +161,3 @@ DEFERRED。自动化测试不能替代真实 DSH 和 Owner 对 Project A / 无 P
 ### BLOCKED_DESIGN_DEVIATION
 
 无。
-

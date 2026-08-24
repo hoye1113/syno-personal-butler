@@ -10,6 +10,7 @@
     "status": { "enum": ["active", "paused", "completed", "abandoned"] },
     "priority": { "type": "integer", "minimum": 0, "maximum": 100 },
     "focusAreas": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "ownerKey": { "type": "string", "minLength": 1 },
     "projectRef": { "type": "string" },
     "dueAt": { "type": "string", "format": "date-time" },
     "created": { "type": "string", "format": "date-time" },

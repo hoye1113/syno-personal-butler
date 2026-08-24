@@ -6,18 +6,28 @@ import { parseRecord, writeRecord } from "./markdown-record.mjs";
 import { PATHS } from "./paths.mjs";
 
 class GoalService {
-  constructor({ opsRoot = PATHS.opsRoot, clock = () => new Date() } = {}) { this.opsRoot = opsRoot; this.clock = clock; }
+  constructor({ opsRoot = PATHS.opsRoot, clock = () => new Date(), projectService = null } = {}) {
+    this.opsRoot = opsRoot;
+    this.clock = clock;
+    this.projectService = projectService;
+  }
 
-  async create(input, { opsRoot = this.opsRoot } = {}) {
+  async create(input, { opsRoot = this.opsRoot, ownerKey } = {}) {
     const now = this.clock().toISOString();
+    const projectRef = input.projectRef ? String(input.projectRef).trim() : "";
+    if (projectRef) {
+      if (!ownerKey) throw Object.assign(new Error("Goal 的 Project 关联缺少 Owner"), { code: "PROJECT_OWNER_REQUIRED" });
+      if (!this.projectService) throw Object.assign(new Error("Goal 的 Project 校验服务未配置"), { code: "PROJECT_CONTEXT_UNAVAILABLE" });
+      await this.projectService.validateProjectReference({ ownerKey, projectRef, opsRoot });
+    }
     const goal = {
       id: `goal-${randomUUID().slice(0, 8)}`, title: String(input.title || "").trim(), status: "active",
       priority: Math.max(0, Math.min(100, Number(input.priority ?? 70))), focusAreas: input.focusAreas || [],
-      ...(input.projectRef ? { projectRef: input.projectRef } : {}), ...(input.dueAt ? { dueAt: input.dueAt } : {}),
+      ...(ownerKey ? { ownerKey: String(ownerKey) } : {}), ...(projectRef ? { projectRef } : {}), ...(input.dueAt ? { dueAt: input.dueAt } : {}),
       created: now, updated: now,
     };
     const file = path.join(opsRoot, "goals", `${goal.id}.md`);
-    await writeRecord(file, goal, { schema: "goal", title: goal.title, summaryKeys: ["id", "title", "status", "priority", "dueAt", "created", "updated"] });
+    await writeRecord(file, goal, { schema: "goal", title: goal.title, summaryKeys: ["id", "ownerKey", "title", "status", "priority", "projectRef", "dueAt", "created", "updated"] });
     return { goal, changedPaths: [path.relative(path.dirname(opsRoot), file).replace(/\\/g, "/")] };
   }
 

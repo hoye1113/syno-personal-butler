@@ -25,6 +25,8 @@ const WRITE_INTENTS = new Set([
   "record_learning_evidence",
   "create_output_opportunity",
   "create_goal",
+  "create_project",
+  "update_project_status",
   "create_claim",
   "create_evidence_candidate",
   "create_knowledge_profile",

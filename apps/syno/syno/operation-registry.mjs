@@ -8,6 +8,8 @@ const OPERATION_INTENTS = Object.freeze({
   "outputs.opportunity.create": "create_output_opportunity",
   "outputs.opportunity.progress": "create_output_opportunity",
   "goals.create": "create_goal",
+  "projects.create": "create_project",
+  "projects.update_status": "update_project_status",
   "claims.create": "create_claim",
   "evidence.candidates.create": "create_evidence_candidate",
   "evidence.candidates.approve": "approve_evidence_candidate",
