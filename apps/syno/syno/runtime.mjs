@@ -375,9 +375,14 @@ function createSynoRuntime(options = {}) {
       name: "knowledge.search", description: "搜索 Syno 知识库", risk: "read", permission: "syno-read", retry: "safe", version: "1",
       inputSchema: { type: "object", required: ["query"], properties: { query: { type: "string", minLength: 1 }, limit: { type: "integer", minimum: 1, maximum: 20 } }, additionalProperties: false },
       outputSchema: { type: "array", items: { type: "object" } },
-      execute: async ({ query, limit }) => (await knowledge.search(query, { limit: limit || 8 }))
-        .filter((item) => item.sensitive !== true)
-        .map(({ sensitive, ...item }) => item),
+      execute: async ({ query, limit }, context = {}) => {
+        if (context.projectRef) {
+          await projects.validateProjectReference({ ownerKey: context.ownerId, projectRef: context.projectRef });
+        }
+        return (await knowledge.search(query, { limit: limit || 8, projectRef: context.projectRef || "" }))
+          .filter((item) => item.sensitive !== true)
+          .map(({ sensitive, ...item }) => item);
+      },
     },
     {
       name: "image.read",

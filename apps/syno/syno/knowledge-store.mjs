@@ -6,6 +6,8 @@ import { PATHS, relativeToRepo, resolveInside } from "./paths.mjs";
 import { frontmatterData } from "./validator.mjs";
 import { inspectRemoteContent } from "./sensitive-content.mjs";
 
+const PROJECT_BOOST = 3;
+
 function plainText(markdown) {
   return String(markdown).replace(/^---[\s\S]*?---\s*/m, "").replace(/!\[.*?\]\(.*?\)/g, "")
     .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1").replace(/[#>*_`~|\[\]]/g, " ").replace(/\s+/g, " ").trim();
@@ -67,6 +69,7 @@ class KnowledgeStore {
       const source = frontmatter.values.source_url || frontmatter.values.source || "";
       const sourceDigest = frontmatter.values.source_content_sha256 || "";
       const sourceFileDigest = frontmatter.values.source_file_sha256 || "";
+      const projectRefs = arrayValue(frontmatter.values.project_refs);
       const stability = frontmatter.values.stability || frontmatter.values.stability_class || "";
       const date = frontmatter.values.updated || frontmatter.values.created || frontmatter.values.date || "";
       const privacy = String(frontmatter.values.privacy || "").toLocaleLowerCase("en-US");
@@ -74,6 +77,7 @@ class KnowledgeStore {
         || ["private", "sensitive"].includes(privacy)
         || !inspectRemoteContent(`${source}\n${markdown}`, { maxChars: Number.MAX_SAFE_INTEGER }).safe;
       notes.push({ path: relativeToRepo(entry.file), title, excerpt: sensitive ? "" : text.slice(0, 280), tags: frontmatter.tags, legacyTags, source, sourceDigest, sourceFileDigest, stability, date, searchable: isContentNote(this.vaultRoot, entry.file), sensitive,
+        projectRefs,
         knowledgeState: frontmatter.values.knowledge_state || "", linkStatus: frontmatter.values.link_status || "",
         qualityStatus: frontmatter.values.quality_status || (frontmatter.values.source || frontmatter.values.source_url ? "traceable" : "needs_source"),
         index: { title: tokens(title), tags: tokens(frontmatter.tags.join(" ")), legacyTags: tokens(legacyTags.join(" ")), body: sensitive ? [] : tokens(text), source: tokens(source) } });
@@ -88,7 +92,7 @@ class KnowledgeStore {
     if (!this.cache || inventory.fingerprint !== this.fingerprint) await this.rebuild();
   }
   invalidate() { this.cache = null; this.fingerprint = ""; }
-  async search(query, { limit = 30, tags = [], source = "", stability = "", from = "", to = "" } = {}) {
+  async search(query, { limit = 30, tags = [], source = "", stability = "", from = "", to = "", projectRef = "" } = {}) {
     await this.#ensureCurrent(); const queryTokens = tokens(query);
     const ranked = this.cache.map((note) => {
       const reasons = []; let score = 0;
@@ -96,6 +100,7 @@ class KnowledgeStore {
       for (const [field, weight, reason] of [["title", 8, "title"], ["tags", 6, "tag"], ["legacyTags", 5, "legacy_tag"], ["source", 2, "source"], ["body", 1, "body"]]) {
         const matches = count(field); if (matches) { score += matches * weight; reasons.push(reason); }
       }
+      if (projectRef && note.projectRefs.includes(projectRef)) { score += PROJECT_BOOST; reasons.push("project"); }
       return { note, score, reasons };
     }).filter(({ note, score }) => note.searchable && (!queryTokens.length || score > 0)
       && (!tags.length || tags.every((tag) => [...note.tags, ...note.legacyTags].some((value) => value.toLocaleLowerCase("zh-CN") === tag.toLocaleLowerCase("zh-CN"))))
@@ -128,4 +133,4 @@ class KnowledgeStore {
   }
 }
 
-export { KnowledgeStore, plainText, titleOf, walkMarkdown };
+export { KnowledgeStore, PROJECT_BOOST, plainText, titleOf, walkMarkdown };

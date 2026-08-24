@@ -94,7 +94,7 @@ project_refs: ["project-20260824-a1b2c3d4"]
 | Phase 1：Minimal Project Domain | DONE | Project schema/service、Goal 兼容、Project tools 和契约测试完成 |
 | Phase 2：Explicit Project → Job Propagation | DONE | 指令解析、可信上下文、Job/Workflow 传播和隔离测试完成 |
 | Phase 3：Knowledge `project_refs` Round-trip | DONE | Workflow → Proposal → Apply → Markdown → reload 全链路完成 |
-| Phase 4：Project-aware Retrieval | IN_PROGRESS | boost、无 Project 回归和 Owner 隔离测试完成 |
+| Phase 4：Project-aware Retrieval | DONE | 固定 boost、无 Project 回归、跨 Project 隔离和 Tool Bridge 注入完成 |
 | Phase 5：Real DSH MVP Acceptance | DEFERRED | 仅使用真实 DSH/Owner 证据记录召回改善，不用自动化测试冒充验收 |
 
 `DONE` 的统一定义是：代码完成、契约测试通过、全量测试通过、verify 通过、文档同步、阶段验收完成。
@@ -173,6 +173,15 @@ Phase 3 已完成新 Note 项目关系往返：
 - Proposal 与 Apply 会拒绝被篡改的 Project 关系，不会把 invalid/wrong-owner ref 写入 canonical Vault。
 
 Phase 3 targeted：`node --test tests/project-knowledge.test.mjs`，4/4 passed；覆盖 Note/Proposal contract、invalid/wrong-owner、completed Project、Markdown frontmatter、lifecycle reload 和既有 Note append 行为。Phase 3 代码尚未包含旧 Vault 批量迁移。
+
+Phase 4 已完成 Project-aware Retrieval：
+
+- `KnowledgeStore` 读取既有 frontmatter inline `project_refs`，将其保存在 Note metadata，并只在可信当前 Project 命中时增加固定 `PROJECT_BOOST = 3`。
+- `knowledge.search` 的模型可见输入契约不增加 `projectRef`；ToolRegistry execution context 内部注入 Project，并在进入检索前重新校验当前 Owner 的 Project 引用。
+- 无 Project 查询继续使用原有结果集合、排序、score 和 matchReasons；其他 Project 不扣分，强通用相关性仍可超过弱同项目相关性。
+- 敏感内容过滤和既有 tag/source/stability/date 过滤路径保持不变；旧 Note 没有 `project_refs` 时按空数组处理。
+
+Phase 4 targeted：`node --test tests/project-retrieval.test.mjs`，2/2 passed；覆盖 inline array round-trip、固定加权、Project A/B 隔离、强通用相关性、无 Project baseline 精确回归、模型输入契约隐藏和 wrong-owner 拒绝。真实 DSH 召回质量仍由 Phase 5 现场验收负责。
 
 ### Owner 验收证据
 
