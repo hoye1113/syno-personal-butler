@@ -146,6 +146,7 @@ Phase 0：`docs/INDEX.md`、`docs/project-aware-knowledge-execution-plan.md`。
 Phase 1：`contracts/project.schema.json`、`contracts/goal.schema.json`、`apps/syno/syno/project-service.mjs`、`apps/syno/syno/goal-service.mjs`、`apps/syno/syno/validator.mjs`、`apps/syno/syno/policy.mjs`、`apps/syno/syno/operation-registry.mjs`、`apps/syno/syno/runtime.mjs`、`apps/syno/syno/syno-tool-bridge.mjs`、`config/deepseek-harness/syno-tool-sets.mjs`、`config/deepseek-harness/syno-tool-bridge-plugin.mjs`、`config/deepseek-harness/syno-agent.md`、`tests/project-service.test.mjs`。
 Phase 4：`apps/syno/syno/knowledge-store.mjs`、`apps/syno/syno/runtime.mjs`、`tests/project-retrieval.test.mjs`；检索实现提交为 `3362336`。
 文档同步：`docs/ARCHITECTURE.md`、`docs/POLICY.md`、`ops/README.md`、`NEXT_SESSION.md`、`docs/HANDOFF-EXECUTION-PLAN.md`、`docs/TODO-EXECUTION-PLAN.md`、`docs/INDEX.md`、`scripts/check-active-docs.mjs`、本执行计划。
+文档同步提交：`80d21ce`（`docs: record project-aware knowledge mvp acceptance`）。
 
 ### 契约变化
 

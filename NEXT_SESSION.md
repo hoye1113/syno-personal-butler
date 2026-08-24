@@ -6,6 +6,7 @@
 
 - 分支：`feat/project-aware-knowledge-mvp`；基线：`f4997ab`；当前 Phase 4 HEAD：`3362336`。
 - 已提交阶段：Phase 0 `5c3b8e2`、Phase 1 `6ca3dae`、Phase 2 `04a792e`、Phase 3 `b569825`、Phase 4 `3362336`。
+- 文档同步提交：`80d21ce`（`docs: record project-aware knowledge mvp acceptance`）。
 - 当前代码闭环：Project → 显式 `/project <ref>` → trusted execution context → Job/Workflow/Proposal → Note `project_refs` → KnowledgeStore `PROJECT_BOOST = 3`。
 - 最近一次全量自动回归：`pnpm test` 731/731 passed、0 failed、0 cancelled；文档同步后的 `pnpm run verify` 已通过（Repository verification 1640 files、active docs 9），`git diff --check` 已通过。
 - `pnpm harness:doctor` 已通过 Harness chat/capture bootability、Cordis、sandbox 和动态 MCP 禁用检查，但当前没有可用 DeepSeek key；这不是真实模型或召回验收证据。
