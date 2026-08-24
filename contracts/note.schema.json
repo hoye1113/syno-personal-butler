@@ -8,6 +8,11 @@
     "path": { "type": "string", "pattern": "\\.md$" },
     "title": { "type": "string", "minLength": 1 },
     "tags": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "project_refs": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^project-\\d{8}-[a-f0-9]{8}$" },
+      "uniqueItems": true
+    },
     "source_url": { "type": "string", "format": "uri" },
     "factual_status": { "enum": ["verified", "partial", "unverified"] }
   },

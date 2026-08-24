@@ -228,6 +228,21 @@ class IngestService {
     return this.projectService.validateProjectReference({ ownerKey: state.ownerId, projectRef: state.projectRef });
   }
 
+  async #validateProposalProjects(state) {
+    const expected = state?.projectRef ? [String(state.projectRef)] : [];
+    const actual = [...new Set(Array.isArray(state?.proposal?.suggestedProjectRefs)
+      ? state.proposal.suggestedProjectRefs.map(String)
+      : [])];
+    if (actual.length && (actual.length !== expected.length || actual.some((ref, index) => ref !== expected[index]))) {
+      throw Object.assign(new Error("收录方案中的 Project 关系与请求上下文不一致"), { code: "PROJECT_CONTEXT_PROPOSAL_MISMATCH" });
+    }
+    for (const projectRef of actual) {
+      if (!this.projectService) throw Object.assign(new Error("Project 上下文校验服务未配置"), { code: "PROJECT_CONTEXT_UNAVAILABLE" });
+      await this.projectService.validateProjectReference({ ownerKey: state.ownerId, projectRef });
+    }
+    return actual.length ? actual : expected;
+  }
+
   // 串行化对同一目标文件的写；空闲后清条目防止 Map 无界增长。
   #serializeTarget(target, task) {
     const previous = this.#targetLocks.get(target) ?? Promise.resolve();
@@ -332,6 +347,7 @@ class IngestService {
       ],
       validators: ["source-traceability", "duplicate", "frontmatter", "vault-contract"],
       sourceDigest,
+      ...(state.projectRef ? { suggestedProjectRefs: [state.projectRef] } : {}),
       ...(matches[0] ? { existingNoteRef: matches[0].path } : {}),
     };
     const proposal = { ...proposalBase, proposalDigest: objectDigest(proposalBase) };
@@ -348,6 +364,7 @@ class IngestService {
     const stateFile = path.join(this.stateRoot, `${id}.json`);
     const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
     await this.#validateProject(state);
+    await this.#validateProposalProjects(state);
     if (!state.proposal) throw Object.assign(new Error("收录方案尚未生成"), { code: "INGEST_PROPOSAL_MISSING" });
     const revision = String(revisionRequest || "").trim();
     if (!revision) throw Object.assign(new Error("修改要求不能为空"), { code: "INGEST_REVISION_REQUIRED" });
@@ -372,6 +389,7 @@ class IngestService {
     const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
     if (!state.proposal) throw Object.assign(new Error("收录方案尚未生成"), { code: "INGEST_PROPOSAL_MISSING" });
     await this.#validateProject(state);
+    await this.#validateProposalProjects(state);
     const allowedRelations = new Set(["supports", "extends", "contradicts", "limits", "depends_on", "applies_to", "example_of"]);
     const relationInputs = Array.isArray(analysis.relations) ? analysis.relations : state.proposal.relations;
     const allowedRelationTargets = new Set(state.candidate?.dedupeMatches || []);
@@ -502,6 +520,7 @@ class IngestService {
     const state = JSON.parse(await fs.readFile(path.join(this.stateRoot, `${id}.json`), "utf8"));
     if (!state.proposal) throw Object.assign(new Error("收录方案尚未生成"), { code: "INGEST_PROPOSAL_MISSING" });
     await this.#validateProject(state);
+    const projectRefs = await this.#validateProposalProjects(state);
     const action = String(decision?.action || "");
     if (!action) throw Object.assign(new Error("必须提供显式收录决策"), { code: "INGEST_DECISION_REQUIRED" });
     const allowed = state.proposal.risk === "additive"
@@ -529,8 +548,11 @@ class IngestService {
     const factualStatus = bilibiliProfile?.factualStatus || (descriptor.verificationStatus === "verified" ? "partial" : "unverified");
     const specialized = renderBilibiliFrontmatter(bilibiliProfile, state.proposal.materialTier);
     const genericSource = bilibiliProfile ? "" : `factual_status: ${factualStatus}\n`;
+    const projectFrontmatter = (action === "create" || action === "keep-separate") && projectRefs.length
+      ? `project_refs: ${JSON.stringify(projectRefs)}\n`
+      : "";
     const noteBody = bilibiliProfile ? state.proposal.canonicalBody : (state.prepared.content || state.prepared.text);
-    const content = `---\ntitle: ${JSON.stringify(state.candidate.title)}\ntags: ${JSON.stringify(canonicalTags)}\ncreated: ${String(state.created).slice(0, 10)}\nsource: ${JSON.stringify(sourceRef)}\ndescription: ${JSON.stringify(description)}\nknowledge_state: captured\nlink_status: ${relations.length ? "connected" : "orphan"}\n${genericSource}${specialized}source_kind: ${descriptor.kind}\nsource_reliability: ${descriptor.reliability}\nsource_verification: ${descriptor.verificationStatus}\n${sourceUrl}${sourceDigest}${sourceFileDigest}---\n\n# ${state.candidate.title}\n\n${noteBody}\n\n## 关系状态\n\n${renderRelations(relations)}\n`;
+    const content = `---\ntitle: ${JSON.stringify(state.candidate.title)}\ntags: ${JSON.stringify(canonicalTags)}\n${projectFrontmatter}created: ${String(state.created).slice(0, 10)}\nsource: ${JSON.stringify(sourceRef)}\ndescription: ${JSON.stringify(description)}\nknowledge_state: captured\nlink_status: ${relations.length ? "connected" : "orphan"}\n${genericSource}${specialized}source_kind: ${descriptor.kind}\nsource_reliability: ${descriptor.reliability}\nsource_verification: ${descriptor.verificationStatus}\n${sourceUrl}${sourceDigest}${sourceFileDigest}---\n\n# ${state.candidate.title}\n\n${noteBody}\n\n## 关系状态\n\n${renderRelations(relations)}\n`;
     const changedPaths = [];
     if (action === "create" || action === "keep-separate") {
       // 「存在性检查 + 写」也按目标串行化，避免并发同路径新建的 TOCTOU（两者都见 ENOENT 后互相覆盖）（R3 补齐）。

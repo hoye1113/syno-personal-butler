@@ -93,8 +93,8 @@ project_refs: ["project-20260824-a1b2c3d4"]
 | Phase 0：Repository Truth & Interface Freeze | DONE | 调用链、契约、分数和停止条件已记录；基线测试与 verify 通过 |
 | Phase 1：Minimal Project Domain | DONE | Project schema/service、Goal 兼容、Project tools 和契约测试完成 |
 | Phase 2：Explicit Project → Job Propagation | DONE | 指令解析、可信上下文、Job/Workflow 传播和隔离测试完成 |
-| Phase 3：Knowledge `project_refs` Round-trip | PLANNED | Workflow → Proposal → Apply → Markdown → reload 全链路完成 |
-| Phase 4：Project-aware Retrieval | PLANNED | boost、无 Project 回归和 Owner 隔离测试完成 |
+| Phase 3：Knowledge `project_refs` Round-trip | DONE | Workflow → Proposal → Apply → Markdown → reload 全链路完成 |
+| Phase 4：Project-aware Retrieval | IN_PROGRESS | boost、无 Project 回归和 Owner 隔离测试完成 |
 | Phase 5：Real DSH MVP Acceptance | DEFERRED | 仅使用真实 DSH/Owner 证据记录召回改善，不用自动化测试冒充验收 |
 
 `DONE` 的统一定义是：代码完成、契约测试通过、全量测试通过、verify 通过、文档同步、阶段验收完成。
@@ -164,6 +164,15 @@ Phase 2 已完成显式 Project 上下文传播：
 - 相关契约更新为 `contracts/job.schema.json`、`contracts/ingest-workflow.schema.json`。
 
 Phase 2 targeted：`node --test tests/project-propagation.test.mjs tests/ingest-workflow-coordinator.test.mjs`，34/34 passed；覆盖 directive、wrong-owner、非 active Project、Job 持久化、Artifact/Workflow、跨 Project dedupe、Tool Bridge active context 和 malformed directive 不进入模型。完整回归与 verify 将在后续阶段完成。
+
+Phase 3 已完成新 Note 项目关系往返：
+
+- `contracts/note.schema.json` 增加 `project_refs` unique inline array；`contracts/ingest-proposal.schema.json` 增加 `suggestedProjectRefs` unique array。
+- `IngestService` 在 receive、proposal/revision/enrichment 和 apply 重新验证 Owner/Project；canonical 新建或 keep-separate Note 写入 `project_refs: ["<projectRef>"]`。
+- completed/abandoned 等终态 Project 仍可作为历史 Note 引用；append-source/link-only 不改已有 Note，保留 `DEFERRED_EXISTING_NOTE_PROJECT_LINK` 范围。
+- Proposal 与 Apply 会拒绝被篡改的 Project 关系，不会把 invalid/wrong-owner ref 写入 canonical Vault。
+
+Phase 3 targeted：`node --test tests/project-knowledge.test.mjs`，4/4 passed；覆盖 Note/Proposal contract、invalid/wrong-owner、completed Project、Markdown frontmatter、lifecycle reload 和既有 Note append 行为。Phase 3 代码尚未包含旧 Vault 批量迁移。
 
 ### Owner 验收证据
 

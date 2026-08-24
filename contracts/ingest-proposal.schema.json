@@ -17,6 +17,11 @@
     "suggestedPath": { "type": "string", "pattern": "^vault/(00-Inbox|01-Areas|02-Resources|03-Archive)/" },
     "suggestedTags": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
     "suggestedLinks": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "suggestedProjectRefs": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^project-\\d{8}-[a-f0-9]{8}$" },
+      "uniqueItems": true
+    },
     "splitTitles": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
     "existingNoteRef": { "type": "string" },
     "previousProposalId": { "type": "string" },
