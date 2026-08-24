@@ -1,0 +1,162 @@
+# Syno Project-aware Knowledge MVP 执行计划
+
+状态：IN_PROGRESS  
+更新日期：2026-08-24（Asia/Hong_Kong）  
+执行分支：`feat/project-aware-knowledge-mvp`  
+基线提交：`f4997ab`  
+Push / merge：本轮禁止自动执行
+
+## 1. 本轮目标与范围
+
+本轮只实现一条可以验证的最小闭环：
+
+```text
+创建 Project
+→ 用户显式指定 Project
+→ Job 绑定 projectRef
+→ Capture / Ingest 继承 Project
+→ 新 Knowledge Note 保存 project_refs
+→ KnowledgeStore 对同项目知识加权
+→ 真实 DSH 验证召回质量改善
+```
+
+本轮不实现完整 PARA、Session 自动继承、Usage、Knowledge Health、Today/Planner 项目化或 Project UI；也不批量迁移旧 Goal/Vault。
+
+## 2. 当前事实源与执行约束
+
+- `vault/` 是长期知识事实源；`ops/` 是 Job、Action、Artifact、Proposal、Event 和 Project 等运行事实源。
+- `contracts/` 是机器校验契约；`.runtime/` 只能保存可重建缓存和运行状态，禁止提交。
+- 产品认知运行时是 `DeepSeekHarnessCognitiveRuntime`；DSH Session 只保存 Owner/thread/Session 元数据，不保存 Project 自动继承关系。
+- 普通写入必须经 ToolRegistry、Policy、Job、隔离 worktree、validator 和 GitGuard；Project 写入同样不能绕过 Job。
+- `/project <projectRef>` 是服务端显式入口。projectRef 由服务端校验并注入 execution context，模型不可生成、猜测或覆盖。
+- 提交只暂存 Job 声明的精确路径；禁止 `git add -A`、`git add .`、自动 Push 和自动 merge。
+
+## 3. 冻结决策
+
+### Project 语义
+
+Project 是具有明确 Outcome 和 Done Condition、需要跨多个 Job、对话或知识记录保持共同上下文的工作上下文。它不是 PARA 目录、Area、Goal 的强制父节点、DSH Session、任务树或项目管理 UI。
+
+Goal 与 Project 只保持单向关联：`Goal 0..1 → Project`。Goal 可以独立存在；Project 可以没有 Goal；Project 完成不级联关闭 Goal，只产生后续 review candidate。
+
+### Project 记录与生命周期
+
+记录路径为 `ops/projects/<projectRef>.md`，固定字段为：
+
+```yaml
+projectRef:
+ownerKey:
+title:
+status:
+objective:
+doneCondition:
+createdAt:
+updatedAt:
+```
+
+projectRef 格式为 `project-YYYYMMDD-xxxxxxxx`，后缀来自 `randomUUID()` 的 8 位小写十六进制字符。状态只有 `active`、`paused`、`completed`、`abandoned`；四种状态都允许历史 Note 引用，只有 `active` 可绑定新普通 Job。MVP 不提供删除，也不提供终态 reopen。隔离唯一性边界为 `(ownerKey, projectRef)`。
+
+### 显式入口与传播
+
+- 指令必须位于消息首个非空行，且必须有正文：`/project <projectRef>`。
+- 只接受已存在的稳定 projectRef；不存在、格式错误、缺少正文、Owner 不匹配或 Project 不可绑定时返回确定性错误，不启动普通模型工作流。
+- 服务端移除指令后才把正文交给模型；不支持 title matching、alias、fuzzy matching、embedding 或 confidence。
+- 不修改 `DeepSeekHarnessSessionBindingStore`，不做跨消息、跨 Session、跨渠道自动继承。
+
+传播链固定为：
+
+```text
+/project <ref>
+→ shared chat ingress
+→ runtime.run(context.projectRef)
+→ DSH Tool Bridge activeContext.projectRef
+→ ToolRegistry execution context
+→ AgentHost.receive(context.projectRef)
+→ Job.projectRef
+→ IngestWorkflow / Proposal / Note
+```
+
+### Note 与检索
+
+新 canonical Note 只使用 inline scalar array：
+
+```yaml
+project_refs: ["project-20260824-a1b2c3d4"]
+```
+
+旧 Note 不批量改写；已有 append/link 行为保持不变，并记录 `DEFERRED_EXISTING_NOTE_PROJECT_LINK`。检索保持原有 `baseScore`，仅在当前可信 Project 与 Note 的 `project_refs` 相交时加固定 `PROJECT_BOOST = 3`；不 hard filter、不惩罚其他项目、不改变无 Project 查询，也不把 projectRef 加入模型可见的 `knowledge.search` 输入契约。
+
+## 4. Phase 状态
+
+| Phase | 状态 | 退出条件 |
+|---|---|---|
+| Phase 0：Repository Truth & Interface Freeze | IN_PROGRESS | 调用链、契约、分数和停止条件已记录；基线测试与 verify 通过 |
+| Phase 1：Minimal Project Domain | PLANNED | Project schema/service、Goal 兼容、Project tools 和契约测试完成 |
+| Phase 2：Explicit Project → Job Propagation | PLANNED | 指令解析、可信上下文、Job/child Job 传播和隔离测试完成 |
+| Phase 3：Knowledge `project_refs` Round-trip | PLANNED | Workflow → Proposal → Apply → Markdown → reload 全链路完成 |
+| Phase 4：Project-aware Retrieval | PLANNED | boost、无 Project 回归和 Owner 隔离测试完成 |
+| Phase 5：Real DSH MVP Acceptance | DEFERRED | 仅使用真实 DSH/Owner 证据记录召回改善，不用自动化测试冒充验收 |
+
+`DONE` 的统一定义是：代码完成、契约测试通过、全量测试通过、verify 通过、文档同步、阶段验收完成。
+
+## 5. Phase 0 核查结果（2026-08-24）
+
+已核查的真实模块：
+
+- 契约：`contracts/goal.schema.json`、`job.schema.json`、`ingest-workflow.schema.json`、`ingest-proposal.schema.json`、`note.schema.json`。
+- 入口与执行：`channel-conversation-handler.mjs`、`runtime.mjs`、`deepseek-harness-cognitive-runtime.mjs`、`syno-tool-bridge.mjs`、`tool-registry.mjs`、`agent-host.mjs`、`job-store.mjs`。
+- 收录与检索：`ingest-workflow-coordinator.mjs`、`ingest-service.mjs`、`knowledge-store.mjs`、`validator.mjs`、`markdown-record.mjs`。
+- Policy 与确定性操作：`policy.mjs`、`operation-registry.mjs`、`operation-executor.mjs`、`domain-operations.mjs`、Goal Service、DSH tool set/plugin mapping 和 agent instructions。
+
+已确认的当前接缝：
+
+1. 统一聊天入口在 `ChannelConversationHandler` 中最终调用 `runtime.run({ text }, context)`；因此指令解析可以放在送入 runtime 前的确定性协议段。
+2. `DeepSeekHarnessCognitiveRuntime` 会调用 `SynoToolBridge.bindContext()`；Bridge 再把 active context 传给 `ToolRegistry.execute()`，适合作为 server-owned projectRef 的可信传播 seam。
+3. `AgentHost.receive()` 是 Job 落盘前的统一入口；`JobStore.create()` 当前把 Owner、thread、requestKey 持久化到 Job，可增加正式 optional `projectRef`。
+4. `capture.start` 直接调用 `IngestWorkflowCoordinator.receive()`；Workflow 已持久化 `ownerKey`、thread 和 idempotency 信息，可增加 projectRef。收录 Job 在 `runtime` 的 `onProposed` 中创建。
+5. `IngestService.apply()` 新建 Note 时手工生成 frontmatter；`markdown-record` 与 `validator.frontmatterData` 已支持 inline 数组，不能依赖 multiline nested YAML。
+6. `KnowledgeStore` 已将 frontmatter 解析成 metadata 并按 title/tag/source/body 做词法计分；可在内部 option 中追加固定 Project boost。
+7. `ops` Profile 已允许 `ops/`，但 `validator.contractForPath()` 还没有 `ops/projects/*.md` 映射；新增 Project contract 时需要补齐。
+8. 当前 Goal schema 已有可选 `projectRef`，但没有 `ownerKey`；Goal Service 没有 Project 校验，需要向新建路径加 Owner 和引用校验，同时保持旧记录可读。
+
+当前没有发现需要重写 DSH Session Store、全局 activeProject、整个 frontmatter parser、全局信任边界或批量迁移旧 Goal/Vault 的必要性。
+
+## 6. 基线证据
+
+已执行：
+
+```text
+pnpm test       # 714/714 passed, 0 failed
+pnpm run verify # Repository verification passed (1631 files); active docs 7 files
+```
+
+后续每个阶段还必须执行 targeted tests、`pnpm test`、`pnpm run verify` 和 `git diff --check`。当前 `package.json` 没有独立 lint、typecheck 或 build script，不新增虚假的验证命令。
+
+## 7. 停止条件与 deferred
+
+遇到以下任一情况，停止当前 Phase，并在本文件记录 `BLOCKED_DESIGN_DEVIATION`：必须修改全局 activeProject 或 DSH Session Binding Store；必须让模型提交 projectRef；必须重写 frontmatter parser；必须修改已有 Note 才能完成第一版；无法保证 Owner/projectRef 隔离或 server context 到 Bridge 的传递；无 Project 查询改变现有排序；必须批量迁移旧 Goal/Vault；必须新增 Context/Graph/Usage/Health 大型模块。
+
+以下内容明确 deferred：Session inheritance、Web/微信自动继承、Usage、Learning feedback、Profile/Today/Planner 项目化、Area、PARA UI、Project UI、旧 Note 项目关联、Vault/Goal migration，以及真实 DSH 无法证明价值时的复杂功能补救。
+
+## 8. 阶段交接记录
+
+### 实际修改文件
+
+Phase 0 正在建立；后续按阶段追加精确路径和变更原因。
+
+### 契约变化
+
+尚未开始；预定变化为 Project、Job、Goal、IngestWorkflow、IngestProposal、Note 的最小 optional/required 字段扩展，详见上面的冻结决策。
+
+### 测试、验收与提交
+
+尚未新增测试或提交。每个阶段完成后记录 targeted/full/verify/diff-check 结果和 commit hash；Phase 5 单独记录真实 DSH、Owner 观察、对照实验和未证明项。
+
+### Owner 验收证据
+
+DEFERRED。自动化测试不能替代真实 DSH 和 Owner 对 Project A / 无 Project / Project B 的召回对照。
+
+### BLOCKED_DESIGN_DEVIATION
+
+无。
+
