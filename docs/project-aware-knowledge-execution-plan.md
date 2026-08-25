@@ -4,6 +4,7 @@
 更新日期：2026-08-25（Asia/Hong_Kong）
 执行分支：`feat/project-aware-knowledge-mvp`  
 基线提交：`f4997ab`  
+当前边界修复代码提交：`cd785a0`（`fix: harden project-aware knowledge boundaries`）
 Push / merge：本轮禁止自动执行
 
 ## 1. 本轮目标与范围
@@ -156,6 +157,7 @@ Phase 1：`contracts/project.schema.json`、`contracts/goal.schema.json`、`apps
 Phase 4：`apps/syno/syno/knowledge-store.mjs`、`apps/syno/syno/runtime.mjs`、`tests/project-retrieval.test.mjs`；检索实现提交为 `3362336`。
 文档同步：`docs/ARCHITECTURE.md`、`docs/POLICY.md`、`ops/README.md`、`NEXT_SESSION.md`、`docs/HANDOFF-EXECUTION-PLAN.md`、`docs/TODO-EXECUTION-PLAN.md`、`docs/INDEX.md`、`scripts/check-active-docs.mjs`、本执行计划。
 文档同步提交：`80d21ce`（`docs: record project-aware knowledge mvp acceptance`）。
+边界修复代码提交：`cd785a0`（`fix: harden project-aware knowledge boundaries`）；本次交接文档回填为该代码提交之后的独立文档提交。
 
 ### 契约变化
 

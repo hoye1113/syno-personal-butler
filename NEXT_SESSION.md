@@ -4,9 +4,9 @@
 
 当前唯一执行入口是 [`docs/project-aware-knowledge-execution-plan.md`](docs/project-aware-knowledge-execution-plan.md)；本文下方的 2026-07/08 内容仅作历史背景，不覆盖该执行计划。
 
-- 分支：`feat/project-aware-knowledge-mvp`；基线：`f4997ab`；当前提交 HEAD：`d14bbde`；本轮边界修复正在工作树中，尚未提交。
+- 分支：`feat/project-aware-knowledge-mvp`；基线：`f4997ab`；本轮边界修复代码已提交为 `cd785a0`（`fix: harden project-aware knowledge boundaries`）。本次文档回填将在该代码提交之后单独提交。
 - 已提交阶段：Phase 0 `5c3b8e2`、Phase 1 `6ca3dae`、Phase 2 `04a792e`、Phase 3 `b569825`、Phase 4 `3362336`。
-- 文档同步提交：`80d21ce`、`d14bbde`；本轮修复涉及执行链、Project Service、Workflow/Job/Tool 隔离、检索边界和测试，待验证后再决定是否分阶段提交。
+- 文档同步提交：`80d21ce`、`d14bbde`；边界修复代码提交：`cd785a0`。本轮修复涉及执行链、Project Service、Workflow/Job/Tool 隔离、检索边界和测试，已完成自动化验证。
 - 当前代码闭环：Project → 显式 `/project <ref>` → trusted execution context → Job/Workflow/Proposal → Note `project_refs` → KnowledgeStore `PROJECT_BOOST = 3`。
 - 边界修复后的当前全量回归为 `pnpm test` 749/749 passed、0 failed、0 cancelled；Project/安全定向回归为 121/121；最终 `pnpm run verify` 通过（Repository verification 1640 files、active docs 9 files），最终 `git diff --check` 通过。旧的 731/731、737/737 仅保留作历史基线。
 - `pnpm harness:doctor` 已通过 Harness chat/capture bootability、Cordis、sandbox 和动态 MCP 禁用检查，但当前没有可用 DeepSeek key；这不是真实模型或召回验收证据。
