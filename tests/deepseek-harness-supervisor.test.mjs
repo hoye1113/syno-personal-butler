@@ -82,8 +82,14 @@ test("cordis configs live in the Syno repo and never inline API keys", async () 
   assert.match(chat, /dsh-web-search-deepseek/);
   assert.match(chat, /searchProvider: deepseek-official/);
   assert.match(chat, /search: true/);
+  assert.match(chat, /id: deepseek-v4-flash-vision-exp[\s\S]*inputModalities:[\s\S]*- image/);
+  assert.match(chat, /id: deepseek-v4-flash[\s\S]*contextWindow: 128000/);
+  assert.doesNotMatch(chat, /deepseek-chat|deepseek-v4-pro/);
   assert.doesNotMatch(chat, /dsh-web-search-exa|dsh-web-search-perplexity/);
   assert.match(capture, /toolBash: false/);
+  assert.match(capture, /id: deepseek-v4-flash-vision-exp[\s\S]*inputModalities:[\s\S]*- image/);
+  assert.match(capture, /id: deepseek-v4-flash[\s\S]*contextWindow: 128000/);
+  assert.doesNotMatch(capture, /deepseek-chat|deepseek-v4-pro/);
   assert.doesNotMatch(capture, /dsh-tool-bash|dsh-tool-fs|dsh-tool-web|dsh-web-search/);
   for (const text of [chat, capture]) {
     assert.doesNotMatch(text, /sk-[A-Za-z0-9]/);

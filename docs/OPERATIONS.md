@@ -141,6 +141,8 @@ pnpm run build
 
 `pnpm harness:doctor` 目前只要看到 clone 的 `node_modules` + CLI 源码就会把 chat-web 标成 bootable，**不能**当作 DSH Web 已能启动。
 
+2026-08-25 的真实 JSON-RPC sidecar 复核进一步证明了这一点：本机 clone 即使 `pnpm install --frozen-lockfile` 返回 `Already up to date`，packaged-bin 仍可能因安装闭包缺少 `@deepseek-ai/dsh-command-compact`、`@deepseek-ai/dsh-compaction-basic` 而以 `HARNESS_TRANSPORT_CLOSED` 退出。此类失败属于 DSH clone 的依赖/启动闭包问题，不是模型 ID 或 Syno fallback 问题；在修复外部 clone 的运行闭包前，不得把 `bootable: true` 写成真实 DSH、Tool Bridge 或 web_search 验收通过，也不要为绕过启动失败而删除官方 compaction 条目。
+
 Windows 计划任务 `start-syno.ps1` **不会**写入 `SYNO_DSH_ROOT`。用户/机器环境变量里没有它时，`pnpm windows:restart` 起的 Host 会 `waiting_provider`。`pnpm start` 必须在该进程环境里设置。
 
 **事件通道是 WebSocket，不是 SSE**

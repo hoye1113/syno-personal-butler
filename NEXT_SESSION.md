@@ -9,7 +9,9 @@
 - 文档同步提交：`80d21ce`、`d14bbde`；边界修复代码提交：`cd785a0`。本轮修复涉及执行链、Project Service、Workflow/Job/Tool 隔离、检索边界和测试，已完成自动化验证。
 - 当前代码闭环：Project → 显式 `/project <ref>` → trusted execution context → Job/Workflow/Proposal → Note `project_refs` → KnowledgeStore `PROJECT_BOOST = 3`。
 - 边界修复后的当前全量回归为 `pnpm test` 749/749 passed、0 failed、0 cancelled；Project/安全定向回归为 121/121；最终 `pnpm run verify` 通过（Repository verification 1640 files、active docs 9 files），最终 `git diff --check` 通过。旧的 731/731、737/737 仅保留作历史基线。
-- `pnpm harness:doctor` 已通过 Harness chat/capture bootability、Cordis、sandbox 和动态 MCP 禁用检查，但当前没有可用 DeepSeek key；这不是真实模型或召回验收证据。
+- 模型链已切换为 `deepseek/deepseek-v4-flash-vision-exp` → `deepseek/deepseek-v4-flash`，不使用 Pro；两份 Cordis profile 将主模型声明为 `text`/`image`。用户级 `DEEPSEEK_API_KEY` 已存在，但旧宿主进程不会自动继承新设置，验证命令需在当前进程显式读取用户变量或重启宿主。
+- 官方 DeepSeek 真实验证已通过：模型列表包含 vision-exp；vision-exp 文本请求和图片请求成功，仓库绿色测试图片的视觉判断返回 `GREEN`。这只证明官方模型能力，不等于真实 DSH/Project 召回验收。
+- `pnpm harness:doctor` 仍只能证明 bootability；真实 JSON-RPC sidecar 当前因外部 clone packaged-bin 缺少 `@deepseek-ai/dsh-command-compact` / `@deepseek-ai/dsh-compaction-basic` 安装闭包而 `HARNESS_TRANSPORT_CLOSED` 退出。Phase 5 继续 `DEFERRED`，先修复/确认 DSH 外部运行闭包，再做 DSH `web_search` 和 Project A/无 Project/Project B 对照。
 - Phase 5 当前为 `DEFERRED`：尚未取得真实 DSH + Owner 的 Project A / 无 Project / Project B 对照证据；自动化测试只证明实现接缝，不证明召回质量改善。
 - 旧页面曾在隔离测试 Host `http://127.0.0.1:8898/` 完成一次非规范浏览器 smoke，仅记录页面可访问和 malformed `/project` 的确定性错误。Web 页面即将重构，当前 UI/DOM 不属于 Project MVP 验收契约；Project A / 无 Project / Project B 的 Job、Workflow、Note、检索排名和错误隔离以测试文件、Schema 和运行时回归为准。真实 DeepSeek DSH/Owner 召回对照仍需单独记录，不因未证明价值而扩展 Session inheritance、Usage、Health、UI 或迁移。
 - PendingDecision、AcceptedRequest、Unknown Case、Reconciliation Case、jobs.list/goals.list 和近期交互均已补上 Owner/Project 读取边界；裸的“确认/刚才那个”不会隐式继承 Project，Project-bound 决策必须再次显式 `/project <projectRef>`。

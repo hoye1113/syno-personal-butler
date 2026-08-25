@@ -17,8 +17,8 @@ import { isCoreChatToolName } from "../../../config/deepseek-harness/syno-tool-s
 
 const HARNESS_ADAPTER = "deepseek-harness-sdk";
 const HARNESS_MODEL_CHAIN = Object.freeze([
+  "deepseek/deepseek-v4-flash-vision-exp",
   "deepseek/deepseek-v4-flash",
-  "deepseek/deepseek-chat",
 ]);
 const DEFAULT_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
 const ATTEMPT_DETAIL_LIMIT = 500;

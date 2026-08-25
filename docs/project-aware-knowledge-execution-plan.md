@@ -197,7 +197,7 @@ Phase 4 已完成 Project-aware Retrieval：
 
 Phase 4 targeted：`node --test tests/project-retrieval.test.mjs`，2/2 passed；覆盖 inline array round-trip、固定加权、Project A/B 隔离、强通用相关性、无 Project baseline 精确回归、模型输入契约隐藏和 wrong-owner 拒绝。真实 DSH 召回质量仍由 Phase 5 现场验收负责。
 
-当前完整回归：Phase 4 后执行 `pnpm test`，731/731 passed、0 failed、0 cancelled。文档同步后的 `pnpm run verify` 已通过：Repository verification 1640 files、active documentation 9 files；`git diff --check` 已通过。`pnpm harness:doctor` 通过 capture/chat bootability、sandbox、Cordis 和动态 MCP 禁用检查，但当前 `deepseek-key.present=false`，因此不能进行真实模型召回对照。
+当前完整回归：边界修复后执行 `pnpm test`，749/749 passed、0 failed、0 cancelled；`pnpm run verify` 已通过：Repository verification 1640 files、active documentation 9 files；`git diff --check` 已通过。模型链后续改为 vision-exp → v4-flash 后，定向 DSH/runtime/config 回归为 53/53；真实官方模型请求另有记录，不将其冒充 DSH/Project 召回验收。
 
 2026-08-25 边界修复后的当前自动化门禁：`pnpm test` 为 749/749 passed、0 failed、0 cancelled；完整 Project/安全定向回归为 121/121；最终 `pnpm run verify` 通过（Repository verification 1640 files、active documentation 9 files）；最终 `git diff --check` 通过（仅有 Windows 行尾转换提示，无 whitespace error）。旧页面曾在隔离测试 Host `http://127.0.0.1:8898/` 完成一次非规范浏览器 smoke：页面可访问并能返回 malformed `/project` 的确定性错误；由于 Web 页面即将重构，该记录不构成当前 UI、产品或召回验收。
 
@@ -217,6 +217,18 @@ Phase 4 targeted：`node --test tests/project-retrieval.test.mjs`，2/2 passed�
 - 控制面 Web 的 Job ID approve/reject/cancel/retry 现在要求已绑定 Job 带匹配的显式 Project 指令；旧页面的无作用域操作不是当前 MVP 兼容契约。
 
 新增/扩展测试覆盖：ToolLoopExecutor propagation、Project-scoped effect idempotency、并发 Project duplicate、paused resume、Project decision isolation、Workflow owner/project status scope、Apply mismatch、zero-lexical retrieval、Job ID mutation scope、Web advice Owner scope、legacy Weixin Project scope。
+
+### 2026-08-25 DeepSeek 模型链与真实 Provider 复核
+
+本次模型决策已落到运行时代码和两个 DSH Cordis profile：
+
+- `HARNESS_MODEL_CHAIN` 固定为 `deepseek/deepseek-v4-flash-vision-exp` → `deepseek/deepseek-v4-flash`；Supervisor 的默认 route、probe、capability fixture 和 fallback 断言已同步。
+- `syno-chat.cordis.yml` 与 `syno-capture.cordis.yml` 的首个模型为 `deepseek-v4-flash-vision-exp`，并声明 `inputModalities: [text, image]`；第二个模型为 `deepseek-v4-flash`；profile 不包含 `deepseek-v4-pro` 或 `deepseek-chat`。
+- 官方 API 使用 Windows 用户级 `DEEPSEEK_API_KEY` 做了不落盘验证：`GET /models` 包含 vision-exp；vision-exp 文本请求成功；向同一模型发送仓库生成的绿色测试图片成功返回 `GREEN`。验证过程没有输出或保存 key。
+- 当前 Syno 图片消息仍是 `artifactId → syno_image_read → Host Vision`，并未把本地 artifact 直接转换成 DSH `ImageAttachmentRef`；因此 `inputModalities` 是 DSH 能力声明，不应被表述为当前聊天 attachment 已经直传 DSH。现有图片行为保持不变，直接 DSH attachment bridge 仍是 deferred。
+- 真实 DSH JSON-RPC 启动仍未通过：在外部 clone 执行 `pnpm install --frozen-lockfile` 后，packaged-bin 仍因缺少 `@deepseek-ai/dsh-command-compact`、`@deepseek-ai/dsh-compaction-basic` 安装闭包而以 `HARNESS_TRANSPORT_CLOSED` 退出。故 Phase 5 的真实 DSH `web_search`、Project A/无 Project/Project B 召回对照和 Owner 观察继续 `DEFERRED`；`harness:doctor` 的 `bootable` 不能替代该证据。
+
+本次源码/配置/测试/文档同步涉及：`apps/syno/syno/deepseek-harness-cognitive-runtime.mjs`、`apps/syno/syno/deepseek-harness-supervisor.mjs`、`config/deepseek-harness/syno-chat.cordis.yml`、`config/deepseek-harness/syno-capture.cordis.yml`、`scripts/probe-harness.mjs`、README/架构/运维/限制/交接文档及对应 DSH/runtime 测试。模型链改动尚未单独提交；提交后必须把 hash 回填到本节和 `NEXT_SESSION.md`。
 
 ### Owner 验收证据
 

@@ -382,7 +382,7 @@ class DeepSeekHarnessSupervisor {
     return slot.client;
   }
 
-  async ensure(profile, { provider = "deepseek-official", model = "deepseek-v4-flash" } = {}) {
+  async ensure(profile, { provider = "deepseek-official", model = "deepseek-v4-flash-vision-exp" } = {}) {
     if (!HARNESS_PROFILES.includes(profile)) throw runtimeError("HARNESS_PROFILE_INVALID", `未知 Harness profile：${profile}`);
     const slot = this.slots.get(profile);
     if (slot?.client?.initialized && slot.child?.exitCode === null && slot.provider === provider && slot.model === model) {
@@ -392,7 +392,7 @@ class DeepSeekHarnessSupervisor {
     return this.start(profile, { provider, model });
   }
 
-  async start(profile, { provider = "deepseek-official", model = "deepseek-v4-flash" } = {}) {
+  async start(profile, { provider = "deepseek-official", model = "deepseek-v4-flash-vision-exp" } = {}) {
     if (!this.launch) await this.discover();
     if (profile === "chat" && this.chatSurface === "web") {
       if (this.webLaunch?.bootable === false) {

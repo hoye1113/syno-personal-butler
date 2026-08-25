@@ -70,7 +70,7 @@ implementation:
 
 - 仓库：`D:\workSpace\syno-personal-butler`
 - 分支：`codex/dsh-hub-slimming`（从 `main` / `cdd93f3` 建立隔离 worktree）。
-- 产品运行时：`DeepSeekHarnessCognitiveRuntime`，固定 `deepseek/deepseek-v4-flash` → `deepseek/deepseek-chat`。
+- 产品运行时：`DeepSeekHarnessCognitiveRuntime`，固定 `deepseek/deepseek-v4-flash-vision-exp` → `deepseek/deepseek-v4-flash`，不使用 Pro。
 - 当前 Harness 生产 profile bundle：`@deepseek-ai/dsh-base`、`@deepseek-ai/dsh-web-app`、`@syno/dsh-plugin`；compaction 由 `dsh-base` 提供，`@deepseek-ai/dsh-schedule` 作为官方 function plugin 由 Syno overlay 挂载。
 - 实验 profile：`syno-lab` 保留 DSH CLI 已安装实验依赖；`dsh-mnemon@0.2.13` 只在该 profile，不能访问 Syno Bridge、`vault/ops`、微信或飞书。
 - 本轮修改前的 Node 全量基线为 698 tests / 697 pass / 0 fail / 1 cancelled；修改后必须以当前命令重新取得证据。
@@ -111,8 +111,8 @@ implementation:
 
 固定顺序：
 
-1. `deepseek/deepseek-v4-flash`
-2. `deepseek/deepseek-chat`
+1. `deepseek/deepseek-v4-flash-vision-exp`
+2. `deepseek/deepseek-v4-flash`
 
 只有不可用、限流、连接失败、超时、5xx、空响应或契约失败，且本次尝试未产生不可逆副作用时，Syno 才可确定性尝试下一模型。模型不能选择模型、Provider 或回退目标；全部失败进入 `waiting_provider`。
 
