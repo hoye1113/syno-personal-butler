@@ -30,29 +30,50 @@ async function fixture(t, { existingNote = false } = {}) {
     await fs.mkdir(path.join(vaultRoot, "02-Resources"), { recursive: true });
     await fs.writeFile(path.join(vaultRoot, "02-Resources", "existing.md"), "---\ntitle: Existing\ntags: [notes]\ncreated: 2026-08-24\nsource: local\ndescription: existing\nknowledge_state: captured\nlink_status: orphan\nfactual_status: unverified\n---\n\n# Existing\n\nExisting note.\n", "utf8");
   }
+  const searches = [];
+  const knowledge = {
+    async search(query, options) {
+      searches.push({ query, options });
+      return existingNote ? [{ path: "vault/02-Resources/existing.md", title: "Existing", excerpt: "existing", sensitive: false }] : [];
+    },
+  };
   const service = new IngestService({
     intake: { async prepare(payload) { return { sourceType: payload.kind, text: payload.value, content: payload.value, title: "Project knowledge" }; } },
-    knowledge: existingNote
-      ? { async search() { return [{ path: "vault/02-Resources/existing.md", title: "Existing", excerpt: "existing", sensitive: false }]; } }
-      : { async search() { return []; } },
+    knowledge,
     opsRoot,
     stateRoot: path.join(root, "ingest-state"),
     projectService,
     clock: fixedClock,
   });
-  return { root, opsRoot, vaultRoot, projectService, project: project.project, service };
+  return { root, opsRoot, vaultRoot, projectService, project: project.project, service, searches };
 }
 
 test("Project references survive proposal, apply, Markdown frontmatter and lifecycle reload", async (t) => {
-  const { root, projectService, project, service } = await fixture(t);
+  const { root, projectService, project, service, searches } = await fixture(t);
   assert.equal(project.projectRef, PROJECT_REF);
   const receipt = await service.receive({ kind: "text", value: "项目知识正文" }, { ownerId: "owner-a", projectRef: project.projectRef });
   const proposed = await service.propose(receipt.artifact.id);
   assert.deepEqual(proposed.proposal.suggestedProjectRefs, [PROJECT_REF]);
+  await service.readArtifact(receipt.artifact.id);
+  assert.equal(searches.at(-1).options.projectRef, PROJECT_REF);
   await validateContractRecord("ingest-proposal", proposed.proposal);
 
   await projectService.updateProjectStatus(PROJECT_REF, "completed", { ownerKey: "owner-a" });
-  const applied = await service.apply(receipt.artifact.id, { workspace: root, decision: { action: "create" } });
+  await assert.rejects(
+    service.apply(receipt.artifact.id, {
+      workspace: root,
+      decision: { action: "create" },
+      expectedOwnerKey: "owner-a",
+      expectedProjectRef: "project-20260824-bbbbbbbb",
+    }),
+    (error) => error.code === "PROJECT_WORKFLOW_PROJECT_MISMATCH",
+  );
+  const applied = await service.apply(receipt.artifact.id, {
+    workspace: root,
+    decision: { action: "create" },
+    expectedOwnerKey: "owner-a",
+    expectedProjectRef: PROJECT_REF,
+  });
   const noteText = await fs.readFile(path.join(root, applied.path), "utf8");
   assert.match(noteText, /^project_refs: \["project-20260824-a1b2c3d4"\]$/m);
   assert.equal(frontmatterData(noteText).values.project_refs, `["${PROJECT_REF}"]`);

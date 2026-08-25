@@ -49,7 +49,8 @@ class JobStore {
 
   async create({ request, decision, channel = "web", senderId = "local-user", ownerKey = "local-user", threadKey = "main", conversationId = "", requestKey = "", projectRef = "" }) {
     if (requestKey) {
-      const existing = (await this.list({ limit: 2_000 })).find((job) => job.requestKey === requestKey);
+      const existing = (await this.list({ limit: 2_000 })).find((job) =>
+        job.requestKey === requestKey && String(job.ownerKey || "local-user") === String(ownerKey || "local-user"));
       if (existing) return { ...existing, deduplicated: true };
     }
     const now = this.clock().toISOString();
@@ -111,12 +112,15 @@ class JobStore {
     return job;
   }
 
-  async list({ limit = 100 } = {}) {
+  async list({ limit = 100, ownerKey, projectRef } = {}) {
     const files = await this.#jobFiles();
     const jobs = [];
-    for (const file of files.slice(-limit * 2)) {
+    const candidates = ownerKey !== undefined || projectRef !== undefined ? files : files.slice(-limit * 2);
+    for (const file of candidates) {
       try {
         const job = await readRecord(file);
+        if (ownerKey !== undefined && String(job.ownerKey || "local-user") !== String(ownerKey || "local-user")) continue;
+        if (projectRef !== undefined && String(job.projectRef || "") !== String(projectRef || "")) continue;
         job.recordPath = relativeToRepo(file);
         jobs.push(job);
       } catch {

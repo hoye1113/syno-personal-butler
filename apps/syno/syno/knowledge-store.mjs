@@ -100,7 +100,10 @@ class KnowledgeStore {
       for (const [field, weight, reason] of [["title", 8, "title"], ["tags", 6, "tag"], ["legacyTags", 5, "legacy_tag"], ["source", 2, "source"], ["body", 1, "body"]]) {
         const matches = count(field); if (matches) { score += matches * weight; reasons.push(reason); }
       }
-      if (projectRef && note.projectRefs.includes(projectRef)) { score += PROJECT_BOOST; reasons.push("project"); }
+      // Project context is a ranking boost for lexical candidates, not a replacement
+      // for the query. This preserves the existing "no lexical match => no result"
+      // boundary while still preferring same-Project notes with comparable relevance.
+      if (projectRef && score > 0 && note.projectRefs.includes(projectRef)) { score += PROJECT_BOOST; reasons.push("project"); }
       return { note, score, reasons };
     }).filter(({ note, score }) => note.searchable && (!queryTokens.length || score > 0)
       && (!tags.length || tags.every((tag) => [...note.tags, ...note.legacyTags].some((value) => value.toLocaleLowerCase("zh-CN") === tag.toLocaleLowerCase("zh-CN"))))

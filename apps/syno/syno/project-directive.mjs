@@ -1,7 +1,7 @@
 const PROJECT_REF_PATTERN = /^project-\d{8}-[a-f0-9]{8}$/;
 
 function directiveError(code, message) {
-  return Object.assign(new Error(message), { code });
+  return Object.assign(new Error(message), { code, statusCode: 400 });
 }
 
 function parseProjectDirective(text) {

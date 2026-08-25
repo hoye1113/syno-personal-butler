@@ -2,7 +2,7 @@
 
 本文只负责说明文档分类、唯一权威性和当前状态；具体产品规则以对应 Normative 文档为准。
 
-当前 Project-aware Knowledge MVP 已完成 Phase 0–4 的代码与契约闭环；Phase 5 的真实 DSH/Owner 召回对照仍为 `DEFERRED`，唯一执行事实源是 `docs/project-aware-knowledge-execution-plan.md`。
+当前 Project-aware Knowledge MVP 已完成 Phase 0–4 的代码与契约闭环；Phase 5 的真实 DSH/Owner 召回对照仍为 `DEFERRED`，唯一执行事实源是 `docs/project-aware-knowledge-execution-plan.md`。Web 页面即将重构，当前 UI/DOM 不属于 MVP 验收契约。
 
 ## Normative
 
@@ -40,5 +40,5 @@
 
 1. 先读本索引、`AGENTS.md`、Project 执行计划和 `NEXT_SESSION.md`。
 2. 任何阶段状态、实际修改文件、测试结果、commit hash、Owner 证据、deferred 内容和 `BLOCKED_DESIGN_DEVIATION` 只追加到 Project 执行计划。
-3. 不能用历史测试数字、Fake DSH 或静态检查冒充当前真实产品验收。
+3. 不能用历史测试数字、Fake DSH 或静态检查冒充当前真实产品验收；本轮 Project MVP 的代码验收以测试文件、Schema 和服务端运行时回归为准，旧 Web smoke 仅作非规范可访问性记录。
 4. 本轮提交和推送权限分离：执行 Agent 可以按计划提交，但不得自动 Push 或 merge。

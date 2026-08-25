@@ -2,9 +2,13 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { inspectRemoteContent } from "./sensitive-content.mjs";
 import { serializeForMcp } from "./tool-result-serializer.mjs";
 
-function toolInvocationKey({ ownerKey, threadKey, messageId, toolName }) {
+function projectScope(projectRef) {
+  return String(projectRef || "").trim() || "<none>";
+}
+
+function toolInvocationKey({ ownerKey, threadKey, messageId, toolName, projectRef }) {
   return createHash("sha256")
-    .update(`${ownerKey}\0${threadKey}\0${messageId}\0${toolName}`, "utf8")
+    .update(`${ownerKey}\0${threadKey}\0${messageId}\0${toolName}\0${projectScope(projectRef)}`, "utf8")
     .digest("hex");
 }
 
@@ -170,15 +174,17 @@ class SynoToolBridge {
       };
     }
     const idempotencyKey = definition.retry === "idempotent" && active.messageId
-      ? `${active.ownerKey}\0${active.threadKey}\0${active.messageId}\0${name}\0${JSON.stringify(request.params?.arguments || {})}`
+      ? `${active.ownerKey}\0${active.threadKey}\0${active.messageId}\0${projectScope(active.projectRef)}\0${name}\0${JSON.stringify(request.params?.arguments || {})}`
       : "";
     if (idempotencyKey && this.idempotentResults.has(idempotencyKey)) return this.idempotentResults.get(idempotencyKey);
-    const toolInvocation = active.messageId ? toolInvocationKey({ ownerKey: active.ownerKey, threadKey: active.threadKey, messageId: active.messageId, toolName: name }) : "";
+    const toolInvocation = active.messageId ? toolInvocationKey({ ownerKey: active.ownerKey, threadKey: active.threadKey, messageId: active.messageId, toolName: name, projectRef: active.projectRef }) : "";
     try {
       const toolArguments = request.params?.arguments || {};
       this.tools.validateInput(definition.name, toolArguments);
       const argumentsDigest = createHash("sha256").update(JSON.stringify(request.params?.arguments || {})).digest("hex");
-      const requestIdentity = active.messageId ? `${active.messageId}:${name}:${argumentsDigest.slice(0, 16)}` : "";
+      const requestIdentity = active.messageId
+        ? `${active.messageId}:${projectScope(active.projectRef)}:${name}:${argumentsDigest.slice(0, 16)}`
+        : "";
       let durableReceipt = null;
       if (this.effectReceipts && toolInvocation && definition.risk !== "read") {
         const begun = await this.effectReceipts.begin({ toolInvocationKey: toolInvocation, toolName: name, ownerKey: active.ownerKey, argumentsDigest });
@@ -198,7 +204,7 @@ class SynoToolBridge {
           return replay;
         }
         if (!begun.created) {
-          await this.reconciliationCases?.open({ toolInvocationKey: toolInvocation, toolName: name, ownerKey: active.ownerKey, sourceType: "tool", sourceId: active.messageId, lastErrorCode: "TOOL_INVOCATION_PENDING" });
+          await this.reconciliationCases?.open({ toolInvocationKey: toolInvocation, toolName: name, ownerKey: active.ownerKey, projectRef: active.projectRef, sourceType: "tool", sourceId: active.messageId, lastErrorCode: "TOOL_INVOCATION_PENDING" });
           return { ...response, result: { content: [{ type: "text", text: "TOOL_INVOCATION_PENDING: 该调用已有未完成事实，请等待对账" }], isError: true } };
         }
       }
@@ -257,7 +263,7 @@ class SynoToolBridge {
         const effectOutputSafe = inspectRemoteContent(JSON.stringify(result)).safe;
         if (!effectOutputSafe) {
           if (this.reconciliationCases && toolInvocation) {
-            await this.reconciliationCases.open({ toolInvocationKey: toolInvocation, toolName: name, ownerKey: active.ownerKey, sourceType: "tool", sourceId: active.messageId, lastErrorCode: "REMOTE_TOOL_RESULT_BLOCKED" }).catch(() => {});
+            await this.reconciliationCases.open({ toolInvocationKey: toolInvocation, toolName: name, ownerKey: active.ownerKey, projectRef: active.projectRef, sourceType: "tool", sourceId: active.messageId, lastErrorCode: "REMOTE_TOOL_RESULT_BLOCKED" }).catch(() => {});
           }
           return { ...response, result: { content: [{ type: "text", text: JSON.stringify({ ok: false, error: { code: "REMOTE_TOOL_RESULT_BLOCKED", message: "工具结果可能包含凭据或敏感信息，已阻止持久化与发送" } }) }], isError: true } };
         }
@@ -265,7 +271,7 @@ class SynoToolBridge {
         return { ...response, result: { ...serializeForMcp(result, { redact: false, charLimit: this.charLimit }), directEffect, businessOutcome, isError: true } };
       }
       if (this.reconciliationCases && toolInvocation && definition.risk !== "read" && !["TOOL_INPUT_INVALID", "TOOL_NOT_ALLOWED"].includes(error.code)) {
-        await this.reconciliationCases.open({ toolInvocationKey: toolInvocation, toolName: name, ownerKey: active.ownerKey, sourceType: "tool", sourceId: active.messageId, lastErrorCode: error.code || "EFFECT_UNKNOWN" }).catch(() => {});
+        await this.reconciliationCases.open({ toolInvocationKey: toolInvocation, toolName: name, ownerKey: active.ownerKey, projectRef: active.projectRef, sourceType: "tool", sourceId: active.messageId, lastErrorCode: error.code || "EFFECT_UNKNOWN" }).catch(() => {});
       }
       const invalid = ["TOOL_INPUT_INVALID", "TOOL_NOT_ALLOWED"].includes(error.code);
       const rawError = `${error.code || "TOOL_FAILED"}: ${error.message}`;
@@ -284,4 +290,4 @@ class SynoToolBridge {
   }
 }
 
-export { BRIDGE_TOOL_NAMES, SynoToolBridge, bridgeName, normalizeAllowedToolName, normalizeExposedToolName, toolInvocationKey };
+export { BRIDGE_TOOL_NAMES, SynoToolBridge, bridgeName, normalizeAllowedToolName, normalizeExposedToolName, projectScope, toolInvocationKey };

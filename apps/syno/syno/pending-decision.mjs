@@ -36,6 +36,16 @@ function isDecisionReply(text) {
     || /^修改：.+$/u.test(normalized);
 }
 
+function matchesProjectScope(item, projectRef) {
+  if (projectRef === undefined) return true;
+  return String(item?.projectRef || "") === String(projectRef || "");
+}
+
+function samePersistedProjectScope(item, projectRef) {
+  if (projectRef === undefined) return item?.projectRef === undefined;
+  return matchesProjectScope(item, projectRef);
+}
+
 class PendingDecisionStore {
   constructor({ file = path.join(PATHS.stateRoot, "pending-decisions.json"), clock = () => new Date() } = {}) {
     this.file = file;
@@ -66,10 +76,11 @@ class PendingDecisionStore {
     }
   }
 
-  async list({ ownerKey, threadKey, includeConsumed = false } = {}) {
+  async list({ ownerKey, threadKey, projectRef, includeConsumed = false } = {}) {
     return (await this.#list()).filter((item) =>
       (!ownerKey || item.ownerKey === ownerKey)
       && (!threadKey || item.threadKey === threadKey)
+      && matchesProjectScope(item, projectRef)
       && (includeConsumed || !item.consumedAt));
   }
 
@@ -92,7 +103,8 @@ class PendingDecisionStore {
         && item.jobId === String(input.jobId)
         && item.ownerKey === String(input.ownerKey)
         && item.threadKey === String(input.threadKey || "main")
-        && item.phase === String(input.phase || "execution"));
+        && item.phase === String(input.phase || "execution")
+        && samePersistedProjectScope(item, input.projectRef));
       if (existing) return existing;
       const record = {
         id: `decision-${randomUUID().slice(0, 8)}`,
@@ -105,6 +117,7 @@ class PendingDecisionStore {
         options: Array.isArray(input.options) ? input.options : [],
         diffDigest: input.diffDigest || undefined,
         ...(input.businessVersion ? { businessVersion: String(input.businessVersion) } : {}),
+        ...(input.projectRef !== undefined ? { projectRef: String(input.projectRef || "") } : {}),
         approvalCode: String(input.approvalCode || "").toUpperCase(),
         ...(input.artifactId ? { artifactId: String(input.artifactId) } : {}),
         createdAt: now.toISOString(),
@@ -115,10 +128,13 @@ class PendingDecisionStore {
     });
   }
 
-  async present({ ownerKey, threadKey = "main", channel = "unknown", businessVersion = "1" } = {}) {
+  async present({ ownerKey, threadKey = "main", channel = "unknown", businessVersion = "1", projectRef } = {}) {
     return this.#mutate(async (decisions, state) => {
       const active = decisions
-        .filter((item) => !item.consumedAt && item.ownerKey === String(ownerKey) && item.threadKey === String(threadKey))
+        .filter((item) => !item.consumedAt
+          && item.ownerKey === String(ownerKey)
+          && item.threadKey === String(threadKey)
+          && matchesProjectScope(item, projectRef))
         .sort((a, b) => `${a.createdAt}\0${a.id}`.localeCompare(`${b.createdAt}\0${b.id}`));
       const orderedDecisionIds = active.map((item) => item.id);
       const effectiveBusinessVersion = businessVersion === "1"
@@ -128,15 +144,18 @@ class PendingDecisionStore {
         && item.threadKey === String(threadKey)
         && item.channel === String(channel)
         && item.businessVersion === effectiveBusinessVersion
+        && matchesProjectScope(item, projectRef)
         && JSON.stringify(item.orderedDecisionIds) === JSON.stringify(orderedDecisionIds));
+      const projectScope = projectRef === undefined ? "<all>" : String(projectRef || "<none>");
       const presentation = existing || {
-        presentationId: `presentation-${createHash("sha256").update(`${ownerKey}\0${threadKey}\0${channel}\0${effectiveBusinessVersion}\0${orderedDecisionIds.join(",")}`, "utf8").digest("hex").slice(0, 16)}`,
+        presentationId: `presentation-${createHash("sha256").update(`${ownerKey}\0${threadKey}\0${channel}\0${effectiveBusinessVersion}\0${projectScope}\0${orderedDecisionIds.join(",")}`, "utf8").digest("hex").slice(0, 16)}`,
         version: 1,
         ownerKey: String(ownerKey),
         threadKey: String(threadKey),
         channel: String(channel),
         businessVersion: effectiveBusinessVersion,
         orderedDecisionIds,
+        ...(projectRef !== undefined ? { projectRef: String(projectRef || "") } : {}),
         createdAt: this.clock().toISOString(),
       };
       if (!existing) state.presentations.push(presentation);
@@ -157,7 +176,7 @@ class PendingDecisionStore {
     });
   }
 
-  async parse(text, { ownerKey, threadKey = "main", channel = "unknown", presentationId, businessVersion, diffDigest, getDiffDigest } = {}) {
+  async parse(text, { ownerKey, threadKey = "main", channel = "unknown", projectRef, presentationId, businessVersion, diffDigest, getDiffDigest } = {}) {
     const normalized = String(text || "").trim();
     if (!isDecisionReply(normalized)) throw decisionError("PENDING_DECISION_NOT_A_REPLY", "消息不是确定性审批回复");
     return this.#mutate(async (decisions, state) => {
@@ -165,14 +184,18 @@ class PendingDecisionStore {
       for (const item of decisions) {
         if (item.reservedAt && new Date(item.reservedAt).getTime() <= reservationCutoff) delete item.reservedAt;
       }
-      const allBound = decisions.filter((item) => item.ownerKey === ownerKey && item.threadKey === threadKey);
+      const allBound = decisions.filter((item) => item.ownerKey === ownerKey
+        && item.threadKey === threadKey
+        && matchesProjectScope(item, projectRef));
       let available = allBound.filter((item) => !item.consumedAt && !item.reservedAt);
       if (!available.length) {
         if (allBound.length) throw decisionError("PENDING_DECISION_REPLAYED", "该待确认事项已处理，拒绝重放");
         throw decisionError("PENDING_DECISION_NOT_FOUND", "当前会话没有可处理的待确认事项");
       }
       const selectedPresentation = presentationId
-        ? state.presentations.find((item) => item.presentationId === presentationId && item.channel === String(channel))
+        ? state.presentations.find((item) => item.presentationId === presentationId
+          && item.channel === String(channel)
+          && matchesProjectScope(item, projectRef))
         : null;
       if (selectedPresentation) {
         const order = new Map(selectedPresentation.orderedDecisionIds.map((id, index) => [id, index]));

@@ -321,6 +321,29 @@ test("Weixin approval commands are parsed deterministically", () => {
   assert.equal(parseWeixinApproval("批准全部任务"), null);
 });
 
+test("legacy Weixin approval carries an explicit Project scope", async () => {
+  let received;
+  const handler = createWeixinMessageHandler({
+    core: {
+      async approve(_jobId, approval) {
+        received = approval;
+        return { job: { id: "job-20260717-a1b2c3d4", status: "completed" } };
+      },
+      async execute() { throw new Error("not a chat message"); },
+    },
+    ingest: { async receive() { throw new Error("not an attachment"); } },
+    conversationRouter: { async resolve() { return "conversation-1"; } },
+  });
+  const result = await handler({
+    text: "/project project-20260824-aaaaaaaa\n批准 job-20260717-a1b2c3d4 0f12ab",
+    senderId: "owner",
+    id: "message-1",
+  });
+  assert.match(result.text, /已确认/);
+  assert.equal(received.ownerKey, "local-user");
+  assert.equal(received.projectRef, "project-20260824-aaaaaaaa");
+});
+
 test("Feishu long connection accepts only owner DMs and deduplicates messages", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-feishu-channel-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));

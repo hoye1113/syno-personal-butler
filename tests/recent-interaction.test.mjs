@@ -74,3 +74,33 @@ test("PendingDecision presentation fixes ordered IDs, channel and version across
   const resolved = await store.parse("确认 2", { ownerKey: "owner", threadKey: "main", channel: "weixin", presentationId: presentation.presentationId });
   assert.equal(resolved.decision.id, second.id);
 });
+
+test("RecentInteractionView keeps every durable source inside the explicit Project scope", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-recent-project-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const pending = new PendingDecisionStore({ file: path.join(root, "pending.json") });
+  await pending.add({ jobId: "job-a", ownerKey: "owner", threadKey: "main", projectRef: "project-a", summary: "A" });
+  await pending.add({ jobId: "job-b", ownerKey: "owner", threadKey: "main", projectRef: "project-b", summary: "B" });
+  const view = new RecentInteractionView({
+    pendingDecisions: pending,
+    ingestWorkflows: {
+      async listPending(_ownerKey, { projectRef } = {}) {
+        return [{ id: `workflow-${projectRef}`, projectRef, stage: "proposed", createdAt: "2026-07-29T00:02:00.000Z", updatedAt: "2026-07-29T00:02:00.000Z" }];
+      },
+    },
+    core: {
+      host: { async list() { return [
+        { id: "job-a", ownerKey: "owner", projectRef: "project-a", channel: "weixin", threadKey: "main", status: "running", created: "2026-07-29T00:03:00.000Z", updated: "2026-07-29T00:03:00.000Z" },
+        { id: "job-b", ownerKey: "owner", projectRef: "project-b", channel: "weixin", threadKey: "main", status: "running", created: "2026-07-29T00:04:00.000Z", updated: "2026-07-29T00:04:00.000Z" },
+      ]; } },
+    },
+    acceptedRequests: { async list({ projectRef }) { return [{ requestId: `request-${projectRef}`, projectRef, status: "accepted", receivedAt: "2026-07-29T00:05:00.000Z", updatedAt: "2026-07-29T00:05:00.000Z" }]; } },
+    reconciliationCases: { async list({ projectRef }) { return [{ caseId: `case-${projectRef}`, projectRef, status: "open", createdAt: "2026-07-29T00:06:00.000Z", updatedAt: "2026-07-29T00:06:00.000Z" }]; } },
+  });
+  const snapshot = await view.snapshot({ ownerKey: "owner", channel: "weixin", projectRef: "project-a" });
+  assert.equal(snapshot.projectRef, "project-a");
+  assert.equal(snapshot.counts.decisions, 1);
+  assert.equal(snapshot.counts.jobs, 1);
+  assert.deepEqual(snapshot.recent.map((item) => item.projectRef).filter(Boolean), Array.from({ length: snapshot.recent.filter((item) => item.projectRef).length }, () => "project-a"));
+  assert.doesNotMatch(JSON.stringify(snapshot.recent), /project-b/);
+});

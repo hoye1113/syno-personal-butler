@@ -4,6 +4,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { GoalService } from "../apps/syno/syno/goal-service.mjs";
+import { JobStore } from "../apps/syno/syno/job-store.mjs";
 import { writeRecord } from "../apps/syno/syno/markdown-record.mjs";
 import { ProjectService } from "../apps/syno/syno/project-service.mjs";
 import { createSynoRuntime } from "../apps/syno/syno/runtime.mjs";
@@ -57,6 +58,10 @@ test("ProjectService generates stable refs, rejects duplicates, and isolates Own
     service.updateProjectStatus(created.project.projectRef, "paused", { ownerKey: "owner-b" }),
     (error) => error.code === "PROJECT_OWNER_MISMATCH",
   );
+  await assert.rejects(
+    service.getProject(created.project.projectRef),
+    (error) => error.code === "PROJECT_OWNER_REQUIRED",
+  );
 });
 
 test("only active Projects bind new work while every lifecycle state remains referenceable", async (t) => {
@@ -74,6 +79,9 @@ test("only active Projects bind new work while every lifecycle state remains ref
     (error) => error.code === "PROJECT_NOT_BINDABLE",
   );
   assert.equal((await service.validateProjectReference({ ownerKey: "owner-a", projectRef: paused.project.projectRef })).status, "paused");
+  await service.updateProjectStatus(paused.project.projectRef, "active", { ownerKey: "owner-a" });
+  assert.equal((await service.validateProjectReference({ ownerKey: "owner-a", projectRef: paused.project.projectRef, forBinding: true })).status, "active");
+  await service.updateProjectStatus(paused.project.projectRef, "paused", { ownerKey: "owner-a" });
   await service.updateProjectStatus(paused.project.projectRef, "completed", { ownerKey: "owner-a" });
   assert.equal((await service.validateProjectReference({ ownerKey: "owner-a", projectRef: paused.project.projectRef })).status, "completed");
   await assert.rejects(
@@ -107,6 +115,21 @@ test("new Goals persist ownerKey and validate Project ownership while legacy Goa
   assert.equal(listed.some((goal) => goal.id === "goal-legacy"), true);
 });
 
+test("Job listing filters by Owner and explicit Project without changing unscoped reads", async (t) => {
+  const root = await fs.mkdtemp(path.join(process.cwd(), ".runtime", "syno-job-scope-"));
+  const opsRoot = path.join(root, "ops");
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const jobs = new JobStore({ opsRoot, payloadRoot: path.join(root, "payloads") });
+  const decision = { intent: "create_action", allowed: true, approval: "none", profile: "syno-ops", risk: "low" };
+  await jobs.create({ request: { intent: "create_action", title: "A" }, decision, ownerKey: "owner-a", projectRef: "project-20260824-aaaaaaaa" });
+  await jobs.create({ request: { intent: "create_action", title: "B" }, decision, ownerKey: "owner-b", projectRef: "project-20260824-bbbbbbbb" });
+  await jobs.create({ request: { intent: "create_action", title: "none" }, decision, ownerKey: "owner-a" });
+  assert.equal((await jobs.list({ ownerKey: "owner-a" })).length, 2);
+  assert.deepEqual((await jobs.list({ ownerKey: "owner-a", projectRef: "project-20260824-aaaaaaaa" })).map((job) => job.projectRef), ["project-20260824-aaaaaaaa"]);
+  assert.equal((await jobs.list({ ownerKey: "owner-b", projectRef: "project-20260824-aaaaaaaa" })).length, 0);
+  assert.equal((await jobs.list()).length, 3);
+});
+
 test("DSH Project tools are core-exposed and keep identity server-owned", () => {
   const runtime = createSynoRuntime({});
   const definitions = runtime.tools.list();
@@ -120,4 +143,17 @@ test("DSH Project tools are core-exposed and keep identity server-owned", () => 
   assert.equal(Object.hasOwn(create.inputSchema.properties, "projectRef"), false);
   assert.equal(buildOperationRequest("projects.create", { title: "A", objective: "B", doneCondition: "C" }).intent, "create_project");
   assert.equal(buildOperationRequest("projects.update_status", { projectRef: "project-20260824-a1b2c3d4", status: "paused" }).intent, "update_project_status");
+});
+
+test("Project creation rejects a colliding stable reference under concurrent writers", async (t) => {
+  const root = await fs.mkdtemp(path.join(process.env.TEMP || process.cwd(), "syno-project-concurrent-"));
+  const opsRoot = path.join(root, "ops");
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const service = makeProjectService(opsRoot);
+  const results = await Promise.allSettled([
+    service.createProject({ title: "A", objective: "A", doneCondition: "done" }, { ownerKey: "owner-a", projectRef: "project-20260824-deadbeef" }),
+    service.createProject({ title: "B", objective: "B", doneCondition: "done" }, { ownerKey: "owner-b", projectRef: "project-20260824-deadbeef" }),
+  ]);
+  assert.equal(results.filter((item) => item.status === "fulfilled").length, 1);
+  assert.equal(results.filter((item) => item.status === "rejected" && item.reason.code === "PROJECT_DUPLICATE").length, 1);
 });

@@ -4,9 +4,9 @@
 
 更新日期：2026-07-28（Asia/Shanghai）
 
-本文维护长期产品目标、架构边界和迁移历史摘要。OpenCode 重构的唯一详细任务、公共接口、R0–R6 阶段顺序和验收门槛位于 `docs/TODO-EXECUTION-PLAN.md`；当前执行断点位于根目录 `NEXT_SESSION.md`。旧 P0–P5 计划仅保存在 `docs/archive/`。
+本文维护长期产品目标、架构边界和迁移历史摘要。旧 OpenCode 重构计划位于 `docs/TODO-EXECUTION-PLAN.md`；当前 Project-aware Knowledge 执行断点唯一位于 [`docs/project-aware-knowledge-execution-plan.md`](project-aware-knowledge-execution-plan.md)，当前交接位于根目录 [`NEXT_SESSION.md`](../NEXT_SESSION.md)。旧 P0–P5 计划仅保存在 `docs/archive/`。
 
-> 当前执行状态以 `docs/TODO-EXECUTION-PLAN.md` 与根 `NEXT_SESSION.md` 为准；历史验收不替代 OpenCode R5 的真实模型、渠道和 Windows 恢复证据。
+> 本文及 `docs/TODO-EXECUTION-PLAN.md` 均为历史资料；当前 Project MVP 状态以 Project 执行计划、`docs/INDEX.md` 和根 `NEXT_SESSION.md` 为准。历史验收不替代当前真实 DSH、渠道和 Owner 证据。
 
 ## 当前交接状态（2026-07-28）
 

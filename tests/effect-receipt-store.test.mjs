@@ -73,6 +73,37 @@ test("SynoToolBridge uses durable receipts across bridge instances and never rep
   assert.equal(executions, 1);
 });
 
+test("SynoToolBridge scopes idempotency and effect receipts by Project context", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-effect-project-scope-"));
+  t.after(() => cleanup(root));
+  const store = makeStore(root);
+  let executions = 0;
+  const contexts = [];
+  const tools = new ToolRegistry([{
+    name: "settings.adjust", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1",
+    agentAdjustableBoundary: true,
+    inputSchema: { type: "object", required: ["key"], properties: { key: { type: "string" } }, additionalProperties: false },
+    outputSchema: { type: "object", required: ["changed"], properties: { changed: { type: "boolean" } }, additionalProperties: false },
+    execute: async (_input, context) => { executions += 1; contexts.push(context); return { changed: true }; },
+  }]);
+  const call = (id) => ({ authorization: "Bearer secret", body: { jsonrpc: "2.0", id, method: "tools/call", params: { name: "settings_adjust", arguments: { key: "quiet" } } } });
+  const run = async (projectRef, id) => {
+    const bridge = new SynoToolBridge({ tools, token: "secret", effectReceipts: store });
+    const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "same-message", projectRef, allowedTools: ["settings_adjust"] });
+    const result = await bridge.handle(call(id));
+    release();
+    return result;
+  };
+  const first = await run("project-20260824-aaaaaaaa", 1);
+  const second = await run("project-20260824-bbbbbbbb", 2);
+  const third = await run("", 3);
+  assert.equal(first.result.directEffect.status, "committed");
+  assert.equal(second.result.directEffect.status, "committed");
+  assert.equal(third.result.directEffect.status, "committed");
+  assert.equal(executions, 3);
+  assert.equal(new Set(contexts.map((context) => context.conversationId)).size, 3);
+});
+
 test("Replay branch routes an array-shaped committed result through the serializer (no structuredContent)", async (t) => {
   // 锁定 bridge 重放分支（syno-tool-bridge.mjs:170 serializeForMcp(cached)）：
   // 跨重启幂等重放时，无论 commit 存了什么形状的 result，都不能回放数组型 structuredContent——

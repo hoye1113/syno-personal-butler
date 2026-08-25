@@ -31,13 +31,17 @@ class GoalService {
     return { goal, changedPaths: [path.relative(path.dirname(opsRoot), file).replace(/\\/g, "/")] };
   }
 
-  async list({ opsRoot = this.opsRoot, status } = {}) {
+  async list({ opsRoot = this.opsRoot, status, ownerKey } = {}) {
     const root = path.join(opsRoot, "goals");
     let entries = [];
     try { entries = await fs.readdir(root, { withFileTypes: true }); } catch (error) { if (error.code === "ENOENT") return []; throw error; }
     const goals = [];
     for (const entry of entries) if (entry.isFile() && entry.name.endsWith(".md")) goals.push(parseRecord(await fs.readFile(path.join(root, entry.name), "utf8")));
-    return goals.filter((goal) => !status || goal.status === status).sort((a, b) => b.priority - a.priority || a.created.localeCompare(b.created));
+    return goals
+      .filter((goal) => !status || goal.status === status)
+      // Legacy Goals have no ownerKey; keep them readable during the MVP migration.
+      .filter((goal) => ownerKey === undefined || !goal.ownerKey || goal.ownerKey === ownerKey)
+      .sort((a, b) => b.priority - a.priority || a.created.localeCompare(b.created));
   }
 }
 

@@ -79,3 +79,22 @@ test("ToolLoopExecutor delegates only through the CognitiveRuntime seam", async 
   assert.deepEqual({ conversationId: calls[0].context.conversationId, channel: calls[0].context.channel, ownerId: calls[0].context.ownerId }, { conversationId: "c1", channel: "web", ownerId: "owner" });
   assert.equal(executor.cancel("runtime-1"), true);
 });
+
+test("ToolLoopExecutor preserves the durable Job Project context", async () => {
+  let received;
+  const runtime = {
+    async run(_request, context) { received = context; return { runId: "runtime-project", text: "done" }; },
+    inspect() { return null; },
+    cancel() { return false; },
+  };
+  const executor = new ToolLoopExecutor({ runtime });
+  await executor.submit({
+    id: "job-project",
+    request: { text: "project work" },
+    channel: "web",
+    senderId: "owner-a",
+    ownerKey: "owner-a",
+    projectRef: "project-20260824-aaaaaaaa",
+  });
+  assert.equal(received.projectRef, "project-20260824-aaaaaaaa");
+});

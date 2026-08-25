@@ -40,7 +40,7 @@ class EffectReconciliationCaseStore {
     return next;
   }
 
-  async open({ toolInvocationKey, toolName, ownerKey = "local-user", sourceType = "tool", sourceId = null, lastErrorCode = "EFFECT_UNKNOWN" } = {}) {
+  async open({ toolInvocationKey, toolName, ownerKey = "local-user", projectRef, sourceType = "tool", sourceId = null, lastErrorCode = "EFFECT_UNKNOWN" } = {}) {
     if (!toolInvocationKey || !toolName) throw new Error("Unknown Case 缺少 toolInvocationKey/toolName");
     const key = caseKey(toolInvocationKey);
     return this.processLock.run(async () => {
@@ -52,6 +52,7 @@ class EffectReconciliationCaseStore {
         version: EFFECT_CASE_VERSION,
         caseId: `case-${key.slice(0, 24)}`,
         ownerKey: String(ownerKey || "local-user"),
+        ...(projectRef !== undefined ? { projectRef: String(projectRef || "") } : {}),
         toolInvocationKey: String(toolInvocationKey),
         toolName: String(toolName),
         sourceType: String(sourceType || "tool"),
@@ -84,14 +85,17 @@ class EffectReconciliationCaseStore {
     return this.#readUnlocked(key);
   }
 
-  async list({ status, ownerKey, limit = 100 } = {}) {
+  async list({ status, ownerKey, projectRef, limit = 100 } = {}) {
     await this.#ensureRoot();
     const names = (await fs.readdir(this.root)).filter((name) => name.endsWith(".json"));
     const records = [];
     for (const name of names) {
       try {
         const record = JSON.parse(await fs.readFile(path.join(this.root, name), "utf8"));
-        if (record?.version === EFFECT_CASE_VERSION && (!status || record.status === status) && (!ownerKey || record.ownerKey === ownerKey)) records.push(record);
+        if (record?.version === EFFECT_CASE_VERSION
+          && (!status || record.status === status)
+          && (!ownerKey || record.ownerKey === ownerKey)
+          && (projectRef === undefined || String(record.projectRef || "") === String(projectRef || ""))) records.push(record);
       } catch {}
     }
     return records.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))).slice(-Math.max(1, Number(limit) || 100));
@@ -125,9 +129,16 @@ class EffectReconciliationCaseStore {
     });
   }
 
-  async resolveOwner(caseIdOrInvocation, resolution = {}) {
+  async resolveOwner(caseIdOrInvocation, resolution = {}, { ownerKey, projectRef } = {}) {
     return this.processLock.run(async () => {
       const current = await this.get(caseIdOrInvocation);
+      if (!current) throw Object.assign(new Error("Unknown Case 不存在"), { code: "EFFECT_CASE_NOT_FOUND" });
+      if (ownerKey !== undefined && String(current.ownerKey || "") !== String(ownerKey || "")) {
+        throw Object.assign(new Error("Unknown Case 不属于当前 Owner"), { code: "OWNER_CONTEXT_MISMATCH" });
+      }
+      if (projectRef !== undefined && String(current.projectRef || "") !== String(projectRef || "")) {
+        throw Object.assign(new Error("Unknown Case 不属于当前 Project"), { code: "PROJECT_CONTEXT_MISMATCH" });
+      }
       return this.#updateUnlocked(caseKey(current.toolInvocationKey), { status: current.status === "claimed" ? "open" : current.status, claim: null, ownerResolution: { source: "owner", ...resolution, resolvedAt: resolution.resolvedAt || this.clock().toISOString() } });
     });
   }

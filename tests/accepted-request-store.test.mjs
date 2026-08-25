@@ -66,6 +66,15 @@ test("same platform message id remains isolated across Owner identities", async 
   assert.equal((await store.list()).length, 2);
 });
 
+test("AcceptedRequest listing can be narrowed to the trusted Project scope", async (t) => {
+  const { root, store } = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await store.accept({ ownerKey: "owner-a", originChannel: "weixin", platformMessageId: "project-a", projectRef: "project-a", payload: { text: "a" } });
+  await store.accept({ ownerKey: "owner-a", originChannel: "weixin", platformMessageId: "project-b", projectRef: "project-b", payload: { text: "b" } });
+  assert.deepEqual((await store.list({ ownerKey: "owner-a", projectRef: "project-a" })).map((item) => item.projectRef), ["project-a"]);
+  assert.deepEqual((await store.list({ ownerKey: "owner-a", projectRef: "project-b" })).map((item) => item.projectRef), ["project-b"]);
+});
+
 test("claim lease permits one worker and expired claims recover", async (t) => {
   const { root } = await fixture();
   t.after(() => fs.rm(root, { recursive: true, force: true }));

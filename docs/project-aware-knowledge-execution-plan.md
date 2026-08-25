@@ -1,7 +1,7 @@
 # Syno Project-aware Knowledge MVP 执行计划
 
 状态：IN_PROGRESS  
-更新日期：2026-08-24（Asia/Hong_Kong）  
+更新日期：2026-08-25（Asia/Hong_Kong）
 执行分支：`feat/project-aware-knowledge-mvp`  
 基线提交：`f4997ab`  
 Push / merge：本轮禁止自动执行
@@ -54,7 +54,7 @@ createdAt:
 updatedAt:
 ```
 
-projectRef 格式为 `project-YYYYMMDD-xxxxxxxx`，后缀来自 `randomUUID()` 的 8 位小写十六进制字符。状态只有 `active`、`paused`、`completed`、`abandoned`；四种状态都允许历史 Note 引用，只有 `active` 可绑定新普通 Job。MVP 不提供删除，也不提供终态 reopen。隔离唯一性边界为 `(ownerKey, projectRef)`。
+projectRef 格式为 `project-YYYYMMDD-xxxxxxxx`，后缀来自 `randomUUID()` 的 8 位小写十六进制字符。由于 durable 路径固定为 `ops/projects/<projectRef>.md`，projectRef 在仓库内全局唯一；Owner 仍是所有读取、变更、绑定和引用的隔离边界，其他 Owner 看到的是拒绝而不是另一份同名记录。状态只有 `active`、`paused`、`completed`、`abandoned`；四种状态都允许历史 Note 引用，只有 `active` 可绑定新普通 Job。`paused → active` 允许恢复；`completed`、`abandoned` 不 reopen。MVP 不提供删除。
 
 ### 显式入口与传播
 
@@ -62,6 +62,7 @@ projectRef 格式为 `project-YYYYMMDD-xxxxxxxx`，后缀来自 `randomUUID()` �
 - 只接受已存在的稳定 projectRef；不存在、格式错误、缺少正文、Owner 不匹配或 Project 不可绑定时返回确定性错误，不启动普通模型工作流。
 - 服务端移除指令后才把正文交给模型；不支持 title matching、alias、fuzzy matching、embedding 或 confidence。
 - 不修改 `DeepSeekHarnessSessionBindingStore`，不做跨消息、跨 Session、跨渠道自动继承。
+- 通过 Job ID 直达的 advice、approve、reject、cancel、retry 等操作也必须在服务端按 Owner 校验；需要 Project 作用域的操作还必须匹配显式 Project。旧微信批准命令同样不能从历史消息猜测 Project，必须显式提供 `/project <projectRef>`。
 
 传播链固定为：
 
@@ -76,6 +77,14 @@ projectRef 格式为 `project-YYYYMMDD-xxxxxxxx`，后缀来自 `randomUUID()` �
 → IngestWorkflow / Proposal / Note
 ```
 
+排队、fallback、重放和对话轮转路径也必须从持久化 Job 重新把 `projectRef` 注入 ToolLoopExecutor；Tool 幂等键和 effect receipt 同时包含 Project scope（含无 Project 的 `none` scope）。`projects.update_status` 的 Job 绑定目标是被修改的 Project；历史 Ingest Apply 使用 `historical` 校验模式，只允许继续已创建的 Workflow，不允许以此绑定新的普通 Job。
+
+控制面 Web 聊天 `POST /api/syno/jobs` 也属于聊天入口：服务端同样先解析并校验 `/project <ref>`，再把去除指令的正文交给 Job/模型；客户端不得直接传入顶层 `projectRef`，否则确定性返回 400。因此浏览器聊天不会形成绕过 Project 边界的旁路。
+
+控制面 Web 的 Job ID approve/reject/cancel/retry 入口也只接受正文首行的 `/project <ref>` 作为显式作用域；对于已绑定 Project 的 Job，缺少指令或使用其他 Project 会确定性拒绝，客户端直接传入 `projectRef` 同样拒绝。旧页面的无作用域按钮因此不属于当前 Project MVP 的兼容契约。
+
+当前 Web 页面即将重构，不定义 Project MVP 的 UI/DOM 契约。测试文件、Schema、服务端运行时链路和隔离回归是本轮验收事实源；旧页面的浏览器 smoke 仅作历史可访问性记录，不作为产品验收或后续 UI 设计依据。
+
 ### Note 与检索
 
 新 canonical Note 只使用 inline scalar array：
@@ -84,7 +93,7 @@ projectRef 格式为 `project-YYYYMMDD-xxxxxxxx`，后缀来自 `randomUUID()` �
 project_refs: ["project-20260824-a1b2c3d4"]
 ```
 
-旧 Note 不批量改写；已有 append/link 行为保持不变，并记录 `DEFERRED_EXISTING_NOTE_PROJECT_LINK`。检索保持原有 `baseScore`，仅在当前可信 Project 与 Note 的 `project_refs` 相交时加固定 `PROJECT_BOOST = 3`；不 hard filter、不惩罚其他项目、不改变无 Project 查询，也不把 projectRef 加入模型可见的 `knowledge.search` 输入契约。
+旧 Note 不批量改写；已有 append/link 行为保持不变，并记录 `DEFERRED_EXISTING_NOTE_PROJECT_LINK`。检索保持原有 `baseScore`，仅对已有词法命中的 Note，在当前可信 Project 与 Note 的 `project_refs` 相交时加固定 `PROJECT_BOOST = 3`；Project boost 不把零词法命中的 Note 强行加入结果。不 hard filter、不惩罚其他项目、不改变无 Project 查询，也不把 projectRef 加入模型可见的 `knowledge.search` 输入契约。
 
 ## 4. Phase 状态
 
@@ -123,7 +132,7 @@ project_refs: ["project-20260824-a1b2c3d4"]
 
 ## 6. 基线证据
 
-已执行：
+Phase 0 的历史基线（2026-08-24）为：
 
 ```text
 pnpm test       # 714/714 passed, 0 failed
@@ -134,7 +143,7 @@ pnpm run verify # Repository verification passed (1631 files); active docs 7 fil
 
 ## 7. 停止条件与 deferred
 
-遇到以下任一情况，停止当前 Phase，并在本文件记录 `BLOCKED_DESIGN_DEVIATION`：必须修改全局 activeProject 或 DSH Session Binding Store；必须让模型提交 projectRef；必须重写 frontmatter parser；必须修改已有 Note 才能完成第一版；无法保证 Owner/projectRef 隔离或 server context 到 Bridge 的传递；无 Project 查询改变现有排序；必须批量迁移旧 Goal/Vault；必须新增 Context/Graph/Usage/Health 大型模块。
+遇到以下任一情况，停止当前 Phase，并在本文件记录 `BLOCKED_DESIGN_DEVIATION`：必须修改全局 activeProject 或 DSH Session Binding Store；必须让模型提交 projectRef；必须重写 frontmatter parser；必须修改已有 Note 才能完成第一版；无法保证 Owner/projectRef 隔离或 server context 到 Bridge 的传递；Job ID 直达操作无法按 Owner/Project 重新校验；无 Project 查询改变现有排序；必须批量迁移旧 Goal/Vault；必须新增 Context/Graph/Usage/Health 大型模块。
 
 以下内容明确 deferred：Session inheritance、Web/微信自动继承、Usage、Learning feedback、Profile/Today/Planner 项目化、Area、PARA UI、Project UI、旧 Note 项目关联、Vault/Goal migration，以及真实 DSH 无法证明价值时的复杂功能补救。
 
@@ -188,9 +197,30 @@ Phase 4 targeted：`node --test tests/project-retrieval.test.mjs`，2/2 passed�
 
 当前完整回归：Phase 4 后执行 `pnpm test`，731/731 passed、0 failed、0 cancelled。文档同步后的 `pnpm run verify` 已通过：Repository verification 1640 files、active documentation 9 files；`git diff --check` 已通过。`pnpm harness:doctor` 通过 capture/chat bootability、sandbox、Cordis 和动态 MCP 禁用检查，但当前 `deepseek-key.present=false`，因此不能进行真实模型召回对照。
 
+2026-08-25 边界修复后的当前自动化门禁：`pnpm test` 为 749/749 passed、0 failed、0 cancelled；完整 Project/安全定向回归为 121/121；最终 `pnpm run verify` 通过（Repository verification 1640 files、active documentation 9 files）；最终 `git diff --check` 通过（仅有 Windows 行尾转换提示，无 whitespace error）。旧页面曾在隔离测试 Host `http://127.0.0.1:8898/` 完成一次非规范浏览器 smoke：页面可访问并能返回 malformed `/project` 的确定性错误；由于 Web 页面即将重构，该记录不构成当前 UI、产品或召回验收。
+
+### 2026-08-25 边界修复记录（DONE）
+
+本轮针对代码审查补齐了以下边界：
+
+- ToolLoopExecutor、对话轮转和 Job 重放保留 Project context；Tool Bridge 的内存幂等键、持久 effect receipt 和 `none` 无项目 scope 不再跨 Project 复用。
+- Project Service 对创建和状态读改写使用项目级跨进程锁；Owner 缺失 fail-closed；`paused → active` 可恢复；ProjectRef 的全局 durable 文件唯一性已写入冻结决策。
+- Workflow/Job Apply 交叉校验 Owner 与 Project；非 active Project 只允许已有历史 Workflow 或生命周期状态 Job 使用，不允许绑定新普通 Job。
+- Pending Decision、Capture status/list/resume/close 使用 Owner/显式 Project 边界；Web intake status/retry 也强制 local Owner。
+- Ingest 标题去重使用当前 Project boost；Project boost 只作用于已有词法命中的候选；jobs.list 只读摘要带回 projectRef。
+- `projects.list`、`jobs.list`、`goals.list` 和近期交互视图均按服务端 Owner 过滤；PendingDecision、AcceptedRequest、Unknown Case、Reconciliation Case 和历史 Workflow 在显式 Project 下继续隔离。裸的“确认/刚才那个”等后续消息不会从 Job 或 DSH 历史隐式继承 Project，Project-bound 决策必须再次显式 `/project <projectRef>`。
+- Mobile v2 在 ACK 前解析并校验 `/project`，AcceptedRequest 保存可信 projectRef，恢复执行时继续使用同一 Project。
+- 控制面 Web `/api/syno/jobs` 现在也解析显式 Project 指令，并在 Job 前完成 Owner/bindable 校验；客户端直接传入顶层 `projectRef` 会被拒绝。
+- Job ID 直达的 advice/approve/reject/cancel/retry 在服务端按 Owner（必要时 Project）重新校验；旧微信批准命令必须带显式 Project 作用域，避免使用历史上下文越权操作。
+- 控制面 Web 的 Job ID approve/reject/cancel/retry 现在要求已绑定 Job 带匹配的显式 Project 指令；旧页面的无作用域操作不是当前 MVP 兼容契约。
+
+新增/扩展测试覆盖：ToolLoopExecutor propagation、Project-scoped effect idempotency、并发 Project duplicate、paused resume、Project decision isolation、Workflow owner/project status scope、Apply mismatch、zero-lexical retrieval、Job ID mutation scope、Web advice Owner scope、legacy Weixin Project scope。
+
 ### Owner 验收证据
 
-DEFERRED（不是设计阻塞）。本次执行已验证静态 Tool Bridge/runtime 注入、同项目 boost、无 Project 回归和 wrong-owner 隔离，但没有在真实生产 DSH 上完成 Owner 观察。因此尚未宣称召回质量改善。下一位 Agent/Owner 必须按 Phase 5 使用 Project A、无 Project、Project B 的相同 query 做对照，记录返回排名、`matchReasons`、最终上下文和 Owner 观察；若无法观察到改善，应标记 MVP 未证明价值，不通过新增复杂功能补救。
+DEFERRED（不是设计阻塞）。本次执行已通过测试文件验证静态 Tool Bridge/runtime 注入、同项目 boost、无 Project 回归、wrong-owner 隔离、控制面 directive 入口、Project-bound 决策不被裸后续消息继承、Job ID 操作 Owner 校验以及 legacy Weixin 作用域；没有在真实生产 DSH 上完成 Owner 观察。因此尚未宣称召回质量改善。下一位 Agent/Owner 必须按 Phase 5 使用 Project A、无 Project、Project B 的相同 query 做对照，记录返回排名、`matchReasons`、最终上下文和 Owner 观察；若无法观察到改善，应标记 MVP 未证明价值，不通过新增复杂功能补救。Web 页面重构期间不需要补做旧 UI 验收。
+
+补充残余边界：显式 Project 是可信执行上下文，不等于 DSH Session 历史自动隔离；同一 DSH 会话若连续切换 Project，历史对话仍可能保留此前语义。MVP 不修改 Session Binding Store，也不把历史文本当作 Project 授权依据；若产品需要会话级强隔离，应在后续单独设计并验收 Session 分区/压缩策略。
 
 ### BLOCKED_DESIGN_DEVIATION
 

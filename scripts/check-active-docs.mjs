@@ -20,10 +20,14 @@ const forbidden = [
   "普通写入需要审批",
   "双审批",
   "二次审批",
+  "当前 Phase 4 HEAD：3362336",
+  "Node 714 tests / 714 pass",
 ];
 const required = new Map([
   ["docs/INDEX.md", ["Normative", "Historical", "Generated", "project-aware-knowledge-execution-plan.md"]],
-  ["docs/project-aware-knowledge-execution-plan.md", ["projectRef", "PROJECT_BOOST = 3", "DEFERRED_EXISTING_NOTE_PROJECT_LINK", "BLOCKED_DESIGN_DEVIATION"]],
+  ["docs/project-aware-knowledge-execution-plan.md", ["projectRef", "PROJECT_BOOST = 3", "DEFERRED_EXISTING_NOTE_PROJECT_LINK", "BLOCKED_DESIGN_DEVIATION", "paused → active", "ToolLoopExecutor", "Job ID", "UI/DOM"]],
+  ["docs/ARCHITECTURE.md", ["projects.list", "projects.create", "projects.update_status"]],
+  ["docs/POLICY.md", ["projects.list", "projects.create", "projects.update_status"]],
 ]);
 
 const violations = [];

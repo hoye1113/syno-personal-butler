@@ -28,6 +28,7 @@ test("KnowledgeStore reads inline project_refs and applies only the fixed same-P
   const projectBNote = await writeNote(vaultRoot, "project-b.md", { title: "General Query", projectRefs: [PROJECT_B] });
   const strongGeneral = await writeNote(vaultRoot, "strong-general.md", { title: "Strong Query", body: "query query query query query" });
   const weakProject = await writeNote(vaultRoot, "weak-project.md", { title: "Weak", projectRefs: [PROJECT_A], body: "query" });
+  const zeroLexicalProject = await writeNote(vaultRoot, "zero-lexical-project.md", { title: "完全不同的标题", projectRefs: [PROJECT_A], body: "完全不同的正文" });
   const knowledge = new KnowledgeStore({ vaultRoot, indexFile });
 
   const baseline = await knowledge.search("query", { limit: 10 });
@@ -43,6 +44,7 @@ test("KnowledgeStore reads inline project_refs and applies only the fixed same-P
   assert.equal(aResults.find((item) => item.path === projectBNote).score, baseline.find((item) => item.path === projectBNote).score);
   assert.equal(aResults.find((item) => item.path === strongGeneral).path, strongGeneral);
   assert.ok(aResults.find((item) => item.path === strongGeneral).score > aResults.find((item) => item.path === weakProject).score);
+  assert.equal(aResults.some((item) => item.path === zeroLexicalProject), false);
 
   const listed = await knowledge.list();
   assert.deepEqual(listed.find((item) => item.path === projectANote).projectRefs, [PROJECT_A]);

@@ -307,7 +307,7 @@ class IngestService {
         ? { ...state.payload, browserSnapshot: state.browserSnapshot }
         : state.payload);
     const title = titleFromPrepared(prepared, state.payload);
-    const titleMatches = await this.knowledge.search(title, { limit: 5 });
+    const titleMatches = await this.knowledge.search(title, { limit: 5, projectRef: state.projectRef || "" });
     const now = this.clock().toISOString();
     const candidate = {
       id: `candidate-${randomUUID().slice(0, 8)}`, artifactId: id, title, summary: String(prepared.content || prepared.text || "").slice(0, 280),
@@ -482,7 +482,7 @@ class IngestService {
     const proposal = state.proposal || {};
     const payload = state.payload || {};
     const relationCandidates = candidate.title && typeof this.knowledge.search === "function"
-      ? (await this.knowledge.search(candidate.title, { limit: 5 }))
+      ? (await this.knowledge.search(candidate.title, { limit: 5, projectRef: state.projectRef || "" }))
         .filter((item) => item.path && item.excerpt && item.sensitive !== true)
         .map((item) => ({ path: item.path, title: item.title, excerpt: String(item.excerpt).slice(0, 800) }))
       : [];
@@ -516,9 +516,15 @@ class IngestService {
     return pending.sort((a, b) => String(b.created || "").localeCompare(String(a.created || ""))).slice(0, limit);
   }
 
-  async apply(id, { workspace = PATHS.repoRoot, decision } = {}) {
+  async apply(id, { workspace = PATHS.repoRoot, decision, expectedOwnerKey, expectedProjectRef } = {}) {
     const state = JSON.parse(await fs.readFile(path.join(this.stateRoot, `${id}.json`), "utf8"));
     if (!state.proposal) throw Object.assign(new Error("收录方案尚未生成"), { code: "INGEST_PROPOSAL_MISSING" });
+    if (expectedOwnerKey !== undefined && String(state.ownerId || "") !== String(expectedOwnerKey || "")) {
+      throw Object.assign(new Error("收录 Workflow 与执行 Job 的 Owner 不一致"), { code: "PROJECT_WORKFLOW_OWNER_MISMATCH" });
+    }
+    if (expectedProjectRef !== undefined && String(state.projectRef || "") !== String(expectedProjectRef || "")) {
+      throw Object.assign(new Error("收录 Workflow 与执行 Job 的 Project 不一致"), { code: "PROJECT_WORKFLOW_PROJECT_MISMATCH" });
+    }
     await this.#validateProject(state);
     const projectRefs = await this.#validateProposalProjects(state);
     const action = String(decision?.action || "");

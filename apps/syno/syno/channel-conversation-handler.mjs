@@ -112,6 +112,7 @@ class ChannelConversationHandler {
       ownerId: message.ownerKey,
       channel: message.channel,
       messageId: message.id,
+      ...(message.projectRef ? { projectRef: message.projectRef } : {}),
     });
     queueMicrotask(async () => {
       try {
@@ -260,9 +261,18 @@ class ChannelConversationHandler {
         messageDedupKey: message.messageDedupKey,
         threadKey: trace.threadKey,
         payloadKind: attachmentRefs.length ? "message_with_attachments" : "text",
-        payload: { text, attachments: attachmentRefs },
+        payload: {
+          text,
+          attachments: attachmentRefs,
+          ...(message.projectRef ? { projectRef: String(message.projectRef) } : {}),
+        },
+        ...(message.projectRef !== undefined ? { projectRef: String(message.projectRef || "") } : {}),
         deliveryTarget: this.#deliveryTarget(message),
       });
+      if (!accepted.created
+        && String(accepted.request?.projectRef || "") !== String(message.projectRef || "")) {
+        throw Object.assign(new Error("同一渠道消息身份不能切换 Project 上下文"), { code: "PROJECT_CONTEXT_IDENTITY_CONFLICT" });
+      }
       const deliveryTarget = this.#deliveryTarget(message);
       if (deliveryTarget && this.ownerChannelTargets?.set) {
         try {
@@ -290,7 +300,11 @@ class ChannelConversationHandler {
   }
 
   async #runV2(request, message) {
-    const response = await this.handle({ ...message, __synoV2Worker: true });
+    const response = await this.handle({
+      ...message,
+      ...(request.payload?.projectRef ? { projectRef: request.payload.projectRef } : {}),
+      __synoV2Worker: true,
+    });
     const text = String(response?.text || "Syno 已处理，但没有生成可显示的文本。");
     const deliveryTarget = request.payload?.deliveryTarget || this.#deliveryTarget(message);
     const final = await this.channelDeliveryOutbox.enqueue({
@@ -327,6 +341,7 @@ class ChannelConversationHandler {
       senderId: deliveryTarget.toUserId || request.ownerKey,
       contextToken: deliveryTarget.contextToken,
       chatId: deliveryTarget.chatId,
+      ...(request.payload?.projectRef ? { projectRef: request.payload.projectRef } : {}),
       privateConversation: true,
     };
     return this.#runV2(request, message);
@@ -336,7 +351,18 @@ class ChannelConversationHandler {
     if (!this.acceptedRequests || !this.channelDeliveryOutbox) {
       throw Object.assign(new Error("移动 v2 需要 AcceptedRequest 与 ChannelDeliveryOutbox"), { code: "MOBILE_V2_UNAVAILABLE" });
     }
-    const accepted = await this.#persistAccepted(message, trace, text);
+    const directive = parseProjectDirective(text);
+    const projectRef = directive.projectRef || "";
+    if (projectRef) {
+      if (!this.projects) throw Object.assign(new Error("Project 上下文校验服务未配置"), { code: "PROJECT_CONTEXT_UNAVAILABLE" });
+      await this.projects.validateProjectReference({
+        ownerKey: trace.ownerKey,
+        projectRef,
+        forBinding: !isDecisionReply(directive.textWithoutDirective),
+      });
+      text = directive.textWithoutDirective;
+    }
+    const accepted = await this.#persistAccepted({ ...message, ...(projectRef ? { projectRef } : {}) }, trace, text);
     const request = accepted.request;
     const target = request.payload?.deliveryTarget || this.#deliveryTarget(message);
     const ack = await this.channelDeliveryOutbox.enqueue({
@@ -386,14 +412,32 @@ class ChannelConversationHandler {
       const ownerKey = String(message.ownerKey || "local-user");
       const threadKey = String(message.threadKey || "main");
       const directive = parseProjectDirective(text);
-      const projectRef = directive.projectRef || "";
+      const inheritedProjectRef = message.__synoV2Worker ? String(message.projectRef || "").trim() : "";
+      if (inheritedProjectRef && directive.hadDirective && directive.projectRef !== inheritedProjectRef) {
+        throw Object.assign(new Error("AcceptedRequest 的 Project 与消息指令不一致"), { code: "PROJECT_CONTEXT_IDENTITY_CONFLICT" });
+      }
+      const projectRef = directive.projectRef || inheritedProjectRef;
+      const projectListScope = (directive.hadDirective || inheritedProjectRef) ? { projectRef } : {};
+      // A Project is never inherited by a bare follow-up message. Keep legacy
+      // projectless clarifications usable, but require an explicit directive for
+      // any decision or recent interaction bound to a Project.
+      const decisionScope = projectListScope.projectRef === undefined ? { projectRef: "" } : projectListScope;
       if (projectRef) {
         if (!this.projects) throw Object.assign(new Error("Project 上下文校验服务未配置"), { code: "PROJECT_CONTEXT_UNAVAILABLE" });
-        await this.projects.validateProjectReference({ ownerKey, projectRef, forBinding: true });
+        // A directive on an approval/clarification reply continues an already-created
+        // historical Workflow, so terminal/paused Projects remain referenceable there.
+        // Ordinary work still requires an active Project before it reaches the model.
+        await this.projects.validateProjectReference({
+          ownerKey,
+          projectRef,
+          forBinding: !inheritedProjectRef && !isDecisionReply(directive.textWithoutDirective),
+        });
         text = directive.textWithoutDirective;
       }
       const localOnly = /(?:^|\s)仅本地(?:\s|$)/u.test(text);
-      if (!message.__synoV2Worker && this.acceptedRequests && trace.messageId) await this.#persistAccepted(message, trace, text);
+      if (!message.__synoV2Worker && this.acceptedRequests && trace.messageId) {
+        await this.#persistAccepted({ ...message, ...(projectRef ? { projectRef } : {}) }, trace, text);
+      }
       await this.#record("channel.message.received", {
         ...trace,
         hasAttachments: Array.isArray(message.artifacts) && message.artifacts.length > 0,
@@ -410,7 +454,12 @@ class ChannelConversationHandler {
       const pendingChatImages = Array.isArray(message.__imageArtifacts) && message.__imageArtifacts.length > 0;
       const recentReference = pendingChatImages ? null : parseRecentReference(text);
       if (recentReference && this.recentInteractions) {
-        const resolution = await this.recentInteractions.resolve(recentReference, { ownerKey, channel: message.channel, threadKey });
+        const resolution = await this.recentInteractions.resolve(recentReference, {
+          ownerKey,
+          channel: message.channel,
+          threadKey,
+          ...decisionScope,
+        });
         await this.#record("channel.recent_interaction.resolved", { ...trace, action: recentReference.action, kind: resolution.kind, itemId: resolution.item?.id || null });
         return { text: resolution.text };
       }
@@ -419,21 +468,40 @@ class ChannelConversationHandler {
         if (message.privateConversation !== true) {
           throw Object.assign(new Error("澄清回复只允许已绑定 Owner 的明确私聊会话"), { code: "DECISION_PRIVATE_CHAT_REQUIRED" });
         }
-        const presentation = await this.pendingDecisions.present?.({ ownerKey, threadKey, channel: message.channel, businessVersion: message.businessVersion || "1" });
+        const presentation = await this.pendingDecisions.present?.({ ownerKey, threadKey, channel: message.channel, businessVersion: message.businessVersion || "1", ...decisionScope });
         const resolved = await this.pendingDecisions.parse(text, {
           ownerKey,
           threadKey,
           channel: message.channel,
+          ...decisionScope,
           ...(presentation?.presentationId ? { presentationId: presentation.presentationId } : {}),
           ...(message.businessVersion ? { businessVersion: message.businessVersion } : {}),
           diffDigest: message.diffDigest,
           getDiffDigest: typeof this.core.inspect === "function"
-            ? async (jobId) => (await this.core.inspect(jobId))?.result?.diffHash
+            ? async (jobId) => (await this.core.inspect(jobId, { ownerKey, ...decisionScope }))?.result?.diffHash
             : undefined,
         });
-        const workflow = resolved.decision.artifactId && this.ingestWorkflows
-          ? await this.ingestWorkflows.status(resolved.decision.artifactId)
+        const decisionJob = typeof this.core.inspect === "function"
+          ? await this.core.inspect(resolved.decision.jobId, { ownerKey, ...decisionScope }).catch(() => null)
           : null;
+        const decisionProjectRef = String(decisionJob?.projectRef || "");
+        if (decisionJob && projectListScope.projectRef === undefined && decisionProjectRef) {
+          throw Object.assign(new Error("该待确认事项属于 Project，请在本条消息首行显式指定 /project <projectRef>"), { code: "PROJECT_CONTEXT_REQUIRED" });
+        }
+        if (decisionJob && projectListScope.projectRef !== undefined && decisionProjectRef !== String(projectRef || "")) {
+          throw Object.assign(new Error("当前 Project 不能操作其他 Project 的待确认事项"), { code: "PROJECT_CONTEXT_MISMATCH" });
+        }
+        const workflow = resolved.decision.artifactId && this.ingestWorkflows
+          ? await this.ingestWorkflows.status(resolved.decision.artifactId, {
+            ownerKey,
+            ...(decisionScope.projectRef !== undefined
+              ? { projectRef: decisionScope.projectRef, scopeProject: true }
+              : {}),
+          })
+          : null;
+        if (workflow && (directive.hadDirective || inheritedProjectRef) && String(workflow.projectRef || "") !== projectRef) {
+          throw Object.assign(new Error("当前 Project 不能操作其他 Project 的收录决策"), { code: "PROJECT_CONTEXT_MISMATCH" });
+        }
         if (resolved.action === "modify") {
           let revised;
           try {
@@ -441,11 +509,14 @@ class ChannelConversationHandler {
               const decisionResult = await this.ingestWorkflows.decide(workflow.id, {
                 action: "modify",
                 modification: resolved.modification,
-              }, { ownerKey, channel: message.channel, senderId: message.senderId });
+              }, { ownerKey, channel: message.channel, senderId: message.senderId, ...decisionScope });
               revised = { proposal: { id: decisionResult.workflow.proposalId } };
             } else if (resolved.decision.artifactId) revised = await this.ingest.revise(resolved.decision.artifactId, resolved.modification);
             if (!workflow && typeof this.core.requestModification === "function") {
-              await this.core.requestModification(resolved.decision.jobId, resolved.modification);
+              await this.core.requestModification(resolved.decision.jobId, resolved.modification, {
+                ownerKey,
+                projectRef: decisionProjectRef,
+              });
             }
             await this.pendingDecisions.update(resolved.decision.id, { reservedAt: null, consumedAt: new Date().toISOString() });
           } catch (error) {
@@ -464,7 +535,7 @@ class ChannelConversationHandler {
             const selected = await this.ingestWorkflows.decide(workflow.id, {
               action: "select",
               option: resolved.option,
-            }, { ownerKey, channel: message.channel, senderId: message.senderId });
+            }, { ownerKey, channel: message.channel, senderId: message.senderId, ...decisionScope });
             await this.pendingDecisions.update(resolved.decision.id, { reservedAt: null, consumedAt: new Date().toISOString() });
             return {
               text: `已选择“${resolved.option}”，原方案已失效。新任务 ${selected.workflow.jobId} 已生成，请按新提示确认。`,
@@ -478,8 +549,11 @@ class ChannelConversationHandler {
         try {
           if (resolved.action === "reject") {
             result = workflow
-              ? (await this.ingestWorkflows.decide(workflow.id, { action: "reject" }, { ownerKey, channel: message.channel, senderId: message.senderId })).result
-              : await this.core.reject(resolved.decision.jobId, "主人通过私聊拒绝");
+              ? (await this.ingestWorkflows.decide(workflow.id, { action: "reject" }, { ownerKey, channel: message.channel, senderId: message.senderId, ...decisionScope })).result
+              : await this.core.reject(resolved.decision.jobId, "主人通过私聊拒绝", {
+                ownerKey,
+                projectRef: decisionProjectRef,
+              });
             await this.pendingDecisions.update(resolved.decision.id, { reservedAt: null, consumedAt: new Date().toISOString() });
             return { text: `已拒绝任务 ${result.job.id}。` };
           }
@@ -488,11 +562,12 @@ class ChannelConversationHandler {
               action: "approve",
               code: resolved.code,
               diffDigest: resolved.decision.diffDigest,
-            }, { ownerKey, channel: message.channel, senderId: message.senderId })).result
+            }, { ownerKey, channel: message.channel, senderId: message.senderId, ...decisionScope })).result
             : await this.core.approve(resolved.decision.jobId, {
               channel: message.channel,
               senderId: message.senderId,
               ownerKey,
+              projectRef: decisionProjectRef,
               threadKey,
               code: resolved.code,
               diffDigest: resolved.decision.diffDigest,
@@ -501,7 +576,7 @@ class ChannelConversationHandler {
         } catch (error) {
           if (typeof this.pendingDecisions.update === "function") {
             const current = typeof this.core.inspect === "function"
-              ? await this.core.inspect(resolved.decision.jobId).catch(() => null)
+              ? await this.core.inspect(resolved.decision.jobId, { ownerKey, ...decisionScope }).catch(() => null)
               : null;
             await this.pendingDecisions.update(resolved.decision.id, current?.status === "awaiting_approval"
               ? { reservedAt: null }
@@ -528,7 +603,7 @@ class ChannelConversationHandler {
       }
       if (intent.kind === "show_capabilities") {
         const pendingCaptureCount = this.ingestWorkflows
-          ? (await this.ingestWorkflows.listPending(ownerKey)).length
+          ? (await this.ingestWorkflows.listPending(ownerKey, projectListScope)).length
           : 0;
         const runtimeHealth = typeof this.runtime.health === "function"
           ? await this.runtime.health().catch(() => ({ ready: false }))
@@ -543,20 +618,20 @@ class ChannelConversationHandler {
         });
       }
       if (intent.kind === "continue_browser_capture" && this.ingestWorkflows) {
-        const waiting = (await this.ingestWorkflows.listPending(ownerKey)).filter((item) => item.browserStatus === "interaction_required");
+        const waiting = (await this.ingestWorkflows.listPending(ownerKey, projectListScope)).filter((item) => item.browserStatus === "interaction_required");
         if (!waiting.length) return { text: "当前没有等待浏览器验证的收录。" };
         if (waiting.length > 1) {
           if (Number.isInteger(intent.index) && intent.index >= 1 && intent.index <= waiting.length) {
-            const selected = await this.ingestWorkflows.resumeBrowser(waiting[intent.index - 1].id, { ownerKey, channel: message.channel, senderId: message.senderId });
+            const selected = await this.ingestWorkflows.resumeBrowser(waiting[intent.index - 1].id, { ownerKey, channel: message.channel, senderId: message.senderId, ...projectListScope });
             return { text: `已继续收录 ${selected.id}，正在重新生成收录方案。` };
           }
           return { text: waiting.slice(0, 10).map((item, index) => `${index + 1}. ${item.id}：请明确要继续哪一项收录`).join("\n") };
         }
-        const resumed = await this.ingestWorkflows.resumeBrowser(waiting[0].id, { ownerKey, channel: message.channel, senderId: message.senderId });
+        const resumed = await this.ingestWorkflows.resumeBrowser(waiting[0].id, { ownerKey, channel: message.channel, senderId: message.senderId, ...projectListScope });
         return { text: `已继续收录 ${resumed.id}，正在重新生成收录方案。` };
       }
       if (intent.kind === "close_capture_tabs" && this.ingestWorkflows && this.browserCapture?.closeSession) {
-        const workflows = (await this.ingestWorkflows.listPending(ownerKey)).filter((item) => item.browserSessionId);
+        const workflows = (await this.ingestWorkflows.listPending(ownerKey, projectListScope)).filter((item) => item.browserSessionId);
         let closed = 0;
         for (const workflow of workflows) {
           const result = await this.browserCapture.closeSession({ workflowId: workflow.id });
@@ -566,7 +641,7 @@ class ChannelConversationHandler {
         return { text: closed ? `已关闭 ${closed} 个收录浏览器标签。` : "当前没有可关闭的收录浏览器标签。" };
       }
       if (["capture_status", "list_pending_capture"].includes(intent.kind) && this.ingestWorkflows) {
-        const pending = await this.ingestWorkflows.listPending(ownerKey);
+        const pending = await this.ingestWorkflows.listPending(ownerKey, projectListScope);
         if (!pending.length) return { text: "当前没有未完成的收录。" };
         return {
           text: pending.slice(0, 10).map((item, index) =>

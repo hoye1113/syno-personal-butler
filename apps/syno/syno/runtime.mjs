@@ -35,6 +35,7 @@ import { DEFAULT_WEB_PORT, PATHS } from "./paths.mjs";
 import { PlannerService } from "./planner-service.mjs";
 import { PostIngestCandidateStore } from "./post-ingest-candidates.mjs";
 import { OutputService } from "./output-service.mjs";
+import { parseProjectDirective } from "./project-directive.mjs";
 import { ProviderClient } from "./provider-client.mjs";
 import { ProviderCredentialStore } from "./provider-credential-store.mjs";
 import { ProactiveOrchestrator } from "./proactive-orchestrator.mjs";
@@ -145,6 +146,7 @@ function remoteSafeJobSummary(job = {}) {
     status: String(job.status || ""),
     risk: String(job.risk || job.decision?.risk || ""),
     phase: String(job.phase || ""),
+    ...(job.projectRef ? { projectRef: String(job.projectRef) } : {}),
     changedPaths: Array.isArray(job.changedPaths)
       ? job.changedPaths.map(String).filter((item) => /^(?:vault|ops)\//u.test(item)).slice(0, 100)
       : [],
@@ -459,8 +461,11 @@ function createSynoRuntime(options = {}) {
       name: "capture.status", description: "读取 Artifact 安全提取与收录方案状态", risk: "read", permission: "syno-read", retry: "safe", version: "1",
       inputSchema: { type: "object", required: ["artifactId"], properties: { artifactId: { type: "string", minLength: 1 } }, additionalProperties: false },
       outputSchema: { type: "object", required: ["found"], properties: { found: { type: "boolean" }, item: {} } },
-      execute: async ({ artifactId }) => {
-        const item = await ingestWorkflows.status(artifactId);
+      execute: async ({ artifactId }, context) => {
+        const item = await ingestWorkflows.status(artifactId, {
+          ownerKey: context.ownerId,
+          ...(context.projectRef !== undefined ? { projectRef: context.projectRef, scopeProject: true } : {}),
+        });
         return item ? { found: true, item } : { found: false };
       },
     },
@@ -468,13 +473,16 @@ function createSynoRuntime(options = {}) {
       name: "capture.list_pending", description: "列出主人尚未完成的收录工作流", risk: "read", permission: "syno-read", retry: "safe", version: "2",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       outputSchema: { type: "array", items: { type: "object" } },
-      execute: (_input, context) => ingestWorkflows.listPending(context.ownerId),
+      execute: (_input, context) => ingestWorkflows.listPending(
+        context.ownerId,
+        context.projectRef !== undefined ? { projectRef: context.projectRef } : {},
+      ),
     },
     {
       name: "goals.list", description: "查看主人的活跃目标和项目", risk: "read", permission: "syno-read", retry: "safe", version: "1",
       inputSchema: { type: "object", properties: { status: { enum: ["active", "paused", "completed", "abandoned"] } }, additionalProperties: false },
       outputSchema: { type: "array", items: { type: "object" } },
-      execute: ({ status }) => goals.list(status ? { status } : {}),
+      execute: ({ status }, context) => goals.list({ ...(status ? { status } : {}), ownerKey: context.ownerId }),
     },
     {
       name: "projects.list", description: "查看当前 Owner 的 Project", risk: "read", permission: "syno-read", retry: "safe", version: "1",
@@ -543,7 +551,8 @@ function createSynoRuntime(options = {}) {
           threadKey: context.threadKey,
           conversationId: context.conversationId,
           messageId: context.conversationId,
-          projectRef: context.projectRef,
+          projectRef,
+          projectValidationMode: "lifecycle",
         });
         const project = result.job.result?.operationResult?.project || null;
         return {
@@ -591,7 +600,11 @@ function createSynoRuntime(options = {}) {
       name: "jobs.list", description: "查看任务和审批状态", risk: "read", permission: "syno-read", retry: "safe", version: "1",
       inputSchema: { type: "object", properties: { limit: { type: "integer", minimum: 1, maximum: 100 } }, additionalProperties: false },
       outputSchema: { type: "array", items: { type: "object" } },
-      execute: async ({ limit }) => (await host.list({ limit: limit || 20 })).map(remoteSafeJobSummary),
+      execute: async ({ limit }, context) => (await host.list({
+        limit: limit || 20,
+        ownerKey: context.ownerId,
+        ...(context.projectRef !== undefined ? { projectRef: context.projectRef } : {}),
+      })).map(remoteSafeJobSummary),
     },
     {
       name: "jobs.submit", description: "提交需经 Policy 和审批的收录、行动、记忆候选或报告 Job", risk: "low", permission: "syno-ops", retry: "idempotent", version: "1", approvalBoundary: true,
@@ -651,7 +664,7 @@ function createSynoRuntime(options = {}) {
     effectReceipts,
     reconciliationCases,
     isRuntimeReady: () => lifecycleState === "ready",
-    onResult: async ({ tool, result, ownerKey, threadKey, channel }) => {
+    onResult: async ({ tool, result, ownerKey, threadKey, channel, projectRef }) => {
       if (!result?.requiresApproval || !result.id) return;
       const job = await jobStore.get(result.id);
       if (!job) return;
@@ -668,8 +681,9 @@ function createSynoRuntime(options = {}) {
         businessVersion: job.result?.diffHash || job.updated || "1",
         approvalCode: job.approvalCode,
         artifactId: request.artifactId,
+        ...(projectRef !== undefined ? { projectRef } : {}),
       });
-      await pendingDecisions.present({ ownerKey, threadKey, channel: channel || "harness", businessVersion: decision.businessVersion || "1" });
+      await pendingDecisions.present({ ownerKey, threadKey, channel: channel || "harness", businessVersion: decision.businessVersion || "1", ...(projectRef !== undefined ? { projectRef } : {}) });
     },
   });
   const fakeHarness = process.env.NODE_ENV === "test" && (process.env.SYNO_HARNESS_FAKE === "true" || Boolean(process.env.SYNO_DSH_FAKE_AGENT));
@@ -792,7 +806,12 @@ function createSynoRuntime(options = {}) {
     fallback: baseExecutor,
     execute: async (operation, payload, { workspace, job } = {}) => {
       const root = workspace || PATHS.repoRoot;
-      if (operation === "ingest.apply") return ingest.apply(payload.artifactId, { workspace: root, decision: payload.decision });
+      if (operation === "ingest.apply") return ingest.apply(payload.artifactId, {
+        workspace: root,
+        decision: payload.decision,
+        expectedOwnerKey: job?.ownerKey,
+        expectedProjectRef: job?.projectRef || "",
+      });
       if (operation === "ingest.apply-batch") return ingest.applyBatch(payload.artifactIds, { workspace: root, decision: payload.decision });
       if (operation === "learning.evidence.record") return learning.record(payload, { opsRoot: path.join(root, "ops") });
       if (operation === "outputs.opportunity.create") return outputs.createOpportunity(payload, { opsRoot: path.join(root, "ops") });
@@ -996,7 +1015,18 @@ function createSynoRuntime(options = {}) {
       // trust-but-clarify：只有系统歧义（撞重复=merge / 有未决事项）才回到人在环；
       // additive 且无未决事项 = 无冲突，直接自动收录，不产 PendingDecision。
       const hasConflict = proposal.risk === "merge" || (Array.isArray(proposal.unresolved) && proposal.unresolved.length > 0);
-      const existingJob = workflow.jobId ? await host.inspect(workflow.jobId) : null;
+      const existingJob = workflow.jobId
+        ? await host.inspect(workflow.jobId, { ownerKey: workflow.ownerKey, projectRef: workflow.projectRef || "" })
+        : null;
+      if (existingJob && (
+        String(existingJob.ownerKey || "") !== String(workflow.ownerKey || "")
+        || String(existingJob.projectRef || "") !== String(workflow.projectRef || "")
+      )) {
+        throw Object.assign(new Error("Workflow 与关联 Job 的 Owner 或 Project 上下文不一致"), {
+          code: "PROJECT_WORKFLOW_JOB_MISMATCH",
+          retryable: false,
+        });
+      }
       const result = existingJob ? { job: existingJob } : await host.receive(buildOperationRequest("ingest.apply", {
           artifactId: workflow.artifactId,
           decision: { action },
@@ -1007,6 +1037,7 @@ function createSynoRuntime(options = {}) {
           threadKey: workflow.threadKey,
           messageId: `ingest-workflow:${workflow.id}:${proposal.proposalDigest}`,
           projectRef: workflow.projectRef,
+          projectValidationMode: "historical",
           awaitClarification: hasConflict,
         });
       const job = result.job;
@@ -1058,8 +1089,9 @@ function createSynoRuntime(options = {}) {
         businessVersion: proposal.proposalDigest,
         approvalCode: job.approvalCode,
         artifactId: workflow.artifactId,
+        ...(workflow.projectRef !== undefined ? { projectRef: workflow.projectRef } : {}),
       });
-      const decisionPresentation = await pendingDecisions.present({ ownerKey: workflow.ownerKey, threadKey: workflow.threadKey, channel: workflow.originChannel, businessVersion: proposal.proposalDigest });
+      const decisionPresentation = await pendingDecisions.present({ ownerKey: workflow.ownerKey, threadKey: workflow.threadKey, channel: workflow.originChannel, businessVersion: proposal.proposalDigest, ...(workflow.projectRef !== undefined ? { projectRef: workflow.projectRef } : {}) });
       // 微信排版：空行分节 + emoji 锚点；「内容要点」块让主人直接看到要收录的内容
       // （candidate.summary 是正文前 280 字切片，含 markdown/frontmatter，先清洗再截断）。
       const previewLines = [];
@@ -1151,12 +1183,13 @@ function createSynoRuntime(options = {}) {
       }
     },
     decisionExecutor: async ({ workflow, decision, context }) => {
-      if (decision.action === "modify") return core.requestModification(workflow.jobId, decision.modification);
-      if (decision.action === "reject") return core.reject(workflow.jobId, "主人通过私聊拒绝");
+      if (decision.action === "modify") return core.requestModification(workflow.jobId, decision.modification, { ownerKey: workflow.ownerKey, projectRef: workflow.projectRef || "" });
+      if (decision.action === "reject") return core.reject(workflow.jobId, "主人通过私聊拒绝", { ownerKey: workflow.ownerKey, projectRef: workflow.projectRef || "" });
       return core.approve(workflow.jobId, {
         channel: context.channel,
         senderId: context.senderId,
         ownerKey: workflow.ownerKey,
+        projectRef: workflow.projectRef || "",
         threadKey: workflow.threadKey,
         code: decision.code,
         diffDigest: decision.diffDigest,
@@ -1167,7 +1200,10 @@ function createSynoRuntime(options = {}) {
         status: "missing",
         error: { code: "INGEST_JOB_MISSING", message: "Workflow 缺少关联 Job" },
       };
-      const job = await host.inspect(workflow.jobId);
+      const job = await host.inspect(workflow.jobId, {
+        ownerKey: workflow.ownerKey,
+        projectRef: workflow.projectRef || "",
+      });
       if (!job) return {
         status: "missing",
         error: { code: "INGEST_JOB_MISSING", message: `关联 Job 不存在：${workflow.jobId}` },
@@ -1750,7 +1786,7 @@ async function routeSynoApi(runtime, req, url, readBody) {
     from: url.searchParams.get("from") || "", to: url.searchParams.get("to") || "",
   }) };
   if (method === "GET" && url.pathname === "/api/syno/note") return runtime.core.read(url.searchParams.get("path") || "");
-  if (method === "GET" && url.pathname === "/api/syno/jobs") return { jobs: await runtime.host.list({ limit: 100 }) };
+  if (method === "GET" && url.pathname === "/api/syno/jobs") return { jobs: await runtime.host.list({ limit: 100, ownerKey: webContext.ownerKey }) };
   if (method === "GET" && url.pathname === "/api/syno/notifications") return { notifications: await runtime.notifications.list({ limit: 100 }) };
   if (method === "GET" && url.pathname === "/api/syno/channels") return { channels: runtime.channels.status() };
   if (method === "GET" && url.pathname === "/api/syno/proactive/preview") return runtime.proactive.preview();
@@ -1897,6 +1933,12 @@ async function routeSynoApi(runtime, req, url, readBody) {
   }
   if (method === "POST" && url.pathname === "/api/syno/jobs") {
     const request = await readBody(req);
+    if (Object.hasOwn(request, "projectRef")) {
+      const error = new Error("公共 Job API 不接受客户端 projectRef；请使用消息首行 /project <projectRef>");
+      error.code = "PROJECT_CONTEXT_SERVER_OWNED";
+      error.statusCode = 400;
+      throw error;
+    }
     const reserved = ["intent", "kind", "operation", "profile", "decision", "approval", "risk", "complexity"]
       .filter((field) => Object.hasOwn(request, field));
     if (reserved.length) {
@@ -1904,26 +1946,43 @@ async function routeSynoApi(runtime, req, url, readBody) {
       error.statusCode = 400;
       throw error;
     }
+    const rawText = String(request.text || request.message || "");
+    const directive = parseProjectDirective(rawText);
+    const text = directive.hadDirective ? directive.textWithoutDirective : rawText;
+    const projectContext = directive.projectRef
+      ? { projectRef: directive.projectRef }
+      : {};
+    if (directive.projectRef) {
+      if (!runtime.projects?.validateProjectReference) {
+        throw Object.assign(new Error("Project 上下文校验服务未配置"), { code: "PROJECT_CONTEXT_UNAVAILABLE" });
+      }
+      await runtime.projects.validateProjectReference({
+        ownerKey: webContext.ownerKey,
+        projectRef: directive.projectRef,
+        forBinding: true,
+      });
+    }
+    const requestContext = { ...webContext, ...projectContext };
     const mappedIntent = request.mode ? PUBLIC_COMMAND_INTENTS[request.mode] : "";
     if (request.mode && !mappedIntent) {
       const error = new Error("未知的公共任务模式");
       error.statusCode = 400;
       throw error;
     }
-    if (mappedIntent === "create_action") return runtime.core.execute(buildOperationRequest("actions.create", { title: String(request.text || request.message || "") }), webContext);
-    if (mappedIntent === "create_memory_proposal") return runtime.core.execute(buildOperationRequest("memory.proposals.create", { statement: String(request.text || request.message || ""), reason: "主人通过 Web 提交" }), webContext);
+    if (mappedIntent === "create_action") return runtime.core.execute(buildOperationRequest("actions.create", { title: text }), requestContext);
+    if (mappedIntent === "create_memory_proposal") return runtime.core.execute(buildOperationRequest("memory.proposals.create", { statement: text, reason: "主人通过 Web 提交" }), requestContext);
     return runtime.core.execute({
-      text: String(request.text || request.message || ""),
+      text,
       attachments: request.attachments || [],
       ...(mappedIntent ? { intent: mappedIntent } : {}),
-    }, webContext);
+    }, requestContext);
   }
   if (method === "POST" && url.pathname === "/api/syno/intake") {
     return runtime.ingestWorkflows.receive(await readBody(req), { channel: "web", ownerKey: "local-user", threadKey: "main" });
   }
   if (method === "GET" && url.pathname === "/api/syno/intake/pending") return { items: await runtime.ingestWorkflows.listPending("local-user") };
   const intakeStatus = /^\/api\/syno\/intake\/([^/]+)$/.exec(url.pathname);
-  if (method === "GET" && intakeStatus) return runtime.ingestWorkflows.status(decodeURIComponent(intakeStatus[1]));
+  if (method === "GET" && intakeStatus) return runtime.ingestWorkflows.status(decodeURIComponent(intakeStatus[1]), { ownerKey: "local-user" });
   const intakeApply = /^\/api\/syno\/intake\/([^/]+)\/apply$/.exec(url.pathname);
   if (method === "POST" && intakeApply) {
     const body = await readBody(req);
@@ -1931,7 +1990,7 @@ async function routeSynoApi(runtime, req, url, readBody) {
   }
   const intakeRetry = /^\/api\/syno\/intake\/([^/]+)\/retry$/.exec(url.pathname);
   if (method === "POST" && intakeRetry) {
-    const workflow = await runtime.ingestWorkflows.status(decodeURIComponent(intakeRetry[1]));
+    const workflow = await runtime.ingestWorkflows.status(decodeURIComponent(intakeRetry[1]), { ownerKey: "local-user" });
     if (!workflow) throw Object.assign(new Error("收录 Workflow 不存在"), { statusCode: 404 });
     return runtime.ingestWorkflows.retry(workflow.id);
   }
@@ -1949,7 +2008,7 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "GET" && url.pathname === "/api/syno/outputs/opportunities") return { opportunities: await runtime.outputs.list() };
   const outputProgress = /^\/api\/syno\/outputs\/opportunities\/([^/]+)\/progress$/.exec(url.pathname);
   if (method === "POST" && outputProgress) return runtime.core.execute(buildOperationRequest("outputs.opportunity.progress", { id: decodeURIComponent(outputProgress[1]), ...await readBody(req) }), webContext);
-  if (method === "GET" && url.pathname === "/api/syno/goals") return { goals: await runtime.goals.list() };
+  if (method === "GET" && url.pathname === "/api/syno/goals") return { goals: await runtime.goals.list({ ownerKey: webContext.ownerKey }) };
   if (method === "POST" && url.pathname === "/api/syno/goals") return runtime.core.execute(buildOperationRequest("goals.create", await readBody(req)), webContext);
   if (method === "POST" && url.pathname === "/api/syno/claims") return runtime.core.execute(buildOperationRequest("claims.create", await readBody(req)), webContext);
   if (method === "POST" && url.pathname === "/api/syno/knowledge/profile") return runtime.core.execute(buildOperationRequest("knowledge.profile.generate", await readBody(req)), webContext);
@@ -2012,6 +2071,9 @@ async function routeSynoApi(runtime, req, url, readBody) {
     const id = decodeURIComponent(adviceMatch[1]);
     const job = await runtime.jobStore.get(id);
     if (!job) { const error = new Error(`任务不存在：${id}`); error.statusCode = 404; throw error; }
+    if (String(job.ownerKey || "local-user") !== String(webContext.ownerKey)) {
+      throw Object.assign(new Error("Job 不属于当前 Owner"), { code: "JOB_OWNER_MISMATCH", statusCode: 403 });
+    }
     if (job.advice) return { advice: job.advice };
     try {
       const advice = await runtime.approvalAdvisor.generate(job, { loadRequest: (j) => runtime.jobStore.loadRequest(j) });
@@ -2024,15 +2086,67 @@ async function routeSynoApi(runtime, req, url, readBody) {
   const match = /^\/api\/syno\/jobs\/([^/]+)\/(approve|reject|cancel)$/.exec(url.pathname);
   if (method === "POST" && match) {
     const body = await readBody(req);
-    if (match[2] === "approve") return runtime.core.approve(decodeURIComponent(match[1]), { channel: "web", senderId: "local-user", code: body.code });
-    if (match[2] === "reject") return runtime.core.reject(decodeURIComponent(match[1]), body.reason);
-    return runtime.core.cancel(decodeURIComponent(match[1]));
+    if (Object.hasOwn(body || {}, "projectRef")) {
+      const error = new Error("Job 操作不接受客户端 projectRef；请使用正文首行 /project <projectRef>");
+      error.code = "PROJECT_CONTEXT_SERVER_OWNED";
+      error.statusCode = 400;
+      throw error;
+    }
+    const id = decodeURIComponent(match[1]);
+    const scope = await resolveWebJobMutationScope(runtime, webContext, id, body?.text || body?.message || "");
+    if (match[2] === "approve") return runtime.core.approve(id, { channel: "web", senderId: "local-user", ownerKey: webContext.ownerKey, ...scope, code: body.code });
+    if (match[2] === "reject") return runtime.core.reject(id, body.reason, { ownerKey: webContext.ownerKey, ...scope });
+    return runtime.core.cancel(id, { ownerKey: webContext.ownerKey, ...scope });
   }
   const retryMatch = /^\/api\/syno\/jobs\/([^/]+)\/retry$/.exec(url.pathname);
-  if (method === "POST" && retryMatch) return runtime.host.retry(decodeURIComponent(retryMatch[1]));
+  if (method === "POST" && retryMatch) {
+    const body = await readBody(req);
+    if (Object.hasOwn(body || {}, "projectRef")) {
+      const error = new Error("Job 操作不接受客户端 projectRef；请使用正文首行 /project <projectRef>");
+      error.code = "PROJECT_CONTEXT_SERVER_OWNED";
+      error.statusCode = 400;
+      throw error;
+    }
+    const id = decodeURIComponent(retryMatch[1]);
+    const scope = await resolveWebJobMutationScope(runtime, webContext, id, body?.text || body?.message || "");
+    return runtime.host.retry(id, { ownerKey: webContext.ownerKey, ...scope });
+  }
   const error = new Error(`未知 Syno API：${method} ${url.pathname}`);
   error.statusCode = 404;
   throw error;
+}
+
+async function resolveWebJobMutationScope(runtime, webContext, jobId, rawText) {
+  const bodyText = String(rawText || "");
+  const directive = parseProjectDirective(bodyText);
+  const projectRef = directive.hadDirective ? directive.projectRef : "";
+  const job = await runtime.jobStore?.get?.(jobId) || null;
+  if (job && String(job.ownerKey || "local-user") !== String(webContext.ownerKey)) {
+    throw Object.assign(new Error("Job 不属于当前 Owner"), { code: "JOB_OWNER_MISMATCH", statusCode: 403 });
+  }
+  if (job) {
+    const jobProjectRef = String(job.projectRef || "");
+    if (jobProjectRef && !projectRef) {
+      throw Object.assign(new Error("该 Job 属于 Project，请在操作正文首行显式指定 /project <projectRef>"), { code: "PROJECT_CONTEXT_REQUIRED", statusCode: 400 });
+    }
+    if (!jobProjectRef && projectRef) {
+      throw Object.assign(new Error("当前 Job 没有 Project，不能使用 Project 上下文操作"), { code: "PROJECT_CONTEXT_MISMATCH", statusCode: 403 });
+    }
+    if (jobProjectRef && jobProjectRef !== projectRef) {
+      throw Object.assign(new Error("当前 Project 不能操作其他 Project 的 Job"), { code: "PROJECT_CONTEXT_MISMATCH", statusCode: 403 });
+    }
+  }
+  if (projectRef) {
+    if (!runtime.projects?.validateProjectReference) {
+      throw Object.assign(new Error("Project 上下文校验服务未配置"), { code: "PROJECT_CONTEXT_UNAVAILABLE" });
+    }
+    await runtime.projects.validateProjectReference({
+      ownerKey: webContext.ownerKey,
+      projectRef,
+      forBinding: false,
+    });
+  }
+  return { projectRef };
 }
 
 export { PUBLIC_COMMAND_INTENTS, buildConversationMigrationContext, createControlMutationLock, createSynoRuntime, createWeixinMessageHandler, parseWeixinApproval, readKnowledgeSnippet, redactMigrationText, remoteSafeJobSummary, resolveCognitiveRuntimeMode, routeSynoApi };

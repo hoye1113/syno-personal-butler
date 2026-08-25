@@ -65,7 +65,15 @@ class AgentHost {
     const projectRef = String(mergedContext.projectRef || "").trim();
     if (projectRef) {
       if (!this.projectService) throw Object.assign(new Error("Project 上下文校验服务未配置"), { code: "PROJECT_CONTEXT_UNAVAILABLE" });
-      await this.projectService.validateProjectReference({ ownerKey, projectRef, forBinding: true });
+      const validationMode = mergedContext.projectValidationMode || "new-binding";
+      if (!new Set(["new-binding", "historical", "lifecycle"]).has(validationMode)) {
+        throw Object.assign(new Error("Project 校验模式无效"), { code: "PROJECT_VALIDATION_MODE_INVALID" });
+      }
+      await this.projectService.validateProjectReference({
+        ownerKey,
+        projectRef,
+        forBinding: validationMode === "new-binding",
+      });
     }
     const decision = this.policy(request, mergedContext);
     const job = await this.store.create({
@@ -76,7 +84,9 @@ class AgentHost {
       ownerKey,
       threadKey: mergedContext.threadKey || "main",
       conversationId: mergedContext.conversationId || "",
-      requestKey: mergedContext.messageId ? `${mergedContext.channel || "web"}:${mergedContext.senderId || "local-user"}:${mergedContext.messageId}` : "",
+      requestKey: mergedContext.messageId
+        ? `${mergedContext.channel || "web"}:${mergedContext.senderId || "local-user"}:${mergedContext.messageId}`
+        : "",
       projectRef,
     });
     if (job.deduplicated) {
@@ -100,8 +110,9 @@ class AgentHost {
     return { job, requiresApproval: true };
   }
 
-  async inspect(jobId) {
-    return this.store.get(jobId);
+  async inspect(jobId, context = {}) {
+    const job = await this.store.get(jobId);
+    return job ? this.#assertJobScope(job, context) : null;
   }
 
   async list(options) {
@@ -110,7 +121,7 @@ class AgentHost {
 
   async approve(jobId, approval = {}) {
     const launch = await this.#withJobLock(jobId, async () => {
-      const job = await this.#requiredJob(jobId);
+      const job = await this.#requiredJob(jobId, approval);
       const { ready } = await this.store.approve(job, approval);
       if (!ready) return { job, action: "wait" };
       const action = job.phase === "merge" ? "merge" : "execute";
@@ -122,8 +133,8 @@ class AgentHost {
     return this.#execute(launch.job, { alreadyRunning: true });
   }
 
-  async reject(jobId, reason) {
-    const job = await this.#withJobLock(jobId, async () => this.store.reject(await this.#requiredJob(jobId), reason));
+  async reject(jobId, reason, context = {}) {
+    const job = await this.#withJobLock(jobId, async () => this.store.reject(await this.#requiredJob(jobId, context), reason));
     if (job.worktree) {
       job.cleanup = await this.#cleanupWorktree(job);
       await this.store.save(job);
@@ -132,16 +143,16 @@ class AgentHost {
     return { job };
   }
 
-  async requestModification(jobId, modification) {
+  async requestModification(jobId, modification, context = {}) {
     const job = await this.#withJobLock(jobId, async () =>
-      this.store.requestModification(await this.#requiredJob(jobId), modification));
+      this.store.requestModification(await this.#requiredJob(jobId, context), modification));
     await this.#commitSystemRecords(job, `syno: request modification ${job.id}`);
     return { job };
   }
 
-  async cancel(jobId) {
+  async cancel(jobId, context = {}) {
     const job = await this.#withJobLock(jobId, async () => {
-      const current = await this.#requiredJob(jobId);
+      const current = await this.#requiredJob(jobId, context);
       if (["completed", "failed", "rejected", "canceled"].includes(current.status)) return current;
       if (current.runId) this.executor.cancel(current.runId);
       await this.store.transition(current, "canceled", { cleanup: { removed: false, reason: current.runId ? "executor_stopping" : "pending_cleanup" } });
@@ -155,9 +166,9 @@ class AgentHost {
     return { job };
   }
 
-  async retry(jobId) {
+  async retry(jobId, context = {}) {
     const job = await this.#withJobLock(jobId, async () => {
-      const current = await this.#requiredJob(jobId);
+      const current = await this.#requiredJob(jobId, context);
       if (current.status !== "waiting_provider") throw new Error("Job 当前不等待 Provider 重试");
       await this.store.transition(current, "running");
       return current;
@@ -391,14 +402,24 @@ class AgentHost {
     return this.gitGuard.commitPaths(records, message, PATHS.repoRoot);
   }
 
-  async #requiredJob(jobId) {
+  #assertJobScope(job, { ownerKey, projectRef } = {}) {
+    if (ownerKey !== undefined && String(job.ownerKey || "local-user") !== String(ownerKey || "local-user")) {
+      throw Object.assign(new Error("Job 不属于当前 Owner"), { code: "JOB_OWNER_MISMATCH", statusCode: 403 });
+    }
+    if (projectRef !== undefined && String(job.projectRef || "") !== String(projectRef || "")) {
+      throw Object.assign(new Error("Job 不属于当前 Project"), { code: "PROJECT_CONTEXT_MISMATCH", statusCode: 403 });
+    }
+    return job;
+  }
+
+  async #requiredJob(jobId, context = {}) {
     const job = await this.store.get(jobId);
     if (!job) {
       const error = new Error(`Job 不存在：${jobId}`);
       error.code = "JOB_NOT_FOUND";
       throw error;
     }
-    return job;
+    return this.#assertJobScope(job, context);
   }
 
   async #cleanupWorktree(job) {

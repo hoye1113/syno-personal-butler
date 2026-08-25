@@ -64,6 +64,22 @@ test("Owner-confirmed not-started reconciliation never reuses the old invocation
   assert.notEqual("new-invocation", resolved.toolInvocationKey);
 });
 
+test("Unknown Cases remain visible and resolvable only inside the trusted Project scope", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-effect-project-"));
+  t.after(() => cleanup(root));
+  const store = makeStore(root, () => new Date("2026-07-29T00:00:00.000Z"));
+  const projectA = await store.open({ toolInvocationKey: "project-a-invocation", toolName: "settings.adjust", ownerKey: "owner", projectRef: "project-a" });
+  const projectB = await store.open({ toolInvocationKey: "project-b-invocation", toolName: "settings.adjust", ownerKey: "owner", projectRef: "project-b" });
+  assert.deepEqual((await store.list({ ownerKey: "owner", projectRef: "project-a" })).map((item) => item.caseId), [projectA.case.caseId]);
+  await assert.rejects(
+    store.resolveOwner(projectA.case.caseId, { result: "confirmed_not_started" }, { ownerKey: "owner", projectRef: "project-b" }),
+    (error) => error.code === "PROJECT_CONTEXT_MISMATCH",
+  );
+  const resolved = await store.resolveOwner(projectA.case.caseId, { result: "confirmed_not_started" }, { ownerKey: "owner", projectRef: "project-a" });
+  assert.equal(resolved.ownerResolution.result, "confirmed_not_started");
+  assert.equal(projectB.case.projectRef, "project-b");
+});
+
 test("Reconciliation Worker escalates a case to failed_terminal after maxAttempts failures and stops re-claiming it", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-effect-terminal-"));
   t.after(() => cleanup(root));

@@ -1,13 +1,14 @@
 # Syno 已知限制
 
-更新日期：2026-08-23
+更新日期：2026-08-25
 
-## 2026-08-24 Project-aware Knowledge MVP
+## 2026-08-25 Project-aware Knowledge MVP
 
 - Phase 0–4 已完成：Project、显式 `/project <projectRef>`、Job/Workflow/Proposal/Note 传播、`project_refs` round-trip 和同项目 `PROJECT_BOOST = 3` 检索加权均已通过当前自动化测试。
-- 当前自动回归为 Node 731/731；Repository verification 1640 files、active docs 9 files 通过。`pnpm harness:doctor` 只证明 Harness 可启动和安全边界配置正确；当前没有可用 DeepSeek key，也没有 Owner 的真实 DSH 召回对照。
+- 边界修复后的当前全量测试为 749/749，Project/安全定向回归为 121/121；最终 `pnpm run verify` 通过（Repository verification 1640 files、active docs 9 files），最终 `git diff --check` 通过。旧页面曾在隔离测试 Host `http://127.0.0.1:8898/` 完成一次非规范 smoke，仅记录可访问性和 malformed `/project` 的确定性错误；Web 页面即将重构，当前 UI/DOM 不属于 Project MVP 验收契约。上一轮 731/731、737/737 只是历史基线。`pnpm harness:doctor` 只证明 Harness 可启动和安全边界配置正确；当前没有可用 DeepSeek key，也没有 Owner 的真实 DSH 召回对照。
 - Phase 5 仍为 `DEFERRED`：必须由 Owner 在真实 DSH 运行 Project A / 无 Project / Project B 相同 query，对照排名、`matchReasons`、最终上下文和主观改善后，才能宣称 MVP 证明价值。
-- Project 不做 Session、跨消息或跨渠道自动继承；旧 Note 不批量补 `project_refs`；暂停/完成/放弃 Project 不可绑定新 Job，但仍可作为历史 Note 引用。
+- Project 不做 Session、跨消息或跨渠道自动继承；裸的“确认/刚才那个”等后续消息不会从 Job 或 DSH 历史隐式继承 Project，Project-bound 决策必须再次显式指定；旧 Note 不批量补 `project_refs`；暂停/完成/放弃 Project 不可绑定新的普通工作 Job，但仍可作为历史 Note 引用；已创建的历史 Workflow 和生命周期状态 Job 经过一致性校验后可以继续执行。显式 Project 也不会切分 DSH Session 历史：同一会话切换 Project 时旧语义可能仍在上下文中，但历史文本不具备服务端授权能力；强会话隔离需要后续单独设计。
+- Job ID 直达的 advice、approve、reject、cancel、retry 已通过测试覆盖 Owner 校验；Project-bound 的 approve/reject/cancel/retry 和旧微信批准同样需要显式匹配 Project。当前旧 UI 的无作用域按钮不兼容 Project-bound Job；若未来 UI 重构改变入口，必须保留这些服务端边界，不能把 UI 参数当作授权。
 
 ## 发布门槛状态
 
@@ -21,7 +22,7 @@
 
 历史 Provider/旧运行时验收不替代当前 DSH 发布门槛。当前生产只启用 `DeepSeekHarnessCognitiveRuntime`；真实模型、跨渠道计数、提示注入、长会话 compaction 行为、Harness 重启恢复和 Windows 登录恢复仍未完成。生产受控 `syno` agent preset、Web `agentPreset: syno` 显式绑定和 JSON-RPC 官方 compaction stack 已实现并通过构建产物级验证，但不能替代真实模型和 Owner 验收。不得把凭据已配置、自动测试或历史探针证据表述为 DSH 已封板。
 
-历史自动门禁数字和旧运行时探针只作为追溯记录；本分支本次按 `package.json` 测试入口执行 Node 714 tests / 714 pass / 0 fail / 0 cancelled / exit 0。该结果只证明自动化门禁，不替代真实 DSH、渠道和 Owner 验收。
+历史自动门禁数字和旧运行时探针只作为追溯记录；本分支当前修复后的结果以 `NEXT_SESSION.md` 和 Project 执行计划最新记录为准。该结果只证明自动化门禁，不替代真实 DSH、渠道和 Owner 验收。
 
 Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导出、保护、重注册并再次导出验证，且健康快路径也必须先通过同一契约。当前真实任务已安装并使用绝对 `node.exe`，受控重启验证时刻曾等待 8 秒仍保持 `Running` 且 Host 健康；安装器还修复了 mise shim 与相对 server 路径接管问题。本次复核（2026-07-28 约 22:26 CST）快照：任务当前 `State=Ready`、未运行，`LastRunTime=2026-07-28 20:31:19`、`LastTaskResult=3221225786`（0xC000013A 控制中断退出），`manage-windows-task -Action Status` 报告 `running=False`，8888 上存活的是更早（20:05:47）手动启动的 Host 进程而非活动任务实例。下次 Windows 登录恢复仍未实测，不能把当前运行态当作冷启动证据；`0xC000013A` 退出根因（疑似受控重启停止旧实例或撞端口占用）需在冷启动验收中确认。
 

@@ -172,3 +172,18 @@ test("GET /api/syno/jobs/:id/advice returns degraded minimal advice when generat
   assert.equal(result.degraded, true);
   assert.equal(result.advice.via, "minimal");
 });
+
+test("GET /api/syno/jobs/:id/advice rejects a Job owned by another Owner", async () => {
+  const store = inMemoryJobStore({
+    id: "job-20260722-test",
+    ownerKey: "owner-b",
+    intent: "curate_note",
+    status: "awaiting_approval",
+    request: { operation: "ingest.apply" },
+    decision: { reason: "r" },
+  });
+  await assert.rejects(
+    routeSynoApi({ jobStore: store, approvalAdvisor: { async generate() { throw new Error("must not run"); } } }, { method: "GET" }, new URL("http://127.0.0.1/api/syno/jobs/job-20260722-test/advice"), async () => ({})),
+    (error) => error.code === "JOB_OWNER_MISMATCH" && error.statusCode === 403,
+  );
+});

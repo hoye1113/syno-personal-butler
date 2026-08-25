@@ -340,7 +340,7 @@ test("SynoToolBridge binds Owner thread and idempotency identity while tracking 
   assert.equal(executions, 1);
   assert.equal(receivedContext.ownerId, "owner-1");
   assert.equal(receivedContext.channel, "feishu");
-  assert.match(receivedContext.conversationId, /^fs-99:settings_adjust:[a-f0-9]{16}$/);
+  assert.match(receivedContext.conversationId, /^fs-99:<none>:settings_adjust:[a-f0-9]{16}$/);
   assert.equal(resultContext.threadKey, "project-a");
 });
 

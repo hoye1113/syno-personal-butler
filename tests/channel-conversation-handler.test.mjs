@@ -60,6 +60,69 @@ test("ChannelConversationHandler shadow-persists mobile text before model execut
   assert.equal(wakes, 1);
 });
 
+test("ChannelConversationHandler preserves an explicit Project in shadow persistence", async () => {
+  const accepted = [];
+  const runs = [];
+  const handler = new ChannelConversationHandler({
+    runtime: { async run(request, context) { runs.push({ request, context }); return { text: "project-reply" }; } },
+    core: {},
+    ingest: {},
+    projects: {
+      async validateProjectReference(input) {
+        assert.deepEqual(input, { ownerKey: "owner", projectRef: "project-20260824-aaaaaaaa", forBinding: true });
+        return { projectRef: input.projectRef, status: "active" };
+      },
+    },
+    pendingDecisions: {},
+    acceptedRequests: {
+      async accept(input) {
+        accepted.push(input);
+        return { created: true, request: { requestId: "request-project-1" } };
+      },
+    },
+  });
+
+  const response = await handler.handle({
+    id: "wx-project-shadow-1",
+    ownerKey: "owner",
+    channel: "weixin",
+    text: "/project project-20260824-aaaaaaaa\n整理 Project A",
+  });
+
+  assert.deepEqual(response, { text: "project-reply" });
+  assert.deepEqual(accepted[0].payload, {
+    text: "整理 Project A",
+    attachments: [],
+    projectRef: "project-20260824-aaaaaaaa",
+  });
+  assert.equal(runs[0].request.text, "整理 Project A");
+  assert.equal(runs[0].context.projectRef, "project-20260824-aaaaaaaa");
+});
+
+test("ChannelConversationHandler rejects AcceptedRequest replay under a different Project", async () => {
+  let runs = 0;
+  const handler = new ChannelConversationHandler({
+    runtime: { async run() { runs += 1; return { text: "must not run" }; } },
+    core: {},
+    ingest: {},
+    projects: { async validateProjectReference() { return { status: "active" }; } },
+    pendingDecisions: {},
+    acceptedRequests: {
+      async accept() {
+        return { created: false, request: { requestId: "request-existing", projectRef: "project-20260824-aaaaaaaa" } };
+      },
+    },
+  });
+  const response = await handler.handle({
+    id: "same-platform-message",
+    ownerKey: "owner",
+    channel: "weixin",
+    text: "/project project-20260824-bbbbbbbb\n普通消息",
+  });
+  assert.match(response.text, /PROJECT_CONTEXT_IDENTITY_CONFLICT|不能切换 Project/);
+  assert.equal(runs, 0);
+});
+
 test("ChannelConversationHandler receives URL before invoking the model and records source message identity", async () => {
   const received = [];
   const proposed = [];
@@ -77,6 +140,38 @@ test("ChannelConversationHandler receives URL before invoking the model and reco
   assert.equal(received[0].context.messageId, "wx-url");
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(proposed, ["artifact-1"]);
+});
+
+test("ChannelConversationHandler preserves explicit Project context on the legacy ingest fallback", async () => {
+  const received = [];
+  const projectRef = "project-20260824-aaaaaaaa";
+  const handler = new ChannelConversationHandler({
+    runtime: { async run() { throw new Error("legacy capture must not invoke the model"); } },
+    core: {},
+    ingest: {
+      async receive(payload, context) {
+        received.push({ payload, context });
+        return { artifact: { id: "artifact-legacy-project" }, proposalPending: true };
+      },
+      async propose() {},
+    },
+    projects: {
+      async validateProjectReference(input) {
+        assert.deepEqual(input, { ownerKey: "owner", projectRef, forBinding: true });
+        return { projectRef, status: "active" };
+      },
+    },
+    pendingDecisions: {},
+  });
+
+  await handler.handle({
+    id: "legacy-project-url",
+    ownerKey: "owner",
+    channel: "web",
+    text: `/project ${projectRef}\nhttps://example.com/article`,
+  });
+
+  assert.equal(received[0].context.projectRef, projectRef);
 });
 
 test("ChannelConversationHandler deterministically captures an embedded URL with explicit intent or read-link phrases", async () => {

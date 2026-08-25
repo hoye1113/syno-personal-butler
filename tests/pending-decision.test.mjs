@@ -188,3 +188,30 @@ test("replaying proposal publication reuses the same active PendingDecision", as
   assert.equal(replay.id, first.id);
   assert.equal((await store.list({ ownerKey: "owner", threadKey: "main" })).length, 1);
 });
+
+test("Project-scoped decisions cannot be presented or resolved across Project boundaries", async (t) => {
+  const { store } = await setup(t);
+  const projectA = await store.add({ jobId: "job-project-a", ownerKey: "owner", threadKey: "main", projectRef: "project-a", summary: "A", approvalCode: "AAA111" });
+  const projectB = await store.add({ jobId: "job-project-b", ownerKey: "owner", threadKey: "main", projectRef: "project-b", summary: "B", approvalCode: "BBB222" });
+
+  assert.deepEqual((await store.list({ ownerKey: "owner", threadKey: "main", projectRef: "project-a" })).map((item) => item.id), [projectA.id]);
+  assert.deepEqual((await store.list({ ownerKey: "owner", threadKey: "main", projectRef: "project-b" })).map((item) => item.id), [projectB.id]);
+
+  const presentationA = await store.present({ ownerKey: "owner", threadKey: "main", channel: "weixin", projectRef: "project-a" });
+  const presentationB = await store.present({ ownerKey: "owner", threadKey: "main", channel: "weixin", projectRef: "project-b" });
+  assert.notEqual(presentationA.presentationId, presentationB.presentationId);
+  assert.deepEqual(presentationA.orderedDecisionIds, [projectA.id]);
+  assert.deepEqual(presentationB.orderedDecisionIds, [projectB.id]);
+
+  const resolvedB = await store.parse("确认", {
+    ownerKey: "owner",
+    threadKey: "main",
+    channel: "weixin",
+    projectRef: "project-b",
+    presentationId: presentationB.presentationId,
+  });
+  assert.equal(resolvedB.decision.id, projectB.id);
+  await store.update(projectB.id, { reservedAt: null });
+  const resolvedA = await store.parse("确认", { ownerKey: "owner", threadKey: "main", channel: "weixin", projectRef: "project-a", presentationId: presentationB.presentationId });
+  assert.equal(resolvedA.decision.id, projectA.id);
+});

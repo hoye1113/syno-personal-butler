@@ -38,26 +38,32 @@ class RecentInteractionView {
     this.limit = Math.max(1, Number(limit) || 10);
   }
 
-  async snapshot({ ownerKey = "local-user", channel, threadKey = "main" } = {}) {
+  async snapshot({ ownerKey = "local-user", channel, threadKey = "main", projectRef } = {}) {
+    const projectScope = projectRef === undefined ? {} : { projectRef };
     const [decisions, workflows, jobs, accepted, unknown] = await Promise.all([
-      this.pendingDecisions?.list({ ownerKey, threadKey }) || [],
-      this.ingestWorkflows?.listPending(ownerKey) || [],
+      this.pendingDecisions?.list({ ownerKey, threadKey, ...projectScope }) || [],
+      this.ingestWorkflows?.listPending(ownerKey, projectScope) || [],
       this.core?.host?.list ? this.core.host.list({ limit: this.limit * 3 }) : [],
-      this.acceptedRequests?.list ? this.acceptedRequests.list({ ownerKey, limit: this.limit * 3 }) : [],
-      this.reconciliationCases?.list ? this.reconciliationCases.list({ ownerKey, status: "open", limit: this.limit * 3 }) : [],
+      this.acceptedRequests?.list ? this.acceptedRequests.list({ ownerKey, ...projectScope, limit: this.limit * 3 }) : [],
+      this.reconciliationCases?.list ? this.reconciliationCases.list({ ownerKey, ...projectScope, status: "open", limit: this.limit * 3 }) : [],
     ]);
-    const ownedJobs = (jobs || []).filter((job) => job.ownerKey === ownerKey && (!channel || job.channel === channel) && job.threadKey === threadKey && ACTIVE_JOB_STATUSES.has(job.status));
+    const ownedJobs = (jobs || []).filter((job) => job.ownerKey === ownerKey
+      && (!channel || job.channel === channel)
+      && job.threadKey === threadKey
+      && ACTIVE_JOB_STATUSES.has(job.status)
+      && (projectRef === undefined || String(job.projectRef || "") === String(projectRef || "")));
     const items = [
-      ...(decisions || []).map((item) => ({ kind: "decision", id: item.id, status: "awaiting_decision", createdAt: item.createdAt, updatedAt: item.createdAt, presentationId: item.presentationId || null })),
-      ...(workflows || []).map((item) => ({ kind: "ingest", id: item.id, status: item.stage, createdAt: item.createdAt, updatedAt: item.updatedAt, browserStatus: item.browserStatus || null })),
-      ...ownedJobs.map((item) => ({ kind: "job", id: item.id, status: item.status, createdAt: item.created, updatedAt: item.updated })),
-      ...(accepted || []).filter((item) => !["delivered", "canceled", "failed_terminal"].includes(item.status)).map((item) => ({ kind: "accepted_request", id: item.requestId, status: item.status, createdAt: item.receivedAt, updatedAt: item.updatedAt, originChannel: item.originChannel })),
-      ...(unknown || []).map((item) => ({ kind: "unknown", id: item.caseId, status: item.status, createdAt: item.createdAt, updatedAt: item.updatedAt, toolName: item.toolName })),
+      ...(decisions || []).map((item) => ({ kind: "decision", id: item.id, status: "awaiting_decision", createdAt: item.createdAt, updatedAt: item.createdAt, presentationId: item.presentationId || null, ...(item.projectRef !== undefined ? { projectRef: item.projectRef } : {}) })),
+      ...(workflows || []).map((item) => ({ kind: "ingest", id: item.id, status: item.stage, createdAt: item.createdAt, updatedAt: item.updatedAt, browserStatus: item.browserStatus || null, ...(item.projectRef !== undefined ? { projectRef: item.projectRef } : {}) })),
+      ...ownedJobs.map((item) => ({ kind: "job", id: item.id, status: item.status, createdAt: item.created, updatedAt: item.updated, ...(item.projectRef !== undefined ? { projectRef: item.projectRef } : {}) })),
+      ...(accepted || []).filter((item) => !["delivered", "canceled", "failed_terminal"].includes(item.status)).map((item) => ({ kind: "accepted_request", id: item.requestId, status: item.status, createdAt: item.receivedAt, updatedAt: item.updatedAt, originChannel: item.originChannel, ...(item.projectRef !== undefined ? { projectRef: item.projectRef } : {}) })),
+      ...(unknown || []).map((item) => ({ kind: "unknown", id: item.caseId, status: item.status, createdAt: item.createdAt, updatedAt: item.updatedAt, toolName: item.toolName, ...(item.projectRef !== undefined ? { projectRef: item.projectRef } : {}) })),
     ].sort(recentSort).slice(0, this.limit);
     return {
       ownerKey: String(ownerKey),
       channel: channel ? String(channel) : null,
       threadKey: String(threadKey),
+      projectRef: projectRef === undefined ? null : String(projectRef || ""),
       generatedAt: new Date().toISOString(),
       currentChannelDecisions: (decisions || []).filter((item) => !channel || item.channel === channel),
       recent: items,
@@ -87,6 +93,9 @@ class RecentInteractionView {
         result: reference.result,
         resolvedBy: "owner",
         channel: context.channel || null,
+      }, {
+        ownerKey: context.ownerKey,
+        ...(context.projectRef !== undefined ? { projectRef: context.projectRef } : {}),
       });
       const nextStep = reference.result === "confirmed_not_started"
         ? "如需重试，请重新发起新请求；系统不会复用原 Invocation Key。"
@@ -101,7 +110,10 @@ class RecentInteractionView {
     if (!selected) return { kind: "ambiguous", candidates, text: candidates.slice(0, this.limit).map((item, index) => `${index + 1}. ${item.id}：${item.status}`).join("\n") };
     if (reference.action === "cancel") {
       if (selected.kind !== "job" || typeof this.core?.cancel !== "function") return { kind: "unsupported", item: selected, text: `事项 ${selected.id} 当前不能从移动端取消。` };
-      const result = await this.core.cancel(selected.id);
+      const result = await this.core.cancel(selected.id, {
+        ownerKey: context.ownerKey,
+        ...(context.projectRef !== undefined ? { projectRef: context.projectRef } : {}),
+      });
       return { kind: "resolved", item: selected, result, text: `已取消 ${selected.id}。` };
     }
     return { kind: "resolved", item: selected, text: `已定位 ${selected.id}（${selected.status}），请继续提供明确操作。` };

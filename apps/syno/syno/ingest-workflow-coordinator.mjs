@@ -621,10 +621,17 @@ class IngestWorkflowCoordinator {
     }
   }
 
-  async status(reference) {
+  async status(reference, { ownerKey, projectRef, scopeProject = false } = {}) {
     const direct = String(reference || "").startsWith("workflow-") ? await this.store.get(reference) : null;
-    if (direct) return direct;
-    return (await this.store.list()).find((item) => item.artifactId === reference) || null;
+    const item = direct || (await this.store.list()).find((candidate) => candidate.artifactId === reference) || null;
+    if (!item) return null;
+    if (ownerKey !== undefined && String(item.ownerKey || "") !== String(ownerKey || "")) {
+      throw Object.assign(new Error("不能读取其他 Owner 的收录 Workflow"), { code: "INGEST_WORKFLOW_OWNER_MISMATCH" });
+    }
+    if (scopeProject && String(item.projectRef || "") !== String(projectRef || "")) {
+      throw Object.assign(new Error("当前 Project 不能读取该收录 Workflow"), { code: "PROJECT_CONTEXT_MISMATCH" });
+    }
+    return item;
   }
 
   async #finishReject(id, { throwOnFailure = false, context = {}, jobAlreadyRejected = false } = {}) {
@@ -679,8 +686,13 @@ class IngestWorkflowCoordinator {
     }
   }
 
-  async listPending(ownerKey) {
-    return (await this.store.list({ ownerKey, includeTerminal: false })).filter((item) => PENDING_STAGES.has(item.stage));
+  async listPending(ownerKey, { projectRef } = {}) {
+    if (!String(ownerKey || "").trim()) {
+      throw Object.assign(new Error("列出收录 Workflow 缺少 Owner"), { code: "INGEST_WORKFLOW_OWNER_REQUIRED" });
+    }
+    return (await this.store.list({ ownerKey, includeTerminal: false }))
+      .filter((item) => PENDING_STAGES.has(item.stage))
+      .filter((item) => projectRef === undefined || String(item.projectRef || "") === String(projectRef || ""));
   }
 
   async recover() {
@@ -792,11 +804,14 @@ class IngestWorkflowCoordinator {
   }
 
   async resumeBrowser(reference, context = {}) {
-    const workflow = await this.status(reference);
-    if (!workflow) throw Object.assign(new Error(`IngestWorkflow 不存在：${reference}`), { code: "INGEST_WORKFLOW_MISSING" });
-    if (context.ownerKey && workflow.ownerKey !== context.ownerKey) {
-      throw Object.assign(new Error("不能继续其他 Owner 的浏览器收录"), { code: "INGEST_WORKFLOW_OWNER_MISMATCH" });
+    if (!String(context.ownerKey || "").trim()) {
+      throw Object.assign(new Error("继续浏览器收录缺少 Owner"), { code: "INGEST_WORKFLOW_OWNER_REQUIRED" });
     }
+    const workflow = await this.status(reference, {
+      ownerKey: context.ownerKey,
+      ...(Object.hasOwn(context, "projectRef") ? { projectRef: context.projectRef, scopeProject: true } : {}),
+    });
+    if (!workflow) throw Object.assign(new Error(`IngestWorkflow 不存在：${reference}`), { code: "INGEST_WORKFLOW_MISSING" });
     if (workflow.browserStatus !== "interaction_required") {
       throw Object.assign(new Error(`Workflow ${workflow.id} 当前不在等待浏览器交互：${workflow.browserStatus || workflow.stage}`), { code: "BROWSER_WORKFLOW_NOT_WAITING" });
     }
@@ -851,7 +866,10 @@ class IngestWorkflowCoordinator {
   }
 
   async decide(reference, decision = {}, context = {}) {
-    let workflow = await this.status(reference);
+    let workflow = await this.status(reference, {
+      ownerKey: context.ownerKey,
+      ...(Object.hasOwn(context, "projectRef") ? { projectRef: context.projectRef, scopeProject: true } : {}),
+    });
     if (!workflow) throw Object.assign(new Error(`IngestWorkflow 不存在：${reference}`), { code: "INGEST_WORKFLOW_MISSING" });
     if (context.ownerKey && workflow.ownerKey !== context.ownerKey) {
       throw Object.assign(new Error("不能处理其他 Owner 的收录"), { code: "INGEST_WORKFLOW_OWNER_MISMATCH" });

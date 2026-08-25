@@ -1,17 +1,20 @@
 # Syno 执行语义与移动可靠交付交接（2026-07-29）
 
-## 2026-08-24 当前交接：Project-aware Knowledge MVP
+## 2026-08-25 当前交接：Project-aware Knowledge MVP 边界修复
 
 当前唯一执行入口是 [`docs/project-aware-knowledge-execution-plan.md`](docs/project-aware-knowledge-execution-plan.md)；本文下方的 2026-07/08 内容仅作历史背景，不覆盖该执行计划。
 
-- 分支：`feat/project-aware-knowledge-mvp`；基线：`f4997ab`；当前 Phase 4 HEAD：`3362336`。
+- 分支：`feat/project-aware-knowledge-mvp`；基线：`f4997ab`；当前提交 HEAD：`d14bbde`；本轮边界修复正在工作树中，尚未提交。
 - 已提交阶段：Phase 0 `5c3b8e2`、Phase 1 `6ca3dae`、Phase 2 `04a792e`、Phase 3 `b569825`、Phase 4 `3362336`。
-- 文档同步提交：`80d21ce`（`docs: record project-aware knowledge mvp acceptance`）。
+- 文档同步提交：`80d21ce`、`d14bbde`；本轮修复涉及执行链、Project Service、Workflow/Job/Tool 隔离、检索边界和测试，待验证后再决定是否分阶段提交。
 - 当前代码闭环：Project → 显式 `/project <ref>` → trusted execution context → Job/Workflow/Proposal → Note `project_refs` → KnowledgeStore `PROJECT_BOOST = 3`。
-- 最近一次全量自动回归：`pnpm test` 731/731 passed、0 failed、0 cancelled；文档同步后的 `pnpm run verify` 已通过（Repository verification 1640 files、active docs 9），`git diff --check` 已通过。
+- 边界修复后的当前全量回归为 `pnpm test` 749/749 passed、0 failed、0 cancelled；Project/安全定向回归为 121/121；最终 `pnpm run verify` 通过（Repository verification 1640 files、active docs 9 files），最终 `git diff --check` 通过。旧的 731/731、737/737 仅保留作历史基线。
 - `pnpm harness:doctor` 已通过 Harness chat/capture bootability、Cordis、sandbox 和动态 MCP 禁用检查，但当前没有可用 DeepSeek key；这不是真实模型或召回验收证据。
 - Phase 5 当前为 `DEFERRED`：尚未取得真实 DSH + Owner 的 Project A / 无 Project / Project B 对照证据；自动化测试只证明实现接缝，不证明召回质量改善。
-- 下一步：完成文档同步后的 verify/diff-check；随后由 Owner 在真实 DSH 做相同 query 的三组对照，记录排名、`matchReasons`、Agent 最终上下文和主观改善；不因未证明价值而扩展 Session inheritance、Usage、Health、UI 或迁移。
+- 旧页面曾在隔离测试 Host `http://127.0.0.1:8898/` 完成一次非规范浏览器 smoke，仅记录页面可访问和 malformed `/project` 的确定性错误。Web 页面即将重构，当前 UI/DOM 不属于 Project MVP 验收契约；Project A / 无 Project / Project B 的 Job、Workflow、Note、检索排名和错误隔离以测试文件、Schema 和运行时回归为准。真实 DeepSeek DSH/Owner 召回对照仍需单独记录，不因未证明价值而扩展 Session inheritance、Usage、Health、UI 或迁移。
+- PendingDecision、AcceptedRequest、Unknown Case、Reconciliation Case、jobs.list/goals.list 和近期交互均已补上 Owner/Project 读取边界；裸的“确认/刚才那个”不会隐式继承 Project，Project-bound 决策必须再次显式 `/project <projectRef>`。
+- Job ID 直达的 advice/approve/reject/cancel/retry 已补上 Owner 校验；Project-bound 的 approve/reject/cancel/retry 和 legacy Weixin 批准也必须显式带匹配的 Project 作用域。旧页面无作用域按钮不属于当前 MVP 兼容契约。
+- 残余边界：显式 Project 不会自动切分 DSH Session 历史；同一会话切换 Project 时历史文本仍可能存在，但不作为服务端授权。若要求强会话隔离，后续需单独设计 Session 分区/压缩，不在本 MVP 内修改 Session Binding Store。
 - 明确 deferred：Session/跨渠道自动继承、Usage、Learning feedback、Today/Planner 项目化、Area、PARA UI、Project UI、旧 Note 项目关联、Vault/Goal migration。
 - 停止条件：若必须修改全局 `activeProject`、DSH Session Binding Store、模型 projectRef 输入、整个 frontmatter parser、旧 Note 批量迁移，或破坏 Owner 隔离/无 Project baseline，立即在执行计划记录 `BLOCKED_DESIGN_DEVIATION` 并暂停。
 - 本轮不自动 Push 或 merge；提交必须按 Job 声明精确路径暂存。
