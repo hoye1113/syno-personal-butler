@@ -159,6 +159,12 @@ function resultSummary(items) {
   }));
 }
 
+function decodeToolResult(result) {
+  if (result?.structuredContent !== undefined) return result.structuredContent;
+  const text = result?.content?.find((block) => block.type === "text")?.text || "null";
+  return JSON.parse(text);
+}
+
 function stableEvidencePath(value) {
   const normalized = String(value || "").replace(/\\/g, "/");
   return normalized.replace(/^\.runtime\/tests\/[^/]+\/vault\//u, "vault/");
@@ -317,6 +323,60 @@ test("real DSH JSON-RPC, Syno Tool Bridge and Project-aware Capture round-trip",
   assert.ok(searchDefinition, "real Syno Bridge must expose knowledge_search");
   assert.equal(Object.hasOwn(searchDefinition.inputSchema.properties || {}, "projectRef"), false);
 
+  const createRelease = bridge.bindContext({
+    ownerKey: OWNER_A,
+    channel: "web",
+    threadKey: "live-project-create",
+    messageId: "live-project-create",
+    allowedTools: ["projects_create"],
+  });
+  const createdResponse = await bridgeRequest(bridgeOrigin, bridgeToken, "tools/call", {
+    name: "projects_create",
+    arguments: {
+      title: "Live Bridge Project",
+      objective: "Verify that the exposed Project creation tool uses the Job path",
+      doneCondition: "The Project record is listed for the creating Owner",
+    },
+  });
+  createRelease();
+  assert.equal(createdResponse.result?.isError, false);
+  const createdProject = decodeToolResult(createdResponse.result).project;
+  assert.match(String(createdProject?.projectRef || ""), /^project-\d{8}-[a-f0-9]{8}$/);
+  assert.equal(createdProject.ownerKey, OWNER_A);
+
+  const listRelease = bridge.bindContext({
+    ownerKey: OWNER_A,
+    channel: "web",
+    threadKey: "live-project-list",
+    messageId: "live-project-list",
+    allowedTools: ["projects_list"],
+  });
+  const listedProjectsResponse = await bridgeRequest(bridgeOrigin, bridgeToken, "tools/call", {
+    name: "projects_list",
+    arguments: { limit: 100 },
+  });
+  listRelease();
+  assert.equal(listedProjectsResponse.result?.isError, false);
+  const listedProjects = decodeToolResult(listedProjectsResponse.result);
+  assert.ok(listedProjects.some((project) => project.projectRef === PROJECT_A));
+  assert.ok(listedProjects.some((project) => project.projectRef === PROJECT_B));
+  assert.ok(listedProjects.some((project) => project.projectRef === createdProject.projectRef));
+
+  const wrongOwnerListRelease = bridge.bindContext({
+    ownerKey: OWNER_B,
+    channel: "web",
+    threadKey: "live-project-list-wrong-owner",
+    messageId: "live-project-list-wrong-owner",
+    allowedTools: ["projects_list"],
+  });
+  const wrongOwnerListResponse = await bridgeRequest(bridgeOrigin, bridgeToken, "tools/call", {
+    name: "projects_list",
+    arguments: { limit: 100 },
+  });
+  wrongOwnerListRelease();
+  assert.equal(wrongOwnerListResponse.result?.isError, false);
+  assert.deepEqual(decodeToolResult(wrongOwnerListResponse.result), []);
+
   const release = bridge.bindContext({
     ownerKey: OWNER_A,
     channel: "web",
@@ -411,7 +471,6 @@ test("real DSH JSON-RPC, Syno Tool Bridge and Project-aware Capture round-trip",
   assert.equal(aResult.isError, false);
   assert.equal(noProjectResult.isError, false);
   assert.equal(bResult.isError, false);
-  const decodeToolResult = (result) => JSON.parse(result.content.find((block) => block.type === "text")?.text || "[]");
   const aResults = decodeToolResult(aResult);
   const noProjectResults = decodeToolResult(noProjectResult);
   const bResults = decodeToolResult(bResult);
@@ -451,6 +510,10 @@ test("real DSH JSON-RPC, Syno Tool Bridge and Project-aware Capture round-trip",
       workflowId,
       proposalId: ingestState.proposal.id,
       notePath: stableEvidencePath(capturedNote.path),
+    },
+    projectTools: {
+      createdViaBridge: true,
+      ownerScopedList: true,
     },
     ownerObservation: "pending",
     deferred: ["Owner召回改善结论", "直接 DSH ImageAttachmentRef bridge"],
