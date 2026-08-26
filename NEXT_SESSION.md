@@ -7,7 +7,7 @@
 - 基线分支/提交：`main` / `f6d2126`（`feat: switch to vision-capable DeepSeek model chain`）。当前实施分支：`feat/project-aware-dsh-phase5`；本阶段尚未自动 Push 或 merge。
 - 当前实现已新增 Syno 侧 `apps/syno/syno/deepseek-harness-jsonrpc-launcher.mjs`，Supervisor 会检查完整 Capture/Chat DSH runtime closure，并在本地 staging 中调用 DSH 已有 `runJsonrpcAgent(bareModuleBaseUrl)`；由 `SYNO_DSH_ROOT` 指向的外部 Harness clone 未修改。
 - 已提交阶段：Phase 0 `5c3b8e2`、Phase 1 `6ca3dae`、Phase 2 `04a792e`、Phase 3 `b569825`、Phase 4 `3362336`。
-- 前序文档/边界修复提交：`80d21ce`、`d14bbde`、`cd785a0`；本阶段已提交 `80f4aa7`（文档）、`ae71e96`（适配）、`59e2cf7`（live 测试）、`0cad3b0`（证据状态）、`349bc80`（Capture fixture）、`77ba38c`（最终证据与交接文档）、`21e3c78`（Project 工具 live 覆盖）、`487b3e8`（可收录 Capture 素材）。
+- 前序文档/边界修复提交：`80d21ce`、`d14bbde`、`cd785a0`；本阶段已提交 `80f4aa7`（文档）、`ae71e96`（适配）、`59e2cf7`（live 测试）、`0cad3b0`（证据状态）、`349bc80`（Capture fixture）、`77ba38c`（最终证据与交接文档）、`21e3c78`（Project 工具 live 覆盖）、`487b3e8`（可收录 Capture 素材）、`72a8d76`（证据刷新）。
 - 当前代码闭环：Project → 显式 `/project <ref>` → trusted execution context → Job/Workflow/Proposal → Note `project_refs` → KnowledgeStore `PROJECT_BOOST = 3`。
 - 基线回归为 `pnpm test` 749/749；本阶段当前 `pnpm test` 为 755 tests、753 passed、2 skipped（两个显式 live case）、0 failed；`pnpm run verify` 通过（Repository verification 1645 files、active docs 9 files），`git diff --check` 通过。旧的 731/731、737/737 仅保留作历史基线。
 - 模型链固定为 `deepseek/deepseek-v4-flash-vision-exp` → `deepseek/deepseek-v4-flash`，不使用 Pro；用户级 `DEEPSEEK_API_KEY` 当前由宿主环境提供。doctor 只报告存在性，不输出 key。
