@@ -30,7 +30,7 @@ const JSONRPC_BOOTSTRAP_PACKAGES = Object.freeze([
   "@deepseek-ai/dsh-invariants",
 ]);
 const JSONRPC_LAUNCHER_PATH = path.join(PATHS.repoRoot, "apps", "syno", "syno", "deepseek-harness-jsonrpc-launcher.mjs");
-const PROCESS_TREE_KILL_TIMEOUT_MS = 10_000;
+const PROCESS_TREE_KILL_TIMEOUT_MS = 30_000;
 
 function runtimeError(code, message, details) {
   return Object.assign(new Error(message), { code, ...(details ? { details } : {}) });
@@ -805,8 +805,13 @@ class DeepSeekHarnessSupervisor {
   async #disposeSlot(slot) {
     if (!slot) return;
     const child = slot.child;
+    const killOwnedTree = async () => {
+      if (child?.pid) await this.killTree(child.pid).catch(() => {});
+    };
     if (slot.surface === "jsonrpc") {
-      if (child?.pid && child.exitCode === null) await this.killTree(child.pid).catch(() => {});
+      // On Windows the tsx wrapper can exit before its launcher child. Always
+      // target the owned PID so /T can reap descendants in that case too.
+      await killOwnedTree();
       await waitForExit(child, 3_000);
       return;
     }
@@ -816,14 +821,24 @@ class DeepSeekHarnessSupervisor {
     try {
       await slot.client?.close?.();
     } catch {}
-    if (!child || child.exitCode !== null) return;
+    if (!child) return;
+    if (child.exitCode !== null) {
+      await killOwnedTree();
+      return;
+    }
     if (!child.killed && child.stdin && !child.stdin.destroyed) {
       try { child.stdin.end(); } catch {}
     }
-    if (await waitForExit(child, 6_000) !== null) return;
+    if (await waitForExit(child, 6_000) !== null) {
+      await killOwnedTree();
+      return;
+    }
     try { child.kill(); } catch {}
-    if (await waitForExit(child, 3_000) !== null) return;
-    if (child.pid) await this.killTree(child.pid).catch(() => {});
+    if (await waitForExit(child, 3_000) !== null) {
+      await killOwnedTree();
+      return;
+    }
+    await killOwnedTree();
     await waitForExit(child, 3_000);
   }
 }
