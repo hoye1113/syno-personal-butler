@@ -2,7 +2,7 @@
 
 本文只负责说明文档分类、唯一权威性和当前状态；具体产品规则以对应 Normative 文档为准。
 
-当前 Project-aware Knowledge MVP 已完成 Phase 0–4 的代码与契约闭环；Phase 5 处于 `IN_PROGRESS`，真实 DSH runtime closure、`web_search`、Capture round-trip 和 Project A/B/no-Project 技术对照已由测试文件验证，Owner 主观召回观察仍待补充。最新脱敏证据位于 `ops/acceptance/project-aware-knowledge-mvp/jsonrpc-20260826T145335Z.json` 和 `web-search-20260826T145515Z.json`。唯一执行事实源是 `docs/project-aware-knowledge-execution-plan.md`。Web 页面即将重构，当前 UI/DOM 不属于 MVP 验收契约。
+当前 Project-aware Knowledge MVP 已完成 Phase 0–4 的代码与契约闭环；Phase 5 处于 `IN_PROGRESS`，真实 DSH runtime closure、`web_search`、Capture round-trip、Project A/B/no-Project 技术对照和外部 DSH checkout 只读性已由测试文件验证，Owner 主观召回观察仍待补充。最新脱敏证据位于 `ops/acceptance/project-aware-knowledge-mvp/jsonrpc-20260826T153428Z.json` 和 `web-search-20260826T153523Z.json`。唯一执行事实源是 `docs/project-aware-knowledge-execution-plan.md`。Web 页面即将重构，当前 UI/DOM 不属于 MVP 验收契约。
 
 ## Normative
 
