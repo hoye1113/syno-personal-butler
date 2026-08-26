@@ -576,7 +576,7 @@ test("real DSH JSON-RPC Capture and production Web Agent Project round-trip", { 
         threadKey: `live-agent-${label}`,
         channel: "web",
         messageId: `live-agent-${label}`,
-        allowedTools: ["knowledge_search"],
+        allowedTools: ["syno_knowledge_search"],
         ...(projectRef ? { projectRef } : {}),
       });
     } catch (error) {
