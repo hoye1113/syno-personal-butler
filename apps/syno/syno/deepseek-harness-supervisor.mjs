@@ -226,6 +226,57 @@ function packageManifestPath(root, packageName) {
   return path.join(root, "node_modules", ...String(packageName).split("/"), "package.json");
 }
 
+function collectPackageExportTargets(value, targets) {
+  if (typeof value === "string") {
+    targets.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectPackageExportTargets(item, targets);
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  for (const condition of ["node", "import", "require", "default"]) {
+    if (Object.hasOwn(value, condition)) collectPackageExportTargets(value[condition], targets);
+  }
+  for (const [condition, target] of Object.entries(value)) {
+    if (["node", "import", "require", "default"].includes(condition)) continue;
+    collectPackageExportTargets(target, targets);
+  }
+}
+
+async function packageRuntimeEntry(packageRoot, expectedName) {
+  const manifestPath = path.join(packageRoot, "package.json");
+  let manifest;
+  try {
+    manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+  } catch {
+    return null;
+  }
+  if (expectedName && manifest.name !== expectedName) return null;
+  const candidates = [];
+  for (const candidate of [manifest.module, manifest.main]) {
+    if (typeof candidate === "string") candidates.push(candidate);
+  }
+  if (manifest.exports !== undefined) {
+    const rootExports = manifest.exports && typeof manifest.exports === "object" && !Array.isArray(manifest.exports)
+      && Object.hasOwn(manifest.exports, ".")
+      ? manifest.exports["."]
+      : manifest.exports;
+    collectPackageExportTargets(rootExports, candidates);
+  }
+  candidates.push("index.js");
+  const packageRootPath = path.resolve(packageRoot);
+  const packagePrefix = `${packageRootPath}${path.sep}`;
+  for (const candidate of [...new Set(candidates)]) {
+    if (!candidate || candidate.startsWith("node:") || candidate.startsWith("data:")) continue;
+    const entry = path.resolve(packageRootPath, candidate);
+    if (entry !== packageRootPath && !entry.startsWith(packagePrefix)) continue;
+    if (existsSync(entry)) return entry;
+  }
+  return null;
+}
+
 async function discoverDshPackageRoots(dshRoot) {
   const roots = new Map();
   const walk = async (directory) => {
@@ -288,24 +339,30 @@ async function resolveDshRuntimeClosure({
     profileReports.push({ profile, config, packages, missing: [] });
   }
 
-  for (const file of [
-    base,
-    runner,
-    tsx,
-    path.join(demoNodeModules, "@deepseek-ai", "dsh-app-boot", "package.json"),
-    path.join(demoNodeModules, "@deepseek-ai", "cordis", "package.json"),
-    path.join(demoNodeModules, "@deepseek-ai", "dsh-invariants", "package.json"),
-  ]) {
+  for (const file of [base, runner, tsx]) {
     if (!existsSync(file)) missing.push(file);
+  }
+  for (const packageName of JSONRPC_BOOTSTRAP_PACKAGES) {
+    const manifest = packageManifestPath(path.join(root, "packages", "examples", "jsonrpc-demo"), packageName);
+    if (!await packageRuntimeEntry(path.dirname(manifest), packageName)) missing.push(`${manifest}#runtime-entry`);
   }
   for (const packageName of required) {
     const baseManifest = packageManifestPath(baseRoot, packageName);
     const demoManifest = path.join(demoNodeModules, ...packageName.split("/"), "package.json");
-    const packageRoot = existsSync(baseManifest)
-      ? path.dirname(baseManifest)
-      : discoveredRoots.get(packageName) || (existsSync(demoManifest) ? path.dirname(demoManifest) : undefined);
+    const candidates = [
+      existsSync(baseManifest) ? path.dirname(baseManifest) : null,
+      discoveredRoots.get(packageName),
+      existsSync(demoManifest) ? path.dirname(demoManifest) : null,
+    ].filter(Boolean);
+    let packageRoot;
+    for (const candidate of [...new Set(candidates)]) {
+      if (await packageRuntimeEntry(candidate, packageName)) {
+        packageRoot = candidate;
+        break;
+      }
+    }
     if (!packageRoot) {
-      missing.push(baseManifest);
+      missing.push(`${baseManifest}#runtime-entry`);
       continue;
     }
     packageRoots[packageName] = packageRoot;
@@ -474,6 +531,9 @@ class DeepSeekHarnessSupervisor {
     if (profile) {
       const slot = this.slots.get(profile);
       const running = Boolean(slot?.child && slot.child.exitCode === null);
+      const launchable = profile === "chat" && this.chatSurface === "web"
+        ? this.webLaunch?.bootable
+        : this.launch?.bootable;
       return {
         profile,
         state: running ? "running" : this.launch ? "stopped" : "setup_required",
@@ -482,16 +542,17 @@ class DeepSeekHarnessSupervisor {
         model: slot?.model || null,
         surface: slot?.surface || (profile === "chat" ? this.chatSurface : "jsonrpc"),
         origin: slot?.origin || null,
-        bootable: this.launch?.bootable !== false,
+        bootable: launchable === true,
         kind: slot?.kind || (profile === "chat" && this.chatSurface === "web" ? this.webLaunch?.kind : this.launch?.kind) || null,
         runtimeClosure: this.launch?.runtimeClosure || null,
         lastError: this.lastError ? { code: this.lastError.code || "HARNESS_RUNTIME_FAILED", message: this.lastError.message } : null,
       };
     }
+    const launchable = this.chatSurface === "web" ? this.webLaunch?.bootable : this.launch?.bootable;
     return {
       state: [...this.slots.values()].some((slot) => slot.child && slot.child.exitCode === null) ? "running" : this.launch ? "stopped" : "setup_required",
       ready: HARNESS_PROFILES.some((name) => this.status(name).ready),
-      bootable: this.chatSurface === "web" ? this.webLaunch?.bootable !== false : this.launch?.bootable !== false,
+      bootable: launchable === true,
       kind: this.chatSurface === "web" ? this.webLaunch?.kind || this.launch?.kind : this.launch?.kind || null,
       chatSurface: this.chatSurface,
       webOrigin: this.slots.get("chat")?.origin || null,

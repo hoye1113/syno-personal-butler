@@ -19,6 +19,19 @@ import { doctor } from "../scripts/deepseek-harness-runtime.mjs";
 
 const fakeAgent = path.resolve("tests/support/fake-dsh-jsonrpc-agent.mjs");
 
+async function writeRuntimePackage(packageDir, packageName, { runtime = true } = {}) {
+  await fs.mkdir(packageDir, { recursive: true });
+  await fs.writeFile(path.join(packageDir, "package.json"), JSON.stringify({
+    name: packageName,
+    version: "0.0.0",
+    main: "lib/index.js",
+  }));
+  if (runtime) {
+    await fs.mkdir(path.join(packageDir, "lib"), { recursive: true });
+    await fs.writeFile(path.join(packageDir, "lib", "index.js"), "export {};\n");
+  }
+}
+
 test("Harness child environment is an explicit whitelist and drops host secrets", () => {
   const env = harnessChildEnvironment({
     Path: "C:\\Windows",
@@ -125,8 +138,7 @@ test("launch discovery selects the Syno adapter only with a complete DSH bundle 
   await fs.writeFile(path.join(baseRoot, "lib", "index.js"), "export {};\n");
   for (const packageName of ["@deepseek-ai/dsh-app-boot", "@deepseek-ai/cordis", "@deepseek-ai/dsh-invariants"]) {
     const packageDir = path.join(root, "packages", "examples", "jsonrpc-demo", "node_modules", ...packageName.split("/"));
-    await fs.mkdir(packageDir, { recursive: true });
-    await fs.writeFile(path.join(packageDir, "package.json"), JSON.stringify({ name: packageName, version: "0.0.0" }));
+    await writeRuntimePackage(packageDir, packageName);
   }
   const config = [
     "- id: sdk-jsonrpc-server",
@@ -142,8 +154,7 @@ test("launch discovery selects the Syno adapter only with a complete DSH bundle 
   await fs.writeFile(path.join(configDir, "syno-chat.cordis.yml"), config, "utf8");
   for (const packageName of ["@deepseek-ai/dsh-sdk-jsonrpc-server", "@deepseek-ai/dsh-compaction-basic"]) {
     const packageDir = path.join(baseRoot, "node_modules", ...packageName.split("/"));
-    await fs.mkdir(packageDir, { recursive: true });
-    await fs.writeFile(path.join(packageDir, "package.json"), JSON.stringify({ name: packageName, version: "0.0.0" }));
+    await writeRuntimePackage(packageDir, packageName);
   }
 
   const launch = await resolveHarnessLaunch({ dshRoot: root, configDir, fakeAgent: "" });
@@ -161,6 +172,39 @@ test("launch discovery selects the Syno adapter only with a complete DSH bundle 
   ].sort());
   assert.equal(launch.runtimeClosure.base, path.join(baseRoot, "lib", "index.js"));
   assert.equal(launch.argsPrefix.at(-1), path.resolve("apps/syno/syno/deepseek-harness-jsonrpc-launcher.mjs"));
+});
+
+test("launch discovery rejects a package manifest without a built runtime entry", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-harness-entry-missing-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const configDir = path.join(root, "config");
+  const baseRoot = path.join(root, "packages", "bundle", "base");
+  const runner = path.join(root, "packages", "examples", "jsonrpc-demo", "src", "runner.ts");
+  const tsxCli = path.join(root, "node_modules", "tsx", "dist", "cli.mjs");
+  await fs.mkdir(path.dirname(runner), { recursive: true });
+  await fs.mkdir(path.dirname(tsxCli), { recursive: true });
+  await fs.mkdir(path.join(baseRoot, "lib"), { recursive: true });
+  await fs.writeFile(runner, "export async function runJsonrpcAgent() {}\n");
+  await fs.writeFile(tsxCli, "export {};\n");
+  await fs.writeFile(path.join(baseRoot, "lib", "index.js"), "export {};\n");
+  for (const packageName of ["@deepseek-ai/dsh-app-boot", "@deepseek-ai/cordis", "@deepseek-ai/dsh-invariants"]) {
+    await writeRuntimePackage(path.join(root, "packages", "examples", "jsonrpc-demo", "node_modules", ...packageName.split("/")), packageName);
+  }
+  const config = "- id: sdk\n  name: '@deepseek-ai/dsh-sdk-jsonrpc-server'\n";
+  await fs.mkdir(configDir, { recursive: true });
+  await fs.writeFile(path.join(configDir, "syno-capture.cordis.yml"), config, "utf8");
+  await fs.writeFile(path.join(configDir, "syno-chat.cordis.yml"), config, "utf8");
+  await writeRuntimePackage(
+    path.join(baseRoot, "node_modules", "@deepseek-ai", "dsh-sdk-jsonrpc-server"),
+    "@deepseek-ai/dsh-sdk-jsonrpc-server",
+    { runtime: false },
+  );
+
+  const launch = await resolveHarnessLaunch({ dshRoot: root, configDir, fakeAgent: "" });
+
+  assert.equal(launch.bootable, false);
+  assert.equal(launch.runtimeClosure.ok, false);
+  assert.ok(launch.runtimeClosure.missing.some((item) => item.endsWith("#runtime-entry")));
 });
 
 test("supervisor refuses to spawn a real sidecar without node_modules", async (t) => {
@@ -248,6 +292,25 @@ test("fake chat surface stays jsonrpc and does not spawn dsh web", async (t) => 
   assert.equal(supervisor.status("chat").origin, null);
 });
 
+test("Web status reports Web launchability independently from JSON-RPC closure", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-harness-web-status-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.mkdir(path.join(root, "node_modules", "tsx", "dist"), { recursive: true });
+  await fs.mkdir(path.join(root, "apps", "cli", "src"), { recursive: true });
+  await fs.writeFile(path.join(root, "node_modules", "tsx", "dist", "cli.mjs"), "export {};\n");
+  await fs.writeFile(path.join(root, "apps", "cli", "src", "bin.ts"), "export {};\n");
+  const supervisor = new DeepSeekHarnessSupervisor({
+    dshRoot: root,
+    fakeAgent: "",
+    localRoot: path.join(root, "local"),
+  });
+  await supervisor.discover();
+  assert.equal(supervisor.status("chat").surface, "web");
+  assert.equal(supervisor.status("chat").bootable, true);
+  assert.equal(supervisor.status("capture").bootable, false);
+  assert.equal(supervisor.status().bootable, true);
+});
+
 test("JSON-RPC sidecar shutdown terminates the owned process tree instead of racing protocol shutdown", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-harness-eof-shutdown-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
@@ -280,8 +343,7 @@ test("Syno JSON-RPC adapter keeps the external DSH checkout read-only", async (t
     const packageDir = packageName === "@deepseek-ai/dsh-sdk-jsonrpc-server"
       ? path.join(baseRoot, "node_modules", ...packageName.split("/"))
       : path.join(root, "packages", "examples", "jsonrpc-demo", "node_modules", ...packageName.split("/"));
-    await fs.mkdir(packageDir, { recursive: true });
-    await fs.writeFile(path.join(packageDir, "package.json"), JSON.stringify({ name: packageName, version: "0.0.0" }));
+    await writeRuntimePackage(packageDir, packageName);
   }
   await fs.mkdir(configDir, { recursive: true });
   const config = "- id: sdk\n  name: '@deepseek-ai/dsh-sdk-jsonrpc-server'\n";
