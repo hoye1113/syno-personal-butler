@@ -2,7 +2,7 @@
   "schema": "project-aware-knowledge-mvp-acceptance",
   "status": "PARTIAL",
   "phase5": "IN_PROGRESS",
-  "commit": "349bc80b57b2d85a43cc8f3674858c4d19a3ca15",
+  "commit": "487b3e83db5b91a063446c120fcfd7e593658ebd",
   "dshVersion": "0.1.0-rc.8",
   "actualModel": "deepseek-v4-flash-vision-exp",
   "runtimeClosure": {
@@ -46,7 +46,7 @@
       "web_search"
     ],
     "responseNonEmpty": true,
-    "eventCount": 162
+    "eventCount": 124
   },
   "ownerObservation": "pending",
   "deferred": [

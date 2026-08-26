@@ -2,7 +2,7 @@
   "schema": "project-aware-knowledge-mvp-acceptance",
   "status": "PARTIAL",
   "phase5": "IN_PROGRESS",
-  "commit": "349bc80b57b2d85a43cc8f3674858c4d19a3ca15",
+  "commit": "487b3e83db5b91a063446c120fcfd7e593658ebd",
   "dshVersion": "0.1.0-rc.8",
   "actualModel": "deepseek-v4-flash-vision-exp",
   "runtimeClosure": {
@@ -75,7 +75,7 @@
         ]
       },
       {
-        "path": "vault/00-Inbox/project-a-live-capture-525a6291.md",
+        "path": "vault/00-Inbox/project-a-live-capture-0172c49e.md",
         "title": "Project A live capture",
         "score": 4,
         "matchReasons": [
@@ -113,7 +113,7 @@
         ]
       },
       {
-        "path": "vault/00-Inbox/project-a-live-capture-525a6291.md",
+        "path": "vault/00-Inbox/project-a-live-capture-0172c49e.md",
         "title": "Project A live capture",
         "score": 1,
         "matchReasons": [
@@ -151,7 +151,7 @@
         ]
       },
       {
-        "path": "vault/00-Inbox/project-a-live-capture-525a6291.md",
+        "path": "vault/00-Inbox/project-a-live-capture-0172c49e.md",
         "title": "Project A live capture",
         "score": 1,
         "matchReasons": [
@@ -163,10 +163,14 @@
   },
   "relation": {
     "projectRef": "project-20260826-aaaaaaaa",
-    "jobId": "job-20260826-00c521f6",
-    "workflowId": "workflow-f25b2388-9d20-4b12-a079-e65cf8d5c2cc",
-    "proposalId": "ingest-d315402e",
-    "notePath": "vault/00-Inbox/project-a-live-capture-525a6291.md"
+    "jobId": "job-20260826-4a0ab81e",
+    "workflowId": "workflow-8d28fe83-bc9f-4770-9702-a9fcf77c7e92",
+    "proposalId": "ingest-9ba45676",
+    "notePath": "vault/00-Inbox/project-a-live-capture-0172c49e.md"
+  },
+  "projectTools": {
+    "createdViaBridge": true,
+    "ownerScopedList": true
   },
   "ownerObservation": "pending",
   "deferred": [
