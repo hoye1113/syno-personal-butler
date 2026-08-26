@@ -328,8 +328,14 @@ test("real DSH JSON-RPC, Syno Tool Bridge and Project-aware Capture round-trip",
   const received = await bridgeRequest(bridgeOrigin, bridgeToken, "tools/call", {
     name: "capture_start",
     arguments: {
-      kind: "text",
-      value: "Project A live capture. This note records project-aware retrieval behavior.",
+      kind: "personal",
+      sourceKind: "personal",
+      value: [
+        "Project A live acceptance fixture: project-aware retrieval is a ranking aid in Syno.",
+        "When a search request carries a server-validated projectRef, a canonical note whose project_refs contains that ref receives PROJECT_BOOST = 3; unrelated notes are not penalized.",
+        "This personal fixture records the expected behavior for the project-aware knowledge MVP and is intended to verify the Capture round-trip, not to claim an externally verified fact.",
+        "Scope and limitation: the fixture should be rechecked after ranking changes; the source is this Owner-authored acceptance test.",
+      ].join("\n\n"),
       title: "Project A live capture",
       analysisMode: "remote",
     },
