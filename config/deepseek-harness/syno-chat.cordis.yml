@@ -1,7 +1,7 @@
 # Chat / proactive composition for Syno over dsh-jsonrpc-agent.
 # stdout is JSON-RPC only. Credentials stay in the child environment, never here.
-# Plugin names are resolved from the Harness clone (spawn cwd / packaged-bin);
-# the relative syno-tool-bridge plugin stays config-relative.
+# Bare plugin names are resolved from the Syno-owned runtime closure passed to
+# dsh's JSON-RPC runner; the relative Syno Tool Bridge stays config-relative.
 
 - id: sdk-jsonrpc-server
   name: '@deepseek-ai/dsh-sdk-jsonrpc-server'

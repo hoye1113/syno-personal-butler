@@ -36,6 +36,7 @@ async function doctor({
       bootable: launch.bootable === true,
       kind: launch.kind,
       dshRoot: launch.dshRoot,
+      runtimeClosure: launch.runtimeClosure || null,
       ...(launch.missingInstall ? { missingInstall: true } : {}),
     });
   } catch (error) {

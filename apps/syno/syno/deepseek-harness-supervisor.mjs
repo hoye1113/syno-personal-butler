@@ -19,10 +19,17 @@ import {
 const execFileAsync = promisify(execFile);
 const REPO_CONFIG_DIR = path.join(PATHS.repoRoot, "config", "deepseek-harness");
 const HARNESS_PROFILES = Object.freeze(["chat", "capture"]);
+const JSONRPC_RUNTIME_PROFILES = Object.freeze(["capture", "chat"]);
 const CONFIG_FILES = Object.freeze({
   chat: "syno-chat.cordis.yml",
   capture: "syno-capture.cordis.yml",
 });
+const JSONRPC_BOOTSTRAP_PACKAGES = Object.freeze([
+  "@deepseek-ai/dsh-app-boot",
+  "@deepseek-ai/cordis",
+  "@deepseek-ai/dsh-invariants",
+]);
+const JSONRPC_LAUNCHER_PATH = path.join(PATHS.repoRoot, "apps", "syno", "syno", "deepseek-harness-jsonrpc-launcher.mjs");
 
 function runtimeError(code, message, details) {
   return Object.assign(new Error(message), { code, ...(details ? { details } : {}) });
@@ -205,8 +212,154 @@ function harnessChildEnvironment(source = process.env) {
   }));
 }
 
+function cordisBarePackageNames(text) {
+  const names = new Set();
+  for (const line of String(text || "").split(/\r?\n/)) {
+    const match = /^\s*name:\s*(?:"([^"]+)"|'([^']+)'|([^\s#]+))\s*(?:#.*)?$/.exec(line);
+    const name = match?.[1] || match?.[2] || match?.[3] || "";
+    if (name && !name.startsWith(".") && !name.startsWith("file:")) names.add(name);
+  }
+  return [...names].sort();
+}
+
+function packageManifestPath(root, packageName) {
+  return path.join(root, "node_modules", ...String(packageName).split("/"), "package.json");
+}
+
+async function discoverDshPackageRoots(dshRoot) {
+  const roots = new Map();
+  const walk = async (directory) => {
+    let entries;
+    try {
+      entries = await fs.readdir(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if ([".git", "node_modules", "dist", "lib"].includes(entry.name)) continue;
+      const target = path.join(directory, entry.name);
+      if (entry.isFile() && entry.name === "package.json") {
+        try {
+          const manifest = JSON.parse(await fs.readFile(target, "utf8"));
+          if (typeof manifest.name === "string" && manifest.name.startsWith("@deepseek-ai/")) {
+            roots.set(manifest.name, path.dirname(target));
+          }
+        } catch {}
+        continue;
+      }
+      if (entry.isDirectory()) await walk(target);
+    }
+  };
+  await Promise.all([
+    walk(path.join(dshRoot, "packages")),
+    walk(path.join(dshRoot, "apps")),
+  ]);
+  return roots;
+}
+
+async function resolveDshRuntimeClosure({
+  dshRoot,
+  configDir = REPO_CONFIG_DIR,
+  profiles = JSONRPC_RUNTIME_PROFILES,
+} = {}) {
+  const root = path.resolve(String(dshRoot || ""));
+  const baseRoot = path.join(root, "packages", "bundle", "base");
+  const base = path.join(baseRoot, "lib", "index.js");
+  const runner = path.join(root, "packages", "examples", "jsonrpc-demo", "src", "runner.ts");
+  const tsx = path.join(root, "node_modules", "tsx", "dist", "cli.mjs");
+  const demoNodeModules = path.join(root, "packages", "examples", "jsonrpc-demo", "node_modules");
+  const missing = [];
+  const required = new Set(JSONRPC_BOOTSTRAP_PACKAGES);
+  const profileReports = [];
+  const discoveredRoots = await discoverDshPackageRoots(root);
+  const packageRoots = {};
+
+  for (const profile of profiles) {
+    const config = path.join(configDir, CONFIG_FILES[profile]);
+    let packages = [];
+    try {
+      packages = cordisBarePackageNames(await fs.readFile(config, "utf8"));
+    } catch {
+      profileReports.push({ profile, config, packages, missing: [config] });
+      missing.push(config);
+      continue;
+    }
+    for (const packageName of packages) required.add(packageName);
+    profileReports.push({ profile, config, packages, missing: [] });
+  }
+
+  for (const file of [
+    base,
+    runner,
+    tsx,
+    path.join(demoNodeModules, "@deepseek-ai", "dsh-app-boot", "package.json"),
+    path.join(demoNodeModules, "@deepseek-ai", "cordis", "package.json"),
+    path.join(demoNodeModules, "@deepseek-ai", "dsh-invariants", "package.json"),
+  ]) {
+    if (!existsSync(file)) missing.push(file);
+  }
+  for (const packageName of required) {
+    const baseManifest = packageManifestPath(baseRoot, packageName);
+    const demoManifest = path.join(demoNodeModules, ...packageName.split("/"), "package.json");
+    const packageRoot = existsSync(baseManifest)
+      ? path.dirname(baseManifest)
+      : discoveredRoots.get(packageName) || (existsSync(demoManifest) ? path.dirname(demoManifest) : undefined);
+    if (!packageRoot) {
+      missing.push(baseManifest);
+      continue;
+    }
+    packageRoots[packageName] = packageRoot;
+  }
+
+  const uniqueMissing = [...new Set(missing)];
+  const requiredNames = [...required].sort();
+  const profilesWithMissing = profileReports.map((report) => ({
+    ...report,
+    missing: report.packages
+      .filter((packageName) => !packageRoots[packageName])
+      .concat(report.missing),
+  }));
+  return {
+    ok: uniqueMissing.length === 0,
+    base,
+    source: "syno-jsonrpc-launcher",
+    required: requiredNames,
+    missing: uniqueMissing,
+    profiles: profilesWithMissing,
+    packageRoots,
+  };
+}
+
+async function ensureDirectoryLink(link, target) {
+  await fs.mkdir(path.dirname(link), { recursive: true });
+  try {
+    const existing = await fs.lstat(link);
+    if (existing.isSymbolicLink()) {
+      const current = path.resolve(path.dirname(link), await fs.readlink(link));
+      if (current === path.resolve(target)) return;
+    }
+    await fs.rm(link, { recursive: true, force: true });
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  await fs.symlink(path.resolve(target), link, process.platform === "win32" ? "junction" : "dir");
+}
+
+async function prepareJsonRpcModuleBase({ localRoot, profile, runtimeClosure }) {
+  if (!runtimeClosure?.ok) return null;
+  const root = path.join(localRoot, "jsonrpc-runtime", profile);
+  const anchor = path.join(root, "anchor.mjs");
+  await fs.mkdir(root, { recursive: true });
+  await fs.writeFile(anchor, "export {};\n", "utf8");
+  for (const [packageName, packageRoot] of Object.entries(runtimeClosure.packageRoots || {})) {
+    await ensureDirectoryLink(path.join(root, "node_modules", ...packageName.split("/")), packageRoot);
+  }
+  return { root, anchor };
+}
+
 async function resolveHarnessLaunch({
   dshRoot = defaultDshRoot(),
+  configDir = REPO_CONFIG_DIR,
   fakeAgent = process.env.SYNO_DSH_FAKE_AGENT,
   nodeExecutable = process.execPath,
 } = {}) {
@@ -223,6 +376,7 @@ async function resolveHarnessLaunch({
         bootable: true,
         fake: true,
         kind: "fake-agent",
+        runtimeClosure: { ok: true, source: "fake-agent", required: [], missing: [], profiles: [], packageRoots: {} },
         rejected,
       };
     } catch {
@@ -234,40 +388,24 @@ async function resolveHarnessLaunch({
       rejected,
     });
   }
-  const packaged = path.join(dshRoot, "packages", "examples", "jsonrpc-demo", "lib", "packaged-bin.js");
-  const builtBin = path.join(dshRoot, "packages", "examples", "jsonrpc-demo", "lib", "bin.js");
-  const sourcePackaged = path.join(dshRoot, "packages", "examples", "jsonrpc-demo", "src", "packaged-bin.ts");
-  const sourceBin = path.join(dshRoot, "packages", "examples", "jsonrpc-demo", "src", "bin.ts");
-  const nodeModules = path.join(dshRoot, "node_modules");
-  const installed = existsSync(nodeModules);
+  const runtimeClosure = await resolveDshRuntimeClosure({ dshRoot, configDir });
   const tsxCli = path.join(dshRoot, "node_modules", "tsx", "dist", "cli.mjs");
-  const candidates = [
-    { file: packaged, argsPrefix: [packaged], kind: "packaged-bin", needsInstall: true },
-    { file: builtBin, argsPrefix: [builtBin], kind: "jsonrpc-bin", needsInstall: true },
-    { file: sourcePackaged, argsPrefix: existsSync(tsxCli) ? [tsxCli, sourcePackaged] : ["--import", "tsx", sourcePackaged], kind: "packaged-src", needsInstall: true },
-    { file: sourceBin, argsPrefix: existsSync(tsxCli) ? [tsxCli, sourceBin] : ["--import", "tsx", sourceBin], kind: "jsonrpc-src", needsInstall: true },
-  ];
-  for (const candidate of candidates) {
-    if (!existsSync(candidate.file)) {
-      rejected.push({ path: candidate.file, reason: "missing" });
-      continue;
-    }
-    return {
-      command: nodeExecutable,
-      argsPrefix: candidate.argsPrefix,
-      cwd: dshRoot,
-      dshRoot,
-      bootable: installed,
-      fake: false,
-      kind: candidate.kind,
-      rejected,
-      missingInstall: !installed,
-    };
-  }
-  throw runtimeError("HARNESS_SETUP_REQUIRED", "未找到 dsh-jsonrpc-agent；设置 SYNO_DSH_ROOT 指向 deepseek-harness 克隆", {
+  const nodeModules = path.join(dshRoot, "node_modules");
+  const adapterAvailable = existsSync(JSONRPC_LAUNCHER_PATH) && existsSync(tsxCli);
+  if (!existsSync(JSONRPC_LAUNCHER_PATH)) rejected.push({ path: JSONRPC_LAUNCHER_PATH, reason: "missing" });
+  if (!existsSync(tsxCli)) rejected.push({ path: tsxCli, reason: "missing" });
+  return {
+    command: nodeExecutable,
+    argsPrefix: adapterAvailable ? [tsxCli, JSONRPC_LAUNCHER_PATH] : [],
+    cwd: dshRoot,
     dshRoot,
+    bootable: runtimeClosure.ok && adapterAvailable,
+    fake: false,
+    kind: "syno-jsonrpc-adapter",
+    runtimeClosure,
     rejected,
-  });
+    ...(existsSync(nodeModules) ? {} : { missingInstall: true }),
+  };
 }
 
 function configPathFor(profile, { configDir = REPO_CONFIG_DIR } = {}) {
@@ -324,7 +462,7 @@ class DeepSeekHarnessSupervisor {
   }
 
   async discover() {
-    this.launch = await resolveHarnessLaunch({ dshRoot: this.dshRoot, fakeAgent: this.fakeAgent });
+    this.launch = await resolveHarnessLaunch({ dshRoot: this.dshRoot, configDir: this.configDir, fakeAgent: this.fakeAgent });
     this.chatSurface = resolveChatSurface({ fake: this.launch?.fake === true });
     this.webLaunch = this.chatSurface === "web"
       ? await resolveWebLaunch({ dshRoot: this.dshRoot })
@@ -346,6 +484,7 @@ class DeepSeekHarnessSupervisor {
         origin: slot?.origin || null,
         bootable: this.launch?.bootable !== false,
         kind: slot?.kind || (profile === "chat" && this.chatSurface === "web" ? this.webLaunch?.kind : this.launch?.kind) || null,
+        runtimeClosure: this.launch?.runtimeClosure || null,
         lastError: this.lastError ? { code: this.lastError.code || "HARNESS_RUNTIME_FAILED", message: this.lastError.message } : null,
       };
     }
@@ -358,6 +497,7 @@ class DeepSeekHarnessSupervisor {
       webOrigin: this.slots.get("chat")?.origin || null,
       webPort: this.webPort,
       dshRoot: this.dshRoot,
+      runtimeClosure: this.launch?.runtimeClosure || null,
       profiles: Object.fromEntries(HARNESS_PROFILES.map((name) => [name, this.status(name)])),
       lastError: this.lastError ? { code: this.lastError.code || "HARNESS_RUNTIME_FAILED", message: this.lastError.message } : null,
     };
@@ -406,9 +546,17 @@ class DeepSeekHarnessSupervisor {
       return this.#startWeb(profile, { provider, model });
     }
     if (this.launch.bootable === false && this.launch.fake !== true) {
-      const error = runtimeError("HARNESS_SETUP_REQUIRED", "deepseek-harness 尚未安装依赖（缺少 node_modules）；真实 sidecar 无法启动", {
-        dshRoot: this.dshRoot,
-      });
+      const closureUnavailable = this.launch.runtimeClosure?.ok === false;
+      const error = runtimeError(
+        closureUnavailable ? "HARNESS_RUNTIME_CLOSURE_UNAVAILABLE" : "HARNESS_SETUP_REQUIRED",
+        closureUnavailable
+          ? "deepseek-harness 的 JSON-RPC runtime closure 不完整；真实 sidecar 无法启动"
+          : "deepseek-harness 尚未安装依赖（缺少 node_modules）；真实 sidecar 无法启动",
+        {
+          dshRoot: this.dshRoot,
+          runtimeClosure: this.launch.runtimeClosure || null,
+        },
+      );
       this.lastError = error;
       await this.#record("harness.start.failed", { profile, error }, { level: "error" });
       throw error;
@@ -430,6 +578,11 @@ class DeepSeekHarnessSupervisor {
     const workspaceRoot = path.join(this.localRoot, "workspace", profile);
     await Promise.all([sessionRoot, homeRoot, workspaceRoot].map((directory) => fs.mkdir(directory, { recursive: true })));
     if (profile === "chat") await ensureSynoDshProfiles({ homeRoot, repoRoot: this.repoRoot });
+    const jsonRpcBase = await prepareJsonRpcModuleBase({
+      localRoot: this.localRoot,
+      profile,
+      runtimeClosure: this.launch?.runtimeClosure,
+    });
     const env = {
       ...harnessChildEnvironment(process.env),
       ...(includeCordisConfig ? { DSH_CORDIS_CONFIG: configPath } : {}),
@@ -437,14 +590,16 @@ class DeepSeekHarnessSupervisor {
       DSH_HOME: homeRoot,
       DSH_SESSION_ROOT: sessionRoot,
       DSH_SYSTEM_PROMPT: persona,
+      SYNO_DSH_ROOT: this.dshRoot,
       SYNO_REPO_ROOT: this.repoRoot,
       SYNO_SKILL_ROOT: path.join(this.configDir, "skills"),
       SYNO_HARNESS_PLUGIN: pluginPath,
+      ...(jsonRpcBase ? { SYNO_DSH_JSONRPC_BASE: jsonRpcBase.anchor } : {}),
       ...(this.bridgeOrigin ? { SYNO_BRIDGE_ORIGIN: this.bridgeOrigin } : {}),
       ...(this.bridgeToken ? { SYNO_BRIDGE_TOKEN: this.bridgeToken } : {}),
       ...(deepseekKey ? { DEEPSEEK_API_KEY: deepseekKey } : {}),
     };
-    return { env, configPath, workspaceRoot, homeRoot, sessionRoot };
+    return { env, configPath, workspaceRoot, homeRoot, sessionRoot, jsonRpcBase };
   }
 
   async #startJsonRpc(profile, { provider, model } = {}) {
@@ -582,13 +737,18 @@ class DeepSeekHarnessSupervisor {
 
   async #disposeSlot(slot) {
     if (!slot) return;
+    const child = slot.child;
+    if (slot.surface === "jsonrpc") {
+      if (child?.pid && child.exitCode === null) await this.killTree(child.pid).catch(() => {});
+      await waitForExit(child, 3_000);
+      return;
+    }
     try {
       await slot.client?.shutdown?.();
     } catch {}
     try {
       await slot.client?.close?.();
     } catch {}
-    const child = slot.child;
     if (!child || child.exitCode !== null) return;
     if (!child.killed && child.stdin && !child.stdin.destroyed) {
       try { child.stdin.end(); } catch {}
@@ -605,12 +765,17 @@ export {
   CONFIG_FILES,
   DeepSeekHarnessSupervisor,
   HARNESS_PROFILES,
+  JSONRPC_BOOTSTRAP_PACKAGES,
+  JSONRPC_LAUNCHER_PATH,
+  JSONRPC_RUNTIME_PROFILES,
   REPO_CONFIG_DIR,
   configPathFor,
+  cordisBarePackageNames,
   defaultDshRoot,
   dshWebPort,
   harnessChildEnvironment,
   isLoopbackHttpOrigin,
+  resolveDshRuntimeClosure,
   resolveChatSurface,
   resolveHarnessLaunch,
   resolveWebLaunch,

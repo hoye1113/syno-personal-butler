@@ -48,10 +48,13 @@ async function probeReal() {
     return {
       ok: false,
       mode: "real",
-      code: "HARNESS_SETUP_REQUIRED",
+      code: launch.runtimeClosure?.ok === false ? "HARNESS_RUNTIME_CLOSURE_UNAVAILABLE" : "HARNESS_SETUP_REQUIRED",
       kind: launch.kind,
       dshRoot: launch.dshRoot,
-      message: "deepseek-harness 尚未安装依赖；真实 sidecar 无法启动",
+      runtimeClosure: launch.runtimeClosure || null,
+      message: launch.runtimeClosure?.ok === false
+        ? "deepseek-harness 的 JSON-RPC runtime closure 不完整；真实 sidecar 无法启动"
+        : "deepseek-harness 尚未安装依赖；真实 sidecar 无法启动",
     };
   }
   return {
@@ -61,6 +64,7 @@ async function probeReal() {
     complete: false,
     kind: launch.kind,
     dshRoot: launch.dshRoot,
+    runtimeClosure: launch.runtimeClosure || null,
     message: "真实 Harness 构建产物已发现；完整 sidecar / Tool Bridge 由 Syno Host 启动验收，不在此探针内执行模型调用",
   };
 }
