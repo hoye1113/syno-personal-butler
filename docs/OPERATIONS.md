@@ -139,9 +139,9 @@ pnpm run build
 
 只 `pnpm install` 不够。CLI 可用 tsx 跑源码，但 typert 与 `dsh.client` 包的 `exports` 指向 `lib/*.js`。未 build 时典型失败：`Cannot find module …/typert.host.js`、`MissingClientBundleError`、从 `%LOCALAPPDATA%\Syno\harness\home\profiles\node_modules` 解析到空 `lib/`。
 
-`pnpm harness:doctor` 目前只要看到 clone 的 `node_modules` + CLI 源码就会把 chat-web 标成 bootable，**不能**当作 DSH Web 已能启动。
+`pnpm harness:doctor` 现在会检查 Capture/Chat 配置所需的完整 DSH runtime closure，并返回 `runtimeClosure.ok/base/required/missing/source`；closure 不完整时返回 `HARNESS_RUNTIME_CLOSURE_UNAVAILABLE`，不会仅凭 `node_modules` 报告 JSON-RPC sidecar 可启动。doctor 仍不能代替真实 DSH Web、模型回合或 `web_search` 验收。
 
-2026-08-25 的真实 JSON-RPC sidecar 复核进一步证明了这一点：本机 clone 即使 `pnpm install --frozen-lockfile` 返回 `Already up to date`，packaged-bin 仍可能因安装闭包缺少 `@deepseek-ai/dsh-command-compact`、`@deepseek-ai/dsh-compaction-basic` 而以 `HARNESS_TRANSPORT_CLOSED` 退出。此类失败属于 DSH clone 的依赖/启动闭包问题，不是模型 ID 或 Syno fallback 问题；在修复外部 clone 的运行闭包前，不得把 `bootable: true` 写成真实 DSH、Tool Bridge 或 web_search 验收通过，也不要为绕过启动失败而删除官方 compaction 条目。
+2026-08-25 的 packaged-bin 缺失 `@deepseek-ai/dsh-command-compact`、`@deepseek-ai/dsh-compaction-basic` 安装闭包问题已定位为外部运行闭包问题。Syno 现在以本地 launcher + DSH 已有 `runJsonrpcAgent(bareModuleBaseUrl)` 适配完整 closure，不修改外部 clone；如果 closure 仍缺失，确定性返回 `HARNESS_RUNTIME_CLOSURE_UNAVAILABLE`，不得删除官方 compaction 条目或回退到旧 Agent。
 
 Windows 计划任务 `start-syno.ps1` **不会**写入 `SYNO_DSH_ROOT`。用户/机器环境变量里没有它时，`pnpm windows:restart` 起的 Host 会 `waiting_provider`。`pnpm start` 必须在该进程环境里设置。
 
@@ -223,7 +223,7 @@ pnpm start
 
 Clone 还要在 `$env:SYNO_DSH_ROOT` 里 `pnpm run build`，否则 8888 会起来但 3088 起不来。完整踩坑见上文「DeepSeek Harness 生产 chat」。
 
-`harness:doctor` 不把密钥写进输出。协议冒烟用 `pnpm probe:harness`（假 sidecar + 中文 UTF-8）；`pnpm probe:harness -- --real` 只验证真实 Harness 构建产物可发现，完整 sidecar / Tool Bridge 由 Host 启动验收，不在探针中执行模型调用。
+`harness:doctor` 不把密钥写进输出。协议冒烟用 `pnpm probe:harness`（假 sidecar + 中文 UTF-8）；`pnpm probe:harness -- --real` 验证真实 Harness runtime closure 可发现并报告缺失项。显式设置 `SYNO_RUN_REAL_DSH=1` 的测试文件才允许执行真实模型验收；API key 只从宿主环境读取，不写入测试参数、日志、仓库文件或验收产物。
 
 生产 chat 由 Host 监督 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（可用 `SYNO_DSH_WEB_PORT` 覆盖），与微信注入同一 Harness Session。Host 会把 `@syno/dsh-plugin` junction/symlink 进 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\node_modules`，不必再跑 `dsh plugin install`。该对话页是特权壳（`approval: never`，permission 表只有 `workspace-write`），不是普通聊天 UI。普通聊天只显示 Bridge core 工具：`workflow.context`、`knowledge.search`、`knowledge.read_snippet`、`knowledge.fetch_url`、`today.read`、`learning.due`、`learning.teach_back`、`learning.submit`、`capture.start`、`capture.status`、`capture.list_pending`、`jobs.list`、`jobs.submit`、`image.read`。其中 `knowledge.fetch_url` 受安全抓取策略约束，`learning.submit` 只创建待审批的 `learning.evidence.record` Job，不直接改变知识或掌握度；隐藏工具的直接调用仍由 Host 拒绝。Capture Session 继续使用 Workflow 签发的浏览器 allowlist。`http://127.0.0.1:8888` 是控制面。收录分析仍是无 bash/fs/web 的 jsonrpc 第二进程。自动测试 / `SYNO_DSH_FAKE_AGENT` 仍走 jsonrpc fake。紧急回切 chat jsonrpc：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。不要把 jsonrpc sidecar 与生产 DSH Web 同时接到同一 session。不要执行 `dsh web`（那是库存 `--profile web`）。
 

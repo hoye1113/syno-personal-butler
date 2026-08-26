@@ -1,25 +1,29 @@
 # Syno 执行语义与移动可靠交付交接（2026-07-29）
 
-## 2026-08-25 当前交接：Project-aware Knowledge MVP 边界修复
+## 2026-08-26 当前交接：Project-aware DSH Phase 5 启动适配
 
 当前唯一执行入口是 [`docs/project-aware-knowledge-execution-plan.md`](docs/project-aware-knowledge-execution-plan.md)；本文下方的 2026-07/08 内容仅作历史背景，不覆盖该执行计划。
 
-- 分支：`feat/project-aware-knowledge-mvp`；基线：`f4997ab`；本轮边界修复代码已提交为 `cd785a0`（`fix: harden project-aware knowledge boundaries`）。本次文档回填将在该代码提交之后单独提交。
+- 基线分支/提交：`main` / `f6d2126`（`feat: switch to vision-capable DeepSeek model chain`）。当前实施分支：`feat/project-aware-dsh-phase5`；本阶段尚未自动 Push 或 merge。
+- 当前实现已新增 Syno 侧 `apps/syno/syno/deepseek-harness-jsonrpc-launcher.mjs`，Supervisor 会检查完整 Capture/Chat DSH runtime closure，并在本地 staging 中调用 DSH 已有 `runJsonrpcAgent(bareModuleBaseUrl)`；由 `SYNO_DSH_ROOT` 指向的外部 Harness clone 未修改。
 - 已提交阶段：Phase 0 `5c3b8e2`、Phase 1 `6ca3dae`、Phase 2 `04a792e`、Phase 3 `b569825`、Phase 4 `3362336`。
-- 文档同步提交：`80d21ce`、`d14bbde`；边界修复代码提交：`cd785a0`。本轮修复涉及执行链、Project Service、Workflow/Job/Tool 隔离、检索边界和测试，已完成自动化验证。
+- 前序文档/边界修复提交：`80d21ce`、`d14bbde`、`cd785a0`；本阶段代码、测试和文档仍待提交。
 - 当前代码闭环：Project → 显式 `/project <ref>` → trusted execution context → Job/Workflow/Proposal → Note `project_refs` → KnowledgeStore `PROJECT_BOOST = 3`。
-- 边界修复后的当前全量回归为 `pnpm test` 749/749 passed、0 failed、0 cancelled；Project/安全定向回归为 121/121；最终 `pnpm run verify` 通过（Repository verification 1640 files、active docs 9 files），最终 `git diff --check` 通过。旧的 731/731、737/737 仅保留作历史基线。
-- 模型链已切换为 `deepseek/deepseek-v4-flash-vision-exp` → `deepseek/deepseek-v4-flash`，不使用 Pro；两份 Cordis profile 将主模型声明为 `text`/`image`。用户级 `DEEPSEEK_API_KEY` 已存在，但旧宿主进程不会自动继承新设置，验证命令需在当前进程显式读取用户变量或重启宿主。
+- 基线回归为 `pnpm test` 749/749；本阶段当前 `pnpm test` 为 755 tests、753 passed、2 skipped（两个显式 live case）、0 failed；`pnpm run verify` 通过（Repository verification 1646 files、active docs 9 files），`git diff --check` 通过。旧的 731/731、737/737 仅保留作历史基线。
+- 模型链固定为 `deepseek/deepseek-v4-flash-vision-exp` → `deepseek/deepseek-v4-flash`，不使用 Pro；用户级 `DEEPSEEK_API_KEY` 当前由宿主环境提供。doctor 只报告存在性，不输出 key。
 - 官方 DeepSeek 真实验证已通过：模型列表包含 vision-exp；vision-exp 文本请求和图片请求成功，仓库绿色测试图片的视觉判断返回 `GREEN`。这只证明官方模型能力，不等于真实 DSH/Project 召回验收。
-- `pnpm harness:doctor` 仍只能证明 bootability；真实 JSON-RPC sidecar 当前因外部 clone packaged-bin 缺少 `@deepseek-ai/dsh-command-compact` / `@deepseek-ai/dsh-compaction-basic` 安装闭包而 `HARNESS_TRANSPORT_CLOSED` 退出。Phase 5 继续 `DEFERRED`，先修复/确认 DSH 外部运行闭包，再做 DSH `web_search` 和 Project A/无 Project/Project B 对照。
-- Phase 5 当前为 `DEFERRED`：尚未取得真实 DSH + Owner 的 Project A / 无 Project / Project B 对照证据；自动化测试只证明实现接缝，不证明召回质量改善。
-- 旧页面曾在隔离测试 Host `http://127.0.0.1:8898/` 完成一次非规范浏览器 smoke，仅记录页面可访问和 malformed `/project` 的确定性错误。Web 页面即将重构，当前 UI/DOM 不属于 Project MVP 验收契约；Project A / 无 Project / Project B 的 Job、Workflow、Note、检索排名和错误隔离以测试文件、Schema 和运行时回归为准。真实 DeepSeek DSH/Owner 召回对照仍需单独记录，不因未证明价值而扩展 Session inheritance、Usage、Health、UI 或迁移。
+- `pnpm harness:doctor` 当前报告 `runtimeClosure.ok=true`、`missing=[]`、`kind=syno-jsonrpc-adapter`；真实 JSON-RPC sidecar 已完成 `initialize` 和 Capture round-trip，真实 Web chat 已观察到官方 `web_search` 工具调用。证据仍是 `PARTIAL`，因为 Owner 主观召回观察未回填。
+- 外部 DSH clone 在 Windows 上 graceful protocol shutdown/EOF 可能触发其自身 libuv assertion；Syno 对 JSON-RPC 自己创建的进程使用 process-tree termination 清理，避免把外部 crash 当成成功。未修改外部 clone，需在真实模型回合后继续观察。
+- Phase 5 仍为 `IN_PROGRESS`：测试文件已完成真实 DSH 模型、搜索、Tool Bridge、Capture round-trip 和 A/B/no-Project 技术对照；下一步只需 Owner 观察/结论回填及最终提交，不得把技术证据单独标记为 `DONE`。
+- 当前三条运行路径：生产 Web chat = `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`；Capture/Ingest = Syno 监督的 JSON-RPC sidecar；图片读取 = Host `syno_image_read`（Zen `mimo-v2.5-free`）。直接 DSH `ImageAttachmentRef` bridge 延期到 Phase 6。
+- 旧页面曾在隔离测试 Host `http://127.0.0.1:8898/` 完成一次非规范浏览器 smoke，仅记录页面可访问和 malformed `/project` 的确定性错误。Web 页面即将重构，当前 UI/DOM 不属于 Project MVP 验收契约；Project A / 无 Project / Project B 的 Job、Workflow、Note、检索排名和错误隔离以测试文件、Schema 和运行时回归为准。技术对照已记录到 `ops/acceptance/project-aware-knowledge-mvp/jsonrpc-20260826T114530Z.json`，Owner 观察仍待回填，不因未完成而扩展 Session inheritance、Usage、Health、UI 或迁移。
 - PendingDecision、AcceptedRequest、Unknown Case、Reconciliation Case、jobs.list/goals.list 和近期交互均已补上 Owner/Project 读取边界；裸的“确认/刚才那个”不会隐式继承 Project，Project-bound 决策必须再次显式 `/project <projectRef>`。
 - Job ID 直达的 advice/approve/reject/cancel/retry 已补上 Owner 校验；Project-bound 的 approve/reject/cancel/retry 和 legacy Weixin 批准也必须显式带匹配的 Project 作用域。旧页面无作用域按钮不属于当前 MVP 兼容契约。
 - 残余边界：显式 Project 不会自动切分 DSH Session 历史；同一会话切换 Project 时历史文本仍可能存在，但不作为服务端授权。若要求强会话隔离，后续需单独设计 Session 分区/压缩，不在本 MVP 内修改 Session Binding Store。
 - 明确 deferred：Session/跨渠道自动继承、Usage、Learning feedback、Today/Planner 项目化、Area、PARA UI、Project UI、旧 Note 项目关联、Vault/Goal migration。
 - 停止条件：若必须修改全局 `activeProject`、DSH Session Binding Store、模型 projectRef 输入、整个 frontmatter parser、旧 Note 批量迁移，或破坏 Owner 隔离/无 Project baseline，立即在执行计划记录 `BLOCKED_DESIGN_DEVIATION` 并暂停。
-- 本轮不自动 Push 或 merge；提交必须按 Job 声明精确路径暂存。
+- 真实 DSH 未证明价值时记录 `MVP_VALUE_NOT_PROVEN`，不通过新增复杂排序、Session 继承或 Knowledge Health 功能补救。
+- 本阶段不实现 Web/DOM、Session/跨渠道自动继承、Usage、Knowledge Health、Today/Planner/PARA/Project UI、旧 Note 关联、Vault/Goal migration 或直接 DSH 图片附件桥接；提交必须按 Job 声明精确路径暂存。
 
 > 以下历史交接内容保留用于追溯，不是本 Project MVP 的当前分支、HEAD、测试数字或下一步依据。
 

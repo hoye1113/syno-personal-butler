@@ -1,10 +1,10 @@
 # Syno Project-aware Knowledge MVP 执行计划
 
 状态：IN_PROGRESS  
-更新日期：2026-08-25（Asia/Hong_Kong）
-执行分支：`feat/project-aware-knowledge-mvp`  
-基线提交：`f4997ab`  
-当前边界修复代码提交：`cd785a0`（`fix: harden project-aware knowledge boundaries`）
+更新日期：2026-08-26（Asia/Hong_Kong）
+基线分支：`main`
+基线提交：`f6d2126`（`feat: switch to vision-capable DeepSeek model chain`）
+当前执行分支：`feat/project-aware-dsh-phase5`
 Push / merge：本轮禁止自动执行
 
 ## 1. 本轮目标与范围
@@ -105,7 +105,7 @@ project_refs: ["project-20260824-a1b2c3d4"]
 | Phase 2：Explicit Project → Job Propagation | DONE | 指令解析、可信上下文、Job/Workflow 传播和隔离测试完成 |
 | Phase 3：Knowledge `project_refs` Round-trip | DONE | Workflow → Proposal → Apply → Markdown → reload 全链路完成 |
 | Phase 4：Project-aware Retrieval | DONE | 固定 boost、无 Project 回归、跨 Project 隔离和 Tool Bridge 注入完成 |
-| Phase 5：Real DSH MVP Acceptance | DEFERRED | 仅使用真实 DSH/Owner 证据记录召回改善，不用自动化测试冒充验收 |
+| Phase 5：Real DSH MVP Acceptance | IN_PROGRESS | 先完成真实 DSH 启动、`web_search`、Capture round-trip、Project A/B/no-Project 对照和 Owner 观察；未满足全部门槛前不得标记 DONE |
 
 `DONE` 的统一定义是：代码完成、契约测试通过、全量测试通过、verify 通过、文档同步、阶段验收完成。
 
@@ -141,6 +141,16 @@ pnpm run verify # Repository verification passed (1631 files); active docs 7 fil
 ```
 
 后续每个阶段还必须执行 targeted tests、`pnpm test`、`pnpm run verify` 和 `git diff --check`。当前 `package.json` 没有独立 lint、typecheck 或 build script，不新增虚假的验证命令。
+
+当前基线（从 `main`/`f6d2126` 创建本执行分支）为：
+
+```text
+pnpm test       # 749/749 passed（Phase 0–4 已完成的自动化基线）
+pnpm run verify # 通过；active docs 9 files
+git diff --check # 通过
+```
+
+`DEEPSEEK_API_KEY` 当前由宿主环境提供；`harness:doctor` 只报告密钥存在性，不输出密钥。模型链固定为 `deepseek-v4-flash-vision-exp → deepseek-v4-flash`，不包含 Pro 或旧 `deepseek-chat`。当前真实 DSH 技术验收已通过测试文件完成；Owner 主观召回改善观察仍是 Phase 5 的剩余门槛。
 
 ## 7. 停止条件与 deferred
 
@@ -201,6 +211,24 @@ Phase 4 targeted：`node --test tests/project-retrieval.test.mjs`，2/2 passed�
 
 2026-08-25 边界修复后的当前自动化门禁：`pnpm test` 为 749/749 passed、0 failed、0 cancelled；完整 Project/安全定向回归为 121/121；最终 `pnpm run verify` 通过（Repository verification 1640 files、active documentation 9 files）；最终 `git diff --check` 通过（仅有 Windows 行尾转换提示，无 whitespace error）。旧页面曾在隔离测试 Host `http://127.0.0.1:8898/` 完成一次非规范浏览器 smoke：页面可访问并能返回 malformed `/project` 的确定性错误；由于 Web 页面即将重构，该记录不构成当前 UI、产品或召回验收。
 
+### 2026-08-26 Phase 5 启动适配记录（IN_PROGRESS）
+
+- 从 `main`/`f6d2126` 创建 `feat/project-aware-dsh-phase5`；本分支尚未自动 Push 或 merge。
+- Syno 新增 `apps/syno/syno/deepseek-harness-jsonrpc-launcher.mjs`，Supervisor 不再仅凭 `node_modules` 或旧 packaged-bin 报告可启动；会同时检查 Capture/Chat 配置所需的 DSH 包、runner、tsx 和 bundle base。
+- 完整闭包由 Syno 在本地 `.runtime`/Host Harness 目录生成 junction staging，并调用 DSH 已有 `runJsonrpcAgent(bareModuleBaseUrl)`；未修改 `D:\workSpace\deepseek-harness` 源码、锁文件或依赖，也没有 vendoring Harness。
+- `pnpm harness:doctor` 已观察到 `kind: syno-jsonrpc-adapter`、`runtimeClosure.ok: true`、`missing: []`；不完整闭包确定性返回 `HARNESS_RUNTIME_CLOSURE_UNAVAILABLE`。doctor 本身不等于真实验收，但后续 live test 已实际完成模型回合、`web_search` 和 Project 对照。
+- 已用真实 DSH JSON-RPC sidecar 完成 `initialize`、Capture round-trip 和 Syno 进程级清理探针；真实 Web chat 也已观察到官方 `web_search` 工具调用。当前外部 DSH clone 在 Windows 上的 graceful protocol shutdown/EOF 会触发其自身 libuv assertion，因此 JSON-RPC slot 清理使用 Syno 所拥有的 process-tree termination，避免把外部 crash 当成成功；该限制不修改外部 Harness。
+- 当前运行路径保持三条：生产 Web chat 使用官方 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`；Capture/Ingest 使用 Syno 监督的 JSON-RPC sidecar；图片读取继续走 Host `syno_image_read`（Zen `mimo-v2.5-free`），直接 DSH `ImageAttachmentRef` 桥接延期到 Phase 6。
+- Phase 5 仍为 `IN_PROGRESS`；`web_search`、Capture round-trip、Project A/B/no-Project 排名和错误隔离已有脱敏技术证据，但 `ownerObservation` 仍为 `pending`，因此不得标记 `DONE`。如果 Owner 无法观察到改善，记录 `MVP_VALUE_NOT_PROVEN`，不新增复杂排序或 Session 继承补救。
+
+### 2026-08-26 Phase 5 live acceptance evidence（PARTIAL）
+
+- `tests/project-aware-dsh-live.test.mjs` 在显式 `SYNO_RUN_REAL_DSH=1` 下通过两项真实验收：JSON-RPC Capture round-trip 1/1、Web chat 官方 `web_search` 1/1；默认 `pnpm test` 不调用真实模型，两个 live case 按设计跳过。
+- 实际模型为 `deepseek-v4-flash-vision-exp`；runtime closure `ok=true`、`missing=[]`，DSH 版本为 `0.1.0-rc.8`。Web 事件中观察到的实际工具名为 `web_search`，不是由用户提示文本匹配推断。
+- Capture 证据 `ops/acceptance/project-aware-knowledge-mvp/jsonrpc-20260826T114530Z.json` 记录了 Project A 的 Job → Workflow → Proposal → canonical Note.project_refs 关系，以及 A/B/no-Project 检索对照：A 命中同项目 Note 的 score 12（包含 `project` reason），无 Project baseline 为 9，B 在 Project B 上得到对应 boost，wrong-owner 被拒绝。
+- Web 证据 `ops/acceptance/project-aware-knowledge-mvp/web-search-20260826T113519Z.json` 只保存模型/closure、`web_search` 工具名、事件数量和非空响应布尔值；不保存 API key、Bridge token、Cookie 或完整知识内容。
+- 当前证据状态为 `PARTIAL`，Owner 观察尚未回填；本地生产 3088 实例在 Web 验收期间未被结束，测试使用动态临时端口。外部 DSH clone 保持 clean，未修改源码、锁文件或依赖。
+
 ### 2026-08-25 边界修复记录（DONE）
 
 本轮针对代码审查补齐了以下边界：
@@ -228,7 +256,7 @@ Phase 4 targeted：`node --test tests/project-retrieval.test.mjs`，2/2 passed�
 - 当前 Syno 图片消息仍是 `artifactId → syno_image_read → Host Vision`，并未把本地 artifact 直接转换成 DSH `ImageAttachmentRef`；因此 `inputModalities` 是 DSH 能力声明，不应被表述为当前聊天 attachment 已经直传 DSH。现有图片行为保持不变，直接 DSH attachment bridge 仍是 deferred。
 - 真实 DSH JSON-RPC 启动仍未通过：在外部 clone 执行 `pnpm install --frozen-lockfile` 后，packaged-bin 仍因缺少 `@deepseek-ai/dsh-command-compact`、`@deepseek-ai/dsh-compaction-basic` 安装闭包而以 `HARNESS_TRANSPORT_CLOSED` 退出。故 Phase 5 的真实 DSH `web_search`、Project A/无 Project/Project B 召回对照和 Owner 观察继续 `DEFERRED`；`harness:doctor` 的 `bootable` 不能替代该证据。
 
-本次源码/配置/测试/文档同步涉及：`apps/syno/syno/deepseek-harness-cognitive-runtime.mjs`、`apps/syno/syno/deepseek-harness-supervisor.mjs`、`config/deepseek-harness/syno-chat.cordis.yml`、`config/deepseek-harness/syno-capture.cordis.yml`、`scripts/probe-harness.mjs`、README/架构/运维/限制/交接文档及对应 DSH/runtime 测试。模型链改动尚未单独提交；提交后必须把 hash 回填到本节和 `NEXT_SESSION.md`。
+本次模型链已在基线提交 `f6d2126` 落地；本阶段实际修改文件、测试结果和阶段 commit hash 在本节继续追加，不把外部 DSH clone 的运行事实写成仓库提交。
 
 ### Owner 验收证据
 
