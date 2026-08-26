@@ -447,7 +447,7 @@ test("real DSH JSON-RPC, Syno Tool Bridge and Project-aware Capture round-trip",
       notePath: stableEvidencePath(capturedNote.path),
     },
     ownerObservation: "pending",
-    deferred: ["web-search", "Owner召回改善结论", "直接 DSH ImageAttachmentRef bridge"],
+    deferred: ["Owner召回改善结论", "直接 DSH ImageAttachmentRef bridge"],
   });
   assert.match(evidence, /^ops\/acceptance\/project-aware-knowledge-mvp\/jsonrpc-/);
 });
