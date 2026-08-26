@@ -323,7 +323,7 @@ async function createLiveRuntime({ dshRoot, root, bridgeOrigin, bridgeToken }) {
   }
 }
 
-test("real DSH JSON-RPC Capture and production Web Agent Project round-trip", { skip: !LIVE, timeout: 360_000 }, async (t) => {
+test("real DSH JSON-RPC Capture and production Web Agent Project round-trip", { skip: !LIVE, timeout: 900_000 }, async (t) => {
   const dshRoot = liveEnvironment();
   const root = await fs.mkdtemp(path.join(REPO_ROOT, ".runtime", "tests", "project-aware-dsh-live-"));
   const bridgeToken = "live-bridge-token";
