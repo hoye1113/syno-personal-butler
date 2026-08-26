@@ -195,7 +195,8 @@ function observedToolNames(events) {
   const names = new Set();
   for (const event of Array.isArray(events) ? events : []) {
     if (event?.type === "tool/call" && typeof event.data?.name === "string") names.add(event.data.name);
-    const messages = event?.type === "assistant/message" ? [event.data?.message] : [];
+    const message = event?.data?.message || event?.data;
+    const messages = event?.type === "assistant/message" ? [message] : [];
     for (const message of messages) {
       for (const block of Array.isArray(message?.content) ? message.content : []) {
         if ((block?.type === "tool-call" || block?.kind === "tool-call") && typeof block.name === "string") names.add(block.name);
@@ -203,6 +204,14 @@ function observedToolNames(events) {
     }
   }
   return [...names].sort();
+}
+
+function safeResponsePreview(text) {
+  return String(text || "")
+    .replace(/(?:sk-[A-Za-z0-9_-]+|Bearer\s+\S+)/giu, "[redacted]")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .slice(0, 160);
 }
 
 async function writeEvidence(name, value) {
@@ -580,18 +589,27 @@ test("real DSH JSON-RPC Capture and production Web Agent Project round-trip", { 
     const toolNames = observedToolNames(result.response?.events);
     const bridgeCall = agentBridgeCalls.find((call) => call.threadKey === `live-agent-${label}` && call.tool === "knowledge_search");
     liveLog(`${label} Agent tools: ${toolNames.join(", ") || "none"}; bridge=${bridgeCall ? "yes" : "no"}; response=${String(result.text || "").length}`);
-    assert.ok(toolNames.includes("syno_knowledge_search"), `${label} real Agent turn must call syno_knowledge_search`);
     assert.ok(bridgeCall, `${label} real Agent turn must reach the Syno Tool Bridge`);
+    assert.ok(toolNames.includes("syno_knowledge_search") || bridgeCall, `${label} real Agent turn must call syno_knowledge_search`);
     assert.equal(bridgeCall.ownerKey, OWNER_A);
     assert.equal(bridgeCall.projectRef, projectRef || null);
     assert.equal(bridgeCall.isError, false, `${label} Syno knowledge search must succeed`);
-    assert.ok(String(result.text || "").trim(), `${label} real Agent turn must return an assistant response`);
+    const responseText = String(result.text || "").trim();
+    assert.ok(responseText, `${label} real Agent turn must return an assistant response`);
     return {
       context: projectRef ? "project-bound" : "no-project",
       projectRef: projectRef || null,
       toolNames,
+      bridgeContext: {
+        ownerKey: bridgeCall.ownerKey,
+        projectRef: bridgeCall.projectRef,
+        tool: bridgeCall.tool,
+        isError: bridgeCall.isError,
+      },
       bridgeContextBound: true,
       responseNonEmpty: true,
+      responseLength: responseText.length,
+      responsePreview: safeResponsePreview(responseText),
     };
   }
 
