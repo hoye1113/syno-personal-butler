@@ -225,9 +225,9 @@ Phase 4 targeted：`node --test tests/project-retrieval.test.mjs`，2/2 passed�
 
 - `tests/project-aware-dsh-live.test.mjs` 在显式 `SYNO_RUN_REAL_DSH=1` 下通过两项真实验收：JSON-RPC Capture round-trip 1/1、Web chat 官方 `web_search` 1/1；默认 `pnpm test` 不调用真实模型，两个 live case 按设计跳过。
 - 实际模型为 `deepseek-v4-flash-vision-exp`；runtime closure `ok=true`、`missing=[]`，DSH 版本为 `0.1.0-rc.8`。Web 事件中观察到的实际工具名为 `web_search`，不是由用户提示文本匹配推断。
-- Capture 证据 `ops/acceptance/project-aware-knowledge-mvp/jsonrpc-20260826T114530Z.json` 记录了 Project A 的 Job → Workflow → Proposal → canonical Note.project_refs 关系，以及 A/B/no-Project 检索对照：A 命中同项目 Note 的 score 12（包含 `project` reason），无 Project baseline 为 9，B 在 Project B 上得到对应 boost，wrong-owner 被拒绝。
-- Web 证据 `ops/acceptance/project-aware-knowledge-mvp/web-search-20260826T113519Z.json` 只保存模型/closure、`web_search` 工具名、事件数量和非空响应布尔值；不保存 API key、Bridge token、Cookie 或完整知识内容。
-- 当前证据状态为 `PARTIAL`，Owner 观察尚未回填；本地生产 3088 实例在 Web 验收期间未被结束，测试使用动态临时端口。外部 DSH clone 保持 clean，未修改源码、锁文件或依赖。
+- Capture 证据 `ops/acceptance/project-aware-knowledge-mvp/jsonrpc-20260826T120259Z.json` 记录了 Project A 的 Job → Workflow → Proposal → canonical Note.project_refs 关系，以及 A/B/no-Project 检索对照：A 命中同项目 Note 的 score 12（包含 `project` reason），无 Project baseline 为 9，B 在 Project B 上得到对应 boost，wrong-owner 被拒绝。
+- Web 证据 `ops/acceptance/project-aware-knowledge-mvp/web-search-20260826T120347Z.json` 只保存模型/closure、`web_search` 工具名、事件数量和非空响应布尔值；不保存 API key、Bridge token、Cookie 或完整知识内容。
+- 当前证据状态为 `PARTIAL`，Owner 观察尚未回填；本地生产 3088 实例在 Web 验收期间未被结束，测试使用动态临时端口。实现提交链为 `80f4aa7`（文档）、`ae71e96`（适配）、`59e2cf7`（live 测试）、`0cad3b0`（证据状态）、`349bc80`（Capture fixture）；外部 DSH clone 保持 clean，未修改源码、锁文件或依赖。
 
 ### 2026-08-25 边界修复记录（DONE）
 
@@ -254,7 +254,7 @@ Phase 4 targeted：`node --test tests/project-retrieval.test.mjs`，2/2 passed�
 - `syno-chat.cordis.yml` 与 `syno-capture.cordis.yml` 的首个模型为 `deepseek-v4-flash-vision-exp`，并声明 `inputModalities: [text, image]`；第二个模型为 `deepseek-v4-flash`；profile 不包含 `deepseek-v4-pro` 或 `deepseek-chat`。
 - 官方 API 使用 Windows 用户级 `DEEPSEEK_API_KEY` 做了不落盘验证：`GET /models` 包含 vision-exp；vision-exp 文本请求成功；向同一模型发送仓库生成的绿色测试图片成功返回 `GREEN`。验证过程没有输出或保存 key。
 - 当前 Syno 图片消息仍是 `artifactId → syno_image_read → Host Vision`，并未把本地 artifact 直接转换成 DSH `ImageAttachmentRef`；因此 `inputModalities` 是 DSH 能力声明，不应被表述为当前聊天 attachment 已经直传 DSH。现有图片行为保持不变，直接 DSH attachment bridge 仍是 deferred。
-- 真实 DSH JSON-RPC 启动仍未通过：在外部 clone 执行 `pnpm install --frozen-lockfile` 后，packaged-bin 仍因缺少 `@deepseek-ai/dsh-command-compact`、`@deepseek-ai/dsh-compaction-basic` 安装闭包而以 `HARNESS_TRANSPORT_CLOSED` 退出。故 Phase 5 的真实 DSH `web_search`、Project A/无 Project/Project B 召回对照和 Owner 观察继续 `DEFERRED`；`harness:doctor` 的 `bootable` 不能替代该证据。
+- 历史快照（截至 2026-08-25）：真实 DSH JSON-RPC 启动曾因 packaged-bin 缺少 `@deepseek-ai/dsh-command-compact`、`@deepseek-ai/dsh-compaction-basic` 安装闭包而以 `HARNESS_TRANSPORT_CLOSED` 退出。该问题已由本阶段 Syno 侧 adapter 处理；当前事实以 2026-08-26 live evidence 为准，不能用历史失败覆盖当前结果。
 
 本次模型链已在基线提交 `f6d2126` 落地；本阶段实际修改文件、测试结果和阶段 commit hash 在本节继续追加，不把外部 DSH clone 的运行事实写成仓库提交。
 

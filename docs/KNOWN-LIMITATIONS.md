@@ -5,7 +5,7 @@
 ## 2026-08-26 Project-aware Knowledge MVP
 
 - Phase 0–4 已完成：Project、显式 `/project <projectRef>`、Job/Workflow/Proposal/Note 传播、`project_refs` round-trip 和同项目 `PROJECT_BOOST = 3` 检索加权均已通过当前自动化测试。
-- 当前基线是 `main`/`f6d2126`；实现分支为 `feat/project-aware-dsh-phase5`。基线全量自动化为 749/749；本阶段当前 `pnpm test` 为 755 tests、753 passed、2 skipped、0 failed，`pnpm run verify` 通过（Repository verification 1646 files、active docs 9 files），`git diff --check` 通过。用户级 `DEEPSEEK_API_KEY` 已由宿主环境提供；doctor 只证明变量存在，不输出密钥。官方模型链已单独验证为 `deepseek-v4-flash-vision-exp → deepseek-v4-flash`，不使用 Pro。
+- 当前基线是 `main`/`f6d2126`；实现分支为 `feat/project-aware-dsh-phase5`。基线全量自动化为 749/749；本阶段当前 `pnpm test` 为 755 tests、753 passed、2 skipped、0 failed，`pnpm run verify` 通过（Repository verification 1645 files、active docs 9 files），`git diff --check` 通过。用户级 `DEEPSEEK_API_KEY` 已由宿主环境提供；doctor 只证明变量存在，不输出密钥。官方模型链已单独验证为 `deepseek-v4-flash-vision-exp → deepseek-v4-flash`，不使用 Pro。
 - Phase 5 仍为 `IN_PROGRESS`：真实 JSON-RPC Capture round-trip、Project A/无 Project/Project B 技术对照和真实 Web `web_search` 已由显式 live 测试通过，并保存为 `ops/acceptance/project-aware-knowledge-mvp/` 下的脱敏证据；Owner 主观召回改善观察仍未回填，因此不能标记 `DONE`。旧页面曾在隔离测试 Host `http://127.0.0.1:8898/` 完成一次非规范 smoke；Web 页面即将重构，当前 UI/DOM 不属于 Project MVP 验收契约。
 - Project 不做 Session、跨消息或跨渠道自动继承；裸的“确认/刚才那个”等后续消息不会从 Job 或 DSH 历史隐式继承 Project，Project-bound 决策必须再次显式指定；旧 Note 不批量补 `project_refs`；暂停/完成/放弃 Project 不可绑定新的普通工作 Job，但仍可作为历史 Note 引用；已创建的历史 Workflow 和生命周期状态 Job 经过一致性校验后可以继续执行。显式 Project 也不会切分 DSH Session 历史：同一会话切换 Project 时旧语义可能仍在上下文中，但历史文本不具备服务端授权能力；强会话隔离需要后续单独设计。
 - Job ID 直达的 advice、approve、reject、cancel、retry 已通过测试覆盖 Owner 校验；Project-bound 的 approve/reject/cancel/retry 和旧微信批准同样需要显式匹配 Project。当前旧 UI 的无作用域按钮不兼容 Project-bound Job；若未来 UI 重构改变入口，必须保留这些服务端边界，不能把 UI 参数当作授权。

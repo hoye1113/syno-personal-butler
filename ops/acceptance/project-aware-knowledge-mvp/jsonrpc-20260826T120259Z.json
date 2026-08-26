@@ -1,0 +1,176 @@
+{
+  "schema": "project-aware-knowledge-mvp-acceptance",
+  "status": "PARTIAL",
+  "phase5": "IN_PROGRESS",
+  "commit": "349bc80b57b2d85a43cc8f3674858c4d19a3ca15",
+  "dshVersion": "0.1.0-rc.8",
+  "actualModel": "deepseek-v4-flash-vision-exp",
+  "runtimeClosure": {
+    "ok": true,
+    "base": "D:\\workSpace\\deepseek-harness\\packages\\bundle\\base\\lib\\index.js",
+    "required": [
+      "@deepseek-ai/cordis",
+      "@deepseek-ai/dsh-agent-spine-demo",
+      "@deepseek-ai/dsh-app-boot",
+      "@deepseek-ai/dsh-command-compact",
+      "@deepseek-ai/dsh-compaction-basic",
+      "@deepseek-ai/dsh-compaction-tool-result-pruner",
+      "@deepseek-ai/dsh-fs-local",
+      "@deepseek-ai/dsh-fs-observation-policy",
+      "@deepseek-ai/dsh-invariants",
+      "@deepseek-ai/dsh-llm-deepseek",
+      "@deepseek-ai/dsh-sandbox-local",
+      "@deepseek-ai/dsh-sandbox-policy",
+      "@deepseek-ai/dsh-sdk-jsonrpc-server",
+      "@deepseek-ai/dsh-session-persistence-jsonl",
+      "@deepseek-ai/dsh-subprocess-local",
+      "@deepseek-ai/dsh-terminal",
+      "@deepseek-ai/dsh-terminal-bash",
+      "@deepseek-ai/dsh-token-meter",
+      "@deepseek-ai/dsh-tool-bash-persistent",
+      "@deepseek-ai/dsh-tool-fs",
+      "@deepseek-ai/dsh-tool-pwsh-persistent",
+      "@deepseek-ai/dsh-tool-web",
+      "@deepseek-ai/dsh-user-approval",
+      "@deepseek-ai/dsh-web",
+      "@deepseek-ai/dsh-web-fetch-http",
+      "@deepseek-ai/dsh-web-search-deepseek"
+    ],
+    "missing": [],
+    "source": "syno-jsonrpc-launcher"
+  },
+  "jsonRpcInitialize": true,
+  "webSearch": {
+    "attempted": false,
+    "reason": "web chat is recorded by the separate web live test"
+  },
+  "projectComparison": {
+    "projectA": [
+      {
+        "path": "vault/02-Resources/project-a-query.md",
+        "title": "Project A retrieval",
+        "score": 12,
+        "matchReasons": [
+          "title",
+          "body",
+          "project"
+        ]
+      },
+      {
+        "path": "vault/02-Resources/project-b.md",
+        "title": "Project B retrieval",
+        "score": 9,
+        "matchReasons": [
+          "title",
+          "body"
+        ]
+      },
+      {
+        "path": "vault/02-Resources/shared.md",
+        "title": "Shared retrieval",
+        "score": 9,
+        "matchReasons": [
+          "title",
+          "body"
+        ]
+      },
+      {
+        "path": "vault/00-Inbox/project-a-live-capture-525a6291.md",
+        "title": "Project A live capture",
+        "score": 4,
+        "matchReasons": [
+          "body",
+          "project"
+        ]
+      }
+    ],
+    "noProject": [
+      {
+        "path": "vault/02-Resources/project-a-query.md",
+        "title": "Project A retrieval",
+        "score": 9,
+        "matchReasons": [
+          "title",
+          "body"
+        ]
+      },
+      {
+        "path": "vault/02-Resources/project-b.md",
+        "title": "Project B retrieval",
+        "score": 9,
+        "matchReasons": [
+          "title",
+          "body"
+        ]
+      },
+      {
+        "path": "vault/02-Resources/shared.md",
+        "title": "Shared retrieval",
+        "score": 9,
+        "matchReasons": [
+          "title",
+          "body"
+        ]
+      },
+      {
+        "path": "vault/00-Inbox/project-a-live-capture-525a6291.md",
+        "title": "Project A live capture",
+        "score": 1,
+        "matchReasons": [
+          "body"
+        ]
+      }
+    ],
+    "projectB": [
+      {
+        "path": "vault/02-Resources/project-b.md",
+        "title": "Project B retrieval",
+        "score": 12,
+        "matchReasons": [
+          "title",
+          "body",
+          "project"
+        ]
+      },
+      {
+        "path": "vault/02-Resources/project-a-query.md",
+        "title": "Project A retrieval",
+        "score": 9,
+        "matchReasons": [
+          "title",
+          "body"
+        ]
+      },
+      {
+        "path": "vault/02-Resources/shared.md",
+        "title": "Shared retrieval",
+        "score": 9,
+        "matchReasons": [
+          "title",
+          "body"
+        ]
+      },
+      {
+        "path": "vault/00-Inbox/project-a-live-capture-525a6291.md",
+        "title": "Project A live capture",
+        "score": 1,
+        "matchReasons": [
+          "body"
+        ]
+      }
+    ],
+    "wrongOwnerRejected": true
+  },
+  "relation": {
+    "projectRef": "project-20260826-aaaaaaaa",
+    "jobId": "job-20260826-00c521f6",
+    "workflowId": "workflow-f25b2388-9d20-4b12-a079-e65cf8d5c2cc",
+    "proposalId": "ingest-d315402e",
+    "notePath": "vault/00-Inbox/project-a-live-capture-525a6291.md"
+  },
+  "ownerObservation": "pending",
+  "deferred": [
+    "Owner召回改善结论",
+    "直接 DSH ImageAttachmentRef bridge"
+  ]
+}
