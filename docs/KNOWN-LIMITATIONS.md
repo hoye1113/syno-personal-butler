@@ -5,14 +5,14 @@
 ## 2026-08-26 Project-aware Knowledge MVP
 
 - Phase 0–4 已完成：Project、显式 `/project <projectRef>`、Job/Workflow/Proposal/Note 传播、`project_refs` round-trip 和同项目 `PROJECT_BOOST = 3` 检索加权均已通过当前自动化测试。
-- 当前基线是 `main`/`f6d2126`；实现分支为 `feat/project-aware-dsh-phase5`。基线全量自动化为 749/749；本阶段当前 `pnpm test` 为 757 tests、755 passed、2 skipped、0 failed，`pnpm run verify` 通过（Repository verification 1645 files、active docs 9 files），`git diff --check` 通过。用户级 `DEEPSEEK_API_KEY` 已由宿主环境提供；doctor 只证明变量存在，不输出密钥。官方模型链已单独验证为 `deepseek-v4-flash-vision-exp → deepseek-v4-flash`，不使用 Pro。
-- Phase 5 仍为 `IN_PROGRESS`：真实 JSON-RPC Capture round-trip、Project A/无 Project/Project B 技术对照和真实 Web `web_search` 已由显式 live 测试通过，并保存为 `ops/acceptance/project-aware-knowledge-mvp/` 下的脱敏证据；Owner 主观召回改善观察仍未回填，因此不能标记 `DONE`。旧页面曾在隔离测试 Host `http://127.0.0.1:8898/` 完成一次非规范 smoke；Web 页面即将重构，当前 UI/DOM 不属于 Project MVP 验收契约。
+- 当前基线是 `main`/`f6d2126`；实现分支为 `feat/project-aware-dsh-phase5`，当前实现 HEAD 为 `356d612`。基线全量自动化为 749/749；本阶段最终 `pnpm test` 为 757 tests、755 passed、2 skipped、0 failed，`pnpm run verify` 通过（Repository verification 1645 files、active docs 9 files），`git diff --check` 通过。用户级 `DEEPSEEK_API_KEY` 已由宿主环境提供；doctor 只证明变量存在，不输出密钥。官方模型链已验证为 `deepseek-v4-flash-vision-exp → deepseek-v4-flash`，不使用 Pro。
+- Phase 5 仍为 `IN_PROGRESS`：最终真实 JSON-RPC Capture round-trip、Project A/无 Project/Project B 技术对照和真实 Web `web_search` 已由显式 live 测试通过，并保存为 `ops/acceptance/project-aware-knowledge-mvp/jsonrpc-20260826T145335Z.json`、`web-search-20260826T145515Z.json`；Owner 主观召回改善观察仍未回填，因此不能标记 `DONE`。旧页面曾在隔离测试 Host `http://127.0.0.1:8898/` 完成一次非规范 smoke；Web 页面即将重构，当前 UI/DOM 不属于 Project MVP 验收契约。
 - Project 不做 Session、跨消息或跨渠道自动继承；裸的“确认/刚才那个”等后续消息不会从 Job 或 DSH 历史隐式继承 Project，Project-bound 决策必须再次显式指定；旧 Note 不批量补 `project_refs`；暂停/完成/放弃 Project 不可绑定新的普通工作 Job，但仍可作为历史 Note 引用；已创建的历史 Workflow 和生命周期状态 Job 经过一致性校验后可以继续执行。显式 Project 也不会切分 DSH Session 历史：同一会话切换 Project 时旧语义可能仍在上下文中，但历史文本不具备服务端授权能力；强会话隔离需要后续单独设计。
 - Job ID 直达的 advice、approve、reject、cancel、retry 已通过测试覆盖 Owner 校验；Project-bound 的 approve/reject/cancel/retry 和旧微信批准同样需要显式匹配 Project。当前旧 UI 的无作用域按钮不兼容 Project-bound Job；若未来 UI 重构改变入口，必须保留这些服务端边界，不能把 UI 参数当作授权。
 
 ## 发布门槛状态
 
-- 当前 Goal 状态为 `blocked`：P4.0–P4.6 已完成，P4.7 的真实渠道、自动执行与澄清、跨渠道连续性、重启恢复和下次 Windows 登录冷启动仍需主人验收；不得把自动测试、探针或当前任务 Running 状态表述为封板。
+- 历史 P4 发布 Goal 状态为 `blocked`：P4.0–P4.6 已完成，P4.7 的真实渠道、自动执行与澄清、跨渠道连续性、重启恢复和下次 Windows 登录冷启动仍需主人验收；不得把自动测试、探针或当前任务 Running 状态表述为封板。
 - `567f23d` 是执行语义与移动可靠交付计划的审查基线，不是所有后续 PR 的永久父提交。当前实现尚未提供 ACK 前持久化、通用 ChannelDeliveryOutbox、Effect Receipt 或 Unknown Case Store；这些能力必须按 ADR 0003–0005 和 TODO 的新批次门禁交付，不能从文档目标推断为已实现。
 
 - token-cloud 固定模型五轮真实工具调用、故障持久等待和同模型恢复已通过，不再是发布门槛。
@@ -35,8 +35,8 @@ Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导�
 - 仅支持 Windows；Provider Token、微信 Bot/回复上下文和飞书 App Secret 使用当前 Windows 用户的 DPAPI，不可作为跨用户可移植凭据。
 - 只启用 DeepSeek Harness SDK，模型链只有 `deepseek/deepseek-v4-flash-vision-exp` → `deepseek/deepseek-v4-flash`，不使用 `deepseek-v4-pro`。仅在枚举的瞬态/契约失败且尚无不可逆副作用时尝试下一模型，不切换 Runtime，不回退到其它 Agent。主模型在 DSH profile 中声明了 `text`/`image` 输入能力。
 - DeepSeek Harness 克隆路径必须由 `SYNO_DSH_ROOT` 指向本机 checkout；未设置则无法启动。该 checkout **必须** `pnpm run build`（`lib/` + web dist）；只 install 不够，`harness:doctor` 的 bootable 也不是现网证据。生产 chat 的真实 argv 是 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（`dsh web` = 库存 `--profile web`，不要当生产）。事件通道是 WebSocket（HTTP GET `/api/events.*` 返回 426），不是 SSE。loopback 3088 是特权壳（`approval: never`，permission 表只准 `workspace-write`，禁止 `danger-full-access`），不是 8888 控制面。收录分析仍通过 jsonrpc sidecar；自动测试走 `tests/support/fake-dsh-jsonrpc-agent.mjs`。不要把 Harness 源码 vendoring 进本仓库。Chat 沙箱工作区是 `%LOCALAPPDATA%\Syno\harness\workspace\<profile>`，不是 git 仓库根。生产 `syno` profile 禁止市场 `dsh plugin add`；Host 会把 `@syno/dsh-plugin` link 进 profile `node_modules`。Windows 计划任务默认不注入 `SYNO_DSH_ROOT`。踩坑清单：`docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」。
-- 2026-08-25 的 packaged-bin 失败已由 Syno 侧 adapter 处理：Supervisor 现在检查完整 closure、配置包的实际运行入口，并在 Web/JSON-RPC 两条路径分别报告 `bootable`；缺失时返回 `HARNESS_RUNTIME_CLOSURE_UNAVAILABLE`，不会误报 `bootable`，也不会选择 OpenCode、原生 Agent 或 fake runtime。当前 doctor 的 closure 已完整；真实 JSON-RPC `initialize`、Capture round-trip 和 Web 官方 `web_search` 已通过显式 live 测试。Project 技术对照已证明固定 boost 的可观察差异，但 Owner 主观价值结论仍待确认。
-- 当前外部 DSH clone 在 Windows 上 graceful protocol shutdown/EOF 可能触发其自身 libuv assertion。Syno JSON-RPC supervisor 对自己创建的 sidecar 使用 process-tree termination 清理，避免把外部 crash 当成成功；本阶段不修改外部 clone，仍需继续观察真实模型回合后的退出和重启行为。
+- 2026-08-25 的 packaged-bin 失败已由 Syno 侧 adapter 处理：Supervisor 现在检查完整 closure、配置包的实际运行入口，并在 Web/JSON-RPC 两条路径分别报告 `bootable`；缺失时返回 `HARNESS_RUNTIME_CLOSURE_UNAVAILABLE`，不会误报 `bootable`，也不会选择 OpenCode、原生 Agent 或 fake runtime。当前 doctor 的 closure 已完整；最终真实 JSON-RPC `initialize`、Capture round-trip、生产 Agent Project A/B/no-Project 对照和 Web 官方 `web_search` 已通过显式 live 测试。Project 技术对照已证明固定 boost 的可观察差异，但 Owner 主观价值结论仍待确认。
+- 当前外部 DSH clone 在 Windows 上 graceful protocol shutdown/EOF 可能触发其自身 libuv assertion。Syno Supervisor 对自己创建的 sidecar/Web 进程使用有界 process-tree termination 清理；同时覆盖 tsx 外层先退出而 launcher 孙进程仍存活的情况。最终 live 命令已正常退出，本阶段不修改外部 clone，生产重启/崩溃行为仍需继续观察。
 - 当前 Syno 图片消息仍走 Host `syno_image_read` → Zen HTTP（`mimo-v2.5-free`），不把本地 artifact 直接作为 DSH image attachment 发送；DSH 的 vision model 声明暂不能替代这条 attachment bridge。微信图片默认聊天识图；明确「收录」才把识图 JSON 送进 text Intake。网络/超时最多再试 2 次，鉴权失败不重试，失败对微信可见、禁止猜图。
 - Chat `web_search` 已启用，后端固定为官方 DeepSeek 搜索（Anthropic 兼容 Messages + 服务端 `web_search`）。该 seam 没有查询/域名白名单；每次搜索是一次额外模型轮次，比纯检索 API 更重。`web_fetch` 仍是匿名 HTTP(S)，Harness 侧不做 SSRF 过滤。收录分析 sidecar 没有 web。
 - OpenCode、Hermes 和原生 Agent 不是产品运行时；旧认知模块的删除仍受 R6 真实验收门禁约束。

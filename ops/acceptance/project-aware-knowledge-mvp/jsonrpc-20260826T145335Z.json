@@ -2,7 +2,7 @@
   "schema": "project-aware-knowledge-mvp-acceptance",
   "status": "PARTIAL",
   "phase5": "IN_PROGRESS",
-  "commit": "b6d8fdc54748692727fcd9129d0ca6ca88d56fef",
+  "commit": "356d612bf752a394ead3679230e38224a72ad5bd",
   "dshVersion": "0.1.0-rc.8",
   "actualModel": "deepseek-v4-flash-vision-exp",
   "runtimeClosure": {
@@ -40,6 +40,60 @@
     "source": "syno-jsonrpc-launcher"
   },
   "jsonRpcInitialize": true,
+  "agentContextProbe": {
+    "projectA": {
+      "context": "project-bound",
+      "projectRef": "project-20260826-aaaaaaaa",
+      "toolNames": [
+        "syno_knowledge_search"
+      ],
+      "bridgeContext": {
+        "ownerKey": "live-owner-a",
+        "projectRef": "project-20260826-aaaaaaaa",
+        "tool": "knowledge_search",
+        "isError": false
+      },
+      "bridgeContextBound": true,
+      "responseNonEmpty": true,
+      "responseLength": 88,
+      "responsePreview": "The first result is **\"Project A retrieval\"** (`vault/02-Resources/project-a-query.md`)."
+    },
+    "noProject": {
+      "context": "no-project",
+      "projectRef": null,
+      "toolNames": [
+        "syno_knowledge_search"
+      ],
+      "bridgeContext": {
+        "ownerKey": "live-owner-a",
+        "projectRef": null,
+        "tool": "knowledge_search",
+        "isError": false
+      },
+      "bridgeContextBound": true,
+      "responseNonEmpty": true,
+      "responseLength": 86,
+      "responsePreview": "The first result is \"Project A retrieval\" (`Project A retrieval`, score 9, traceable)."
+    },
+    "projectB": {
+      "context": "project-bound",
+      "projectRef": "project-20260826-bbbbbbbb",
+      "toolNames": [
+        "syno_knowledge_search"
+      ],
+      "bridgeContext": {
+        "ownerKey": "live-owner-a",
+        "projectRef": "project-20260826-bbbbbbbb",
+        "tool": "knowledge_search",
+        "isError": false
+      },
+      "bridgeContextBound": true,
+      "responseNonEmpty": true,
+      "responseLength": 34,
+      "responsePreview": "第一条结果是标题为「Project B retrieval」的笔记。"
+    }
+  },
+  "agentModel": "deepseek-v4-flash-vision-exp",
   "webSearch": {
     "attempted": false,
     "reason": "web chat is recorded by the separate web live test"
@@ -75,7 +129,7 @@
         ]
       },
       {
-        "path": "vault/00-Inbox/project-a-live-capture-24aefc54.md",
+        "path": "vault/00-Inbox/project-a-live-capture-124b759d.md",
         "title": "Project A live capture",
         "score": 4,
         "matchReasons": [
@@ -113,7 +167,7 @@
         ]
       },
       {
-        "path": "vault/00-Inbox/project-a-live-capture-24aefc54.md",
+        "path": "vault/00-Inbox/project-a-live-capture-124b759d.md",
         "title": "Project A live capture",
         "score": 1,
         "matchReasons": [
@@ -151,7 +205,7 @@
         ]
       },
       {
-        "path": "vault/00-Inbox/project-a-live-capture-24aefc54.md",
+        "path": "vault/00-Inbox/project-a-live-capture-124b759d.md",
         "title": "Project A live capture",
         "score": 1,
         "matchReasons": [
@@ -163,10 +217,10 @@
   },
   "relation": {
     "projectRef": "project-20260826-aaaaaaaa",
-    "jobId": "job-20260826-54dc33b7",
-    "workflowId": "workflow-6a69b5e9-b023-4ffd-859e-a305d6344908",
-    "proposalId": "ingest-b099a2d7",
-    "notePath": "vault/00-Inbox/project-a-live-capture-24aefc54.md"
+    "jobId": "job-20260826-cad01512",
+    "workflowId": "workflow-5940b016-0bb0-45c3-aad4-196ed27afa31",
+    "proposalId": "ingest-f55e7e8b",
+    "notePath": "vault/00-Inbox/project-a-live-capture-124b759d.md"
   },
   "projectTools": {
     "createdViaBridge": true,

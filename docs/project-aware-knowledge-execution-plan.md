@@ -165,6 +165,7 @@ git diff --check # 通过
 Phase 0：`docs/INDEX.md`、`docs/project-aware-knowledge-execution-plan.md`。  
 Phase 1：`contracts/project.schema.json`、`contracts/goal.schema.json`、`apps/syno/syno/project-service.mjs`、`apps/syno/syno/goal-service.mjs`、`apps/syno/syno/validator.mjs`、`apps/syno/syno/policy.mjs`、`apps/syno/syno/operation-registry.mjs`、`apps/syno/syno/runtime.mjs`、`apps/syno/syno/syno-tool-bridge.mjs`、`config/deepseek-harness/syno-tool-sets.mjs`、`config/deepseek-harness/syno-tool-bridge-plugin.mjs`、`config/deepseek-harness/syno-agent.md`、`tests/project-service.test.mjs`。
 Phase 4：`apps/syno/syno/knowledge-store.mjs`、`apps/syno/syno/runtime.mjs`、`tests/project-retrieval.test.mjs`；检索实现提交为 `3362336`。
+Phase 5：`apps/syno/syno/deepseek-harness-jsonrpc-launcher.mjs`、`apps/syno/syno/deepseek-harness-supervisor.mjs`、`tests/project-aware-dsh-live.test.mjs`；真实 DSH 启动适配、进程树清理和 live acceptance probe 按 `0dbaab5`、`a48562d`、`b81366b`、`32ab1cd`、`356d612` 分阶段提交。
 文档同步：`docs/ARCHITECTURE.md`、`docs/POLICY.md`、`ops/README.md`、`NEXT_SESSION.md`、`docs/HANDOFF-EXECUTION-PLAN.md`、`docs/TODO-EXECUTION-PLAN.md`、`docs/INDEX.md`、`scripts/check-active-docs.mjs`、本执行计划。
 文档同步提交：`80d21ce`（`docs: record project-aware knowledge mvp acceptance`）。
 边界修复代码提交：`cd785a0`（`fix: harden project-aware knowledge boundaries`）；本次交接文档回填为该代码提交之后的独立文档提交。
@@ -223,11 +224,11 @@ Phase 4 targeted：`node --test tests/project-retrieval.test.mjs`，2/2 passed�
 
 ### 2026-08-26 Phase 5 live acceptance evidence（PARTIAL）
 
-- `tests/project-aware-dsh-live.test.mjs` 在显式 `SYNO_RUN_REAL_DSH=1` 下通过两项真实验收：JSON-RPC Capture round-trip 1/1、Web chat 官方 `web_search` 1/1；默认 `pnpm test` 不调用真实模型，两个 live case 按设计跳过。
-- 实际模型为 `deepseek-v4-flash-vision-exp`；runtime closure `ok=true`、`missing=[]`，DSH 版本为 `0.1.0-rc.8`。Web 事件中观察到的实际工具名为 `web_search`，不是由用户提示文本匹配推断。
-- Capture 证据 `ops/acceptance/project-aware-knowledge-mvp/jsonrpc-20260826T124256Z.json` 记录了 Project A 的 Job → Workflow → Proposal → canonical Note.project_refs 关系，以及 A/B/no-Project 检索对照：A 命中同项目 Note 的 score 12（包含 `project` reason），无 Project baseline 为 9，B 在 Project B 上得到对应 boost，wrong-owner 被拒绝；同一 live 测试还通过真实 Tool Bridge 调用了 `projects_create` 并验证了 `projects_list` 的 Owner 隔离。
-- Web 证据 `ops/acceptance/project-aware-knowledge-mvp/web-search-20260826T124327Z.json` 只保存模型/closure、`web_search` 工具名、事件数量和非空响应布尔值；不保存 API key、Bridge token、Cookie 或完整知识内容。
-- 当前证据状态为 `PARTIAL`，Owner 观察尚未回填；本地生产 3088 实例在 Web 验收期间未被结束，测试使用动态临时端口。实现提交链为 `80f4aa7`（文档）、`ae71e96`（适配）、`59e2cf7`（live 测试）、`0cad3b0`（证据状态）、`349bc80`（Capture fixture）、`77ba38c`（最终证据与交接文档）、`21e3c78`（Project 工具 live 覆盖）、`487b3e8`（可收录 Capture 素材）、`72a8d76`（证据刷新）、`3e1d961`（closure 入口与 Web 状态修复）、`0398c54`（当前 live 证据刷新）；外部 DSH clone 保持 clean，未修改源码、锁文件或依赖。
+- `tests/project-aware-dsh-live.test.mjs` 在显式 `SYNO_RUN_REAL_DSH=1` 下通过两项最终真实验收：JSON-RPC Capture + 生产 Web Agent Project round-trip 1/1、生产 Web chat 官方 `web_search` 1/1；默认 `pnpm test` 不调用真实模型，两个 live case 按设计跳过。Agent 对照使用 DSH 对外工具名 `syno_knowledge_search`，并由 Syno Bridge 实际请求记录 Owner/projectRef 上下文。
+- 最新有效 JSON-RPC 证据为 `ops/acceptance/project-aware-knowledge-mvp/jsonrpc-20260826T145335Z.json`，Web 证据为 `ops/acceptance/project-aware-knowledge-mvp/web-search-20260826T145515Z.json`；两份证据均对应实现 HEAD `356d612`、DSH `0.1.0-rc.8`、实际模型 `deepseek-v4-flash-vision-exp`、runtime closure `ok=true` 且 `missing=[]`。证据只保留脱敏元数据、排名摘要、稳定 ID、工具名、上下文和有限的 Agent 响应摘要，不保存 API key、Bridge token、Cookie 或完整敏感知识内容。
+- JSON-RPC 证据已完成 Project A、无 Project、Project B 三次真实 Agent 回合：三次均实际调用 `syno_knowledge_search` 并得到非空最终回答；Bridge 分别记录 `project-20260826-aaaaaaaa`、无 Project、`project-20260826-bbbbbbbb`，Owner 均为 `live-owner-a`。同一 fixture 的技术对照保持 A 同项目首位 score 12（含 `project` reason）、无 Project baseline 首位 score 9、B 同项目首位 score 12，wrong-owner 被拒绝；Capture 关系同时记录 Job → Workflow → Proposal → canonical Note.project_refs，Project 创建与 Owner 隔离也通过真实 Tool Bridge 验证。
+- Web 证据的事件中实际观察到工具名 `web_search`，不是从提示文本推断；生产 Web 使用动态临时端口，未触碰用户现有 3088 实例。Supervisor 额外修复了 Windows `node → tsx → launcher` 外层进程先退出时的孙进程清理，并将 `taskkill /T /F` 设置为 30 秒有界等待；最终 live 命令以 0 退出且测试树完成清理。
+- 当前证据状态仍为 `PARTIAL`，Owner 观察尚未回填，故 Phase 5 不能标记 `DONE`。本阶段新增/修复提交为 `0dbaab5`（真实 Agent/清理探针）、`a48562d`（live 总超时预算）、`b81366b`（自有 DSH 进程树清理）、`32ab1cd`（Agent/Bridge 脱敏证据）、`356d612`（正确 Agent 工具授权）；文档回填提交后应继续注明证据生成 HEAD 为 `356d612`。外部 DSH clone 保持 clean，未修改源码、锁文件或依赖。
 
 ### 2026-08-25 边界修复记录（DONE）
 

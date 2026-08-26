@@ -2,7 +2,7 @@
 
 本文只负责说明文档分类、唯一权威性和当前状态；具体产品规则以对应 Normative 文档为准。
 
-当前 Project-aware Knowledge MVP 已完成 Phase 0–4 的代码与契约闭环；Phase 5 已从 `DEFERRED` 进入 `IN_PROGRESS`，真实 DSH runtime closure、`web_search`、Capture round-trip 和 Project A/B/no-Project 技术对照已由测试文件验证，Owner 主观召回观察仍待补充。唯一执行事实源是 `docs/project-aware-knowledge-execution-plan.md`。Web 页面即将重构，当前 UI/DOM 不属于 MVP 验收契约。
+当前 Project-aware Knowledge MVP 已完成 Phase 0–4 的代码与契约闭环；Phase 5 处于 `IN_PROGRESS`，真实 DSH runtime closure、`web_search`、Capture round-trip 和 Project A/B/no-Project 技术对照已由测试文件验证，Owner 主观召回观察仍待补充。最新脱敏证据位于 `ops/acceptance/project-aware-knowledge-mvp/jsonrpc-20260826T145335Z.json` 和 `web-search-20260826T145515Z.json`。唯一执行事实源是 `docs/project-aware-knowledge-execution-plan.md`。Web 页面即将重构，当前 UI/DOM 不属于 MVP 验收契约。
 
 ## Normative
 
@@ -32,6 +32,7 @@
 ## Generated
 
 - Node 测试输出：命令行 `pnpm test`；如需持久化验收材料，保存到 `ops/acceptance/`。
+- Project-aware DSH live 证据：`ops/acceptance/project-aware-knowledge-mvp/`；默认不调用真实模型，只有显式 `SYNO_RUN_REAL_DSH=1` 才运行。
 - 仓库与 active-doc 检查：`pnpm run verify`。
 - 运行缓存和索引：`.runtime/`，可删除、可重建、禁止提交。
 - 本机 Harness/渠道运行状态：`%LOCALAPPDATA%\Syno\state` 和日志目录，不是仓库事实源。
