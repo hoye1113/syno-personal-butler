@@ -19,6 +19,7 @@ import { ProjectService } from "../apps/syno/syno/project-service.mjs";
 import { createSynoRuntime } from "../apps/syno/syno/runtime.mjs";
 import { SynoToolBridge } from "../apps/syno/syno/syno-tool-bridge.mjs";
 import { ToolRegistry } from "../apps/syno/syno/tool-registry.mjs";
+import { WorkflowOutbox } from "../apps/syno/syno/workflow-outbox.mjs";
 
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
@@ -84,6 +85,26 @@ async function closeServer(server) {
   if (!server) return;
   server.closeAllConnections?.();
   await new Promise((resolve) => server.close(() => resolve()));
+}
+
+async function removeTemporaryTree(directory) {
+  let entries = [];
+  try {
+    entries = await fs.readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === "ENOENT") return;
+    throw error;
+  }
+  for (const entry of entries) {
+    const target = path.join(directory, entry.name);
+    const stats = await fs.lstat(target);
+    if (stats.isSymbolicLink()) await fs.unlink(target);
+    else if (stats.isDirectory()) await removeTemporaryTree(target);
+    else await fs.unlink(target);
+  }
+  await fs.rmdir(directory).catch(async (error) => {
+    if (error.code !== "ENOENT") throw error;
+  });
 }
 
 function createBridgeServer(getBridge) {
@@ -276,6 +297,7 @@ async function createLiveRuntime({ dshRoot, root, bridgeOrigin, bridgeToken }) {
       knowledge,
       ingest,
       ingestWorkflows,
+      workflowOutbox: new WorkflowOutbox({ root: path.join(stateRoot, "workflow-outbox") }),
       jobStore,
       pendingDecisions,
       captureChunks: new CaptureChunkStore({ root: captureChunksRoot }),
@@ -289,6 +311,10 @@ async function createLiveRuntime({ dshRoot, root, bridgeOrigin, bridgeToken }) {
       cognitiveRuntimeMode: "injected-test",
     });
     await runtime.initialize({ worker: false });
+    // CreateSynoRuntime owns the production Tool Bridge. Delay this assignment until
+    // after initialize so the JSON-RPC chat plugin cannot observe an unbound test
+    // server and fall back to its incomplete catalog.
+    cognitiveRuntime.tools = runtime.toolBridge;
     return { runtime, supervisor, projects, knowledge, ingest, root, vaultRoot, stateRoot, ownerKey: OWNER_A, projectA: PROJECT_A, projectB: PROJECT_B, previousNodeEnv };
   } catch (error) {
     process.env.NODE_ENV = previousNodeEnv;
@@ -297,21 +323,31 @@ async function createLiveRuntime({ dshRoot, root, bridgeOrigin, bridgeToken }) {
   }
 }
 
-test("real DSH JSON-RPC, Syno Tool Bridge and Project-aware Capture round-trip", { skip: !LIVE, timeout: 360_000 }, async (t) => {
+test("real DSH JSON-RPC Capture and production Web Agent Project round-trip", { skip: !LIVE, timeout: 360_000 }, async (t) => {
   const dshRoot = liveEnvironment();
   const root = await fs.mkdtemp(path.join(REPO_ROOT, ".runtime", "tests", "project-aware-dsh-live-"));
   const bridgeToken = "live-bridge-token";
+  const previousWebPort = process.env.SYNO_DSH_WEB_PORT;
+  const webPort = await findFreePort();
+  process.env.SYNO_DSH_WEB_PORT = String(webPort);
   let bridge;
   const server = createBridgeServer(() => bridge);
   const bridgeOrigin = await listen(server);
   let fixture;
   t.after(async () => {
+    liveLog("cleanup: runtime.close");
     await fixture?.runtime?.close().catch(() => {});
+    liveLog("cleanup: supervisor.stop");
     await fixture?.supervisor?.stop().catch(() => {});
+    liveLog("cleanup: bridge.close");
     await closeServer(server);
     if (fixture?.previousNodeEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = fixture.previousNodeEnv;
-    await fs.rm(root, { recursive: true, force: true });
+    if (previousWebPort === undefined) delete process.env.SYNO_DSH_WEB_PORT;
+    else process.env.SYNO_DSH_WEB_PORT = previousWebPort;
+    liveLog("cleanup: temp tree");
+    await removeTemporaryTree(root);
+    liveLog("cleanup: complete");
   });
 
   fixture = await createLiveRuntime({ dshRoot, root, bridgeOrigin, bridgeToken });
@@ -411,6 +447,21 @@ test("real DSH JSON-RPC, Syno Tool Bridge and Project-aware Capture round-trip",
     (value) => value && ["awaiting_decision", "committed", "reported", "rejected", "superseded", "failed_retryable", "failed_terminal"].includes(value.stage),
   );
   liveLog(`capture workflow reached ${workflow.stage}`);
+  if (workflow.lastError) liveLog(`capture workflow error: ${JSON.stringify(workflow.lastError)}`);
+  let captureRetryCount = 0;
+  while (workflow.stage === "failed_retryable" && captureRetryCount < 3) {
+    captureRetryCount += 1;
+    liveLog(`retrying capture workflow after retryable failure (${captureRetryCount}/3)`);
+    workflow = await fixture.runtime.ingestWorkflows.retry(workflowId);
+    if (!["awaiting_decision", "committed", "reported", "rejected", "superseded", "failed_retryable", "failed_terminal"].includes(workflow.stage)) {
+      workflow = await waitFor(
+        () => fixture.runtime.ingestWorkflows.status(workflowId),
+        (value) => value && ["awaiting_decision", "committed", "reported", "rejected", "superseded", "failed_retryable", "failed_terminal"].includes(value.stage),
+      );
+    }
+    liveLog(`capture workflow retry reached ${workflow.stage}`);
+    if (workflow.lastError) liveLog(`capture workflow retry error: ${JSON.stringify(workflow.lastError)}`);
+  }
   if (workflow.stage === "awaiting_decision") {
     const job = await fixture.runtime.host.inspect(workflow.jobId, { ownerKey: OWNER_A, projectRef: PROJECT_A });
     await fixture.runtime.ingestWorkflows.decide(workflowId, { action: "approve", code: job.approvalCode }, {
@@ -486,7 +537,71 @@ test("real DSH JSON-RPC, Syno Tool Bridge and Project-aware Capture round-trip",
   const wrongOwner = await searchAs(OWNER_B, PROJECT_A);
   assert.equal(wrongOwner.isError, true);
   assert.match(wrongOwner.content?.[0]?.text || "", /PROJECT_OWNER_MISMATCH/);
+
+  const agentBridgeCalls = [];
+  const originalHandle = bridge.handle.bind(bridge);
+  bridge.handle = async (request) => {
+    const active = bridge.activeContext;
+    const isAgentKnowledgeCall = request?.body?.method === "tools/call"
+      && request.body.params?.name === "knowledge_search"
+      && active?.threadKey?.startsWith("live-agent-");
+    const response = await originalHandle(request);
+    if (isAgentKnowledgeCall) {
+      agentBridgeCalls.push({
+        threadKey: active.threadKey,
+        tool: request.body.params.name,
+        ownerKey: active.ownerKey || null,
+        projectRef: active.projectRef || null,
+        isError: response?.result?.isError === true,
+      });
+    }
+    return response;
+  };
+  async function runAgentKnowledgeProbe(label, projectRef) {
+    let result;
+    try {
+      result = await fixture.runtime.harnessCognitiveRuntime.run({
+        text: "Use exactly the provided Syno knowledge search tool with query `retrieval`. Do not call any other tool and do not answer from memory. After it returns, reply with one short sentence naming the first result.",
+      }, {
+        ownerKey: OWNER_A,
+        threadKey: `live-agent-${label}`,
+        channel: "web",
+        messageId: `live-agent-${label}`,
+        allowedTools: ["knowledge_search"],
+        ...(projectRef ? { projectRef } : {}),
+      });
+    } catch (error) {
+      const attempts = Array.isArray(error.attempts)
+        ? error.attempts.map(({ modelId, status, failureCode, detail }) => ({ modelId, status, failureCode, detail }))
+        : [];
+      liveLog(`${label} Agent turn failed: ${error.code || error.message}; attempts=${JSON.stringify(attempts)}; chatStatus=${JSON.stringify(fixture.supervisor.status("chat"))}`);
+      throw error;
+    }
+    const toolNames = observedToolNames(result.response?.events);
+    const bridgeCall = agentBridgeCalls.find((call) => call.threadKey === `live-agent-${label}` && call.tool === "knowledge_search");
+    liveLog(`${label} Agent tools: ${toolNames.join(", ") || "none"}; bridge=${bridgeCall ? "yes" : "no"}; response=${String(result.text || "").length}`);
+    assert.ok(toolNames.includes("syno_knowledge_search"), `${label} real Agent turn must call syno_knowledge_search`);
+    assert.ok(bridgeCall, `${label} real Agent turn must reach the Syno Tool Bridge`);
+    assert.equal(bridgeCall.ownerKey, OWNER_A);
+    assert.equal(bridgeCall.projectRef, projectRef || null);
+    assert.equal(bridgeCall.isError, false, `${label} Syno knowledge search must succeed`);
+    assert.ok(String(result.text || "").trim(), `${label} real Agent turn must return an assistant response`);
+    return {
+      context: projectRef ? "project-bound" : "no-project",
+      projectRef: projectRef || null,
+      toolNames,
+      bridgeContextBound: true,
+      responseNonEmpty: true,
+    };
+  }
+
+  const agentContextProbe = {
+    projectA: await runAgentKnowledgeProbe("project-a", PROJECT_A),
+    noProject: await runAgentKnowledgeProbe("no-project", ""),
+    projectB: await runAgentKnowledgeProbe("project-b", PROJECT_B),
+  };
   const status = fixture.supervisor.status("capture");
+  const chatStatus = fixture.supervisor.status("chat");
   liveLog(`capture sidecar completed with model ${status.model || LIVE_MODEL}`);
   const evidence = await writeEvidence("jsonrpc", {
     schema: "project-aware-knowledge-mvp-acceptance",
@@ -494,9 +609,11 @@ test("real DSH JSON-RPC, Syno Tool Bridge and Project-aware Capture round-trip",
     phase5: "IN_PROGRESS",
     commit: await gitHead(),
     dshVersion: await dshVersion(dshRoot),
-    actualModel: status.model || LIVE_MODEL,
+    actualModel: status.model || chatStatus.model || LIVE_MODEL,
     runtimeClosure: safeClosure(status),
     jsonRpcInitialize: status.ready === true,
+    agentContextProbe,
+    agentModel: chatStatus.model || LIVE_MODEL,
     webSearch: { attempted: false, reason: "web chat is recorded by the separate web live test" },
     projectComparison: {
       projectA: resultSummary(aResults),
@@ -542,13 +659,18 @@ test("real DSH Web chat invokes the official web_search tool", { skip: !LIVE, ti
     webReadyTimeoutMs: 120_000,
   });
   t.after(async () => {
+    liveLog("web cleanup: supervisor.stop");
     await supervisor.stop().catch(() => {});
+    liveLog("web cleanup: bridge.close");
     await closeServer(server);
+    liveLog("web cleanup: restore env");
     if (previousSurface === undefined) delete process.env.SYNO_DSH_CHAT_SURFACE;
     else process.env.SYNO_DSH_CHAT_SURFACE = previousSurface;
     if (previousWebPort === undefined) delete process.env.SYNO_DSH_WEB_PORT;
     else process.env.SYNO_DSH_WEB_PORT = previousWebPort;
-    await fs.rm(root, { recursive: true, force: true });
+    liveLog("web cleanup: temp tree");
+    await removeTemporaryTree(root);
+    liveLog("web cleanup: complete");
   });
 
   const client = await supervisor.start("chat", { provider: "deepseek-official", model: LIVE_MODEL });

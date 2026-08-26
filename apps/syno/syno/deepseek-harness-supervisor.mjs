@@ -30,6 +30,7 @@ const JSONRPC_BOOTSTRAP_PACKAGES = Object.freeze([
   "@deepseek-ai/dsh-invariants",
 ]);
 const JSONRPC_LAUNCHER_PATH = path.join(PATHS.repoRoot, "apps", "syno", "syno", "deepseek-harness-jsonrpc-launcher.mjs");
+const PROCESS_TREE_KILL_TIMEOUT_MS = 10_000;
 
 function runtimeError(code, message, details) {
   return Object.assign(new Error(message), { code, ...(details ? { details } : {}) });
@@ -43,8 +44,13 @@ function defaultDshRoot() {
 function defaultKillTree(pid) {
   if (!pid) return Promise.resolve();
   if (process.platform === "win32") {
-    return execFileAsync("taskkill.exe", ["/PID", String(pid), "/T", "/F"], { windowsHide: true }).catch((error) => {
-      if (!/not found|没有找到|not running/i.test(String(error.stderr || error.message))) throw error;
+    return execFileAsync("taskkill.exe", ["/PID", String(pid), "/T", "/F"], {
+      windowsHide: true,
+      timeout: PROCESS_TREE_KILL_TIMEOUT_MS,
+    }).catch((error) => {
+      const detail = String(error.stderr || error.message || "");
+      if (error.code === "ETIMEDOUT" || error.killed || /not found|没有找到|not running/i.test(detail)) return;
+      throw error;
     });
   }
   try { process.kill(-pid, "SIGTERM"); } catch {}
