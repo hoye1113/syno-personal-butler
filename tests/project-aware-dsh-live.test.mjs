@@ -151,6 +151,27 @@ async function gitHead() {
   return String(result.stdout || "").trim();
 }
 
+async function gitWorkingTreeSnapshot(root) {
+  const result = await execFileAsync(
+    "git",
+    ["-C", root, "status", "--porcelain=v1", "--untracked-files=all"],
+    { cwd: REPO_ROOT, windowsHide: true },
+  );
+  return String(result.stdout || "")
+    .split(/\r?\n/u)
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .sort();
+}
+
+function workingTreeEvidence(snapshot) {
+  return {
+    unchanged: true,
+    clean: snapshot.length === 0,
+    entryCount: snapshot.length,
+  };
+}
+
 async function dshVersion(dshRoot) {
   try {
     const packageJson = JSON.parse(await fs.readFile(path.join(dshRoot, "package.json"), "utf8"));
@@ -334,6 +355,7 @@ async function createLiveRuntime({ dshRoot, root, bridgeOrigin, bridgeToken }) {
 
 test("real DSH JSON-RPC Capture and production Web Agent Project round-trip", { skip: !LIVE, timeout: 900_000 }, async (t) => {
   const dshRoot = liveEnvironment();
+  const externalDshBefore = await gitWorkingTreeSnapshot(dshRoot);
   const root = await fs.mkdtemp(path.join(REPO_ROOT, ".runtime", "tests", "project-aware-dsh-live-"));
   const bridgeToken = "live-bridge-token";
   const previousWebPort = process.env.SYNO_DSH_WEB_PORT;
@@ -357,6 +379,12 @@ test("real DSH JSON-RPC Capture and production Web Agent Project round-trip", { 
     liveLog("cleanup: temp tree");
     await removeTemporaryTree(root);
     liveLog("cleanup: complete");
+    const externalDshAfterCleanup = await gitWorkingTreeSnapshot(dshRoot);
+    assert.deepEqual(
+      externalDshAfterCleanup,
+      externalDshBefore,
+      "the live JSON-RPC acceptance must leave the external DSH checkout unchanged",
+    );
   });
 
   fixture = await createLiveRuntime({ dshRoot, root, bridgeOrigin, bridgeToken });
@@ -618,6 +646,12 @@ test("real DSH JSON-RPC Capture and production Web Agent Project round-trip", { 
     noProject: await runAgentKnowledgeProbe("no-project", ""),
     projectB: await runAgentKnowledgeProbe("project-b", PROJECT_B),
   };
+  const externalDshAfter = await gitWorkingTreeSnapshot(dshRoot);
+  assert.deepEqual(
+    externalDshAfter,
+    externalDshBefore,
+    "the live JSON-RPC acceptance must leave the external DSH checkout unchanged",
+  );
   const status = fixture.supervisor.status("capture");
   const chatStatus = fixture.supervisor.status("chat");
   liveLog(`capture sidecar completed with model ${status.model || LIVE_MODEL}`);
@@ -650,6 +684,10 @@ test("real DSH JSON-RPC Capture and production Web Agent Project round-trip", { 
       createdViaBridge: true,
       ownerScopedList: true,
     },
+    externalDsh: {
+      before: workingTreeEvidence(externalDshBefore),
+      after: workingTreeEvidence(externalDshAfter),
+    },
     ownerObservation: "pending",
     deferred: ["Owner召回改善结论", "直接 DSH ImageAttachmentRef bridge"],
   });
@@ -658,6 +696,7 @@ test("real DSH JSON-RPC Capture and production Web Agent Project round-trip", { 
 
 test("real DSH Web chat invokes the official web_search tool", { skip: !LIVE, timeout: 300_000 }, async (t) => {
   const dshRoot = liveEnvironment();
+  const externalDshBefore = await gitWorkingTreeSnapshot(dshRoot);
   const root = await fs.mkdtemp(path.join(REPO_ROOT, ".runtime", "tests", "project-aware-dsh-web-live-"));
   const bridgeToken = "live-web-bridge-token";
   const bridge = new SynoToolBridge({ tools: new ToolRegistry([]), token: bridgeToken, isRuntimeReady: () => true });
@@ -689,6 +728,12 @@ test("real DSH Web chat invokes the official web_search tool", { skip: !LIVE, ti
     liveLog("web cleanup: temp tree");
     await removeTemporaryTree(root);
     liveLog("web cleanup: complete");
+    const externalDshAfterCleanup = await gitWorkingTreeSnapshot(dshRoot);
+    assert.deepEqual(
+      externalDshAfterCleanup,
+      externalDshBefore,
+      "the live Web acceptance must leave the external DSH checkout unchanged",
+    );
   });
 
   const client = await supervisor.start("chat", { provider: "deepseek-official", model: LIVE_MODEL });
@@ -700,6 +745,12 @@ test("real DSH Web chat invokes the official web_search tool", { skip: !LIVE, ti
   liveLog("Web search turn completed");
   const toolNames = observedToolNames(result.events);
   const observed = toolNames.includes("web_search");
+  const externalDshAfter = await gitWorkingTreeSnapshot(dshRoot);
+  assert.deepEqual(
+    externalDshAfter,
+    externalDshBefore,
+    "the live Web acceptance must leave the external DSH checkout unchanged",
+  );
   liveLog(`Observed Web tool calls: ${toolNames.join(", ") || "none"}`);
   assert.equal(observed, true, "the real Web turn must expose an observed web_search tool call");
   assert.ok(String(result.finalResponse || "").trim(), "the real Web turn must return an assistant response");
@@ -718,6 +769,10 @@ test("real DSH Web chat invokes the official web_search tool", { skip: !LIVE, ti
       toolNames,
       responseNonEmpty: Boolean(String(result.finalResponse || "").trim()),
       eventCount: Array.isArray(result.events) ? result.events.length : 0,
+    },
+    externalDsh: {
+      before: workingTreeEvidence(externalDshBefore),
+      after: workingTreeEvidence(externalDshAfter),
     },
     ownerObservation: "pending",
     deferred: ["Project A/B/no-Project Owner observation", "直接 DSH ImageAttachmentRef bridge"],
