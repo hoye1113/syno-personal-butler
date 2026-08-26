@@ -225,8 +225,8 @@ Phase 4 targeted：`node --test tests/project-retrieval.test.mjs`，2/2 passed�
 
 - `tests/project-aware-dsh-live.test.mjs` 在显式 `SYNO_RUN_REAL_DSH=1` 下通过两项真实验收：JSON-RPC Capture round-trip 1/1、Web chat 官方 `web_search` 1/1；默认 `pnpm test` 不调用真实模型，两个 live case 按设计跳过。
 - 实际模型为 `deepseek-v4-flash-vision-exp`；runtime closure `ok=true`、`missing=[]`，DSH 版本为 `0.1.0-rc.8`。Web 事件中观察到的实际工具名为 `web_search`，不是由用户提示文本匹配推断。
-- Capture 证据 `ops/acceptance/project-aware-knowledge-mvp/jsonrpc-20260826T122021Z.json` 记录了 Project A 的 Job → Workflow → Proposal → canonical Note.project_refs 关系，以及 A/B/no-Project 检索对照：A 命中同项目 Note 的 score 12（包含 `project` reason），无 Project baseline 为 9，B 在 Project B 上得到对应 boost，wrong-owner 被拒绝；同一 live 测试还通过真实 Tool Bridge 调用了 `projects_create` 并验证了 `projects_list` 的 Owner 隔离。
-- Web 证据 `ops/acceptance/project-aware-knowledge-mvp/web-search-20260826T122106Z.json` 只保存模型/closure、`web_search` 工具名、事件数量和非空响应布尔值；不保存 API key、Bridge token、Cookie 或完整知识内容。
+- Capture 证据 `ops/acceptance/project-aware-knowledge-mvp/jsonrpc-20260826T124256Z.json` 记录了 Project A 的 Job → Workflow → Proposal → canonical Note.project_refs 关系，以及 A/B/no-Project 检索对照：A 命中同项目 Note 的 score 12（包含 `project` reason），无 Project baseline 为 9，B 在 Project B 上得到对应 boost，wrong-owner 被拒绝；同一 live 测试还通过真实 Tool Bridge 调用了 `projects_create` 并验证了 `projects_list` 的 Owner 隔离。
+- Web 证据 `ops/acceptance/project-aware-knowledge-mvp/web-search-20260826T124327Z.json` 只保存模型/closure、`web_search` 工具名、事件数量和非空响应布尔值；不保存 API key、Bridge token、Cookie 或完整知识内容。
 - 当前证据状态为 `PARTIAL`，Owner 观察尚未回填；本地生产 3088 实例在 Web 验收期间未被结束，测试使用动态临时端口。实现提交链为 `80f4aa7`（文档）、`ae71e96`（适配）、`59e2cf7`（live 测试）、`0cad3b0`（证据状态）、`349bc80`（Capture fixture）、`77ba38c`（最终证据与交接文档）、`21e3c78`（Project 工具 live 覆盖）、`487b3e8`（可收录 Capture 素材）、`72a8d76`（证据刷新）、`3e1d961`（closure 入口与 Web 状态修复）；外部 DSH clone 保持 clean，未修改源码、锁文件或依赖。
 
 ### 2026-08-25 边界修复记录（DONE）
