@@ -581,28 +581,6 @@
     }
   }
 
-  let windowsServiceMutation = false;
-  async function changeWindowsService(action) {
-    if (windowsServiceMutation) return;
-    const verb = action === "install" ? "开启" : "关闭";
-    if (!window.confirm(`${verb}开机自动运行？此操作只修改当前用户的 Syno 计划任务，不会删除数据。`)) return;
-    windowsServiceMutation = true;
-    const buttons = [document.querySelector("#synoWindowsInstall"), document.querySelector("#synoWindowsUninstall")].filter(Boolean);
-    const region = document.querySelector("#synoAutostartSettings");
-    for (const button of buttons) button.disabled = true;
-    region?.setAttribute("aria-busy", "true");
-    const hint = document.querySelector("#synoWindowsServiceHint"); hint.textContent = `正在${verb}…`;
-    try {
-      await api(`/api/syno/windows-service/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      await loadWindowsService();
-    } catch (error) { hint.textContent = error.message; }
-    finally {
-      windowsServiceMutation = false;
-      for (const button of buttons) button.disabled = false;
-      region?.removeAttribute("aria-busy");
-    }
-  }
-
   async function loadIntakeProposal(id, attempt = 0) {
     const target = document.querySelector("#synoIntakeProposal");
     try {
@@ -804,11 +782,6 @@
       document.querySelector("#synoQuietEnd").value = values["notifications.quietHours"]?.end || "07:30";
       document.querySelector("#synoReducedDensity").checked = values["ui.preferences"]?.reducedDensity === true;
       document.body.classList.toggle("syno-reduced-density", values["ui.preferences"]?.reducedDensity === true);
-      // 权限开关（默认关）：code_change / system_control 的 D4 开启通道，状态可见。
-      const allowSelfModify = document.querySelector("#synoAllowSelfModify");
-      const allowSystemControl = document.querySelector("#synoAllowSystemControl");
-      if (allowSelfModify) allowSelfModify.checked = values["policy.allowSelfModify"] === true;
-      if (allowSystemControl) allowSystemControl.checked = values["policy.allowSystemControl"] === true;
       const primary = document.querySelector(".syno-primary-links");
       for (const key of values["ui.displayOrder"] || []) {
         const button = primary?.querySelector(`[data-scroll-target="${key}"], [data-syno-panel="${key}"]`);
@@ -828,18 +801,6 @@
     try {
       for (const [key, value] of changes) await api("/api/syno/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, value }) });
       hint.textContent = "主动偏好已保存并生效。"; await loadPreferences();
-    } catch (error) { hint.textContent = error.message; }
-  }
-
-  async function savePolicy(event) {
-    event.preventDefault(); const hint = document.querySelector("#synoPolicyHint");
-    const changes = [
-      ["policy.allowSelfModify", document.querySelector("#synoAllowSelfModify")?.checked === true],
-      ["policy.allowSystemControl", document.querySelector("#synoAllowSystemControl")?.checked === true],
-    ];
-    try {
-      for (const [key, value] of changes) await api("/api/syno/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, value, confirmed: true }) });
-      hint.textContent = "权限开关已保存并生效。"; await loadPreferences();
     } catch (error) { hint.textContent = error.message; }
   }
 
@@ -999,12 +960,9 @@
   document.querySelector("#synoOutputForm")?.addEventListener("submit", submitOutput);
   document.querySelector("#synoHarnessRestart")?.addEventListener("click", restartHarness);
   document.querySelector("#synoPreferenceForm")?.addEventListener("submit", savePreferences);
-  document.querySelector("#synoPolicyForm")?.addEventListener("submit", savePolicy);
   document.querySelector("#synoFeishuRegister")?.addEventListener("click", () => feishuAction("register/start"));
   document.querySelector("#synoFeishuConnect")?.addEventListener("click", () => feishuAction("connect"));
   document.querySelector("#synoFeishuDisconnect")?.addEventListener("click", () => feishuAction("disconnect"));
-  document.querySelector("#synoWindowsInstall")?.addEventListener("click", () => changeWindowsService("install"));
-  document.querySelector("#synoWindowsUninstall")?.addEventListener("click", () => changeWindowsService("uninstall"));
   document.querySelector("#synoShowOnboarding")?.addEventListener("click", () => {
     document.querySelector("#synoOnboarding").hidden = false; close();
     document.querySelector("#synoOnboarding").scrollIntoView({ behavior: "smooth", block: "center" });

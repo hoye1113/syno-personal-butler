@@ -57,7 +57,6 @@ import { WeixinIlinkAdapter, envToggle } from "./weixin-ilink.mjs";
 import { clip, formatWx, stripMarkdown } from "./weixin-text-format.mjs";
 import { VaultMigrationService } from "./vault-migration-service.mjs";
 import { WindowsServiceManager } from "./windows-service-manager.mjs";
-import { WindowsServiceControl } from "./windows-service-control.mjs";
 import { WorkflowContextCompiler } from "./workflow-context-compiler.mjs";
 import { WorkflowOutbox } from "./workflow-outbox.mjs";
 import { AcceptedRequestStore } from "./accepted-request-store.mjs";
@@ -265,7 +264,8 @@ function createSynoRuntime(options = {}) {
   const settingsRegistry = options.settingsRegistry || new SettingsRegistry();
   const projects = options.projects || new ProjectService();
   const windowsServiceManager = options.windowsServiceManager || new WindowsServiceManager();
-  const windowsService = options.windowsService || new WindowsServiceControl({ manager: windowsServiceManager, jobs: jobStore, settingsRegistry });
+  // D9（2026-09-01）：系统控制能力已物理删除，只保留只读状态查询。
+  const windowsService = options.windowsService || { status: () => windowsServiceManager.status() };
   const sourceIntake = options.intake || new IntakeService();
   const browserCapture = options.browserCapture || new BrowserCaptureAdapter();
   const ingest = options.ingest || new IngestService({ intake: sourceIntake, knowledge, projectService: projects });
@@ -1776,8 +1776,6 @@ async function routeSynoApi(runtime, req, url, readBody) {
     return runtime.restartHarness();
   }
   if (method === "GET" && url.pathname === "/api/syno/windows-service") return runtime.windowsService.status();
-  if (method === "POST" && url.pathname === "/api/syno/windows-service/install") return runtime.windowsService.mutate("install", webContext);
-  if (method === "POST" && url.pathname === "/api/syno/windows-service/uninstall") return runtime.windowsService.mutate("uninstall", webContext);
   if (method === "GET" && url.pathname === "/api/syno/snapshot") return runtime.core.snapshot({ search: url.searchParams.get("q") || "" });
   if (method === "GET" && url.pathname === "/api/syno/search") return { results: await runtime.core.search(url.searchParams.get("q") || "", {
     limit: url.searchParams.get("limit"),

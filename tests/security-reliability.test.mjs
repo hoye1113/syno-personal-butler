@@ -157,19 +157,20 @@ test("output progress API cannot publish without domain-validated feedback", asy
   assert.equal(records[0].status, "drafting");
 });
 
-test("Windows service Web API exposes only fixed status, install and uninstall actions", async () => {
+test("Windows service Web API exposes read-only status; lifecycle mutations are removed", async () => {
   const calls = [];
   const windowsService = {
     async status() { calls.push(["status"]); return { supported: true, installed: false, running: false, startup: "at_logon", webUrl: "http://127.0.0.1:8888/", legacyTaskDetected: true, lastTaskResult: null }; },
-    async mutate(action, context) { calls.push(["mutate", action, context.channel, context.senderId]); return { installed: action === "install", running: action === "install", jobId: "job-audit" }; },
+    async mutate(action) { calls.push(["mutate", action]); return { installed: true }; },
   };
   const runtime = { developmentMode: false, windowsService };
-  const readBody = async () => ({ taskName: "attacker", command: "calc.exe" });
+  const readBody = async () => ({});
   assert.equal((await routeSynoApi(runtime, { method: "GET" }, new URL("http://localhost/api/syno/windows-service"), readBody)).legacyTaskDetected, true);
-  await routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/windows-service/install"), readBody);
-  await routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/windows-service/uninstall"), readBody);
-  assert.deepEqual(calls, [["status"], ["mutate", "install", "web", "local-user"], ["mutate", "uninstall", "web", "local-user"]]);
+  // D9（2026-09-01）：install/uninstall/restart 一律不再有 API 入口；mutate 绝不被调用。
+  await assert.rejects(routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/windows-service/install"), readBody), /未知 Syno API/);
+  await assert.rejects(routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/windows-service/uninstall"), readBody), /未知 Syno API/);
   await assert.rejects(routeSynoApi(runtime, { method: "POST" }, new URL("http://localhost/api/syno/windows-service/restart"), readBody), /未知 Syno API/);
+  assert.deepEqual(calls, [["status"]]);
 });
 
 test("an ingest action that mutates an existing note is deterministically high risk", () => {

@@ -5,7 +5,7 @@ import { PATHS } from "./paths.mjs";
 
 const GROUPS = Object.freeze({
   agentAdjustable: Object.freeze(["notifications.cadence", "notifications.quietHours", "learning.dailyReviewCount", "ui.displayOrder", "ui.preferences"]),
-  confirmationRequired: Object.freeze(["provider.modelId", "budget", "channels", "calendar", "ownerAllowlist", "retention", "actions.allowlist", "context.thresholds", "notifications.proactiveDeliveryEnabled", "notifications.proactiveReleaseEvidence", "policy.allowSelfModify", "policy.allowSystemControl"]),
+  confirmationRequired: Object.freeze(["provider.modelId", "budget", "channels", "calendar", "ownerAllowlist", "retention", "actions.allowlist", "context.thresholds", "notifications.proactiveDeliveryEnabled", "notifications.proactiveReleaseEvidence"]),
   immutable: Object.freeze(["provider.baseUrl", "provider.token", "policy", "allowedRoots", "toolRegistry", "approvals", "security", "source", "contracts"]),
 });
 

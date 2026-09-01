@@ -11,8 +11,8 @@
 
 1. 读取、搜索与所有写入（新增笔记、写 `ops/`、覆盖、删除、移动、新 MOC、新 tag）默认自动执行（`approval:none`），在隔离 worktree 内合并；不要求审批确认。
 2. 只有"系统歧义"才回到人在环：收录撞重复、多方案（新建/分开/追加/关联）、信息不足时暂停澄清。明确指派的覆盖/删除/移动不算歧义，直接执行。
-3. 改管家自身源码（`code_change`）与本机生命周期控制（`system_control`）受显式配置开关控制（`policy.allowSelfModify` / `policy.allowSystemControl`），**默认关**；关闭时拒绝并给出可操作提示。
-4. 非显式 `code_change` 意图的 diff 触及源码根（`apps/contracts/config/scripts/tests`）= 模型 scope creep，硬拒绝（全开后唯一保留的硬拒绝）。
+3. 管家能力内**不存在**修改项目代码与本机生命周期控制（2026-09-01 D9）：`code_change`/`system_control` 意图无条件拒绝，不存在可开启的开关；装卸 Windows 后台服务由主人手动运行脚本。
+4. 任何 diff 触及源码根（`apps/contracts/config/scripts/tests`）= 无条件硬拒绝（唯一保留的硬拒绝）。
 5. 长期记忆只能先写为 `MemoryProposal`，确认后才能进入 `vault/`。
 6. 自动提交只能暂存 Job 声明的精确路径；禁止 `git add -A`，禁止自动 Push。
 7. 不读取、输出或提交 Token、Cookie、密钥和 `%LOCALAPPDATA%\Syno` 下的凭据。

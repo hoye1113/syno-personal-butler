@@ -23,19 +23,19 @@ test("Policy routes read, write and high-risk intents deterministically", () => 
   assert.equal(deletion.executor, "cognitive-runtime");
   assert.equal(deletion.needsWorktree, true);
   assert.equal(evaluate({ intent: "create_report" }, { trustedAutomation: true }).approval, "none");
-  // code_change 受开关控制，默认关 → 拒绝；翻开 allowSelfModify → 允许。
+  // D9（2026-09-01）：code_change / system_control 是结构性禁区——无条件拒绝，
+  // 不存在开关；历史上可放权的 context 字段不再有任何作用。
   assert.equal(evaluate({ intent: "code_change" }).allowed, false);
-  assert.equal(evaluate({ intent: "code_change" }, { allowSelfModify: true }).allowed, true);
-  // system_control 受开关控制，默认关 → 拒绝；翻开 allowSystemControl → 允许。
+  assert.equal(evaluate({ intent: "code_change" }, { allowSelfModify: true }).allowed, false);
+  assert.match(evaluate({ intent: "code_change" }).reason, /不修改项目代码/);
   const systemControl = evaluate({ intent: "system_control" });
   assert.equal(systemControl.profile, "syno-read");
   assert.equal(systemControl.approval, "none");
-  assert.equal(systemControl.risk, "low");
   assert.equal(systemControl.allowed, false);
   assert.equal(systemControl.needsWorktree, false);
   assert.deepEqual(systemControl.allowedRoots, []);
-  assert.match(systemControl.reason, /系统控制开关默认关闭/);
-  assert.equal(evaluate({ intent: "system_control" }, { allowSystemControl: true }).allowed, true);
+  assert.match(systemControl.reason, /不做本机生命周期控制/);
+  assert.equal(evaluate({ intent: "system_control" }, { allowSystemControl: true }).allowed, false);
 });
 
 test("changed path validator enforces Profile roots", () => {

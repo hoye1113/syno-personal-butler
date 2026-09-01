@@ -56,10 +56,10 @@ test("mobile write leg: write intents auto-execute (pending, approval none) and 
       assert.equal(job.status, "pending", `${intent} 应自动入队 pending，而非 awaiting_approval`);
       assert.equal(job.error, null, `${intent} 不应有 POLICY_DENIED`);
     }
-    // 安全开关默认关：管家改自身源码默认拒绝——即便从移动端发起。
+    // D9（2026-09-01）：管家改自身源码是结构性禁区，无条件拒绝——即便从移动端发起。
     const denied = evaluate({ intent: "code_change" });
     assert.equal(denied.allowed, false);
-    assert.match(denied.reason, /allowSelfModify/);
+    assert.match(denied.reason, /不修改项目代码/);
     const rejected = await store.create({ request: { intent: "code_change", text: "改管家源码" }, decision: denied, channel: "feishu", senderId: "fs-owner", ownerKey: "owner", threadKey: "main" });
     assert.equal(rejected.status, "rejected");
     assert.equal(rejected.error.code, "POLICY_DENIED");

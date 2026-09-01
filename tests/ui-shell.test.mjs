@@ -15,10 +15,11 @@ test("Web shell exposes the five knowledge-loop areas and always-reachable appro
   assert.match(html, /id="synoIntakeProposal"/);
   assert.match(html, /id="synoOutputOpportunities"/);
   assert.match(html, /id="synoPreferenceForm"/);
-  // trust-but-clarify：code_change / system_control 的 D4 开启通道（权限开关）在设置中可见。
-  assert.match(html, /id="synoPolicyForm"/);
-  assert.match(html, /id="synoAllowSelfModify"/);
-  assert.match(html, /id="synoAllowSystemControl"/);
+  // D9（2026-09-01）：权限开关与系统控制入口已移除，设置页不得再出现。
+  assert.doesNotMatch(html, /id="synoPolicyForm"/);
+  assert.doesNotMatch(html, /id="synoAllowSelfModify"/);
+  assert.doesNotMatch(html, /id="synoAllowSystemControl"/);
+  assert.doesNotMatch(html, /id="synoWindowsInstall"|id="synoWindowsUninstall"/);
   assert.match(html, /id="synoLearningArtifact"[^>]*minlength="20"/);
   assert.doesNotMatch(html, /value="conversation-outline"/);
   assert.match(html, /class="ghost-btn mobile-settings-trigger"[^>]*data-syno-panel="settings">连接设置</);
@@ -58,14 +59,15 @@ test("knowledge-loop Web actions use inline evidence and explicit lifecycle deci
   assert.match(script, /uiModel\.todayTarget/);
   assert.match(script, /action\.addEventListener\("click", \(\) => show\(/);
   assert.match(script, /button\.addEventListener\("click", \(\) => show\(/);
-  assert.match(script, /windowsServiceMutation/);
+  // D9（2026-09-01）：系统控制/自修改 UI 已移除，脚本中不得再有这些入口。
+  assert.doesNotMatch(script, /windowsServiceMutation/);
+  assert.doesNotMatch(script, /synoPolicyForm|synoAllowSelfModify|synoAllowSystemControl/);
   assert.match(script, /uiModel\.outputActions/);
   assert.match(script, /descriptors\.some\(\(descriptor\) => descriptor\.needsOutput/);
   assert.match(script, /descriptors\.some\(\(descriptor\) => descriptor\.needsFeedback/);
   assert.match(script, /请先记录至少 5 个字符的发布反馈/);
   assert.match(script, /#synoWeixinStatus[\s\S]*weixin\?\.running/);
   assert.doesNotMatch(script, /\["published", "dismissed"\]\.includes\(opportunity\.status\)/);
-  assert.match(script, /aria-busy/);
   assert.doesNotMatch(script, /window\.prompt/);
 });
 

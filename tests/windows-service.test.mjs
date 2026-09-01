@@ -7,8 +7,6 @@ import test from "node:test";
 import { promisify } from "node:util";
 
 import { WindowsServiceManager } from "../apps/syno/syno/windows-service-manager.mjs";
-import { WindowsServiceControl } from "../apps/syno/syno/windows-service-control.mjs";
-import { JobStore } from "../apps/syno/syno/job-store.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "..");
@@ -121,60 +119,6 @@ test("Windows installer reuses an existing healthy task only after its XML contr
 
   assert.ok(existingLookup >= 0 && existingExport > existingLookup);
   assert.ok(existingVerify > existingExport && healthyFastPath > existingVerify);
-});
-
-test("Windows lifecycle mutations are canonical audited operations", async (t) => {
-  await fs.mkdir(path.join(root, ".runtime"), { recursive: true });
-  const tempRoot = await fs.mkdtemp(path.join(root, ".runtime", "syno-windows-control-"));
-  t.after(() => fs.rm(tempRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }));
-  const jobs = new JobStore({ opsRoot: path.join(tempRoot, "ops"), payloadRoot: path.join(tempRoot, "payloads") });
-  const control = new WindowsServiceControl({
-    manager: {
-      async install() { return { supported: true, installed: true, running: true }; },
-      async uninstall() { return { supported: true, installed: false, running: false }; },
-    },
-    jobs,
-  });
-
-  // trust-but-clarify：system_control 受 allowSystemControl 开关控制（默认关）；开启后显式允许、自动执行。
-  const result = await control.mutate("install", { channel: "web", senderId: "local-user", allowSystemControl: true });
-  assert.equal(result.installed, true);
-  assert.match(result.jobId, /^job-/);
-  const job = await jobs.get(result.jobId);
-  assert.equal(job.intent, "system_control");
-  assert.equal(job.status, "completed");
-  assert.equal(job.request.operation, "windows.service.install");
-  assert.deepEqual(job.approvalActors, ["web:local-user"]);
-});
-
-test("failed Windows lifecycle mutations leave a terminal audited Job", async (t) => {
-  await fs.mkdir(path.join(root, ".runtime"), { recursive: true });
-  const tempRoot = await fs.mkdtemp(path.join(root, ".runtime", "syno-windows-failure-"));
-  t.after(() => fs.rm(tempRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }));
-  const jobs = new JobStore({ opsRoot: path.join(tempRoot, "ops"), payloadRoot: path.join(tempRoot, "payloads") });
-  const control = new WindowsServiceControl({ manager: { async install() { throw new Error("Task Scheduler unavailable"); } }, jobs });
-
-  await assert.rejects(control.mutate("install", { channel: "web", senderId: "local-user", allowSystemControl: true }), /Task Scheduler unavailable/);
-  const [job] = await jobs.list();
-  assert.equal(job.status, "failed");
-  assert.equal(job.error.code, "WINDOWS_SERVICE_FAILED");
-  assert.match(job.error.message, /Task Scheduler unavailable/);
-});
-
-test("Windows lifecycle mutations refuse with an actionable hint when the system-control switch is off", async (t) => {
-  await fs.mkdir(path.join(root, ".runtime"), { recursive: true });
-  const tempRoot = await fs.mkdtemp(path.join(root, ".runtime", "syno-windows-denied-"));
-  t.after(() => fs.rm(tempRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }));
-  const jobs = new JobStore({ opsRoot: path.join(tempRoot, "ops"), payloadRoot: path.join(tempRoot, "payloads") });
-  const control = new WindowsServiceControl({
-    manager: { async install() { throw new Error("manager must not run while denied"); }, async uninstall() { throw new Error("manager must not run while denied"); } },
-    jobs,
-  });
-  // 开关默认关（不传 allowSystemControl）→ 拒绝并给出 D4 可操作提示；manager 绝不被调用。
-  await assert.rejects(control.mutate("install", { channel: "web", senderId: "local-user" }), /系统控制开关默认关闭/);
-  const [denied] = await jobs.list();
-  assert.equal(denied.status, "rejected");
-  assert.equal(denied.error.code, "POLICY_DENIED");
 });
 
 test("WindowsServiceManager pins the repository, Node and management script", async () => {

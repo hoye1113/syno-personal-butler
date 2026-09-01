@@ -13,13 +13,13 @@ function isSystemPath(value) {
 }
 
 // trust-but-clarify 的 diff 评估：不再"推回审批"，而是二态——audit（记审计后继续合并）
-// 或 reject（源码根越界硬拒绝，全开后唯一保留的硬拒绝）。
+// 或 reject（源码根越界硬拒绝，唯一保留的硬拒绝）。
 function diffAssessment(decision, changes = []) {
   const sensitiveRoots = ["apps/", "contracts/", "config/", "scripts/", "tests/"];
-  // D3：非 code_change 却触及源码根 = 模型 scope creep。要改源码须用显式 code_change（受开关控制）。
+  // D9（2026-09-01）：管家能力内不存在改代码——触及源码根无条件硬拒绝，无任何开关。
   const touchesSourceRoot = changes.some((change) => sensitiveRoots.some((root) => change.path.startsWith(root)));
-  if (touchesSourceRoot && decision.intent !== "code_change") {
-    return { level: "reject", reason: "实际 diff 触及管家源码根（apps/contracts/config/scripts/tests），需用显式 code_change 意图（受开关控制）才可修改" };
+  if (touchesSourceRoot) {
+    return { level: "reject", reason: "实际 diff 触及管家源码根（apps/contracts/config/scripts/tests）：管家不修改项目代码" };
   }
   // 历史"高风险"信号（high risk / 非 added / MOC）不再阻断，只记审计。
   const notable = decision.risk === "high"
@@ -28,7 +28,7 @@ function diffAssessment(decision, changes = []) {
 }
 
 class AgentHost {
-  constructor({ store, executor, gitGuard, policy = evaluate, validator = validateRepositoryChange, onCommitted = async () => {}, processLockRoot, settingsRegistry = null, projectService = null } = {}) {
+  constructor({ store, executor, gitGuard, policy = evaluate, validator = validateRepositoryChange, onCommitted = async () => {}, processLockRoot, projectService = null } = {}) {
     if (!store || !executor || !gitGuard) throw new Error("AgentHost 缺少必要 Adapter");
     this.store = store;
     this.executor = executor;
@@ -36,7 +36,6 @@ class AgentHost {
     this.policy = policy;
     this.validator = validator;
     this.onCommitted = onCommitted;
-    this.settingsRegistry = settingsRegistry;
     this.projectService = projectService;
     this.activeRuns = new Map();
     this.jobLocks = new Map();
@@ -44,23 +43,8 @@ class AgentHost {
     this.processLockRoot = processLockRoot || path.join(path.dirname(store?.payloadRoot || PATHS.stateRoot), "locks", "jobs");
   }
 
-  // trust-but-clarify：把两个安全开关从 SettingsRegistry 读出注入 Policy context。
-  // 仅当调用方未显式提供时才回填（显式值优先，便于测试与一次性放权）。开关默认关，
-  // 读不到时按 false 处理（拒绝改源码/系统控制）。
-  async #policyContext(context = {}) {
-    if (!this.settingsRegistry) return context;
-    const merged = { ...context };
-    if (merged.allowSelfModify === undefined) {
-      merged.allowSelfModify = await this.settingsRegistry.get("policy.allowSelfModify") === true;
-    }
-    if (merged.allowSystemControl === undefined) {
-      merged.allowSystemControl = await this.settingsRegistry.get("policy.allowSystemControl") === true;
-    }
-    return merged;
-  }
-
   async receive(request, context = {}) {
-    const mergedContext = await this.#policyContext(context);
+    const mergedContext = context;
     const ownerKey = String(mergedContext.ownerKey || "local-user");
     const projectRef = String(mergedContext.projectRef || "").trim();
     if (projectRef) {

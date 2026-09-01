@@ -2,8 +2,11 @@ const PROFILE_ROOTS = Object.freeze({
   "syno-read": [],
   "syno-ops": ["ops"],
   "syno-curate": ["vault", "ops"],
-  "syno-code": ["apps", "contracts", "config", "docs", "scripts", "tests", "AGENTS.md", "README.md", "package.json"],
 });
+
+// 结构性边界（2026-09-01 D9）：管家能力内不存在改代码/系统控制。这两个意图不再是
+// 可开启的开关，而是永远拒绝；开关、syno-code profile 与相关操作注册已物理删除。
+const FORBIDDEN_INTENTS = new Set(["code_change", "system_control"]);
 
 const HIGH_RISK_INTENTS = new Set([
   "overwrite_note",
@@ -12,10 +15,8 @@ const HIGH_RISK_INTENTS = new Set([
   "new_moc",
   "new_tag",
   "migrate_integrate",
-  "code_change",
 ]);
 const COMPLEX_INTENTS = new Set(["complex_analysis"]);
-const LOCAL_CONTROL_INTENTS = new Set(["system_control"]);
 
 const WRITE_INTENTS = new Set([
   "create_action",
@@ -47,7 +48,6 @@ function inferIntent(request = {}) {
   if (/新建\s*moc|new\s+moc/.test(text)) return "new_moc";
   if (/新标签|新 tag|new tag/.test(text)) return "new_tag";
   if (/^(?:\/任务\s+|任务[：:]|待办[：:]|提醒我|新增行动)/u.test(text.trim())) return "create_action";
-  if (/代码|code|实现|修复/.test(text)) return "code_change";
   if (/选题|content idea/.test(text)) return "create_content_idea";
   if (/brief|内容策划|制作说明/.test(text)) return "create_content_brief";
   if (/收录|整理成笔记|curate/.test(text)) return "curate_note";
@@ -58,28 +58,20 @@ function inferIntent(request = {}) {
 
 function evaluate(request = {}, context = {}) {
   const intent = inferIntent(request);
-  // trust-but-clarify：所有写入默认自动执行（approval 恒为 none）。唯一闸门是两
-  // 个安全开关（默认关）：allowSelfModify（管家改自身源码）/ allowSystemControl
-  //（本机生命周期控制）。收录的"冲突澄清"由收录层按系统歧义单独触发，不经此字段。
-  const allowSelfModify = context.allowSelfModify === true;
-  const allowSystemControl = context.allowSystemControl === true;
+  // trust-but-clarify：所有写入默认自动执行（approval 恒为 none）。code_change /
+  // system_control 是结构性禁区（D9），无条件拒绝，没有任何开关可以放开。
+  // 收录的"冲突澄清"由收录层按系统歧义单独触发，不经此字段。
   const highRisk = HIGH_RISK_INTENTS.has(intent);
-  const localControl = LOCAL_CONTROL_INTENTS.has(intent);
   const writes = WRITE_INTENTS.has(intent);
-  const profile = localControl
-    ? "syno-read"
-    : intent === "code_change"
-    ? "syno-code"
-    : highRisk || intent === "curate_note" || intent === "migrate_note"
-      ? "syno-curate"
-      : writes
-        ? "syno-ops"
-        : "syno-read";
+  const profile = highRisk || intent === "curate_note" || intent === "migrate_note"
+    ? "syno-curate"
+    : writes
+      ? "syno-ops"
+      : "syno-read";
   const approval = "none";
-  const risk = highRisk ? "high" : localControl || writes ? "low" : "read";
+  const risk = highRisk ? "high" : writes ? "low" : "read";
   const executor = "cognitive-runtime";
-  const denied = (intent === "code_change" && !allowSelfModify)
-    || (intent === "system_control" && !allowSystemControl);
+  const denied = FORBIDDEN_INTENTS.has(intent);
   return Object.freeze({
     intent,
     profile,
@@ -95,16 +87,14 @@ function evaluate(request = {}, context = {}) {
     allowed: !denied,
     reason: denied
       ? intent === "code_change"
-        ? "代码自改开关默认关闭：拒绝修改管家自身源码。如需放开，请在设置中将 policy.allowSelfModify 置为 true"
-        : "系统控制开关默认关闭：拒绝本机生命周期操作。如需放开，请在设置中将 policy.allowSystemControl 置为 true"
+        ? "管家不修改项目代码：代码变更只由主人在开发流程中进行"
+        : "管家不做本机生命周期控制：装卸服务请使用安装脚本手动执行"
       : highRisk
         ? "高风险意图默认自动执行（已隔离工作区）；收录冲突或源码越界时单独处理"
-        : localControl
-          ? "本机生命周期控制已显式允许，自动执行并记录审计事件"
-          : writes
-            ? "写入请求默认自动执行（已隔离工作区）；收录冲突时暂停澄清"
-            : "只读请求可直接执行",
+        : writes
+          ? "写入请求默认自动执行（已隔离工作区）；收录冲突时暂停澄清"
+          : "只读请求可直接执行",
   });
 }
 
-export { COMPLEX_INTENTS, HIGH_RISK_INTENTS, LOCAL_CONTROL_INTENTS, PROFILE_ROOTS, evaluate, inferIntent };
+export { COMPLEX_INTENTS, FORBIDDEN_INTENTS, HIGH_RISK_INTENTS, PROFILE_ROOTS, evaluate, inferIntent };
