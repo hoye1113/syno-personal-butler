@@ -11,20 +11,6 @@ import { buildSourceDescriptor } from "./source-descriptor.mjs";
 class OutputService {
   constructor({ opsRoot = PATHS.opsRoot, clock = () => new Date() } = {}) { this.opsRoot = opsRoot; this.clock = clock; }
 
-  teachBackPrompt({ title, claims = [] } = {}) {
-    return {
-      title: `用自己的话讲清：${title}`,
-      questions: [
-        "不用术语，向完全不懂的人解释核心判断。",
-        "给出一个具体例子，并说明它为什么成立。",
-        "说出适用边界、一个反例或最容易误解的地方。",
-        "把它应用到你当前的 AI/Agent 项目，下一步会做什么？",
-      ],
-      claimRefs: claims,
-      evidenceRule: "只有主人亲自口述、打字、答题或实践的原始产物计入掌握度。",
-    };
-  }
-
   async createOpportunity(input, { opsRoot = this.opsRoot } = {}) {
     const now = this.clock().toISOString();
     const opportunity = {

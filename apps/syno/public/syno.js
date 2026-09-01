@@ -4,7 +4,7 @@
   const title = document.querySelector("#synoDrawerTitle");
   const panes = [...document.querySelectorAll("[data-syno-pane]")];
   const tabs = [...document.querySelectorAll("[data-syno-tab]")];
-  const labels = { knowledge: "知识", learn: "学习", create: "创作", jobs: "任务", notifications: "通知", settings: "设置", chat: "问赛诺" };
+  const labels = { knowledge: "知识", create: "创作", jobs: "任务", notifications: "通知", settings: "设置", chat: "问赛诺" };
   let active = "knowledge";
   let lastTrigger = null;
   let weixinLoginGeneration = 0;
@@ -85,7 +85,6 @@
     }
     if (panel === "jobs") loadJobs();
     if (panel === "notifications") loadNotifications();
-    if (panel === "learn") loadDueReviews();
     if (panel === "settings") { loadProviderStatus(); loadPreferences(); loadWindowsService(); loadChannelStatus(); }
     if (panel === "create") loadOutputOpportunities();
     if (panel === "knowledge") {
@@ -527,7 +526,7 @@
       setSettingStatus("#synoSettingFeishu", feishu?.running ? "已连接" : "未连接", feishu?.running);
       const weixinDetail = document.querySelector("#synoWeixinStatus");
       if (weixinDetail) weixinDetail.textContent = weixin?.running
-        ? "已连接本人微信；支持快速收录、查询、复习与提醒。"
+        ? "已连接本人微信；支持快速收录、查询与提醒。"
         : weixin?.ownerBound ? "已绑定本人微信，连接暂时中断。" : "未连接。只允许扫码者本人，不启用群聊。";
       const feishuDetail = document.querySelector("#synoFeishuStatus");
       if (feishuDetail && feishu?.running) feishuDetail.textContent = "已连接本人飞书；用于日程与结构化通知。";
@@ -624,7 +623,7 @@
   }
 
   function priorityKind(kind) {
-    return { goal: "目标", commitment: "承诺", review: "复习" }[kind] || "事项";
+    return { goal: "目标", commitment: "承诺" }[kind] || "事项";
   }
 
   async function loadToday() {
@@ -633,7 +632,7 @@
     try {
       const snapshot = await api("/api/syno/today");
       const item = snapshot.primary;
-      const action = node("button", "accent-btn", item ? (item.kind === "review" ? "开始复习" : item.kind === "commitment" ? "去处理" : "开始") : "去收录一条内容");
+      const action = node("button", "accent-btn", item ? (item.kind === "commitment" ? "去处理" : "开始") : "去收录一条内容");
       action.id = "synoTodayPrimaryAction"; action.type = "button";
       action.addEventListener("click", () => show(uiModel.todayTarget(item), action));
       primary.replaceChildren(
@@ -643,7 +642,7 @@
         action,
       );
       const needs = document.querySelector("#synoTodayNeedsYou"); needs.replaceChildren();
-      const needLabels = { approval: "待确认", review: "到期复习", output: "需要你的输出" };
+      const needLabels = { approval: "待确认", output: "需要你的输出" };
       for (const entry of snapshot.needsYou || []) needs.append(node("button", "today-row", `${needLabels[entry.kind] || "待处理"} · ${entry.title}`));
       if (!needs.children.length) needs.append(node("p", "syno-empty", "没有需要你确认的事项。"));
       needs.querySelectorAll("button").forEach((button, index) => button.addEventListener("click", () => show(uiModel.todayTarget(snapshot.needsYou[index]), button)));
@@ -658,69 +657,12 @@
       );
       setHealthIssue("tasks", progress.failed ? `今天有 ${progress.failed} 个任务异常` : "");
       document.querySelector("#weekScheduledCount").textContent = snapshot.counts.commitments;
-      document.querySelector("#inboxCandidateCount").textContent = snapshot.counts.reviews;
+      document.querySelector("#inboxCandidateCount").textContent = (snapshot.recentIntake || []).length;
     } catch (error) {
       primary.replaceChildren(node("span", "", "需要检查"), node("strong", "", "Today 暂时不可用"), node("p", "syno-error", error.message));
     }
   }
 
-  async function loadDueReviews() {
-    const target = document.querySelector("#synoDueReviews");
-    if (!target) return;
-    target.replaceChildren(node("p", "syno-empty", "正在读取到期复习…"));
-    try {
-      const { reviews } = await api("/api/syno/learning/due");
-      document.querySelector("#synoLearnCount").textContent = `今天复习 ${reviews.length} 项`;
-      target.replaceChildren();
-      if (!reviews.length) target.append(node("p", "syno-empty", "当前没有到期复习。可以主动选择一个主题做 Teach-back。"));
-      for (const review of reviews) {
-        const item = node("article", "syno-job");
-        item.append(node("strong", "", review.knowledgeRef), node("p", "", `掌握度 ${Math.round(review.mastery * 100)}% · 当前阶段 ${review.stage}`));
-        const start = node("button", "ghost-btn", "开始复习");
-        start.type = "button";
-        start.addEventListener("click", () => { document.querySelector("#synoLearningRef").value = review.knowledgeRef; document.querySelector("#synoLearningArtifact").focus(); });
-        item.append(start); target.append(item);
-      }
-    } catch (error) { target.replaceChildren(node("p", "syno-error", error.message)); }
-  }
-
-  async function submitLearning(event) {
-    event.preventDefault();
-    const hint = document.querySelector("#synoLearningHint");
-    hint.textContent = "正在记录…";
-    try {
-      const result = await api("/api/syno/learning/evidence", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-        knowledgeRef: document.querySelector("#synoLearningRef").value.trim(),
-        inputMode: document.querySelector("#synoLearningMode").value,
-        assistedLevel: document.querySelector("#synoLearningAssist").value,
-        rubric: {
-          accurate: document.querySelector("#synoRubricAccurate").checked ? 1 : 0,
-          explained: document.querySelector("#synoRubricExplained").checked ? 1 : 0,
-          applied: document.querySelector("#synoRubricApplied").checked ? 1 : 0,
-          discriminated: document.querySelector("#synoRubricDiscriminated").checked ? 1 : 0,
-        },
-        selfAssessment: document.querySelector("#synoLearningSelf").value,
-        isReview: document.querySelector("#synoLearningReview").checked,
-        rawOutput: document.querySelector("#synoLearningArtifact").value.trim(),
-        misconceptions: document.querySelector("#synoLearningMisconceptions").value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean),
-      }) });
-      hint.textContent = result.requiresApproval ? `任务 ${result.job.id} 需要澄清，请到“任务”选择。` : "学习证据已记录，复习时间已更新。";
-      await loadDueReviews();
-    } catch (error) { hint.textContent = error.message; }
-  }
-
-  async function submitTeachBack(event) {
-    event.preventDefault();
-    const target = document.querySelector("#synoTeachBackPrompt");
-    target.replaceChildren(node("p", "syno-empty", "正在准备问题…"));
-    try {
-      const prompt = await api("/api/syno/learning/teach-back", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: document.querySelector("#synoTeachBackTitle").value.trim() }) });
-      const card = node("article", "syno-job"); card.append(node("strong", "", prompt.title));
-      const list = node("ol", ""); prompt.questions.forEach((question) => list.append(node("li", "", question)));
-      card.append(list, node("small", "", prompt.evidenceRule)); target.replaceChildren(card);
-      document.querySelector("#synoOutputTitle").value = document.querySelector("#synoTeachBackTitle").value.trim();
-    } catch (error) { target.replaceChildren(node("p", "syno-error", error.message)); }
-  }
 
   async function submitOutput(event) {
     event.preventDefault(); const hint = document.querySelector("#synoOutputHint"); hint.textContent = "正在建立机会…";
@@ -777,7 +719,6 @@
     try {
       const state = await api("/api/syno/settings"); const values = state.values || {};
       document.querySelector("#synoCadence").value = values["notifications.cadence"] || "balanced";
-      document.querySelector("#synoReviewCount").value = values["learning.dailyReviewCount"] || 5;
       document.querySelector("#synoQuietStart").value = values["notifications.quietHours"]?.start || "22:30";
       document.querySelector("#synoQuietEnd").value = values["notifications.quietHours"]?.end || "07:30";
       document.querySelector("#synoReducedDensity").checked = values["ui.preferences"]?.reducedDensity === true;
@@ -794,7 +735,6 @@
     event.preventDefault(); const hint = document.querySelector("#synoPreferenceHint");
     const changes = [
       ["notifications.cadence", document.querySelector("#synoCadence").value],
-      ["learning.dailyReviewCount", Number(document.querySelector("#synoReviewCount").value)],
       ["notifications.quietHours", { start: document.querySelector("#synoQuietStart").value, end: document.querySelector("#synoQuietEnd").value }],
       ["ui.preferences", { reducedDensity: document.querySelector("#synoReducedDensity").checked }],
     ];
@@ -947,16 +887,9 @@
   document.querySelector("#synoQuickCaptureFile")?.addEventListener("change", (event) => {
     document.querySelector("#synoQuickCaptureFileButton").textContent = event.target.files[0]?.name || "选择文件";
   });
-  document.querySelector("#synoLearnStart")?.addEventListener("click", () => {
-    const queue = document.querySelector("#synoReviewQueue"); queue.open = true;
-    const first = document.querySelector("#synoDueReviews button");
-    if (first) first.focus(); else { document.querySelector("#synoLearningDetails").open = true; document.querySelector("#synoLearningRef").focus(); }
-  });
   document.querySelector("#synoChatForm")?.addEventListener("submit", submitChat);
   document.querySelector("#synoWeixinLogin")?.addEventListener("click", beginWeixinLogin);
   document.querySelector("#synoWeixinHome")?.addEventListener("click", setWeixinHome);
-  document.querySelector("#synoLearningForm")?.addEventListener("submit", submitLearning);
-  document.querySelector("#synoTeachBackForm")?.addEventListener("submit", submitTeachBack);
   document.querySelector("#synoOutputForm")?.addEventListener("submit", submitOutput);
   document.querySelector("#synoHarnessRestart")?.addEventListener("click", restartHarness);
   document.querySelector("#synoPreferenceForm")?.addEventListener("submit", savePreferences);

@@ -23,7 +23,6 @@ const WRITE_INTENTS = new Set([
   "create_content_idea",
   "create_content_brief",
   "create_memory_proposal",
-  "record_learning_evidence",
   "create_output_opportunity",
   "create_goal",
   "create_project",

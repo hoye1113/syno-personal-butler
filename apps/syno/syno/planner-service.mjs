@@ -20,8 +20,8 @@ function actionDate(kind, title, reason, priority, ref, extra = {}) {
     title,
     reason,
     priority,
-    area: extra.area || "learn",
-    intent: extra.intent || "start-review",
+    area: extra.area || "knowledge",
+    intent: extra.intent || "read-note",
     ref: ref || "",
     status: "pending",
     ...(extra.dueAt ? { dueAt: extra.dueAt } : {}),
@@ -32,7 +32,6 @@ class PlannerService {
   constructor({
     knowledge,
     goals,
-    learning,
     claims,
     ingest,
     maintenance,
@@ -44,7 +43,6 @@ class PlannerService {
   } = {}) {
     this.knowledge = knowledge;
     this.goals = goals;
-    this.learning = learning;
     this.claims = claims;
     this.ingest = ingest;
     this.maintenance = maintenance;
@@ -56,8 +54,8 @@ class PlannerService {
   }
 
   /**
-   * 生成今日学习计划。幂等：相同 owner、localDate、vaultFingerprint、Goal 和设置下结果一致。
-   * 不创建 LearningState、LearningEvidence、Goal 或知识笔记。
+   * 生成今日知识计划。幂等：相同 owner、localDate、vaultFingerprint、Goal 和设置下结果一致。
+   * 不创建 Goal 或知识笔记；2026-09-01 起不再产出复习项（学习子系统已移除，D6）。
    */
   async planDay({ opsRoot = this.opsRoot, now = this.clock() } = {}) {
     const localDate = now.toISOString().slice(0, 10);
@@ -72,35 +70,16 @@ class PlannerService {
 
     // 收集所有数据源
     const activeGoals = await this.goals.list({ opsRoot, status: "active" });
-    const dueReviews = await this.learning.due({ opsRoot, now, limit: 20 });
     const pendingIngest = this.ingest ? await this.ingest.pending({ limit: 20 }) : [];
     const maintenanceFindings = this.maintenance ? await this.maintenance.inspect({ limit: 10 }) : [];
     const sensitiveRefs = new Set(notes.filter((note) => note.sensitive).map((note) => note.path));
     const searchable = notes.filter((note) => note.searchable && !note.sensitive);
-    const learningStates = await this.learning.listStates({ opsRoot });
-    const coveredRefs = new Set(learningStates.map((s) => String(s.knowledgeRef || "")));
 
     // 选择动作
     const items = [];
     const usedRefs = new Set();
 
-    // 1. 到期复习（最高优先级）
-    for (const state of dueReviews) {
-      if (items.length >= this.capacity) break;
-      const ref = String(state.knowledgeRef || "");
-      if (!ref || usedRefs.has(ref) || sensitiveRefs.has(ref)) continue;
-      usedRefs.add(ref);
-      items.push(actionDate(
-        "review",
-        `复习：${ref}`,
-        "到期复习，巩固记忆",
-        95,
-        ref,
-        { area: "learn", intent: "start-review", dueAt: state.nextReviewAt },
-      ));
-    }
-
-    // 2. 活跃 Goal 相关知识消化
+    // 1. 活跃 Goal 相关知识消化
     const goalFocusAreas = new Set(activeGoals.flatMap((g) => g.focusAreas || []));
     const goalRefs = activeGoals.map((g) => g.id);
     if (items.length < this.capacity && goalFocusAreas.size > 0) {
@@ -113,36 +92,33 @@ class PlannerService {
         if (items.length >= this.capacity) break;
         if (usedRefs.has(note.path)) continue;
         usedRefs.add(note.path);
-        const hasState = coveredRefs.has(note.path);
         items.push(actionDate(
           "digest",
           note.title || note.path,
-          hasState ? "与目标相关的已有知识，可深化理解" : "与目标相关但尚未验证的知识",
+          "与目标相关的知识，值得重读串联",
           80,
           note.path,
-          { area: "learn", intent: "start-review" },
         ));
       }
     }
 
-    // 3. 未覆盖的高价值知识（填充剩余消化容量）
+    // 2. 高价值知识重读（填充剩余消化容量）
     if (items.length < this.capacity) {
-      const uncovered = searchable.filter((n) => !coveredRefs.has(n.path) && !usedRefs.has(n.path));
+      const uncovered = searchable.filter((n) => !usedRefs.has(n.path));
       for (const note of uncovered) {
         if (items.length >= this.capacity) break;
         usedRefs.add(note.path);
         items.push(actionDate(
           "digest",
           note.title || note.path,
-          "尚未学习的个人知识",
+          "值得重读串联的个人知识",
           60,
           note.path,
-          { area: "learn", intent: "start-review" },
         ));
       }
     }
 
-    // 4. 收录候选
+    // 3. 收录候选
     if (items.length < this.capacity && pendingIngest.length > 0) {
       for (const proposal of pendingIngest) {
         if (items.length >= this.capacity) break;
@@ -157,7 +133,7 @@ class PlannerService {
       }
     }
 
-    // 5. 维护建议（每日最多 1 个）
+    // 4. 维护建议（每日最多 1 个）
     const publicMaintenance = maintenanceFindings.filter((finding) => !sensitiveRefs.has(finding.path));
     if (items.length < this.capacity && publicMaintenance.length > 0) {
       const finding = publicMaintenance[0];
@@ -175,7 +151,7 @@ class PlannerService {
       }
     }
 
-    // 6. 输出机会（如果还有容量）
+    // 5. 输出机会（如果还有容量）
     if (items.length < this.capacity && activeGoals.length > 0) {
       // 检查是否已有活跃的 OutputOpportunity
       let activeOutput = null;
@@ -201,7 +177,7 @@ class PlannerService {
         items.push(actionDate(
           "output",
           `深度文章：将 ${goalTitle} 转化为可分享的输出`,
-          "将所学转化为可分享的输出，加深理解和记忆",
+          "将所学转化为可分享的输出，加深理解",
           40,
           activeGoals[0].id,
           { area: "create", intent: "continue-output" },
@@ -218,10 +194,10 @@ class PlannerService {
       vaultFingerprint,
       goalRefs,
       capacity: this.capacity,
-      // allocation = 学习消化预算（对齐 60/25/15）：digest 含 review（到期复习属消化巩固），
+      // allocation = 知识消化预算（对齐 60/25/15）：digest 为重读串联，
       // ingest 为收录候选，maintenance 为维护建议；output/goal 是创造性产出，不计入消化预算。
       allocation: {
-        digest: items.filter((i) => i.kind === "digest" || i.kind === "review").length,
+        digest: items.filter((i) => i.kind === "digest").length,
         ingest: items.filter((i) => i.kind === "ingest").length,
         maintenance: items.filter((i) => i.kind === "maintenance").length,
       },

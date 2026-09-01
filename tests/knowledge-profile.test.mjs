@@ -6,7 +6,6 @@ import path from "node:path";
 import { KnowledgeStore } from "../apps/syno/syno/knowledge-store.mjs";
 import { KnowledgeMaintenanceSource } from "../apps/syno/syno/knowledge-maintenance-source.mjs";
 import { ClaimEvidenceService } from "../apps/syno/syno/claim-evidence-service.mjs";
-import { LearningService } from "../apps/syno/syno/learning-service.mjs";
 import { KnowledgeProfileService } from "../apps/syno/syno/knowledge-profile-service.mjs";
 import { parseRecord } from "../apps/syno/syno/markdown-record.mjs";
 import { validateContractRecord } from "../apps/syno/syno/schema-registry.mjs";
@@ -30,12 +29,11 @@ async function setup(t, notes) {
   const knowledge = new KnowledgeStore({ vaultRoot, indexFile: path.join(vaultRoot, ".index.json") });
   const maintenance = new KnowledgeMaintenanceSource({ vaultRoot, clock: () => FIXED_NOW });
   const claims = new ClaimEvidenceService({ opsRoot, clock: () => FIXED_NOW });
-  const learning = new LearningService({ opsRoot, clock: () => FIXED_NOW });
-  const profileService = new KnowledgeProfileService({ knowledge, maintenance, claims, learning, opsRoot, clock: () => FIXED_NOW });
-  return { vaultRoot, opsRoot, knowledge, maintenance, claims, learning, profileService };
+  const profileService = new KnowledgeProfileService({ knowledge, maintenance, claims, opsRoot, clock: () => FIXED_NOW });
+  return { vaultRoot, opsRoot, knowledge, maintenance, claims, profileService };
 }
 
-test("generate emits a schema-conformant profile covering all nine dimensions", async (t) => {
+test("generate emits a schema-conformant profile covering all dimensions", async (t) => {
   const { profileService } = await setup(t, {
     "agent.md": "---\ntitle: Agent\ntags: [AI, Agent]\nsource: GitHub\nstability: practice\nupdated: 2025-01-01\n---\n# Agent\n\n[[missing-target]] 反馈闭环。",
     "principle.md": "---\ntitle: 长期主义\ntags: [人生]\nstability: principle\nupdated: 2026-07-01\n---\n# 长期主义\n\n稳固。",
@@ -44,9 +42,10 @@ test("generate emits a schema-conformant profile covering all nine dimensions", 
   await validateContractRecord("knowledge-profile", profile);
   assert.equal(profile.summary.notes, 2);
   assert.equal(profile.summary.searchable, 2);
-  for (const key of ["topics", "sources", "stabilityBreakdown", "reliabilityBreakdown", "orphanNoteRefs", "deadLinkRefs", "outdatedNoteRefs", "evidenceGaps", "learningCoverage"]) {
+  for (const key of ["topics", "sources", "stabilityBreakdown", "reliabilityBreakdown", "orphanNoteRefs", "deadLinkRefs", "outdatedNoteRefs", "evidenceGaps"]) {
     assert.ok(Object.prototype.hasOwnProperty.call(profile, key), `profile missing ${key}`);
   }
+  assert.equal(Object.prototype.hasOwnProperty.call(profile, "learningCoverage"), false, "learningCoverage 已随学习子系统移除（D6）");
   assert.match(profile.id, /^profile-\d{8}-[0-9a-f]{8}$/);
   assert.ok(changedPaths[0].includes("knowledge/profiles/"));
   assert.ok(changedPaths[0].endsWith(`${profile.id}.md`));

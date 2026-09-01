@@ -1,5 +1,5 @@
 ((root) => {
-  const TODAY_TARGETS = Object.freeze({ approval: "jobs", commitment: "jobs", review: "learn", output: "create", goal: "create" });
+  const TODAY_TARGETS = Object.freeze({ approval: "jobs", commitment: "jobs", output: "create", goal: "create" });
   const OUTPUT_ACTIONS = Object.freeze({
     accept: Object.freeze({ label: "接受机会" }),
     draft: Object.freeze({ label: "提交我的草稿", needsOutput: true }),

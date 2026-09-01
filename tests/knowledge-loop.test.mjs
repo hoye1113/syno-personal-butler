@@ -7,7 +7,6 @@ import path from "node:path";
 import { IngestService, isAllowedIngestPath, isAllowedExistingVaultPath, noteFilenameBase, proposalAllowsWriteJob } from "../apps/syno/syno/ingest-service.mjs";
 import { ClaimEvidenceService } from "../apps/syno/syno/claim-evidence-service.mjs";
 import { GoalService } from "../apps/syno/syno/goal-service.mjs";
-import { LearningService, calibrationFor, reviewIntervalDays } from "../apps/syno/syno/learning-service.mjs";
 import { OutputService } from "../apps/syno/syno/output-service.mjs";
 import { TodayService } from "../apps/syno/syno/today-service.mjs";
 import { ConversationRouter } from "../apps/syno/syno/conversation-router.mjs";
@@ -340,44 +339,10 @@ test("pending intake includes new receipts and orders the newest first", async (
   assert.deepEqual((await service.pending()).map((item) => item.id), ["artifact-new", "artifact-old"]);
 });
 
-test("only user-produced practice updates mastery and schedules repetition", async (t) => {
-  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-learning-"));
-  t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const service = new LearningService({ opsRoot: path.join(root, "ops"), clock: () => new Date("2026-07-17T08:00:00.000Z") });
-  await assert.rejects(service.record({ producer: "ai" }), /主人亲自输出/);
-  await assert.rejects(service.record({ producer: "user", rawArtifactRef: "invented" }), /原始输出/);
-  const result = await service.record({
-    producer: "user", knowledgeRef: "vault/agent-loop.md", inputMode: "teach-back",
-    rawOutput: "我会先用自己的话解释 Tool Loop，然后给出失败恢复的例子、适用边界和在 Syno 中的具体应用。",
-    assistedLevel: "prompted",
-    rubric: { accurate: 1, explained: 1, applied: 1, discriminated: 1 }, selfAssessment: "mostly", isReview: false,
-    misconceptions: ["忽略了失败恢复"],
-  });
-  assert.equal(result.state.stage, "expressed");
-  assert.equal(result.evidence.rubricScore, 0.9);
-  assert.equal(result.evidence.calibration, "aligned");
-  assert.equal(result.state.reviewIntervalDays, 1);
-  const reviewed = await service.record({
-    producer: "user", knowledgeRef: "vault/agent-loop.md", inputMode: "quiz",
-    rawOutput: "这次复习我重新说明了工具白名单、审批边界，以及 Provider 离线后为什么必须保持相同模型重试。", assistedLevel: "none",
-    rubric: { accurate: 1, explained: 1, applied: 1, discriminated: 0 }, selfAssessment: "solid", isReview: true,
-    misconceptions: [],
-  });
-  assert.equal(reviewed.state.reviewCount, 1);
-  assert.equal(reviewed.state.reviewIntervalDays, 3);
-  assert.equal(calibrationFor("solid", 0.5), "fluency-illusion");
-  assert.equal(reviewIntervalDays({ passed: false, isReview: true, reviewCount: 5 }), 1);
-  const due = await service.due({ now: new Date("2026-07-21T08:00:00.000Z") });
-  assert.equal(due[0].knowledgeRef, "vault/agent-loop.md");
-});
-
-test("output opportunities and teach-back prompts make output a mastery mechanism", async (t) => {
+test("output opportunities drive evidence-based creation through a full lifecycle", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-output-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const service = new OutputService({ opsRoot: path.join(root, "ops"), clock: () => new Date("2026-07-17T08:00:00.000Z") });
-  const prompt = service.teachBackPrompt({ title: "Tool Loop Agent", claims: ["claim-1"] });
-  assert.equal(prompt.questions.length, 4);
-  assert.match(prompt.evidenceRule, /主人亲自/);
   const { opportunity } = await service.createOpportunity({
     title: "为什么 Harness 比模型排行榜更重要", format: "deep-article", goalRefs: ["goal-1"],
     knowledgeRefs: ["vault/harness.md"], reason: "当前目标相关且缺少可教给小白的完整论证", priority: 90,
@@ -462,21 +427,20 @@ test("time-sensitive claims keep supporting and conflicting evidence side by sid
   assert.deepEqual(updatedClaim.conflictsWith, [second.evidence.id]);
 });
 
-test("Today ranks goals before commitments and reviews with the fixed work mix", async (t) => {
+test("Today ranks goals before commitments with the fixed work mix", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-today-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const goals = new GoalService({ opsRoot: path.join(root, "ops"), clock: () => new Date("2026-07-17T08:00:00.000Z") });
   await goals.create({ title: "完成主动知识闭环", priority: 90, focusAreas: ["AI Agent"] });
   const today = new TodayService({
     goals,
-    learning: { async due() { return [{ id: "review-1", knowledgeRef: "vault/harness.md", mastery: 0.4, nextReviewAt: "2026-07-17T07:00:00.000Z" }]; } },
-    host: { async list() { return [{ id: "job-1", intent: "create_action", status: "awaiting_approval", risk: "low", request: { summary: "复习" } }]; } },
+    host: { async list() { return [{ id: "job-1", intent: "create_action", status: "awaiting_approval", risk: "low", request: { summary: "整理" } }]; } },
     clock: () => new Date("2026-07-17T08:00:00.000Z"),
   });
   const snapshot = await today.snapshot({ capacity: 20 });
   assert.equal(snapshot.priorities[0].kind, "goal");
   assert.deepEqual(snapshot.allocation, { digest: 12, ingest: 5, maintenance: 3 });
-  assert.deepEqual(snapshot.counts, { goals: 1, commitments: 1, reviews: 1, signals: 0 });
+  assert.deepEqual(snapshot.counts, { goals: 1, commitments: 1, signals: 0 });
 });
 
 test("Today exposes one next action, needs-owner items, recent intake and daily progress", async (t) => {
@@ -486,7 +450,6 @@ test("Today exposes one next action, needs-owner items, recent intake and daily 
   await goals.create({ title: "完成今日输出", priority: 90, focusAreas: ["AI Agent"] });
   const today = new TodayService({
     goals,
-    learning: { async due() { return [{ id: "review-1", knowledgeRef: "vault/harness.md", mastery: 0.4, nextReviewAt: "2026-07-20T07:00:00.000Z" }]; } },
     host: { async list() { return [
       { id: "job-approval", intent: "ingest.apply", status: "awaiting_approval", risk: "low", updated: "2026-07-20T07:30:00.000Z", request: { summary: "批准收录建议" } },
       { id: "job-done", intent: "chat", status: "completed", risk: "read", updated: "2026-07-20T07:00:00.000Z", request: { summary: "完成微信回复" } },
@@ -501,7 +464,7 @@ test("Today exposes one next action, needs-owner items, recent intake and daily 
 
   const snapshot = await today.snapshot({ capacity: 10 });
   assert.equal(snapshot.primary.title, "完成今日输出");
-  assert.deepEqual(snapshot.needsYou.map((item) => item.kind), ["approval", "review", "output-opportunity"]);
+  assert.deepEqual(snapshot.needsYou.map((item) => item.kind), ["approval", "output-opportunity"]);
   assert.ok(snapshot.recentIntake.length === 1 && snapshot.recentIntake[0].id === "artifact-1");
   assert.equal(snapshot.recentIntake[0].status, "proposed");
   assert.equal(snapshot.recentIntake[0].area, "capture");

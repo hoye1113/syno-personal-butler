@@ -48,22 +48,8 @@ function captureReceiptText(receipt, { attachment = false } = {}) {
     : `已接收，收录编号：${id}。正在后台安全提取、查重并生成收录方案。`;
 }
 
-// teach-back 软引导（纯函数，可单测）：有活跃复习时把"现在处于复习窗口"注入会话。
-// 条件式指令——模型自己判断本条是否是主人原创讲解；不是则正常回答，不强行判分。
-function buildTeachBackPriming(activeReviews) {
-  const items = activeReviews.slice(0, 3)
-    .map((review, index) => `${index + 1}. 「${review.title}」（knowledgeRef: ${review.knowledgeRef}）`)
-    .join("\n");
-  return [
-    "以下新收录正在等待主人用自己的话讲解（teach-back 复习窗口）：",
-    items,
-    "若主人本条消息是在用自己的话原创讲解其中某条（≥20字），调用 learning.submit（knowledgeRef=对应条目, inputMode='teach-back', assistedLevel='none', isReview=true, rawOutput=主人原文, rubric 四维 0-1, selfAssessment 按语气推断、不明确用 'mostly'），并用一两句反馈判分结果与下次复习日期。",
-    "若只是普通对话则正常回答，不要强行判分。主人可随时说「跳过复习」取消本次提醒。",
-  ].join("\n");
-}
-
 class ChannelConversationHandler {
-  constructor({ runtime, core, ingest, ingestWorkflows, projects = null, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery, reviewReminders = null, imageStore = null, visionClient = null } = {}) {
+  constructor({ runtime, core, ingest, ingestWorkflows, projects = null, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery, imageStore = null, visionClient = null } = {}) {
     if (!runtime || !core || (!ingest && !ingestWorkflows) || !pendingDecisions) throw new Error("ChannelConversationHandler 缺少 Runtime、Core、IngestWorkflow 或 PendingDecision Store");
     this.runtime = runtime;
     this.core = core;
@@ -82,7 +68,6 @@ class ChannelConversationHandler {
     this.mobileDeliveryMode = mobileDeliveryMode;
     this.ownerChannelTargets = ownerChannelTargets;
     this.wakeDelivery = wakeDelivery;
-    this.reviewReminders = reviewReminders;
     this.imageStore = imageStore;
     this.visionClient = visionClient;
   }
@@ -649,14 +634,6 @@ class ChannelConversationHandler {
           ).join("\n"),
         };
       }
-      // 「跳过复习」确定性出口：直接 dismiss 最近一条活跃复习，全程不过模型。
-      // reviewReminders 为空时（未装配）不拦截，行为与现状一致（回落普通对话）。
-      if (!pendingChatImages && intent.kind === "skip_review" && this.reviewReminders) {
-        const skipped = await this.reviewReminders.dismissLatest({ now: new Date() });
-        if (!skipped) return { text: "当前没有等待你复习的新收录。" };
-        await this.#record("channel.review.dismissed", { ...trace, workflowId: skipped.workflowId, knowledgeRef: skipped.knowledgeRef });
-        return { text: `已跳过「${skipped.title}」的复习提醒，它会留在复习曲线里，之后仍会到期。` };
-      }
       const urls = [...text.matchAll(URL_IN_TEXT_PATTERN)].map((item) => item[0]);
       const explicitCapture = EXPLICIT_INGEST_PATTERN.test(text);
       // 裸链接容忍尾随中文标点（「https://a.com。」仍是裸链接），但链接后粘着正文不算。
@@ -696,19 +673,6 @@ class ChannelConversationHandler {
           && /(?:访问|读取|获取|看看|看一下|读一读|读一下|读读|帮我读|打开|总结|分析|讲一讲|解读|解释|什么意思|说了啥|说了什么|内容)/u.test(residual)) {
           await this.#record("channel.read_link.requested", { ...trace, sourceKind: "url" });
           runText = `${text}\n\n（系统提示：主人想让你读取这个链接并回答问题。请调用 knowledge.fetch_url 读取正文后回答；抓取失败或内容被安全策略拦截时如实说明原因，不要编造。主人没有要求收录，不要主动调用收录类工具。）`;
-        }
-      }
-      // teach-back 门（所有确定性协议之后、runtime.run 正前方）：
-      // 有真实送达且 72h 内的活跃复习时，先把复习窗口软引导注入会话，再照常进模型。
-      // 门只加上下文、不改写主人原文，模型保留退出路径；引导失败退化为普通对话。
-      const activeReviews = this.reviewReminders
-        ? await this.reviewReminders.active({ now: new Date() }).catch(() => [])
-        : [];
-      if (activeReviews.length) {
-        try {
-          await this.runtime.appendSystemEvent?.({ ownerKey, threadKey, text: buildTeachBackPriming(activeReviews) });
-        } catch (error) {
-          await this.#record("channel.teach_back.priming_failed", { ...trace, errorCode: error.code || "TEACH_BACK_PRIMING_FAILED" });
         }
       }
       if (Array.isArray(message.__imageArtifacts) && message.__imageArtifacts.length) {
@@ -761,4 +725,4 @@ class ChannelConversationHandler {
   }
 }
 
-export { ChannelConversationHandler, buildTeachBackPriming };
+export { ChannelConversationHandler };

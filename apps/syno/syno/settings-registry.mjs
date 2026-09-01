@@ -4,7 +4,7 @@ import path from "node:path";
 import { PATHS } from "./paths.mjs";
 
 const GROUPS = Object.freeze({
-  agentAdjustable: Object.freeze(["notifications.cadence", "notifications.quietHours", "learning.dailyReviewCount", "ui.displayOrder", "ui.preferences"]),
+  agentAdjustable: Object.freeze(["notifications.cadence", "notifications.quietHours", "ui.displayOrder", "ui.preferences"]),
   confirmationRequired: Object.freeze(["provider.modelId", "budget", "channels", "calendar", "ownerAllowlist", "retention", "actions.allowlist", "context.thresholds", "notifications.proactiveDeliveryEnabled", "notifications.proactiveReleaseEvidence"]),
   immutable: Object.freeze(["provider.baseUrl", "provider.token", "policy", "allowedRoots", "toolRegistry", "approvals", "security", "source", "contracts"]),
 });
@@ -15,8 +15,7 @@ const DEFAULT_VALUES = Object.freeze({
   "notifications.proactiveDeliveryEnabled": false,
   "notifications.proactiveReleaseEvidence": null,
   "notifications.proactiveTestEventId": null,
-  "learning.dailyReviewCount": 5,
-  "ui.displayOrder": Object.freeze(["today", "capture", "knowledge", "learn", "create"]),
+  "ui.displayOrder": Object.freeze(["today", "capture", "knowledge", "create"]),
   "ui.preferences": Object.freeze({ reducedDensity: false }),
   "context.thresholds": null,
 });
@@ -45,10 +44,9 @@ function validateValue(key, value) {
     const valid = (item) => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(item || "");
     if (!valid(value?.start) || !valid(value?.end)) throw new Error("安静时间无效");
   }
-  if (key === "learning.dailyReviewCount" && (!Number.isInteger(value) || value < 1 || value > 20)) throw new Error("每日复习数量必须为 1–20");
   if (key === "ui.displayOrder") {
-    const allowed = ["today", "capture", "knowledge", "learn", "create"];
-    if (!Array.isArray(value) || value.length !== allowed.length || !allowed.every((item) => value.includes(item))) throw new Error("显示顺序必须包含五个主区且不能重复");
+    const allowed = ["today", "capture", "knowledge", "create"];
+    if (!Array.isArray(value) || value.length !== allowed.length || !allowed.every((item) => value.includes(item))) throw new Error("显示顺序必须包含四个主区且不能重复");
   }
   if (key === "ui.preferences" && (value === null || typeof value !== "object" || Array.isArray(value))) throw new Error("界面偏好必须为对象");
   if (key === "context.thresholds" && value !== null) {

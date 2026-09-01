@@ -5,18 +5,16 @@ const JOB_TITLES = Object.freeze({
   "claims.create": "确认一条观点与证据",
   "ingest.apply": "确认一份收录建议",
   "ingest.apply-batch": "确认一批收录建议",
-  "learning.evidence.record": "记录一次学习复盘",
   "outputs.opportunity.create": "确认一个创作机会",
   "outputs.opportunity.progress": "推进一个创作输出",
 });
 
-// 固定 area/intent 映射
+// 固定 area/intent 映射（2026-09-01 起无复习/学习区：消化重读归入 knowledge 区）
 const ACTION_MAP = Object.freeze({
   goal: { area: "today", intent: "view-goal" },
   commitment: { area: "approvals", intent: "view-job" },
   approval: { area: "approvals", intent: "view-job" },
-  review: { area: "learn", intent: "start-review" },
-  digest: { area: "learn", intent: "start-review" },
+  digest: { area: "knowledge", intent: "read-note" },
   ingest: { area: "capture", intent: "review-ingest" },
   claim: { area: "knowledge", intent: "review-claim" },
   "output-opportunity": { area: "create", intent: "continue-output" },
@@ -31,7 +29,6 @@ const SIGNAL_KIND_TO_ACTION = Object.freeze({
   "ingest-pending": "ingest",
   "output-opportunity": "output-opportunity",
   "knowledge-maintenance": "knowledge-maintenance",
-  "review-due": "review",
 });
 
 function jobTitle(job) {
@@ -56,9 +53,8 @@ function typedAction(kind, id, title, ref, extra = {}) {
 }
 
 class TodayService {
-  constructor({ goals, learning, host, settingsRegistry, signalSources, planner, priority = new PriorityEngine(), clock = () => new Date() } = {}) {
+  constructor({ goals, host, settingsRegistry, signalSources, planner, priority = new PriorityEngine(), clock = () => new Date() } = {}) {
     this.goals = goals;
-    this.learning = learning;
     this.host = host;
     this.settingsRegistry = settingsRegistry;
     this.signalSources = signalSources;
@@ -69,10 +65,8 @@ class TodayService {
 
   async snapshot({ capacity = 10 } = {}) {
     const now = this.clock();
-    const reviewLimit = await this.settingsRegistry?.get("learning.dailyReviewCount") || 20;
-    const [goals, reviews, jobs, signals] = await Promise.all([
+    const [goals, jobs, signals] = await Promise.all([
       this.goals.list({ status: "active" }),
-      this.learning.due({ now, limit: reviewLimit }),
       this.host.list({ limit: 100 }),
       this.signalSources?.collect({ now }) || [],
     ]);
@@ -89,10 +83,6 @@ class TodayService {
     const items = [
       ...goals.map((goal) => typedAction("goal", goal.id, goal.title, goal, { priority: goal.priority, dueAt: goal.dueAt })),
       ...commitments.map((job) => typedAction("commitment", job.id, jobTitle(job), job, { priority: job.risk === "high" ? 80 : 60 })),
-      ...reviews.map((review) => typedAction("review", review.id, `复习：${review.knowledgeRef}`, review, {
-        priority: Math.round((1 - review.mastery) * 100),
-        dueAt: review.nextReviewAt,
-      })),
       ...signals.map((signal) => {
         const kind = SIGNAL_KIND_TO_ACTION[signal.kind] || "news";
         return typedAction(kind, signal.id, signal.title, signal.ref, { priority: signal.priority });
@@ -108,10 +98,6 @@ class TodayService {
       ...jobs
         .filter((job) => job.status === "awaiting_approval")
         .map((job) => typedAction("approval", job.id, jobTitle(job), job, { status: job.status })),
-      ...reviews.map((review) => typedAction("review", review.id, `复习：${review.knowledgeRef}`, review, {
-        status: "due",
-        dueAt: review.nextReviewAt,
-      })),
       ...signals
         .filter((signal) => signal.kind === "output-opportunity" && isActionableOutput(signal.ref) && signal.ref?.status !== "suggested")
         .map((signal) => typedAction("output-opportunity", signal.ref.id, signal.title, signal.ref, { status: signal.ref.status })),
@@ -123,7 +109,7 @@ class TodayService {
       .slice(0, 5)
       .map((signal) => typedAction("ingest", signal.ref.id, signal.ref.title || signal.title, signal.ref, { status: signal.ref.status }));
 
-    // 建议学习（来自 planner）与到期复习分离
+    // 建议重读/创作（来自 planner）
     const suggestedLearning = plan?.items
       ?.filter((item) => item.kind === "digest" || item.kind === "output")
       .map((item) => typedAction(item.kind, item.id, item.title, item.ref, {
@@ -132,26 +118,15 @@ class TodayService {
         planItemId: item.id,
       })) || [];
 
-    const dueReviews = plan?.items
-      ?.filter((item) => item.kind === "review")
-      .map((item) => typedAction("review", item.id, item.title, item.ref, {
-        reason: item.reason,
-        priority: item.priority,
-        dueAt: item.dueAt,
-        planItemId: item.id,
-      })) || [];
-
     return {
       generatedAt: now.toISOString(),
       // Goal 为 0 时的引导提示
-      guidance: goals.length === 0 ? "告诉 Syno 你最近最想掌握什么，我来帮你制定学习计划" : null,
+      guidance: goals.length === 0 ? "告诉 Syno 你最近最关注什么主题，我来帮你串联知识库" : null,
       priorities,
       primary: priorities[0] || null,
       needsYou,
       recentIntake,
-      // 分开展示
       suggestedLearning,
-      dueReviews,
       plan: plan ? { id: plan.id, localDate: plan.localDate, capacity: plan.capacity, allocation: plan.allocation } : null,
       progress: {
         completed: todaysJobs.filter((job) => job.status === "completed").length,
@@ -159,7 +134,7 @@ class TodayService {
         failed: todaysJobs.filter((job) => job.status === "failed").length,
       },
       allocation: this.priority.allocate(capacity),
-      counts: { goals: goals.length, commitments: commitments.length, reviews: reviews.length, signals: signals.length },
+      counts: { goals: goals.length, commitments: commitments.length, signals: signals.length },
     };
   }
 }

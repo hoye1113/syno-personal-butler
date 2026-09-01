@@ -414,19 +414,16 @@ test("localMessage morning surfaces plan allocation and primary action", () => {
   assert.ok(msg.text.includes(msg.body));
 });
 
-test("localMessage evening surfaces progress and top due reviews", () => {
+test("localMessage evening surfaces progress without review sections (D6)", () => {
   const signal = { kind: "evening", key: "evening:2026-07-20" };
   const snapshot = {
     progress: { completed: 3, waiting: 2, failed: 1 },
-    dueReviews: [{ title: "复习：Context Engineering" }, { title: "复习：Signal Engine" }, { title: "复习：第三条应被截断" }],
     priorities: [],
   };
   const msg = localMessage(signal, snapshot);
   assert.match(msg.body, /已完成 3/);
   assert.match(msg.body, /待确认 2/);
-  assert.match(msg.body, /Context Engineering/);
-  assert.match(msg.body, /Signal Engine/);
-  assert.doesNotMatch(msg.body, /第三条应被截断/);
+  assert.doesNotMatch(msg.body, /到期复习/);
 });
 
 test("SettingsRegistry persists only valid Agent-adjustable preferences", async (t) => {
@@ -436,9 +433,11 @@ test("SettingsRegistry persists only valid Agent-adjustable preferences", async 
   assert.equal(registry.assertChange("notifications.quietHours", { actor: "agent" }), "agentAdjustable");
   assert.throws(() => registry.assertChange("provider.modelId", { actor: "agent", confirmed: true }), /用户确认/);
   assert.throws(() => registry.assertChange("provider.token", { actor: "agent" }), /不得修改/);
-  await registry.set("learning.dailyReviewCount", 7, { actor: "agent" });
-  assert.equal(await registry.get("learning.dailyReviewCount"), 7);
-  await assert.rejects(registry.set("learning.dailyReviewCount", 100, { actor: "agent" }), /1–20/);
+  await registry.set("notifications.cadence", "minimal", { actor: "agent" });
+  assert.equal(await registry.get("notifications.cadence"), "minimal");
+  await assert.rejects(registry.set("notifications.cadence", "hyper", { actor: "agent" }), /通知节奏/);
+  // D6：学习子系统键已移除，不再是 agentAdjustable
+  assert.equal(registry.classify("learning.dailyReviewCount"), "immutable");
   await assert.rejects(registry.set("channels", ["weixin"], { actor: "agent", confirmed: true }), /用户确认/);
   await assert.rejects(registry.set("notifications.quietHours", { start: "99:00", end: "07:00" }, { actor: "agent" }), /安静时间/);
 });
@@ -504,7 +503,7 @@ test("proactive Owner observation is stable release evidence, not a transient la
     confirmed: true,
     releaseEvidenceVerified: true,
   });
-  await registry.set("learning.dailyReviewCount", 6, { actor: "agent" });
+  await registry.set("notifications.cadence", "active", { actor: "agent" });
 
   assert.deepEqual(await registry.get("notifications.proactiveReleaseEvidence"), evidence);
 });

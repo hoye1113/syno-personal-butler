@@ -15,7 +15,6 @@
         <button class="is-active" type="button" data-scroll-target="today"><span>今</span>Today</button>
         <button type="button" data-scroll-target="capture"><span>收</span>Capture</button>
         <button type="button" data-syno-panel="knowledge"><span>知</span>Knowledge</button>
-        <button type="button" data-syno-panel="learn"><span>习</span>Learn</button>
         <button type="button" data-syno-panel="create"><span>创</span>Create</button>
       </div>
       <div class="syno-primary-foot">
@@ -526,7 +525,6 @@
       </header>
       <nav class="syno-tabs" aria-label="赛诺功能">
         <button type="button" data-syno-tab="knowledge">知识</button>
-        <button type="button" data-syno-tab="learn">学习</button>
         <button type="button" data-syno-tab="create">创作</button>
         <button type="button" data-syno-tab="jobs">任务</button>
         <button type="button" data-syno-tab="notifications">通知</button>
@@ -576,29 +574,6 @@
         </div>
         <div id="synoJobs" class="syno-list" aria-live="polite"></div>
       </section>
-      <section class="syno-pane" data-syno-pane="learn" hidden>
-        <div class="syno-pane-intro">
-          <p class="panel-tag">LEARN · 学习证据</p>
-          <h3>讲得清，才算开始掌握</h3>
-          <p>AI 草稿不会提高掌握度。请用自己的话口述、打字、答题或实践。</p>
-        </div>
-        <div class="learn-primary"><strong id="synoLearnCount">今天复习 0 项</strong><button id="synoLearnStart" class="accent-btn" type="button">开始复习</button></div>
-        <details id="synoReviewQueue" class="setting-detail"><summary>查看复习队列</summary><div id="synoDueReviews" class="syno-list" aria-live="polite"></div></details>
-        <details id="synoLearningDetails" class="setting-detail"><summary>记录学习证据</summary>
-        <form id="synoLearningForm" class="syno-stack-form">
-          <label>知识引用<input id="synoLearningRef" required placeholder="例如：vault/AI/Agent-Harness.md" /></label>
-          <label>输出方式<select id="synoLearningMode"><option value="teach-back">教给小白</option><option value="typed">打字解释</option><option value="voice">口述转录</option><option value="practice">实际应用</option><option value="quiz">答题</option></select></label>
-          <label>辅助程度<select id="synoLearningAssist"><option value="none">无辅助</option><option value="prompted">仅提示</option><option value="outlined">看过提纲</option><option value="heavily-assisted">大量辅助</option></select></label>
-          <fieldset class="syno-rubric"><legend>四维掌握证据</legend><label><input id="synoRubricAccurate" type="checkbox" />事实与逻辑准确</label><label><input id="synoRubricExplained" type="checkbox" />能解释为什么</label><label><input id="synoRubricApplied" type="checkbox" />能用于新场景</label><label><input id="synoRubricDiscriminated" type="checkbox" />能区分相近概念</label></fieldset>
-          <label>提交前自评<select id="synoLearningSelf"><option value="solid">很扎实</option><option value="mostly">基本掌握</option><option value="shaky">不太稳</option><option value="lost">还没理解</option></select></label>
-          <label class="switch-line"><input id="synoLearningReview" type="checkbox" /><span>这是一次到期复习，而不是首次学习</span></label>
-          <label>你的原始输出<textarea id="synoLearningArtifact" required minlength="20" rows="6" placeholder="请直接粘贴你的口述转录、打字解释、答题过程或实践复盘；只填一个引用不会提升掌握度。"></textarea></label>
-          <label>发现的误区<textarea id="synoLearningMisconceptions" rows="3" placeholder="每行一个误区"></textarea></label>
-          <button class="accent-btn" type="submit">提交学习证据</button>
-          <p id="synoLearningHint" class="form-hint" aria-live="polite"></p>
-        </form>
-        </details>
-      </section>
       <section class="syno-pane" data-syno-pane="create" hidden>
         <div class="syno-pane-intro">
           <p class="panel-tag">CREATE · 证据型输出</p>
@@ -606,12 +581,7 @@
           <p>优先 AI、Agent、AI Coding 与 Harness 深度文章；提纲和视频简报作为次级形式。</p>
         </div>
         <div id="synoOutputOpportunities" class="syno-list" aria-live="polite"></div>
-        <details id="synoCreateTools" class="setting-detail"><summary>新建选题与 Teach-back</summary>
-        <form id="synoTeachBackForm" class="syno-stack-form">
-          <label>想讲清的主题<input id="synoTeachBackTitle" required placeholder="例如：为什么 Agent Harness 比模型更决定上限" /></label>
-          <button class="ghost-btn" type="submit">生成 Teach-back 题目</button>
-        </form>
-        <div id="synoTeachBackPrompt" class="syno-list" aria-live="polite"></div>
+        <details id="synoCreateTools" class="setting-detail"><summary>新建选题</summary>
         <form id="synoOutputForm" class="syno-stack-form">
           <label>输出标题<input id="synoOutputTitle" required /></label>
           <label>为什么现在值得输出<textarea id="synoOutputReason" rows="3" required></textarea></label>
@@ -678,7 +648,6 @@
           <div id="synoWorkspaceSettingsMount"></div>
         <details class="setting-detail"><summary>主动节奏</summary><form id="synoPreferenceForm" class="syno-stack-form">
           <label>通知节奏<select id="synoCadence"><option value="minimal">克制（每天最多 1 次）</option><option value="balanced">平衡（每天最多 2 次）</option><option value="active">主动（事件优先，每天最多 3 次）</option></select></label>
-          <label>每日复习数量<input id="synoReviewCount" type="number" min="1" max="20" required /></label>
           <div class="syno-search-row"><label>安静开始<input id="synoQuietStart" type="time" required /></label><label>安静结束<input id="synoQuietEnd" type="time" required /></label></div>
           <label class="switch-line"><input id="synoReducedDensity" type="checkbox" /><span>紧凑显示</span></label>
           <button class="ghost-btn" type="submit">保存主动偏好</button><p id="synoPreferenceHint" class="form-hint" aria-live="polite"></p>

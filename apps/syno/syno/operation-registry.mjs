@@ -4,7 +4,6 @@ const OPERATION_INTENTS = Object.freeze({
   "memory.proposals.create": "create_memory_proposal",
   "ingest.apply": "curate_note",
   "ingest.apply-batch": "curate_note",
-  "learning.evidence.record": "record_learning_evidence",
   "outputs.opportunity.create": "create_output_opportunity",
   "outputs.opportunity.progress": "create_output_opportunity",
   "goals.create": "create_goal",

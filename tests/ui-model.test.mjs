@@ -6,7 +6,8 @@ await import("../apps/syno/public/syno-ui-model.js");
 test("UI model owns Today navigation and renders only server-allowed output actions", () => {
   const model = globalThis.SynoUiModel;
   assert.equal(model.todayTarget({ kind: "approval" }), "jobs");
-  assert.equal(model.todayTarget({ kind: "review" }), "learn");
+  // D6：复习项已移除，未知/旧 kind 一律回落 knowledge 区
+  assert.equal(model.todayTarget({ kind: "review" }), "knowledge");
   assert.equal(model.todayTarget({ kind: "output" }), "create");
   assert.equal(model.todayTarget(null), "knowledge");
   assert.deepEqual(model.outputActions({ status: "published", allowedActions: [] }), []);

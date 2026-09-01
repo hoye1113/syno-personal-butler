@@ -5,12 +5,11 @@ import test from "node:test";
 
 const root = path.resolve(import.meta.dirname, "..");
 
-test("Web shell exposes the five knowledge-loop areas and always-reachable approvals", async () => {
+test("Web shell exposes the four product areas and always-reachable approvals", async () => {
   const html = await fs.readFile(path.join(root, "apps", "syno", "public", "index.html"), "utf8");
-  for (const area of ["Today", "Capture", "Knowledge", "Learn", "Create"]) assert.match(html, new RegExp(`>${area}<`));
+  for (const area of ["Today", "Capture", "Knowledge", "Create"]) assert.match(html, new RegExp(`>${area}<`));
   assert.match(html, /data-syno-panel="jobs">任务/);
   assert.match(html, /id="synoHarnessRestart"/);
-  assert.match(html, /id="synoLearningForm"/);
   assert.match(html, /id="synoOutputForm"/);
   assert.match(html, /id="synoIntakeProposal"/);
   assert.match(html, /id="synoOutputOpportunities"/);
@@ -20,7 +19,9 @@ test("Web shell exposes the five knowledge-loop areas and always-reachable appro
   assert.doesNotMatch(html, /id="synoAllowSelfModify"/);
   assert.doesNotMatch(html, /id="synoAllowSystemControl"/);
   assert.doesNotMatch(html, /id="synoWindowsInstall"|id="synoWindowsUninstall"/);
-  assert.match(html, /id="synoLearningArtifact"[^>]*minlength="20"/);
+  // D6（2026-09-01）：学习区已移除，Learn 面板与学习表单不得再出现。
+  assert.doesNotMatch(html, /data-syno-panel="learn"|data-syno-pane="learn"|data-syno-tab="learn"/);
+  assert.doesNotMatch(html, /id="synoLearningForm"|id="synoLearningArtifact"|id="synoTeachBackForm"/);
   assert.doesNotMatch(html, /value="conversation-outline"/);
   assert.match(html, /class="ghost-btn mobile-settings-trigger"[^>]*data-syno-panel="settings">连接设置</);
 });
@@ -46,14 +47,12 @@ test("Today and settings disclose the daily decision before technical configurat
   assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
   assert.match(html, /data-syno-panel="jobs">任务/);
   assert.ok(html.indexOf('id="synoKnowledgeQuery"') < html.indexOf('class="syno-intake"'), "Knowledge search should be first");
-  assert.match(html, /<details[^>]*id="synoLearningDetails"[\s\S]*id="synoLearningForm"/);
   assert.ok(html.indexOf('id="synoOutputOpportunities"') < html.indexOf('id="synoOutputForm"'), "Create opportunity should precede creation forms");
 });
 
 test("knowledge-loop Web actions use inline evidence and explicit lifecycle decisions", async () => {
   const script = await fs.readFile(path.join(root, "apps", "syno", "public", "syno.js"), "utf8");
   assert.match(script, /decision: \{ action \}/);
-  assert.match(script, /rawOutput: document\.querySelector\("#synoLearningArtifact"\)/);
   assert.match(script, /loadOutputOpportunities/);
   assert.match(script, /savePreferences/);
   assert.match(script, /uiModel\.todayTarget/);

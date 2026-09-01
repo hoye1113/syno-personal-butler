@@ -18,7 +18,6 @@
     "deadLinkRefs",
     "outdatedNoteRefs",
     "evidenceGaps",
-    "learningCoverage",
     "excludedSystemNotes",
     "nextMaintenanceWindow"
   ],
@@ -114,16 +113,6 @@
         },
         "additionalProperties": false
       }
-    },
-    "learningCoverage": {
-      "type": "object",
-      "required": ["withState", "withoutState", "avgMastery"],
-      "properties": {
-        "withState": { "type": "integer", "minimum": 0 },
-        "withoutState": { "type": "integer", "minimum": 0 },
-        "avgMastery": { "type": "number", "minimum": 0, "maximum": 1 }
-      },
-      "additionalProperties": false
     },
     "excludedSystemNotes": { "type": "integer", "minimum": 0 },
     "nextMaintenanceWindow": { "type": "string", "format": "date-time" }

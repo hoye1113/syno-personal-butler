@@ -42,7 +42,6 @@ class KnowledgeProfileService {
     knowledge,
     maintenance,
     claims,
-    learning,
     opsRoot = PATHS.opsRoot,
     repoRoot = PATHS.repoRoot,
     clock = () => new Date(),
@@ -52,7 +51,6 @@ class KnowledgeProfileService {
     this.knowledge = knowledge;
     this.maintenance = maintenance;
     this.claims = claims;
-    this.learning = learning;
     this.opsRoot = opsRoot;
     this.repoRoot = repoRoot;
     this.clock = clock;
@@ -91,7 +89,6 @@ class KnowledgeProfileService {
       deadLinkRefs: this.#deadLinks(searchableWithMarkdown, withMarkdown),
       outdatedNoteRefs: this.#outdated(searchableWithMarkdown, now),
       evidenceGaps: await this.#evidenceGaps({ opsRoot }),
-      learningCoverage: await this.#learningCoverage({ opsRoot }, withMarkdown),
       excludedSystemNotes,
       nextMaintenanceWindow: new Date(now.getTime() + this.maintenanceWindowDays * 86_400_000).toISOString(),
     };
@@ -272,16 +269,6 @@ class KnowledgeProfileService {
       .filter((claim) => !claim.evidenceRefs || claim.evidenceRefs.length === 0)
       .map((claim) => ({ claimId: claim.id, statement: claim.statement }))
       .sort((a, b) => a.claimId.localeCompare(b.claimId));
-  }
-
-  async #learningCoverage({ opsRoot }, notes) {
-    const states = await this.learning.listStates({ opsRoot });
-    const searchable = notes.filter((note) => note.searchable);
-    const refs = new Set(states.map((state) => String(state.knowledgeRef || "")));
-    const withState = searchable.filter((note) => refs.has(note.path) || refs.has(stableBasename(note.path))).length;
-    const masteries = states.map((state) => Number(state.mastery)).filter((value) => !Number.isNaN(value));
-    const avgMastery = masteries.length ? Number((masteries.reduce((sum, value) => sum + value, 0) / masteries.length).toFixed(3)) : 0;
-    return { withState, withoutState: Math.max(0, searchable.length - withState), avgMastery };
   }
 }
 

@@ -76,7 +76,7 @@ async function doctor({
     const target = path.join(configDir, file);
     if (!await fileExists(target)) missing.push(file);
   }
-  for (const skill of ["syno-capture", "syno-create", "syno-knowledge", "syno-learn", "syno-maintain", "syno-review", "syno-web-capture"]) {
+  for (const skill of ["syno-capture", "syno-create", "syno-knowledge", "syno-maintain", "syno-web-capture"]) {
     const target = path.join(configDir, "skills", skill, "SKILL.md");
     if (!await fileExists(target)) missing.push(path.join("skills", skill, "SKILL.md"));
   }

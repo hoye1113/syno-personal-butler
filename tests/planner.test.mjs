@@ -6,7 +6,6 @@ import path from "node:path";
 import { KnowledgeStore } from "../apps/syno/syno/knowledge-store.mjs";
 import { KnowledgeMaintenanceSource } from "../apps/syno/syno/knowledge-maintenance-source.mjs";
 import { ClaimEvidenceService } from "../apps/syno/syno/claim-evidence-service.mjs";
-import { LearningService } from "../apps/syno/syno/learning-service.mjs";
 import { GoalService } from "../apps/syno/syno/goal-service.mjs";
 import { KnowledgeProfileService } from "../apps/syno/syno/knowledge-profile-service.mjs";
 import { PlannerService } from "../apps/syno/syno/planner-service.mjs";
@@ -16,7 +15,8 @@ import { validateContractRecord } from "../apps/syno/syno/schema-registry.mjs";
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const FIXED_NOW = new Date("2026-07-21T08:00:00.000Z");
 
-async function setup(t, notes = {}, { goals: goalInputs = [], learningStates = [] } = {}) {
+// D6（2026-09-01）：学习子系统已移除，Planner 只产出 digest/ingest/maintenance/output 建议。
+async function setup(t, notes = {}, { goals: goalInputs = [] } = {}) {
   const testRoot = path.join(REPO_ROOT, ".runtime", "tests");
   await fs.mkdir(testRoot, { recursive: true });
   const tempRoot = await fs.mkdtemp(path.join(testRoot, "syno-planner-"));
@@ -35,42 +35,16 @@ async function setup(t, notes = {}, { goals: goalInputs = [], learningStates = [
   const knowledge = new KnowledgeStore({ vaultRoot, indexFile: path.join(vaultRoot, ".index.json") });
   const maintenance = new KnowledgeMaintenanceSource({ vaultRoot, clock: () => FIXED_NOW });
   const claims = new ClaimEvidenceService({ opsRoot, clock: () => FIXED_NOW });
-  const learning = new LearningService({ opsRoot, clock: () => FIXED_NOW });
   const goals = new GoalService({ opsRoot, clock: () => FIXED_NOW });
-  const profile = new KnowledgeProfileService({ knowledge, maintenance, claims, learning, opsRoot, clock: () => FIXED_NOW });
-  const planner = new PlannerService({ knowledge, goals, learning, claims, ingest: null, maintenance, opsRoot, runtimeRoot, clock: () => FIXED_NOW });
+  const profile = new KnowledgeProfileService({ knowledge, maintenance, claims, opsRoot, clock: () => FIXED_NOW });
+  const planner = new PlannerService({ knowledge, goals, claims, ingest: null, maintenance, opsRoot, runtimeRoot, clock: () => FIXED_NOW });
 
   // 创建目标
   for (const goalInput of goalInputs) {
     await goals.create(goalInput, { opsRoot });
   }
 
-  // 创建学习状态
-  for (const state of learningStates) {
-    const stateDir = path.join(opsRoot, "reviews", "learning", "states");
-    await fs.mkdir(stateDir, { recursive: true });
-    const stateId = `learning-${state.knowledgeRef.replace(/[^a-z0-9]/gi, "").slice(0, 12)}`;
-    const record = {
-      id: stateId,
-      knowledgeRef: state.knowledgeRef,
-      stage: state.stage || "captured",
-      mastery: state.mastery || 0,
-      evidenceRefs: [],
-      reviewCount: state.reviewCount || 0,
-      reviewIntervalDays: state.reviewIntervalDays || 1,
-      calibrationFlags: [],
-      lastTestedAt: state.lastTestedAt || FIXED_NOW.toISOString(),
-      nextReviewAt: state.nextReviewAt || FIXED_NOW.toISOString(),
-      updated: FIXED_NOW.toISOString(),
-    };
-    await writeRecord(path.join(stateDir, `${stateId}.md`), record, {
-      schema: "learning-state",
-      title: `Learning state: ${state.knowledgeRef}`,
-      summaryKeys: ["id", "knowledgeRef", "stage", "mastery", "reviewCount", "reviewIntervalDays", "lastTestedAt", "nextReviewAt", "updated"],
-    });
-  }
-
-  return { vaultRoot, opsRoot, runtimeRoot, knowledge, maintenance, claims, learning, goals, profile, planner };
+  return { vaultRoot, opsRoot, runtimeRoot, knowledge, maintenance, claims, goals, profile, planner };
 }
 
 test("planDay returns a schema-conformant DailyKnowledgePlan", async (t) => {
@@ -110,48 +84,16 @@ test("planDay returns fresh plan when vault changes", async (t) => {
   assert.notEqual(first.vaultFingerprint, second.vaultFingerprint);
 });
 
-test("planDay does not create LearningState or LearningEvidence", async (t) => {
+test("planDay never emits review-kind items (learning subsystem removed, D6)", async (t) => {
   const { planner, opsRoot } = await setup(t, {
     "note.md": "---\ntitle: Note\ntags: [AI]\nstability: practice\nupdated: 2026-07-01\n---\n# Note",
   });
-  await planner.planDay();
-  // 验证没有创建学习状态或证据
-  const statesDir = path.join(opsRoot, "reviews", "learning", "states");
-  const evidenceDir = path.join(opsRoot, "reviews", "learning", "evidence");
-  await assert.rejects(() => fs.readdir(statesDir), { code: "ENOENT" });
-  await assert.rejects(() => fs.readdir(evidenceDir), { code: "ENOENT" });
-});
-
-test("due reviews appear first with highest priority", async (t) => {
-  const pastDate = new Date("2026-07-20T00:00:00.000Z").toISOString();
-  // 先 setup 获取 vaultRoot，再手动创建学习状态
-  const { planner, vaultRoot, opsRoot } = await setup(t, {
-    "ai.md": "---\ntitle: AI\ntags: [AI]\nstability: practice\nupdated: 2026-07-01\n---\n# AI",
-    "agent.md": "---\ntitle: Agent\ntags: [Agent]\nstability: practice\nupdated: 2026-07-01\n---\n# Agent",
-  });
-  const expectedPath = path.relative(REPO_ROOT, path.join(vaultRoot, "ai.md")).replace(/\\/g, "/");
-  // 手动创建学习状态
-  const stateDir = path.join(opsRoot, "reviews", "learning", "states");
-  await fs.mkdir(stateDir, { recursive: true });
-  await writeRecord(path.join(stateDir, "learning-vaultaimd.md"), {
-    id: "learning-vaultaimd",
-    knowledgeRef: expectedPath,
-    stage: "captured",
-    mastery: 0.5,
-    evidenceRefs: [],
-    reviewCount: 0,
-    reviewIntervalDays: 1,
-    calibrationFlags: [],
-    lastTestedAt: FIXED_NOW.toISOString(),
-    nextReviewAt: pastDate,
-    updated: FIXED_NOW.toISOString(),
-  }, { schema: "learning-state", title: `Learning state: ${expectedPath}`, summaryKeys: ["id", "knowledgeRef", "stage", "mastery", "reviewCount", "reviewIntervalDays", "lastTestedAt", "nextReviewAt", "updated"] });
   const plan = await planner.planDay();
-  assert.ok(plan.items.length > 0);
-  // 到期复习应该是第一项
-  assert.equal(plan.items[0].kind, "review");
-  assert.equal(plan.items[0].ref, expectedPath);
-  assert.ok(plan.items[0].priority >= 90);
+  assert.equal(plan.items.some((item) => item.kind === "review"), false);
+  assert.equal(plan.items.some((item) => item.area === "learn"), false);
+  // 学习状态目录不再被任何链路创建
+  const statesDir = path.join(opsRoot, "reviews", "learning", "states");
+  await assert.rejects(() => fs.readdir(statesDir), { code: "ENOENT" });
 });
 
 test("active goals drive digest selection", async (t) => {
@@ -170,6 +112,8 @@ test("active goals drive digest selection", async (t) => {
   const plan = await planner.planDay();
   const aiAction = plan.items.find((i) => i.ref === expectedAiPath);
   assert.ok(aiAction, `AI note should be selected, got items: ${JSON.stringify(plan.items.map(i => i.ref))}`);
+  assert.equal(aiAction.kind, "digest");
+  assert.equal(aiAction.area, "knowledge");
   assert.equal(plan.goalRefs.length, 1);
 });
 

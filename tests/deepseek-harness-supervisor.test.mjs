@@ -61,9 +61,7 @@ test("native syno_* names are used instead of MCP prefixes", () => {
 test("core chat tool set is shared by the DSH plugin and excludes hidden domain tools", () => {
   const knowledgeLoopTools = [
     "knowledge.fetch_url",
-    "learning.due",
-    "learning.teach_back",
-    "learning.submit",
+    "projects.list",
   ];
   assert.deepEqual(CORE_CHAT_TOOL_NAMES.filter((name) => knowledgeLoopTools.includes(name)), knowledgeLoopTools);
   const definitions = [
@@ -80,8 +78,8 @@ test("Syno agent instructions match the shared core chat tool set", async () => 
   for (const name of CORE_CHAT_TOOL_NAMES) {
     assert.ok(instructions.includes(`syno_${name.replaceAll(".", "_").replaceAll("-", "_")}`), `提示词缺少 ${name}`);
   }
-  assert.doesNotMatch(instructions, /不要通过猜测名称调用 learning/);
-  assert.match(instructions, /learning_submit.*待审批/);
+  // D6（2026-09-01）：学习子系统工具已从 core 集物理移除，提示词不得再出现
+  assert.doesNotMatch(instructions, /syno_learning_/);
 });
 
 test("cordis configs live in the Syno repo and never inline API keys", async () => {

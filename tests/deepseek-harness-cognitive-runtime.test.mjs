@@ -56,9 +56,7 @@ function bridgeTools() {
       { name: "knowledge.search" },
       { name: "knowledge.fetch_url" },
       { name: "jobs.submit" },
-      { name: "learning.due" },
-      { name: "learning.teach_back" },
-      { name: "learning.submit" },
+      { name: "goals.list" },
       { name: "claims.propose" },
       { name: "browser.snapshot" },
     ],
@@ -154,25 +152,21 @@ test("chat tool requests cannot expand the core set while capture keeps its brow
     threadKey: "main",
     allowedTools: [
       "syno_knowledge_fetch_url",
-      "syno_learning_due",
-      "syno_learning_teach_back",
-      "syno_learning_submit",
+      "syno_goals_list",
       "syno_claims_propose",
       "syno_browser_snapshot",
     ],
   });
+  // D6 后 core 集只放行 knowledge/capture/projects/jobs 等聊天工具；goals/claims/浏览器机械工具被滤掉
   assert.deepEqual([...tools.calls[0].allowedTools].sort(), [
     "syno_knowledge_fetch_url",
-    "syno_learning_due",
-    "syno_learning_teach_back",
-    "syno_learning_submit",
   ].sort());
 
   await runtime.run({ text: "browser" }, {
     ownerKey: "owner",
     threadKey: "capture:artifact",
     channel: "capture",
-    allowedTools: ["syno_browser_snapshot", "syno_learning_due"],
+    allowedTools: ["syno_browser_snapshot", "syno_goals_list"],
     browserWorkflowId: "workflow-1",
     ephemeralSession: true,
   });

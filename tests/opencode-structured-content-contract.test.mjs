@@ -52,7 +52,7 @@ async function callTool({ name, outputSchema, stub }) {
 
 const ARRAY_TOOLS = [
   ["knowledge.search", [{ path: "vault/n.md", score: 0.9 }]],
-  ["learning.due", [{ itemId: "x", due: "2026-08-04" }]],
+  ["projects.list", [{ projectRef: "p-1" }]],
   ["capture.list_pending", [{ artifactId: "a" }]],
   ["goals.list", [{ goalId: "g" }]],
   ["jobs.list", [{ jobId: "j" }]],

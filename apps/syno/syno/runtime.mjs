@@ -26,7 +26,6 @@ import { KnowledgeStore } from "./knowledge-store.mjs";
 import { KnowledgeMaintenanceSource } from "./knowledge-maintenance-source.mjs";
 import { fetchUrlForChat } from "./fetch-url-tool.mjs";
 import { KnowledgeProfileService } from "./knowledge-profile-service.mjs";
-import { LearningService } from "./learning-service.mjs";
 import { NotificationStore } from "./notification-store.mjs";
 import { OperationExecutor } from "./operation-executor.mjs";
 import { PendingDecisionStore } from "./pending-decision.mjs";
@@ -41,7 +40,6 @@ import { ProviderCredentialStore } from "./provider-credential-store.mjs";
 import { ProactiveOrchestrator } from "./proactive-orchestrator.mjs";
 import { ProjectService } from "./project-service.mjs";
 import { ReportService } from "./reports.mjs";
-import { ReviewReminderSource } from "./review-reminder-source.mjs";
 import { RuntimeJournal } from "./runtime-journal.mjs";
 import { validateValue } from "./schema-registry.mjs";
 import { SettingsRegistry } from "./settings-registry.mjs";
@@ -98,8 +96,6 @@ const SYSTEM_ALERT_COOLDOWN_MS = 30 * 60 * 1000;
 const WORKFLOW_FILES = Object.freeze({
   capture: ["vault/99-System/Agent/ROUTER.md", "vault/99-System/Agent/INGEST-CONTRACT.md", "vault/99-System/Skills/vskill-vault-curate/SKILL.md"],
   knowledge: ["vault/99-System/Agent/ROUTER.md", "vault/99-System/Skills/vskill-vault-discuss/SKILL.md"],
-  learn: ["vault/99-System/Agent/ROUTER.md"],
-  review: ["vault/99-System/Agent/ROUTER.md"],
   create: ["vault/99-System/Agent/ROUTER.md", "vault/99-System/Agent/DENSITY-PROFILE.md", "vault/99-System/Skills/vskill-vault-write/SKILL.md"],
   maintain: ["vault/99-System/Agent/ROUTER.md", "vault/99-System/Skills/vskill-vault-relate/SKILL.md", "vault/99-System/Skills/vskill-vault-moc-builder/SKILL.md"],
 });
@@ -351,23 +347,22 @@ function createSynoRuntime(options = {}) {
     budget: options.captureBudget ?? Number.POSITIVE_INFINITY,
   });
   const ingestWorkflows = options.ingestWorkflows || new IngestWorkflowCoordinator({ ingest, contextCompiler: workflowContextCompiler, projectService: projects });
-  const learning = options.learning || new LearningService();
+  // D6（2026-09-01）：学习子系统整体移除，不再有 LearningService / 复习提醒源。
   const outputs = options.outputs || new OutputService();
   const goals = options.goals || new GoalService({ projectService: projects });
   const claims = options.claims || new ClaimEvidenceService();
   const knowledgeMaintenance = options.knowledgeMaintenance || new KnowledgeMaintenanceSource();
-  const profile = options.profile || new KnowledgeProfileService({ knowledge, maintenance: knowledgeMaintenance, claims, learning });
-  const planner = options.planner || new PlannerService({ knowledge, goals, learning, claims, ingest, maintenance: knowledgeMaintenance, outputs });
+  const profile = options.profile || new KnowledgeProfileService({ knowledge, maintenance: knowledgeMaintenance, claims });
+  const planner = options.planner || new PlannerService({ knowledge, goals, claims, ingest, maintenance: knowledgeMaintenance, outputs });
   const postIngestCandidates = options.postIngestCandidates || new PostIngestCandidateStore();
-  const reviewReminders = options.reviewReminders || new ReviewReminderSource({ candidates: postIngestCandidates });
   const migration = options.migration || new VaultMigrationService({ repoRoot: PATHS.repoRoot, runtimeRoot: path.join(PATHS.runtimeRoot, "migrations") });
-  const signalSources = options.signalSources || new SignalSourceRegistry({ claims, ingest, outputs, maintenance: knowledgeMaintenance, reviewReminders });
+  const signalSources = options.signalSources || new SignalSourceRegistry({ claims, ingest, outputs, maintenance: knowledgeMaintenance });
   let host;
   let core;
   const tools = options.tools || new ToolRegistry([
     {
       name: "workflow.context", description: "读取 Syno canonical 工作流的必要片段", risk: "read", permission: "syno-read", retry: "safe", version: "1",
-      inputSchema: { type: "object", required: ["domain"], properties: { domain: { enum: ["capture", "knowledge", "learn", "review", "create", "maintain"] }, sourceType: { type: "string" }, stage: { type: "string" }, sourceDigest: { type: "string" }, knowledgeIndexVersion: { type: "string" } }, additionalProperties: false },
+      inputSchema: { type: "object", required: ["domain"], properties: { domain: { enum: ["capture", "knowledge", "create", "maintain"] }, sourceType: { type: "string" }, stage: { type: "string" }, sourceDigest: { type: "string" }, knowledgeIndexVersion: { type: "string" } }, additionalProperties: false },
       outputSchema: { type: "object" },
       execute: ({ domain, sourceType, stage, sourceDigest, knowledgeIndexVersion }) => domain === "capture" && sourceType
         ? workflowContextCompiler.compile({ workflow: "capture", sourceType, stage: stage || "classifying", sourceDigest, knowledgeIndexVersion })
@@ -429,27 +424,6 @@ function createSynoRuntime(options = {}) {
       inputSchema: { type: "object", properties: { capacity: { type: "integer", minimum: 1, maximum: 20 } }, additionalProperties: false },
       outputSchema: { type: "object", required: ["priorities", "allocation", "counts"], properties: { priorities: { type: "array" }, allocation: { type: "object" }, counts: { type: "object" } } },
       execute: ({ capacity }) => today.snapshot({ capacity: capacity || 10 }),
-    },
-    {
-      name: "learning.due", description: "查看当前到期的复习项目", risk: "read", permission: "syno-read", retry: "safe", version: "1",
-      inputSchema: { type: "object", properties: { limit: { type: "integer", minimum: 1, maximum: 20 } }, additionalProperties: false },
-      outputSchema: { type: "array", items: { type: "object" } },
-      execute: ({ limit }) => learning.due({ limit: limit || 10 }),
-    },
-    {
-      name: "learning.teach_back", description: "生成不直接给答案的 Teach-back 掌握测试问题", risk: "read", permission: "syno-read", retry: "safe", version: "1",
-      inputSchema: { type: "object", required: ["title"], properties: { title: { type: "string", minLength: 1 }, claims: { type: "array", items: { type: "string" } } }, additionalProperties: false },
-      outputSchema: { type: "object", required: ["title", "questions", "evidenceRule"], properties: { title: { type: "string" }, questions: { type: "array", items: { type: "string" } }, evidenceRule: { type: "string" }, claimRefs: { type: "array" } } },
-      execute: ({ title, claims }) => outputs.teachBackPrompt({ title, claims }),
-    },
-    {
-      name: "learning.submit", description: "把主人的原始输出提交为待审批的学习证据", risk: "low", permission: "syno-ops", retry: "idempotent", version: "1", approvalBoundary: true,
-      inputSchema: { type: "object", required: ["knowledgeRef", "inputMode", "rawOutput", "rubric", "selfAssessment"], properties: { knowledgeRef: { type: "string", minLength: 1 }, inputMode: { enum: ["teach-back", "typed", "quiz", "practice", "voice"] }, rawOutput: { type: "string", minLength: 20 }, assistedLevel: { enum: ["none", "prompted", "outlined", "heavily-assisted"] }, selfAssessment: { enum: ["solid", "mostly", "shaky", "lost"] }, rubric: { type: "object", required: ["accurate", "explained", "applied", "discriminated"], properties: { accurate: { type: "number", minimum: 0, maximum: 1 }, explained: { type: "number", minimum: 0, maximum: 1 }, applied: { type: "number", minimum: 0, maximum: 1 }, discriminated: { type: "number", minimum: 0, maximum: 1 } }, additionalProperties: false }, misconceptions: { type: "array", items: { type: "string" } }, isReview: { type: "boolean" } }, additionalProperties: false },
-      outputSchema: { type: "object", required: ["id", "status", "requiresApproval"], properties: { id: { type: "string" }, status: { type: "string" }, requiresApproval: { type: "boolean" } } },
-      execute: async (input, context) => {
-        const result = await host.receive(buildOperationRequest("learning.evidence.record", { ...input, producer: "user", assistedLevel: input.assistedLevel || "prompted", isReview: input.isReview === true }), { channel: context.channel, senderId: context.ownerId, ownerKey: context.ownerId, threadKey: context.threadKey, messageId: context.conversationId, conversationId: context.conversationId, projectRef: context.projectRef });
-        return { id: result.job.id, status: result.job.status, requiresApproval: result.requiresApproval === true };
-      },
     },
     {
       name: "capture.start", description: "立即接收待收录内容并启动可恢复的 IngestWorkflow", risk: "low", permission: "syno-ops", retry: "idempotent", version: "2", approvalBoundary: true,
@@ -623,8 +597,8 @@ function createSynoRuntime(options = {}) {
       },
     },
     {
-      name: "settings.adjust", description: "仅调整安静时间、通知节奏、每日复习数量、五区顺序或界面偏好", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1", agentAdjustableBoundary: true,
-      inputSchema: { type: "object", required: ["key", "value"], properties: { key: { enum: ["notifications.cadence", "notifications.quietHours", "learning.dailyReviewCount", "ui.displayOrder", "ui.preferences"] }, value: {} }, additionalProperties: false },
+      name: "settings.adjust", description: "仅调整安静时间、通知节奏、四区顺序或界面偏好", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1", agentAdjustableBoundary: true,
+      inputSchema: { type: "object", required: ["key", "value"], properties: { key: { enum: ["notifications.cadence", "notifications.quietHours", "ui.displayOrder", "ui.preferences"] }, value: {} }, additionalProperties: false },
       outputSchema: { type: "object", required: ["key", "value", "group", "updatedAt"], properties: { key: { type: "string" }, value: {}, group: { enum: ["agentAdjustable"] }, updatedAt: { type: "string" } } },
       execute: ({ key, value }) => settingsRegistry.set(key, value, { actor: "agent" }),
     },
@@ -813,7 +787,6 @@ function createSynoRuntime(options = {}) {
         expectedProjectRef: job?.projectRef || "",
       });
       if (operation === "ingest.apply-batch") return ingest.applyBatch(payload.artifactIds, { workspace: root, decision: payload.decision });
-      if (operation === "learning.evidence.record") return learning.record(payload, { opsRoot: path.join(root, "ops") });
       if (operation === "outputs.opportunity.create") return outputs.createOpportunity(payload, { opsRoot: path.join(root, "ops") });
       if (operation === "outputs.opportunity.progress") return outputs.progress(payload.id, payload, { opsRoot: path.join(root, "ops") });
       if (operation === "goals.create") return goals.create(payload, { opsRoot: path.join(root, "ops"), ownerKey: job.ownerKey });
@@ -863,14 +836,6 @@ function createSynoRuntime(options = {}) {
       if (job.request?.operation === "ingest.apply-batch") {
         for (const item of execution?.operationResult?.results || []) await ingest.markApplied(item.artifactId, item);
       }
-      // 首教完成钩子：学习证据 committed → 关闭该 knowledgeRef 的复习候选（done）并把学习候选推进到 "learning"。
-      // 只读内存中的 operationResult，不碰文件；候选管首教前，之后由 LearningState.nextReviewAt 全权驱动。
-      if (job.request?.operation === "learning.evidence.record" && execution?.operationResult?.evidence?.knowledgeRef) {
-        await postIngestCandidates.completeReviewByKnowledgeRef(execution.operationResult.evidence.knowledgeRef, {
-          evidenceId: execution.operationResult.evidence.id,
-          jobId: job.id,
-        });
-      }
       if (changedPaths.some((item) => item.startsWith("vault/"))) knowledge.invalidate();
       if (job.request?.operation === "reports.create") {
         const report = execution?.operationResult;
@@ -919,7 +884,6 @@ function createSynoRuntime(options = {}) {
     ownerChannelTargets,
     mobileDeliveryMode,
     wakeDelivery: () => drainChannelDeliveryOutbox().catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })),
-    reviewReminders,
     imageStore,
     visionClient,
   });
@@ -1242,9 +1206,9 @@ function createSynoRuntime(options = {}) {
       .catch((error) => { recordEvent("system.alert.failed", { title: alertTitle, error: { code: error?.code, message: error?.message } }, { level: "error" }); return { delivered: false }; });
   };
   reports = new ReportService({ host, knowledge, notifications, channels, gitGuard });
-  const today = options.today || new TodayService({ goals, learning, host, settingsRegistry, signalSources, planner });
+  const today = options.today || new TodayService({ goals, host, settingsRegistry, signalSources, planner });
   core = new SynoCore({ host, knowledge, notifications, channels, reports, today });
-  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance: knowledgeMaintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery: (deliveryOptions) => drainChannelDeliveryOutbox(deliveryOptions).catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })), recordEvent, onSignalsDelivered: (identities) => reviewReminders.acknowledgeDelivered(identities) });
+  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance: knowledgeMaintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery: (deliveryOptions) => drainChannelDeliveryOutbox(deliveryOptions).catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })), recordEvent });
   const approvalAdvisor = options.approvalAdvisor || new ApprovalAdvisor({ ingest });
   let channelRecoveryTimer = null;
   let providerRecoveryTimer = null;
@@ -1534,7 +1498,6 @@ function createSynoRuntime(options = {}) {
     reconciliationCases,
     reconciliationWorker,
     recentInteractions,
-    learning,
     outputs,
     projects,
     goals,
@@ -1542,7 +1505,6 @@ function createSynoRuntime(options = {}) {
     profile,
     planner,
     postIngestCandidates,
-    reviewReminders,
     migration,
     today,
     notifications,
@@ -1996,12 +1958,6 @@ async function routeSynoApi(runtime, req, url, readBody) {
     const body = await readBody(req);
     return runtime.core.execute(buildOperationRequest("ingest.apply-batch", { artifactIds: body.artifactIds, decision: body.decision }), webContext);
   }
-  if (method === "GET" && url.pathname === "/api/syno/learning/due") return { reviews: await runtime.learning.due() };
-  if (method === "POST" && url.pathname === "/api/syno/learning/evidence") {
-    const body = await readBody(req);
-    return runtime.core.execute(buildOperationRequest("learning.evidence.record", { ...body, producer: "user" }), webContext);
-  }
-  if (method === "POST" && url.pathname === "/api/syno/learning/teach-back") return runtime.outputs.teachBackPrompt(await readBody(req));
   if (method === "POST" && url.pathname === "/api/syno/outputs/opportunities") return runtime.core.execute(buildOperationRequest("outputs.opportunity.create", await readBody(req)), webContext);
   if (method === "GET" && url.pathname === "/api/syno/outputs/opportunities") return { opportunities: await runtime.outputs.list() };
   const outputProgress = /^\/api\/syno\/outputs\/opportunities\/([^/]+)\/progress$/.exec(url.pathname);
