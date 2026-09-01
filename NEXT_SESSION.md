@@ -11,7 +11,7 @@
 - 兼容要点：效应幂等键保留 `<none>` 段字面量，跨重启去重连续；历史 Job/Workflow/Note 的 projectRef/project_refs 字段保留只读（契约留 optional 属性供旧记录 round-trip，读取方忽略，不再写入）。
 - 运行态：8888 Host 已部署今日灵感新代码——旧 PID 20828 kill 后 start-syno.ps1 自监督重拉，新 PID 24096（2026-09-01 22:26 本地），`/api/health` ok。真实 vault 采样探针通过（2 近期 2026-08-13 + 2 久未回访 2026-05-19）。**验收阻塞**：微信主动投递连续失败 64 次（`PROACTIVE_DELIVERY_EXHAUSTED`，context token 约 5.5 天未刷新）——Owner 发任意微信消息即刷新持久 token，drain 自动补投；灵感卡每日 16:00 出卡，可回「有用/没用/一般」。
 - 运行时事实不变：产品只走 `DeepSeekHarnessCognitiveRuntime`；生产 chat = `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`，8888 是控制面；模型链 `deepseek/deepseek-v4-flash-vision-exp → deepseek/deepseek-v4-flash`，不使用 Pro；`SYNO_DSH_ROOT` clone 必须 `pnpm run build`；图片走 Host `syno_image_read`（Zen `mimo-v2.5-free`）；chat `web_search` 已启用。
-- 下一步：#11 今日灵感③的 Owner 面对验收（连续数日收卡并回「有用/没用」，随后把验收证据落 `ops/acceptance/inspiration/` 封板）；并行推进 #14 拆库① Phase E 设计冻结（vault+ops 拆为独立知识库仓库，D11 设计点见计划文档）。
+- 下一步：#15 拆库②迁移实施与 cutover（设计已冻结为计划文档 D13.1~D13.13：物理迁出至 `SYNO_KNOWLEDGE_ROOT`、弃用 junction（checkout 穿透写实测确认）、GitGuard 默认根翻转+`productBranch:main` 断言、validator 双根、workspace 默认值翻转、verify 双模式；cutover 需停 host，回滚=unset env+revert 删除提交）。#11 今日灵感③的 Owner 面对验收并行累积中（连续数日收卡并回「有用/没用」，随后把验收证据落 `ops/acceptance/inspiration/` 封板）。
 - 停止条件（计划 D8）：任一阶段若需删除 Job 治理链、改动渠道去重/Outbox 语义、批量改写 vault 历史笔记，立即记录 `BLOCKED_SCOPE_DEVIATION` 并暂停回 Owner。
 - 提交规则：按 Job 声明精确路径暂存；禁止 `git add -A`；不自动 Push；commit 结尾不加 Co-Authored-By。
 
