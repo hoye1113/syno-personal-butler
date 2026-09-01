@@ -3,9 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { VaultMigrationService } from "../apps/syno/syno/vault-migration-service.mjs";
-import { DEFAULT_WEB_PORT } from "../apps/syno/syno/paths.mjs";
-
-const DEFAULT_REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+import { DEFAULT_WEB_PORT, PATHS } from "../apps/syno/syno/paths.mjs";
 
 function parseArgs(argv) {
   const values = argv.filter((item) => item !== "--");
@@ -22,8 +20,9 @@ function parseArgs(argv) {
 
 async function main() {
   const { command, options } = parseArgs(process.argv.slice(2));
-  const repoRoot = path.resolve(options.repo || DEFAULT_REPO);
-  const service = new VaultMigrationService({ repoRoot, runtimeRoot: path.join(repoRoot, ".runtime", "migrations") });
+  // D13.9：迁移目标是知识仓（vault 在那里）；manifest 落代码仓 .runtime，不进知识仓。
+  const repoRoot = path.resolve(options.repo || PATHS.knowledgeRoot);
+  const service = new VaultMigrationService({ repoRoot, runtimeRoot: path.join(PATHS.runtimeRoot, "migrations") });
   if (command === "inventory") {
     if (!options.source) throw new Error("inventory 必须提供 --source");
     const manifest = await service.inventory({ sourceRoot: options.source });

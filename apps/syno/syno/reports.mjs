@@ -1,10 +1,10 @@
 import path from "node:path";
 
-import { PATHS, relativeToRepo } from "./paths.mjs";
+import { PATHS, relativeToKnowledge } from "./paths.mjs";
 import { writeRecord } from "./markdown-record.mjs";
 
 class ReportService {
-  constructor({ host, knowledge, notifications, channels, gitGuard, opsRoot = PATHS.opsRoot, pathResolver = relativeToRepo, clock = () => new Date() } = {}) {
+  constructor({ host, knowledge, notifications, channels, gitGuard, opsRoot = PATHS.opsRoot, pathResolver = relativeToKnowledge, clock = () => new Date() } = {}) {
     this.host = host;
     this.knowledge = knowledge;
     this.notifications = notifications;

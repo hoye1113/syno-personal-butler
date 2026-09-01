@@ -102,10 +102,10 @@ async function markdownFiles(root) {
   return output;
 }
 
-async function validateVaultContract(repoRoot, changedPaths, decision) {
+async function validateVaultContract(repoRoot, changedPaths, decision, contractRoot = repoRoot) {
   const changedNotes = changedPaths.filter((item) => item.startsWith("vault/") && item.endsWith(".md"));
   if (!changedNotes.length) return;
-  const contract = JSON.parse(await fs.readFile(path.join(repoRoot, "config", "vault-contract.json"), "utf8"));
+  const contract = JSON.parse(await fs.readFile(path.join(contractRoot, "config", "vault-contract.json"), "utf8"));
   const approved = new Set(contract.approvedTags || []);
   const errors = [];
   const sourceOwners = new Map();
@@ -198,10 +198,13 @@ async function validateOpsContracts(repoRoot, changedPaths) {
   }
 }
 
-async function validateRepositoryChange({ repoRoot = PATHS.repoRoot, changedPaths, decision }) {
+// D13.5（2026-09-01）：双根——repoRoot 是知识仓（vault 扫描、git HEAD 比对），
+// contractRoot 是代码仓（config/vault-contract.json，与 contracts/*.schema.json 同例：策略即代码）。
+// contractRoot 缺省回退 repoRoot（直接调用与测试夹具同仓的历史语义）；生产接缝（agent-host）显式传代码仓。
+async function validateRepositoryChange({ repoRoot = PATHS.knowledgeRoot, contractRoot, changedPaths, decision }) {
   const normalized = validateChangedPaths(changedPaths, decision);
   if (decision.validators?.includes("markdown")) await validateMarkdown(repoRoot, normalized);
-  if (decision.validators?.includes("vault-contract")) await validateVaultContract(repoRoot, normalized, decision);
+  if (decision.validators?.includes("vault-contract")) await validateVaultContract(repoRoot, normalized, decision, contractRoot || repoRoot);
   if (decision.validators?.includes("ops-contracts")) await validateOpsContracts(repoRoot, normalized);
   return { ok: true, changedPaths: normalized };
 }

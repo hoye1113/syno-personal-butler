@@ -100,7 +100,8 @@ function contextError(code, message) {
 }
 
 class WorkflowContextCompiler {
-  constructor({ repoRoot = PATHS.repoRoot, maxInstructionChars = 32_000 } = {}) {
+  // D13.6：BASE_SOURCES 全为 vault/99-System/** 知识文件，根默认知识仓。
+  constructor({ repoRoot = PATHS.knowledgeRoot, maxInstructionChars = 32_000 } = {}) {
     this.repoRoot = path.resolve(repoRoot);
     this.maxInstructionChars = Math.max(4_000, Number(maxInstructionChars) || 32_000);
   }

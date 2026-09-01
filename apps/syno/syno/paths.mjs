@@ -13,6 +13,10 @@ function localDataRoot() {
   return path.resolve(base, "Syno");
 }
 
+// D13（2026-09-01）：知识根——vault/ops 的归属仓库。SYNO_KNOWLEDGE_ROOT 设置时指向独立知识仓库
+// （拆库形态）；缺省回退 REPO_ROOT（单库模式，测试与 fresh clone 行为与历史逐字节一致）。
+const KNOWLEDGE_ROOT = path.resolve(process.env.SYNO_KNOWLEDGE_ROOT || REPO_ROOT);
+
 function resolveInside(root, candidate) {
   const resolvedRoot = path.resolve(root);
   const resolved = path.resolve(resolvedRoot, candidate || ".");
@@ -30,6 +34,13 @@ function relativeToRepo(candidate) {
   return path.relative(REPO_ROOT, absolute).replace(/\\/g, "/") || ".";
 }
 
+// 知识文件的逻辑路径（vault/...、ops/...）永远对知识根求相对；拆库后对 REPO_ROOT 求相对会
+// 抛 PATH_OUTSIDE_ROOT（知识文件已在仓外）。
+function relativeToKnowledge(candidate) {
+  const absolute = resolveInside(KNOWLEDGE_ROOT, candidate);
+  return path.relative(KNOWLEDGE_ROOT, absolute).replace(/\\/g, "/") || ".";
+}
+
 // Canonical local web port. Host listens here (apps/syno/server.mjs); every probe/script mirrors it.
 // PORT env overrides. This is the single JS source of truth — PowerShell scripts mirror with `$env:PORT || 8888`.
 const DEFAULT_WEB_PORT = 8888;
@@ -37,8 +48,9 @@ const DEFAULT_WEB_PORT = 8888;
 const PATHS = Object.freeze({
   repoRoot: REPO_ROOT,
   appRoot: APP_ROOT,
-  vaultRoot: path.join(REPO_ROOT, "vault"),
-  opsRoot: path.join(REPO_ROOT, "ops"),
+  knowledgeRoot: KNOWLEDGE_ROOT,
+  vaultRoot: path.join(KNOWLEDGE_ROOT, "vault"),
+  opsRoot: path.join(KNOWLEDGE_ROOT, "ops"),
   runtimeRoot: path.resolve(process.env.SYNO_RUNTIME_ROOT || path.join(REPO_ROOT, ".runtime")),
   worktreeRoot: path.join(REPO_ROOT, ".worktrees"),
   localDataRoot: localDataRoot(),
@@ -46,4 +58,4 @@ const PATHS = Object.freeze({
   stateRoot: path.join(localDataRoot(), "state"),
 });
 
-export { DEFAULT_WEB_PORT, PATHS, relativeToRepo, resolveInside };
+export { DEFAULT_WEB_PORT, PATHS, relativeToKnowledge, relativeToRepo, resolveInside };

@@ -86,9 +86,16 @@ function diffHash(value) {
 }
 
 class GitGuard {
-  constructor({ repoRoot = PATHS.repoRoot, worktreeRoot = PATHS.worktreeRoot, lockFile } = {}) {    this.repoRoot = repoRoot;
+  constructor({ repoRoot = PATHS.knowledgeRoot, worktreeRoot = PATHS.worktreeRoot, lockFile, productBranch } = {}) {
+    this.repoRoot = repoRoot;
     this.worktreeRoot = worktreeRoot;
-    const resolvedLockFile = lockFile || (path.resolve(repoRoot) === path.resolve(PATHS.repoRoot)
+    // D13.4：产品装配传 productBranch:"main"——主检出不在 main 时拒绝产品提交，
+    // 结构性堵死「host 把 ops 记录提交到功能分支」的误伤类；worktree（syno/job/*）提交不受限。
+    this.productBranch = productBranch || null;
+    // D13.4：代码仓与知识仓共用的产品锁恒落代码仓 .runtime（知识仓不被锁文件弄脏）；
+    // 测试显式 temp 根仍用仓内锁保持隔离。
+    const sharedRoot = [PATHS.repoRoot, PATHS.knowledgeRoot].some((root) => path.resolve(root) === path.resolve(repoRoot));
+    const resolvedLockFile = lockFile || (sharedRoot
       ? path.join(PATHS.runtimeRoot, "locks", "repository-git.lock")
       : path.join(repoRoot, ".runtime", "locks", "repository-git.lock"));
     this.writeLock = new ProcessFileLock({ file: resolvedLockFile, timeoutMs: 120_000 });
@@ -148,6 +155,13 @@ class GitGuard {
     if (!normalized.length) return { committed: false, reason: "no_changes" };
     const outsideRoots = normalized.filter((item) => !PRODUCT_COMMIT_ROOTS.some((root) => item.startsWith(root)));
     if (outsideRoots.length) throw new Error(`产品自动提交只允许 vault/** 与 ops/**，拒绝暂存：${outsideRoots.join(", ")}`);
+    if (this.productBranch && path.resolve(cwd) === path.resolve(this.repoRoot)) {
+      // symbolic-ref 在未出生分支（空仓首提交前）也可读，rev-parse HEAD 会炸
+      const { stdout: branch } = await git(["symbolic-ref", "--short", "-q", "HEAD"], { cwd });
+      if (branch.trim() !== this.productBranch) {
+        throw new Error(`产品提交只允许在 ${this.productBranch} 分支的主检出进行，当前分支：${branch.trim() || "(detached)"}`);
+      }
+    }
     const pathspec = Buffer.from(`${normalized.map((item) => `:(literal)${item}`).join("\0")}\0`, "utf8");
     await gitWithInput(["add", "--pathspec-from-file=-", "--pathspec-file-nul"], pathspec, { cwd });
     const staged = await git(["diff", "--cached", "--name-only"], { cwd });

@@ -488,7 +488,7 @@ class IngestService {
     return pending.sort((a, b) => String(b.created || "").localeCompare(String(a.created || ""))).slice(0, limit);
   }
 
-  async apply(id, { workspace = PATHS.repoRoot, decision, expectedOwnerKey } = {}) {
+  async apply(id, { workspace = PATHS.knowledgeRoot, decision, expectedOwnerKey } = {}) {
     const state = JSON.parse(await fs.readFile(path.join(this.stateRoot, `${id}.json`), "utf8"));
     if (!state.proposal) throw Object.assign(new Error("收录方案尚未生成"), { code: "INGEST_PROPOSAL_MISSING" });
     if (expectedOwnerKey !== undefined && String(state.ownerId || "") !== String(expectedOwnerKey || "")) {

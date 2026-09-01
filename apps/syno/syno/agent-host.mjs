@@ -159,12 +159,12 @@ class AgentHost {
   }
 
   async #execute(job, { alreadyRunning = false } = {}) {
-    let workspace = PATHS.repoRoot;
+    let workspace = PATHS.knowledgeRoot;
     try {
       if (!alreadyRunning) await this.store.transition(job, "running");
       const baselineChanges = typeof this.gitGuard.changeSnapshot === "function"
-        ? await this.gitGuard.changeSnapshot(PATHS.repoRoot)
-        : (await this.gitGuard.changedPaths(PATHS.repoRoot)).map((item) => ({ path: item }));
+        ? await this.gitGuard.changeSnapshot(PATHS.knowledgeRoot)
+        : (await this.gitGuard.changedPaths(PATHS.knowledgeRoot)).map((item) => ({ path: item }));
       const dirtyBefore = [...new Set(baselineChanges.flatMap((item) => [item.path, item.sourcePath].filter(Boolean)))];
       const unrelated = dirtyBefore.filter((item) => !isSystemPath(item));
       // A read-only run has no filesystem mutation tools, so unrelated edits in
@@ -209,7 +209,7 @@ class AgentHost {
             : (await this.gitGuard.changedPaths(workspace)).map((item) => ({ path: item }));
           const attemptPaths = [...new Set(attemptChanges.flatMap((item) => [item.path, item.sourcePath].filter(Boolean)).filter((item) => !isSystemPath(item)))];
           try {
-            return await this.validator({ repoRoot: workspace, changedPaths: attemptPaths, decision: job.decision });
+            return await this.validator({ repoRoot: workspace, contractRoot: PATHS.repoRoot, changedPaths: attemptPaths, decision: job.decision });
           } catch (error) {
             error.failureCode = error.code === "CONTRACT_VALIDATION_FAILED" ? "schema_failure" : error.failureCode;
             throw error;
@@ -265,7 +265,7 @@ class AgentHost {
         return item.fingerprint !== undefined && baseline.fingerprint !== item.fingerprint;
       });
       const executorPaths = [...new Set(executorChanges.flatMap((item) => [item.path, item.sourcePath].filter(Boolean)))];
-      const validation = await this.validator({ repoRoot: workspace, changedPaths: executorPaths, decision: job.decision });
+      const validation = await this.validator({ repoRoot: workspace, contractRoot: PATHS.repoRoot, changedPaths: executorPaths, decision: job.decision });
       job.changedPaths = validation.changedPaths;
 
       if (job.decision.needsWorktree) {
@@ -302,7 +302,7 @@ class AgentHost {
       }
 
       await this.store.transition(job, "completed", { result: { ...execution, validation } });
-      const allChanged = await this.gitGuard.changedPaths(PATHS.repoRoot);
+      const allChanged = await this.gitGuard.changedPaths(PATHS.knowledgeRoot);
       const commitPaths = [...new Set([...job.changedPaths, ...allChanged.filter(isSystemPath)])];
       if (commitPaths.length) {
         job.localCommit = await this.gitGuard.commitPaths(commitPaths, `syno: complete ${job.id}`);
@@ -363,9 +363,9 @@ class AgentHost {
   }
 
   async #commitSystemRecords(job, message) {
-    const changed = await this.gitGuard.changedPaths(PATHS.repoRoot);
+    const changed = await this.gitGuard.changedPaths(PATHS.knowledgeRoot);
     const records = changed.filter(isSystemPath);
-    return this.gitGuard.commitPaths(records, message, PATHS.repoRoot);
+    return this.gitGuard.commitPaths(records, message, PATHS.knowledgeRoot);
   }
 
   #assertJobScope(job, { ownerKey } = {}) {

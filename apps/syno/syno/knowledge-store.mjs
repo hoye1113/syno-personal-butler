@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { PATHS, relativeToRepo, resolveInside } from "./paths.mjs";
+import { PATHS, relativeToKnowledge, resolveInside } from "./paths.mjs";
 import { frontmatterData } from "./validator.mjs";
 import { inspectRemoteContent } from "./sensitive-content.mjs";
 
@@ -73,7 +73,7 @@ class KnowledgeStore {
       const sensitive = ["true", "yes"].includes(String(frontmatter.values.sensitive || frontmatter.values.private || "").toLocaleLowerCase("en-US"))
         || ["private", "sensitive"].includes(privacy)
         || !inspectRemoteContent(`${source}\n${markdown}`, { maxChars: Number.MAX_SAFE_INTEGER }).safe;
-      notes.push({ path: relativeToRepo(entry.file), title, excerpt: sensitive ? "" : text.slice(0, 280), tags: frontmatter.tags, legacyTags, source, sourceDigest, sourceFileDigest, stability, date, searchable: isContentNote(this.vaultRoot, entry.file), sensitive,
+      notes.push({ path: relativeToKnowledge(entry.file), title, excerpt: sensitive ? "" : text.slice(0, 280), tags: frontmatter.tags, legacyTags, source, sourceDigest, sourceFileDigest, stability, date, searchable: isContentNote(this.vaultRoot, entry.file), sensitive,
         knowledgeState: frontmatter.values.knowledge_state || "", linkStatus: frontmatter.values.link_status || "",
         qualityStatus: frontmatter.values.quality_status || (frontmatter.values.source || frontmatter.values.source_url ? "traceable" : "needs_source"),
         index: { title: tokens(title), tags: tokens(frontmatter.tags.join(" ")), legacyTags: tokens(legacyTags.join(" ")), body: sensitive ? [] : tokens(text), source: tokens(source) } });

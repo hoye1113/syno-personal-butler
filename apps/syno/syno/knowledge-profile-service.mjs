@@ -43,7 +43,7 @@ class KnowledgeProfileService {
     maintenance,
     claims,
     opsRoot = PATHS.opsRoot,
-    repoRoot = PATHS.repoRoot,
+    repoRoot = PATHS.knowledgeRoot,
     clock = () => new Date(),
     outdatedDays = OUTDATED_DAYS,
     maintenanceWindowDays = MAINTENANCE_WINDOW_DAYS,
@@ -142,7 +142,7 @@ class KnowledgeProfileService {
     const out = [];
     for (const note of notes) {
       try {
-        // note.path is repo-relative (KnowledgeStore stores relativeToRepo). Read directly
+        // note.path is knowledge-root-relative (KnowledgeStore stores relativeToKnowledge). Read directly
         // rather than via knowledge.read(), which restricts to the canonical vault/ prefix
         // and would reject notes indexed from a non-default vault root.
         const markdown = await fs.readFile(path.join(this.repoRoot, note.path), "utf8");

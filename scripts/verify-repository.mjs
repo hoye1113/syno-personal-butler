@@ -60,10 +60,24 @@ for (const file of files) {
 
 const required = [
   "apps/syno/server.mjs", "apps/syno/syno/syno-core.mjs",
-  "vault/AGENTS.md", "ops/README.md", "contracts/job.schema.json", "docs/ARCHITECTURE.md",
+  "contracts/job.schema.json", "docs/ARCHITECTURE.md",
 ];
 for (const relative of required) {
   try { await fs.access(path.join(ROOT, relative)); } catch { errors.push(`${relative}: required file missing`); }
+}
+
+// D13.8（2026-09-01）：拆库后 vault/ops 归属独立知识仓库（SYNO_KNOWLEDGE_ROOT），
+// fresh clone 的代码仓不含知识内容；设置 env 时追加知识仓形态检查。
+if (process.env.SYNO_KNOWLEDGE_ROOT) {
+  const knowledgeRoot = path.resolve(process.env.SYNO_KNOWLEDGE_ROOT);
+  const { execFileSync } = await import("node:child_process");
+  for (const entry of ["vault", "ops", ".git", "vault/AGENTS.md", "ops/README.md"]) {
+    try { await fs.access(path.join(knowledgeRoot, entry)); } catch { errors.push(`知识仓库缺少：${entry}`); }
+  }
+  try {
+    const branch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: knowledgeRoot, encoding: "utf8" }).trim();
+    if (branch !== "main") errors.push(`知识仓库当前分支应为 main，实际：${branch}`);
+  } catch (error) { errors.push(`知识仓库 git 检查失败：${error.message}`); }
 }
 
 if (errors.length) {

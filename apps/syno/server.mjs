@@ -102,7 +102,7 @@ let authFlowCache = { expiresAt: 0, value: null };
 let plannerSettingsCache = null;
 const topicMutationLocks = new Map();
 const legacyWorkspace = new AsyncLocalStorage();
-const sideEffectGitGuard = new GitGuard();
+const sideEffectGitGuard = new GitGuard({ productBranch: "main" });
 const workbenchOperations = new WorkbenchOperations({
   workspaceContext: legacyWorkspace,
   handlers: {
@@ -312,7 +312,7 @@ async function queueLegacyMutation(operation, payload) {
 }
 
 async function editVaultNote(payload) {
-  const workspace = legacyWorkspace.getStore()?.workspace || PATHS.repoRoot;
+  const workspace = legacyWorkspace.getStore()?.workspace || PATHS.knowledgeRoot;
   const relative = optionalString(payload.path).replace(/\\/g, "/");
   if (!relative.startsWith("vault/") || !relative.endsWith(".md")) throw badRequest("只允许编辑 vault 内 Markdown");
   // Strip the literal "vault/" prefix and confine to the vault root: resolveInside only enforces
@@ -337,7 +337,7 @@ async function createContentBrief(payload) {
   const source = await loadTopicSource(filePath);
   const title = extractTitle(source.body, path.basename(filePath, ".md"));
   const topic = normalizeTopic(source.frontmatter, title, source.relPath);
-  const workspace = legacyWorkspace.getStore()?.workspace || PATHS.repoRoot;
+  const workspace = legacyWorkspace.getStore()?.workspace || PATHS.knowledgeRoot;
   const now = new Date();
   const id = `brief-${topic.topic_id || stableHash(source.relPath).slice(0, 12)}`;
   const outline = [
@@ -404,7 +404,7 @@ async function listMemoryProposals() {
     try {
       await validateContractRecord("memory-proposal", frontmatter);
       proposals.push({
-        path: path.relative(PATHS.repoRoot, file).replace(/\\/g, "/"),
+        path: path.relative(PATHS.knowledgeRoot, file).replace(/\\/g, "/"),
         id: frontmatter.id,
         statement: frontmatter.statement,
         reason: frontmatter.reason,
@@ -418,7 +418,7 @@ async function listMemoryProposals() {
 }
 
 async function promoteMemoryProposal(payload) {
-  const workspace = legacyWorkspace.getStore()?.workspace || PATHS.repoRoot;
+  const workspace = legacyWorkspace.getStore()?.workspace || PATHS.knowledgeRoot;
   const relative = optionalString(payload.path).replace(/\\/g, "/");
   if (!/^ops\/memory\/proposals\/.*\.md$/i.test(relative)) throw badRequest("只允许晋升 ops/memory/proposals 内候选");
   // Confine to the proposals root: the regex's `.*` matches "../../", which resolveInside
@@ -484,7 +484,7 @@ async function executeLegacySideEffects({ execution } = {}) {
   for (const action of actions) {
     if (action.type === "lark.delete") {
       try {
-        await legacyWorkspace.run({ workspace: PATHS.repoRoot, deferExternal: false, deferredActions: [] }, () => deleteLarkEvent(action.topic));
+        await legacyWorkspace.run({ workspace: PATHS.knowledgeRoot, deferExternal: false, deferredActions: [] }, () => deleteLarkEvent(action.topic));
         results.push({ type: action.type, removed: true });
       } catch (error) {
         results.push({ type: action.type, removed: false, error: formatCalendarSyncError(error) });
@@ -498,7 +498,7 @@ async function executeLegacySideEffects({ execution } = {}) {
     const topic = normalizeTopic(source.frontmatter, title, source.relPath);
     try {
       const result = await legacyWorkspace.run(
-        { workspace: PATHS.repoRoot, deferExternal: false, deferredActions: [] },
+        { workspace: PATHS.knowledgeRoot, deferExternal: false, deferredActions: [] },
         () => syncTopicToLark({ title, topic, path: source.relPath }),
       );
       topic.calendar_provider = result.provider;
@@ -586,8 +586,8 @@ async function savePlannerSettingsPayload(payload) {
   if (workspaceMode === 'obsidian' && !path.isAbsolute(requestedVaultRoot)) {
     throw badRequest("Syno 内置仓库根目录必须是本机绝对路径");
   }
-  if (path.resolve(requestedVaultRoot) !== path.resolve(PATHS.repoRoot)) {
-    throw badRequest("为保证审批、精确提交与回滚，工作区必须是当前 Syno 仓库");
+  if (path.resolve(requestedVaultRoot) !== path.resolve(PATHS.knowledgeRoot)) {
+    throw badRequest("为保证审批、精确提交与回滚，工作区必须是当前 Syno 知识仓库");
   }
 
   const currentSettings = await getPlannerSettings();
@@ -769,13 +769,13 @@ async function getPlannerPaths(forceReload = false) {
   };
   const operation = legacyWorkspace.getStore();
   if (!operation) return resolved;
-  if (!isPathInside(PATHS.repoRoot, resolved.vaultRoot)) {
-    throw badRequest("为保证审批与 Git 回滚，Syno 工作区必须位于当前仓库内");
+  if (!isPathInside(PATHS.knowledgeRoot, resolved.vaultRoot)) {
+    throw badRequest("为保证审批与 Git 回滚，Syno 工作区必须位于知识仓库内");
   }
-  if (path.resolve(operation.workspace) === path.resolve(PATHS.repoRoot)) return resolved;
+  if (path.resolve(operation.workspace) === path.resolve(PATHS.knowledgeRoot)) return resolved;
   const remap = (value) => {
-    if (typeof value !== "string" || !path.isAbsolute(value) || !isPathInside(PATHS.repoRoot, value)) return value;
-    return path.join(operation.workspace, path.relative(PATHS.repoRoot, value));
+    if (typeof value !== "string" || !path.isAbsolute(value) || !isPathInside(PATHS.knowledgeRoot, value)) return value;
+    return path.join(operation.workspace, path.relative(PATHS.knowledgeRoot, value));
   };
   return {
     ...Object.fromEntries(Object.entries(resolved).map(([key, value]) => [key, remap(value)])),

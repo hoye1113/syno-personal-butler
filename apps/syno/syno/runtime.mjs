@@ -105,7 +105,7 @@ async function workflowContext(domain) {
   if (!files) throw Object.assign(new Error(`未知工作流领域：${domain}`), { code: "WORKFLOW_CONTEXT_DENIED" });
   const sections = [];
   for (const relative of files) {
-    const content = await fs.readFile(path.join(PATHS.repoRoot, relative), "utf8");
+    const content = await fs.readFile(path.join(PATHS.knowledgeRoot, relative), "utf8");
     sections.push({ path: relative, content: content.slice(0, 12_000) });
   }
   return { domain, authority: "canonical-vault-skills", sections };
@@ -355,7 +355,7 @@ function createSynoRuntime(options = {}) {
   const profile = options.profile || new KnowledgeProfileService({ knowledge, maintenance: knowledgeMaintenance, claims });
   const planner = options.planner || new PlannerService({ knowledge, goals, claims, ingest, maintenance: knowledgeMaintenance, outputs });
   const postIngestCandidates = options.postIngestCandidates || new PostIngestCandidateStore();
-  const migration = options.migration || new VaultMigrationService({ repoRoot: PATHS.repoRoot, runtimeRoot: path.join(PATHS.runtimeRoot, "migrations") });
+  const migration = options.migration || new VaultMigrationService({ repoRoot: PATHS.knowledgeRoot, runtimeRoot: path.join(PATHS.runtimeRoot, "migrations") });
   const signalSources = options.signalSources || new SignalSourceRegistry({ claims, ingest, outputs, maintenance: knowledgeMaintenance });
   let host;
   let core;
@@ -690,7 +690,7 @@ function createSynoRuntime(options = {}) {
   const executor = new OperationExecutor({
     fallback: baseExecutor,
     execute: async (operation, payload, { workspace, job } = {}) => {
-      const root = workspace || PATHS.repoRoot;
+      const root = workspace || PATHS.knowledgeRoot;
       if (operation === "ingest.apply") return ingest.apply(payload.artifactId, {
         workspace: root,
         decision: payload.decision,
@@ -722,7 +722,7 @@ function createSynoRuntime(options = {}) {
       throw error;
     },
   });
-  const gitGuard = options.gitGuard || new GitGuard();
+  const gitGuard = options.gitGuard || new GitGuard({ productBranch: "main" });
   host = options.host || new AgentHost({
     store: jobStore,
     executor,
@@ -1847,7 +1847,7 @@ async function routeSynoApi(runtime, req, url, readBody) {
     if (!result) return { profile: null, fresh: false, currentVaultFingerprint: "" };
     return { profile: result.profile, fresh: result.fresh, currentVaultFingerprint: result.currentVaultFingerprint, excludedSystemNotes: result.profile.excludedSystemNotes ?? 0 };
   }
-  if (method === "GET" && url.pathname === "/api/syno/learning/plan/today") return runtime.planner.planDay({ opsRoot: path.join(PATHS.repoRoot, "ops") });
+  if (method === "GET" && url.pathname === "/api/syno/learning/plan/today") return runtime.planner.planDay({ opsRoot: PATHS.opsRoot });
   if (method === "POST" && url.pathname === "/api/syno/evidence/candidates") return runtime.core.execute(buildOperationRequest("evidence.candidates.create", await readBody(req)), webContext);
   const evidenceApproval = /^\/api\/syno\/evidence\/candidates\/([^/]+)\/approve$/.exec(url.pathname);
   if (method === "POST" && evidenceApproval) return runtime.core.execute(buildOperationRequest("evidence.candidates.approve", { candidateId: decodeURIComponent(evidenceApproval[1]) }), webContext);

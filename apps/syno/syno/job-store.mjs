@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { readRecord, writeRecord } from "./markdown-record.mjs";
-import { PATHS, relativeToRepo } from "./paths.mjs";
+import { PATHS, relativeToKnowledge } from "./paths.mjs";
 
 const TERMINAL = new Set(["completed", "failed", "rejected", "canceled"]);
 const TRANSITIONS = Object.freeze({
@@ -98,7 +98,7 @@ class JobStore {
       title: `Job ${job.id}`,
       summaryKeys: ["id", "intent", "status", "profile", "approval", "approvalsReceived", "phase", "risk", "channel", "ownerKey", "threadKey", "created", "updated"],
     });
-    job.recordPath = relativeToRepo(this.filePath(job));
+    job.recordPath = relativeToKnowledge(this.filePath(job));
     return job;
   }
 
@@ -107,7 +107,7 @@ class JobStore {
     const target = files.find((file) => path.basename(file) === `${id}.md`);
     if (!target) return null;
     const job = await readRecord(target);
-    job.recordPath = relativeToRepo(target);
+    job.recordPath = relativeToKnowledge(target);
     return job;
   }
 
@@ -119,7 +119,7 @@ class JobStore {
       try {
         const job = await readRecord(file);
         if (ownerKey !== undefined && String(job.ownerKey || "local-user") !== String(ownerKey || "local-user")) continue;
-        job.recordPath = relativeToRepo(file);
+        job.recordPath = relativeToKnowledge(file);
         jobs.push(job);
       } catch {
         // Invalid records are surfaced by repository verification, not hidden in list failures.
