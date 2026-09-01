@@ -1,19 +1,18 @@
 # Syno 已知限制
 
-更新日期：2026-08-26
+更新日期：2026-09-01
 
-## 2026-08-26 Project-aware Knowledge MVP
+## 2026-09-01 产品精简与拆墙（当前状态）
 
-- Phase 0–4 已完成：Project、显式 `/project <projectRef>`、Job/Workflow/Proposal/Note 传播、`project_refs` round-trip 和同项目 `PROJECT_BOOST = 3` 检索加权均已通过当前自动化测试。
-- 当前基线是 `main`/`f6d2126`；实现分支为 `feat/project-aware-dsh-phase5`，当前代码/测试 HEAD 为 `f2718f1`。基线全量自动化为 749/749；本阶段最终 `pnpm test` 为 757 tests、755 passed、2 skipped、0 failed，`pnpm run verify` 通过（Repository verification 1645 files、active docs 9 files），`git diff --check` 通过。用户级 `DEEPSEEK_API_KEY` 已由宿主环境提供；doctor 只证明变量存在，不输出密钥。官方模型链已验证为 `deepseek-v4-flash-vision-exp → deepseek-v4-flash`，不使用 Pro。
-- Phase 5 仍为 `IN_PROGRESS`：最终真实 JSON-RPC Capture round-trip、Project A/无 Project/Project B 技术对照、外部 DSH checkout 前后只读断言和真实 Web `web_search` 已由显式 live 测试通过，并保存为 `ops/acceptance/project-aware-knowledge-mvp/jsonrpc-20260826T153428Z.json`、`web-search-20260826T153523Z.json`；两个 live case 均独立退出码 0。Owner 主观召回改善观察仍未回填，因此不能标记 `DONE`。旧页面曾在隔离测试 Host `http://127.0.0.1:8898/` 完成一次非规范 smoke；Web 页面即将重构，当前 UI/DOM 不属于 Project MVP 验收契约。
-- Project 不做 Session、跨消息或跨渠道自动继承；裸的“确认/刚才那个”等后续消息不会从 Job 或 DSH 历史隐式继承 Project，Project-bound 决策必须再次显式指定；旧 Note 不批量补 `project_refs`；暂停/完成/放弃 Project 不可绑定新的普通工作 Job，但仍可作为历史 Note 引用；已创建的历史 Workflow 和生命周期状态 Job 经过一致性校验后可以继续执行。显式 Project 也不会切分 DSH Session 历史：同一会话切换 Project 时旧语义可能仍在上下文中，但历史文本不具备服务端授权能力；强会话隔离需要后续单独设计。
-- Job ID 直达的 advice、approve、reject、cancel、retry 已通过测试覆盖 Owner 校验；Project-bound 的 approve/reject/cancel/retry 和旧微信批准同样需要显式匹配 Project。当前旧 UI 的无作用域按钮不兼容 Project-bound Job；若未来 UI 重构改变入口，必须保留这些服务端边界，不能把 UI 参数当作授权。
+- 学习子系统与项目子系统已整体物理移除（`f23954d`、`ec068b9`）：`learning.*`/`projects.*` 工具、`/project` 指令、Job/Workflow/Note 的 projectRef 传播与检索加权均不再存在。历史 ops 记录（含 `ops/projects/*.md` 与学习相关记录）保留只读；新记录不再写入 projectRef/project_refs，旧记录中这些字段被读取方忽略。
+- Project-aware Knowledge MVP 已关闭为 SUPERSEDED（Owner 2026-09-01 产品方向决策），Owner 主观召回观察不再回填；live 证据保留在 `ops/acceptance/project-aware-knowledge-mvp/` 仅作追溯。下文 2026-08-26 起关于 Project 边界的描述均为历史记录。
+- 用户入口边界已结构性加固（`e49a66c`、`b634efd`）：`code_change` 意图、`allowSelfModify`/`allowSystemControl` 开关与 Windows 服务安装/卸载操作已物理删除——不是开关关闭，而是代码不存在，没有任何配置能让聊天入口改代码或控制系统。模型可声明的写入路径只有 `vault/**`；`ops/` 仅系统内部固定记录器写入；自动提交只准暂存 `vault/**`、`ops/**`，永不自动 Push。
+- 当前唯一执行事实源为 `docs/product-slimming-and-inspiration-plan.md`；当轮回归基线快照见 `NEXT_SESSION.md`。
 
 ## 发布门槛状态
 
 - 历史 P4 发布 Goal 状态为 `blocked`：P4.0–P4.6 已完成，P4.7 的真实渠道、自动执行与澄清、跨渠道连续性、重启恢复和下次 Windows 登录冷启动仍需主人验收；不得把自动测试、探针或当前任务 Running 状态表述为封板。
-- `567f23d` 是执行语义与移动可靠交付计划的审查基线，不是所有后续 PR 的永久父提交。当前实现尚未提供 ACK 前持久化、通用 ChannelDeliveryOutbox、Effect Receipt 或 Unknown Case Store；这些能力必须按 ADR 0003–0005 和 TODO 的新批次门禁交付，不能从文档目标推断为已实现。
+- `567f23d` 是执行语义与移动可靠交付计划的审查基线，不是所有后续 PR 的永久父提交。该时点尚未提供的 ACK 前持久化、通用 ChannelDeliveryOutbox、Effect Receipt 和 Unknown Case Store 已在后续 PR 交付；本小节整体为 2026-07 历史记录，当前能力以 `docs/ARCHITECTURE.md` 为准。
 
 - token-cloud 固定模型五轮真实工具调用、故障持久等待和同模型恢复已通过，不再是发布门槛。
 - 微信 iLink 已完成扫码、Owner 绑定、4/4 连续回复、故障恢复和 durable seen ID 跨重启；主人直发真实 MD 收到 Artifact 回执，后台形成 Proposal 且未写入 vault。
@@ -22,7 +21,7 @@
 
 历史 Provider/旧运行时验收不替代当前 DSH 发布门槛。当前生产只启用 `DeepSeekHarnessCognitiveRuntime`；真实模型、跨渠道计数、提示注入、长会话 compaction 行为、Harness 重启恢复和 Windows 登录恢复仍未完成。生产受控 `syno` agent preset、Web `agentPreset: syno` 显式绑定和 JSON-RPC 官方 compaction stack 已实现并通过构建产物级验证，但不能替代真实模型和 Owner 验收。不得把凭据已配置、自动测试或历史探针证据表述为 DSH 已封板。
 
-历史自动门禁数字和旧运行时探针只作为追溯记录；本分支当前修复后的结果以 `NEXT_SESSION.md` 和 Project 执行计划最新记录为准。该结果只证明自动化门禁，不替代真实 DSH、渠道和 Owner 验收。
+历史自动门禁数字和旧运行时探针只作为追溯记录；当前修复后的结果以 `NEXT_SESSION.md` 和当前执行计划（`docs/product-slimming-and-inspiration-plan.md`）最新记录为准。该结果只证明自动化门禁，不替代真实渠道和 Owner 验收。
 
 Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导出、保护、重注册并再次导出验证，且健康快路径也必须先通过同一契约。当前真实任务已安装并使用绝对 `node.exe`，受控重启验证时刻曾等待 8 秒仍保持 `Running` 且 Host 健康；安装器还修复了 mise shim 与相对 server 路径接管问题。本次复核（2026-07-28 约 22:26 CST）快照：任务当前 `State=Ready`、未运行，`LastRunTime=2026-07-28 20:31:19`、`LastTaskResult=3221225786`（0xC000013A 控制中断退出），`manage-windows-task -Action Status` 报告 `running=False`，8888 上存活的是更早（20:05:47）手动启动的 Host 进程而非活动任务实例。下次 Windows 登录恢复仍未实测，不能把当前运行态当作冷启动证据；`0xC000013A` 退出根因（疑似受控重启停止旧实例或撞端口占用）需在冷启动验收中确认。
 
@@ -35,13 +34,13 @@ Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导�
 - 仅支持 Windows；Provider Token、微信 Bot/回复上下文和飞书 App Secret 使用当前 Windows 用户的 DPAPI，不可作为跨用户可移植凭据。
 - 只启用 DeepSeek Harness SDK，模型链只有 `deepseek/deepseek-v4-flash-vision-exp` → `deepseek/deepseek-v4-flash`，不使用 `deepseek-v4-pro`。仅在枚举的瞬态/契约失败且尚无不可逆副作用时尝试下一模型，不切换 Runtime，不回退到其它 Agent。主模型在 DSH profile 中声明了 `text`/`image` 输入能力。
 - DeepSeek Harness 克隆路径必须由 `SYNO_DSH_ROOT` 指向本机 checkout；未设置则无法启动。该 checkout **必须** `pnpm run build`（`lib/` + web dist）；只 install 不够，`harness:doctor` 的 bootable 也不是现网证据。生产 chat 的真实 argv 是 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（`dsh web` = 库存 `--profile web`，不要当生产）。事件通道是 WebSocket（HTTP GET `/api/events.*` 返回 426），不是 SSE。loopback 3088 是特权壳（`approval: never`，permission 表只准 `workspace-write`，禁止 `danger-full-access`），不是 8888 控制面。收录分析仍通过 jsonrpc sidecar；自动测试走 `tests/support/fake-dsh-jsonrpc-agent.mjs`。不要把 Harness 源码 vendoring 进本仓库。Chat 沙箱工作区是 `%LOCALAPPDATA%\Syno\harness\workspace\<profile>`，不是 git 仓库根。生产 `syno` profile 禁止市场 `dsh plugin add`；Host 会把 `@syno/dsh-plugin` link 进 profile `node_modules`。Windows 计划任务默认不注入 `SYNO_DSH_ROOT`。踩坑清单：`docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」。
-- 2026-08-25 的 packaged-bin 失败已由 Syno 侧 adapter 处理：Supervisor 现在检查完整 closure、配置包的实际运行入口，并在 Web/JSON-RPC 两条路径分别报告 `bootable`；缺失时返回 `HARNESS_RUNTIME_CLOSURE_UNAVAILABLE`，不会误报 `bootable`，也不会选择 OpenCode、原生 Agent 或 fake runtime。当前 doctor 的 closure 已完整；最终真实 JSON-RPC `initialize`、Capture round-trip、生产 Agent Project A/B/no-Project 对照和 Web 官方 `web_search` 已通过显式 live 测试。Project 技术对照已证明固定 boost 的可观察差异，但 Owner 主观价值结论仍待确认。
+- 2026-08-25 的 packaged-bin 失败已由 Syno 侧 adapter 处理：Supervisor 现在检查完整 closure、配置包的实际运行入口，并在 Web/JSON-RPC 两条路径分别报告 `bootable`；缺失时返回 `HARNESS_RUNTIME_CLOSURE_UNAVAILABLE`，不会误报 `bootable`，也不会选择 OpenCode、原生 Agent 或 fake runtime。当前 doctor 的 closure 已完整；最终真实 JSON-RPC `initialize`、Capture round-trip 和 Web 官方 `web_search` 已通过显式 live 测试（历史上的 Project A/B 对照随项目子系统移除而作废，仅作追溯）。
 - 当前外部 DSH clone 在 Windows 上 graceful protocol shutdown/EOF 可能触发其自身 libuv assertion。Syno Supervisor 对自己创建的 sidecar/Web 进程使用有界 process-tree termination 清理；同时覆盖 tsx 外层先退出而 launcher 孙进程仍存活的情况。最终 live 命令已正常退出，本阶段不修改外部 clone，生产重启/崩溃行为仍需继续观察。
 - 当前 Syno 图片消息仍走 Host `syno_image_read` → Zen HTTP（`mimo-v2.5-free`），不把本地 artifact 直接作为 DSH image attachment 发送；DSH 的 vision model 声明暂不能替代这条 attachment bridge。微信图片默认聊天识图；明确「收录」才把识图 JSON 送进 text Intake。网络/超时最多再试 2 次，鉴权失败不重试，失败对微信可见、禁止猜图。
 - Chat `web_search` 已启用，后端固定为官方 DeepSeek 搜索（Anthropic 兼容 Messages + 服务端 `web_search`）。该 seam 没有查询/域名白名单；每次搜索是一次额外模型轮次，比纯检索 API 更重。`web_fetch` 仍是匿名 HTTP(S)，Harness 侧不做 SSRF 过滤。收录分析 sidecar 没有 web。
 - OpenCode、Hermes 和原生 Agent 不是产品运行时；旧认知模块的删除仍受 R6 真实验收门禁约束。
 - 模型不可用时，本地搜索、收录回执、任务、提醒与决策解析继续工作；需要模型的 Job 保留为 `waiting_provider`，不会自动换 Provider 或原生 Agent。
-- Syno 不能修改自身源码；只能产生 `BugReport`、`ImprovementProposal` 和 SettingsRegistry 白名单内的偏好变更。
+- 产品运行时不能修改自身源码或控制系统：`code_change` 意图、`allowSelfModify`/`allowSystemControl` 开关与 Windows 服务注册操作已物理删除（2026-09-01，`e49a66c`），不是开关关闭而是代码不存在；SettingsRegistry 只保留白名单内的偏好变更。
 
 ## DSH Hub 与 Mnemon 限制
 
@@ -60,7 +59,7 @@ Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导�
 - 当前项目没有 TypeScript 源码、`tsconfig` 或 `typecheck` 脚本；`pnpm run typecheck` 会返回 `ERR_PNPM_NO_SCRIPT`，JavaScript 语法与行为由 Node 全量测试覆盖。
 - `vault/` 是唯一可写知识事实源。原始 Obsidian 仓库只读，不双向同步；渠道会话和飞书文档不是知识事实源。
 - 状态归档只包含 `%LOCALAPPDATA%\Syno\state`，不包含 DPAPI credentials，也不代替对 Git 跟踪的 `vault/`、`ops/` 和配置文档做备份。
-- Web/系统投递通知是可重建运行状态，只写 `.runtime/notifications`，不会因 Host 启动自动污染 `ops/`；需要长期保留的任务、待决策项和学习证据仍写入 canonical `ops/`。
+- Web/系统投递通知是可重建运行状态，只写 `.runtime/notifications`，不会因 Host 启动自动污染 `ops/`；需要长期保留的任务与待决策项仍写入 canonical `ops/`。
 - 自动收录先形成 `IngestProposal`；覆盖、移动、合并、新 tag 和新 MOC 在隔离工作区自动执行，整理冲突时暂停澄清，以降低错误整理的不可逆成本。
 - 飞书消息长连接使用 Syno 注册的 Feishu App；日历排期仍使用历史 `lark-cli` 授权。两者共享 Syno Policy 和 Markdown 事实源，但当前需要分别完成消息与日历授权，后续可统一凭据体验。
 - 微信仅支持绑定 Owner 的私聊入口，不读取个人聊天历史，也不支持群聊授权。

@@ -2,7 +2,7 @@
 
 本文只负责说明文档分类、唯一权威性和当前状态；具体产品规则以对应 Normative 文档为准。
 
-当前 Project-aware Knowledge MVP 已完成 Phase 0–4 的代码与契约闭环；Phase 5 处于 `IN_PROGRESS`，真实 DSH runtime closure、`web_search`、Capture round-trip、Project A/B/no-Project 技术对照和外部 DSH checkout 只读性已由测试文件验证，Owner 主观召回观察仍待补充。最新脱敏证据位于 `ops/acceptance/project-aware-knowledge-mvp/jsonrpc-20260826T153428Z.json` 和 `web-search-20260826T153523Z.json`。唯一执行事实源是 `docs/project-aware-knowledge-execution-plan.md`。Web 页面即将重构，当前 UI/DOM 不属于 MVP 验收契约。
+2026-09-01 Owner 决策产品范围收敛为搜索、收录、深度探索分析、知识库查找与今日灵感；学习子系统与项目子系统已物理移除（`f23954d`、`ec068b9`），用户入口只允许更改知识库（`e49a66c`、`b634efd`）。当前唯一执行事实源是 `docs/product-slimming-and-inspiration-plan.md`。Project-aware Knowledge MVP 已关闭为 SUPERSEDED，其计划文档与 `ops/acceptance/project-aware-knowledge-mvp/` 证据仅作历史追溯。
 
 ## Normative
 
@@ -12,8 +12,7 @@
 | `AGENTS.md` | Agent 执行契约、权限边界、编码和源码修改规则 | Normative |
 | `docs/ARCHITECTURE.md` | 当前模块边界、数据流和事务边界 | Normative |
 | `docs/POLICY.md` | Owner、Policy、Job、工具和写入权限 | Normative |
-| `docs/project-aware-knowledge-execution-plan.md` | Project-aware Knowledge MVP 的唯一执行事实源 | IN_PROGRESS（Phase 5 待按新计划关闭为 superseded） |
-| `docs/product-slimming-and-inspiration-plan.md` | 产品精简与今日灵感的执行计划；Owner 批准后成为唯一执行入口 | DRAFT（待 Owner 批准） |
+| `docs/product-slimming-and-inspiration-plan.md` | 产品精简与今日灵感的唯一执行事实源 | IN_PROGRESS（Owner 2026-09-01 批准，执行中） |
 | `contracts/*.schema.json` | 机器可校验的数据契约 | Normative |
 | `config/deepseek-harness/syno-agent.md` | DSH Syno Agent 的工具与行为边界 | Normative |
 | `vault/AGENTS.md`、`vault/99-System/Agent/` | 知识收录、关联、写作和 MOC 规则 | Normative |
@@ -28,7 +27,7 @@
 
 ## Historical
 
-`docs/HANDOFF-EXECUTION-PLAN.md`、`docs/TODO-EXECUTION-PLAN.md` 以及 `docs/archive/` 中的旧 OpenCode、旧分支和已归档计划只用于追溯。它们不能覆盖 `AGENTS.md`、`docs/ARCHITECTURE.md`、`docs/POLICY.md` 或当前 Project 执行计划；旧计划必须标记为 superseded 或 historical。
+`docs/HANDOFF-EXECUTION-PLAN.md`、`docs/TODO-EXECUTION-PLAN.md`、`docs/project-aware-knowledge-execution-plan.md`（2026-09-01 SUPERSEDED）以及 `docs/archive/` 中的旧 OpenCode、旧分支和已归档计划只用于追溯。它们不能覆盖 `AGENTS.md`、`docs/ARCHITECTURE.md`、`docs/POLICY.md` 或当前执行计划；旧计划必须标记为 superseded 或 historical。
 
 ## Generated
 
@@ -40,7 +39,7 @@
 
 ## 交接规则
 
-1. 先读本索引、`AGENTS.md`、Project 执行计划和 `NEXT_SESSION.md`。
-2. 任何阶段状态、实际修改文件、测试结果、commit hash、Owner 证据、deferred 内容和 `BLOCKED_DESIGN_DEVIATION` 只追加到 Project 执行计划。
-3. 不能用历史测试数字、Fake DSH 或静态检查冒充当前真实产品验收；本轮 Project MVP 的代码验收以测试文件、Schema 和服务端运行时回归为准，旧 Web smoke 仅作非规范可访问性记录。
+1. 先读本索引、`AGENTS.md`、当前执行计划（`docs/product-slimming-and-inspiration-plan.md`）和 `NEXT_SESSION.md`。
+2. 任何阶段状态、实际修改文件、测试结果、commit hash、Owner 证据、deferred 内容和停止条件触发只追加到当前执行计划的「执行记录」区。
+3. 不能用历史测试数字、Fake DSH 或静态检查冒充当前真实产品验收；代码验收以测试文件、Schema 和服务端运行时回归为准。
 4. 本轮提交和推送权限分离：执行 Agent 可以按计划提交，但不得自动 Push 或 merge。

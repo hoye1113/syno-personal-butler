@@ -10,7 +10,6 @@ const activeFiles = [
   "docs/KNOWN-LIMITATIONS.md",
   "docs/TODO-EXECUTION-PLAN.md",
   "docs/INDEX.md",
-  "docs/project-aware-knowledge-execution-plan.md",
   "config/deepseek-harness/syno-agent.md",
 ];
 const forbidden = [
@@ -23,9 +22,10 @@ const forbidden = [
   "当前 Phase 4 HEAD：3362336",
   "Node 714 tests / 714 pass",
 ];
+// project-aware 执行计划 2026-09-01 SUPERSEDED（产品方向决策，见 docs/product-slimming-and-inspiration-plan.md D4），
+// 已移出 activeFiles 归为历史文档；INDEX 仍须提及它以保留追溯入口。
 const required = new Map([
   ["docs/INDEX.md", ["Normative", "Historical", "Generated", "project-aware-knowledge-execution-plan.md"]],
-  ["docs/project-aware-knowledge-execution-plan.md", ["projectRef", "PROJECT_BOOST = 3", "DEFERRED_EXISTING_NOTE_PROJECT_LINK", "BLOCKED_DESIGN_DEVIATION", "paused → active", "ToolLoopExecutor", "Job ID", "UI/DOM"]],
 ]);
 
 const violations = [];

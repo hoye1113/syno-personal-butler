@@ -1,8 +1,23 @@
 # Syno 执行语义与移动可靠交付交接（2026-07-29）
 
-## 2026-08-26 当前交接：Project-aware DSH Phase 5 启动适配
+## 2026-09-01 当前交接：产品精简拆墙已封板，进入今日灵感
 
-当前唯一执行入口是 [`docs/project-aware-knowledge-execution-plan.md`](docs/project-aware-knowledge-execution-plan.md)；本文下方的 2026-07/08 内容仅作历史背景，不覆盖该执行计划。
+当前唯一执行入口是 [`docs/product-slimming-and-inspiration-plan.md`](docs/product-slimming-and-inspiration-plan.md)（Owner 2026-09-01 经 /goal 批准，指示一次性执行完全部任务）；本文下方 2026-08/07 内容仅作历史背景，不覆盖该执行计划。
+
+- 产品范围（Owner 2026-09-01 决策）：搜索、收录、深度探索分析、知识库查找、今日灵感（整合知识库文章产出串联/新观点的"做梦"功能）。学习与项目管理不在范围内。
+- 当前分支/提交：`main` @ `ec068b9`（本地，沿用现规不自动 Push）；工作树干净。
+- 已完成：边界加固① `e49a66c`（`code_change` 意图、`allowSelfModify`/`allowSystemControl` 开关、Windows 服务注册操作物理删除）；边界加固② `b634efd`（模型可声明写入路径仅 `vault/**`，自动提交结构性硬闸门只准暂存 `vault/**`、`ops/**`）；拆墙① `f23954d`（学习子系统物理移除，47 files +151/−1439）；拆墙② `ec068b9`（项目子系统与 `/project` 链路物理移除，44 files +145/−2560）；封板 #8（本交接所属提交：Phase 5 SUPERSEDED、文档同步、封板回归）。
+- 封板回归快照（2026-09-01 当轮实测）：`pnpm test` 699 tests / 699 pass / 0 fail；`pnpm run verify` 通过（Repository verification 1651 files、active docs 8 files——project-aware 计划已归历史文档）；`git diff --check` 通过。
+- 兼容要点：效应幂等键保留 `<none>` 段字面量，跨重启去重连续；历史 Job/Workflow/Note 的 projectRef/project_refs 字段保留只读（契约留 optional 属性供旧记录 round-trip，读取方忽略，不再写入）。
+- 运行态注意：8888 Host 仍运行拆墙前代码（自 #6 以来未重启）。不自动重启——与今日灵感（#9~#11）部署合并为一次重启，Owner 面对验收前按 runbook（kill + 源码重拉）执行。
+- 运行时事实不变：产品只走 `DeepSeekHarnessCognitiveRuntime`；生产 chat = `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`，8888 是控制面；模型链 `deepseek/deepseek-v4-flash-vision-exp → deepseek/deepseek-v4-flash`，不使用 Pro；`SYNO_DSH_ROOT` clone 必须 `pnpm run build`；图片走 Host `syno_image_read`（Zen `mimo-v2.5-free`）；chat `web_search` 已启用。
+- 下一步：#9 今日灵感①设计冻结（做梦机制；边界见计划 D7：接入既有 ProactiveOrchestrator，安静时间 22:30–07:30 与每日预算 1/2/3 条不变，生成走 DSH proactive Session，失败遵守终态三件套，不新造调度轮子）。
+- 停止条件（计划 D8）：任一阶段若需删除 Job 治理链、改动渠道去重/Outbox 语义、批量改写 vault 历史笔记，立即记录 `BLOCKED_SCOPE_DEVIATION` 并暂停回 Owner。
+- 提交规则：按 Job 声明精确路径暂存；禁止 `git add -A`；不自动 Push；commit 结尾不加 Co-Authored-By。
+
+## 2026-08-26 历史交接：Project-aware DSH Phase 5（已 SUPERSEDED，仅追溯）
+
+> 2026-09-01 注：Project-aware MVP 已随产品方向决策关闭为 SUPERSEDED；本节中 Project 闭环、`/project` 指令、Project 读取边界、PROJECT_BOOST 与 Phase 5 状态均不再描述当前产品，仅作历史记录。
 
 - 基线分支/提交：`main` / `f6d2126`（`feat: switch to vision-capable DeepSeek model chain`）。当前实施分支：`feat/project-aware-dsh-phase5`，当前代码/测试 HEAD：`f2718f1`；后续 docs-only 提交不改变该 live 证据对应的实现提交。本阶段尚未自动 Push 或 merge。
 - 当前实现已新增 Syno 侧 `apps/syno/syno/deepseek-harness-jsonrpc-launcher.mjs`，Supervisor 会检查完整 Capture/Chat DSH runtime closure，并在本地 staging 中调用 DSH 已有 `runJsonrpcAgent(bareModuleBaseUrl)`；由 `SYNO_DSH_ROOT` 指向的外部 Harness clone 未修改。

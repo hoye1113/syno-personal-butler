@@ -1,8 +1,10 @@
 # Syno Project-aware Knowledge MVP 执行计划
 
-状态：IN_PROGRESS  
+状态：SUPERSEDED（2026-09-01，Owner 产品方向决策）
 更新日期：2026-08-26（Asia/Hong_Kong）
 基线分支：`main`
+
+> **关闭记录（2026-09-01）**：Owner 决策产品范围收敛为搜索、收录、深度探索、知识库查找与今日灵感，项目管理不在范围内（见 `docs/product-slimming-and-inspiration-plan.md` D4/D6）。Phase 5 的 Owner 主观召回观察不再回填，本计划整体关闭为 SUPERSEDED。Project 子系统已随拆墙②（`ec068b9`）物理移除：project-service/project-directive、`/project` 链路、projects.* 工具、projectRef 传播与 PROJECT_BOOST 均已删除；`ops/projects/*.md` 等历史记录与 `ops/acceptance/project-aware-knowledge-mvp/` 证据原样保留为只读历史。本文其余内容仅作追溯，不再描述当前产品行为。
 基线提交：`f6d2126`（`feat: switch to vision-capable DeepSeek model chain`）
 当前执行分支：`feat/project-aware-dsh-phase5`
 Push / merge：本轮禁止自动执行
@@ -105,7 +107,7 @@ project_refs: ["project-20260824-a1b2c3d4"]
 | Phase 2：Explicit Project → Job Propagation | DONE | 指令解析、可信上下文、Job/Workflow 传播和隔离测试完成 |
 | Phase 3：Knowledge `project_refs` Round-trip | DONE | Workflow → Proposal → Apply → Markdown → reload 全链路完成 |
 | Phase 4：Project-aware Retrieval | DONE | 固定 boost、无 Project 回归、跨 Project 隔离和 Tool Bridge 注入完成 |
-| Phase 5：Real DSH MVP Acceptance | IN_PROGRESS | 先完成真实 DSH 启动、`web_search`、Capture round-trip、Project A/B/no-Project 对照和 Owner 观察；未满足全部门槛前不得标记 DONE |
+| Phase 5：Real DSH MVP Acceptance | SUPERSEDED | 2026-09-01 随产品方向决策关闭：Owner 主观召回观察不再回填，技术证据（真实 DSH、Capture round-trip、A/B 对照）保留于 `ops/acceptance/project-aware-knowledge-mvp/` 作历史记录 |
 
 `DONE` 的统一定义是：代码完成、契约测试通过、全量测试通过、verify 通过、文档同步、阶段验收完成。
 
