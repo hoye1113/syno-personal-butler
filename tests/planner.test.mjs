@@ -104,7 +104,7 @@ test("active goals drive digest selection", async (t) => {
     goals: [{ title: "掌握 AI", priority: 100, focusAreas: ["AI"] }],
   });
   const notes = await knowledge.list();
-  const expectedAiPath = path.relative(REPO_ROOT, path.join(vaultRoot, "ai.md")).replace(/\\/g, "/");
+  const expectedAiPath = path.relative(path.dirname(vaultRoot), path.join(vaultRoot, "ai.md")).replace(/\\/g, "/");
   const aiNote = notes.find((n) => n.path === expectedAiPath);
   assert.ok(aiNote, `ai.md should be indexed at ${expectedAiPath}, got: ${JSON.stringify(notes.map(n => n.path))}`);
   assert.ok(aiNote.searchable, "ai.md should be searchable");

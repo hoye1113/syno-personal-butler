@@ -144,6 +144,8 @@ async function startFixtureServer(t, fixture, extraEnv = {}, { executable = proc
       NODE_ENV: "test",
       SYNO_WEB_ONLY: "true",
       SYNO_REPO_ROOT: fixture.tempRoot,
+      // 拆库（D13）后宿主机全局设了 SYNO_KNOWLEDGE_ROOT；夹具子宿主必须回落单库形态，不得串到真实知识仓
+      SYNO_KNOWLEDGE_ROOT: fixture.tempRoot,
       HOME: fixture.tempRoot,
       SYNO_LOCAL_DATA: path.join(fixture.tempRoot, "local-data"),
       SYNO_RUNTIME_ROOT: path.join(fixture.tempRoot, "runtime"),

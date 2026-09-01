@@ -1,17 +1,18 @@
 import path from "node:path";
 
-import { PATHS, relativeToKnowledge } from "./paths.mjs";
+import { PATHS } from "./paths.mjs";
 import { writeRecord } from "./markdown-record.mjs";
 
 class ReportService {
-  constructor({ host, knowledge, notifications, channels, gitGuard, opsRoot = PATHS.opsRoot, pathResolver = relativeToKnowledge, clock = () => new Date() } = {}) {
+  constructor({ host, knowledge, notifications, channels, gitGuard, opsRoot = PATHS.opsRoot, pathResolver, clock = () => new Date() } = {}) {
     this.host = host;
     this.knowledge = knowledge;
     this.notifications = notifications;
     this.channels = channels;
     this.gitGuard = gitGuard;
     this.opsRoot = opsRoot;
-    this.pathResolver = pathResolver;
+    // D13.6 修正：缺省解析器对本实例 opsRoot 的父目录求相对（ops/... 形态），实例根优先于进程级 PATHS。
+    this.pathResolver = pathResolver || ((file) => path.relative(path.dirname(path.resolve(this.opsRoot)), path.resolve(file)).replace(/\\/g, "/"));
     this.clock = clock;
   }
 

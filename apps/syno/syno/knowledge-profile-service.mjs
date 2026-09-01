@@ -43,7 +43,6 @@ class KnowledgeProfileService {
     maintenance,
     claims,
     opsRoot = PATHS.opsRoot,
-    repoRoot = PATHS.knowledgeRoot,
     clock = () => new Date(),
     outdatedDays = OUTDATED_DAYS,
     maintenanceWindowDays = MAINTENANCE_WINDOW_DAYS,
@@ -52,7 +51,6 @@ class KnowledgeProfileService {
     this.maintenance = maintenance;
     this.claims = claims;
     this.opsRoot = opsRoot;
-    this.repoRoot = repoRoot;
     this.clock = clock;
     this.outdatedDays = outdatedDays;
     this.maintenanceWindowDays = maintenanceWindowDays;
@@ -142,10 +140,10 @@ class KnowledgeProfileService {
     const out = [];
     for (const note of notes) {
       try {
-        // note.path is knowledge-root-relative (KnowledgeStore stores relativeToKnowledge). Read directly
+        // note.path is relative to the vault parent (KnowledgeStore instance root). Read directly
         // rather than via knowledge.read(), which restricts to the canonical vault/ prefix
         // and would reject notes indexed from a non-default vault root.
-        const markdown = await fs.readFile(path.join(this.repoRoot, note.path), "utf8");
+        const markdown = await fs.readFile(path.join(path.dirname(this.knowledge.vaultRoot), note.path), "utf8");
         out.push({ ...note, markdown });
       } catch (error) {
         // Unreadable note: keep metadata, no markdown. Dead-link scan skips it.

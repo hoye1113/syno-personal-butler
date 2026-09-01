@@ -8,11 +8,15 @@ import { promisify } from "node:util";
 
 import { GitGuard, parsePorcelainZ } from "../apps/syno/syno/git-guard.mjs";
 import { KnowledgeStore } from "../apps/syno/syno/knowledge-store.mjs";
+import { PATHS } from "../apps/syno/syno/paths.mjs";
 import { readKnowledgeSnippet } from "../apps/syno/syno/runtime.mjs";
 
 const exec = promisify(execFile);
 
-test("knowledge search and full reader work without Obsidian", async () => {
+test("knowledge search and full reader work without Obsidian", async (t) => {
+  // 拆库（D13）后这是针对真实知识仓的集成断言：PATHS.vaultRoot 经 SYNO_KNOWLEDGE_ROOT
+  // 指向知识仓；fresh clone（无知识仓邻接）下安静跳过，不伪造 fixture 冒充真实库。
+  try { await fs.access(PATHS.vaultRoot); } catch { t.skip(`知识仓不在本检出内（${PATHS.vaultRoot}）`); return; }
   const knowledge = new KnowledgeStore();
   const rebuilt = await knowledge.rebuild();
   assert.ok(rebuilt.notes > 50);

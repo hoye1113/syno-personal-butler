@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { PATHS, relativeToKnowledge, resolveInside } from "./paths.mjs";
+import { PATHS, resolveInside } from "./paths.mjs";
 import { frontmatterData } from "./validator.mjs";
 import { inspectRemoteContent } from "./sensitive-content.mjs";
 
@@ -54,6 +54,10 @@ class KnowledgeStore {
   constructor({ vaultRoot = PATHS.vaultRoot, indexFile = path.join(PATHS.runtimeRoot, "knowledge-index-v1.json") } = {}) {
     this.vaultRoot = path.resolve(vaultRoot); this.indexFile = path.resolve(indexFile); this.cache = null; this.fingerprint = "";
   }
+  // 逻辑路径恒为 "<vault 父目录相对>" 形态（默认根下即 vault/...）；实例根优先于进程级 PATHS。
+  #logicalPath(file) {
+    return path.relative(path.dirname(this.vaultRoot), file).replace(/\\/g, "/");
+  }
   async #inventory() {
     const files = await walkMarkdown(this.vaultRoot);
     const metadata = await Promise.all(files.map(async (file) => { const stat = await fs.stat(file); return { file, path: path.relative(this.vaultRoot, file).replace(/\\/g, "/"), size: stat.size, mtimeMs: stat.mtimeMs }; }));
@@ -73,7 +77,9 @@ class KnowledgeStore {
       const sensitive = ["true", "yes"].includes(String(frontmatter.values.sensitive || frontmatter.values.private || "").toLocaleLowerCase("en-US"))
         || ["private", "sensitive"].includes(privacy)
         || !inspectRemoteContent(`${source}\n${markdown}`, { maxChars: Number.MAX_SAFE_INTEGER }).safe;
-      notes.push({ path: relativeToKnowledge(entry.file), title, excerpt: sensitive ? "" : text.slice(0, 280), tags: frontmatter.tags, legacyTags, source, sourceDigest, sourceFileDigest, stability, date, searchable: isContentNote(this.vaultRoot, entry.file), sensitive,
+      // D13.6 修正：逻辑路径（vault/...）对本实例 vaultRoot 的父目录求相对——PATHS 只供默认值，
+      // 显式根（测试夹具/非常规 vault）不得被进程级 KNOWLEDGE_ROOT 边界误杀。
+      notes.push({ path: this.#logicalPath(entry.file), title, excerpt: sensitive ? "" : text.slice(0, 280), tags: frontmatter.tags, legacyTags, source, sourceDigest, sourceFileDigest, stability, date, searchable: isContentNote(this.vaultRoot, entry.file), sensitive,
         knowledgeState: frontmatter.values.knowledge_state || "", linkStatus: frontmatter.values.link_status || "",
         qualityStatus: frontmatter.values.quality_status || (frontmatter.values.source || frontmatter.values.source_url ? "traceable" : "needs_source"),
         index: { title: tokens(title), tags: tokens(frontmatter.tags.join(" ")), legacyTags: tokens(legacyTags.join(" ")), body: sensitive ? [] : tokens(text), source: tokens(source) } });
