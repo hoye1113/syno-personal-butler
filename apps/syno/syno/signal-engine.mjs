@@ -1,6 +1,6 @@
 import { signalIdentity } from "./proactive-reliability.mjs";
 
-const DEFAULT_SCHEDULE = Object.freeze({ morningHour: 8, eveningHour: 21, weeklyDay: 0, maxDailyNotifications: 3 });
+const DEFAULT_SCHEDULE = Object.freeze({ morningHour: 8, eveningHour: 21, inspirationHour: 16, weeklyDay: 0, maxDailyNotifications: 3 });
 
 function localDateKey(now) {
   return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
@@ -45,8 +45,12 @@ class SignalEngine {
       });
     const morningKey = `morning:${date}`;
     const eveningKey = `evening:${date}`;
+    const inspirationKey = `inspiration:${date}`;
     if (now.getHours() >= this.schedule.morningHour && !lastRuns[morningKey] && lastRuns.morning !== date) daily.push({ kind: "morning", key: morningKey });
     if (now.getHours() >= this.schedule.eveningHour && !lastRuns[eveningKey] && lastRuns.evening !== date) daily.push({ kind: "evening", key: eveningKey });
+    // D12（2026-09-01）：今日灵感每日一卡，16:00 后 eligible；与 morning/evening 同模式，共享当日预算。
+    // 生成失败时 lastRuns 不标记（下一 tick 重试，直至编排层当日 maxAttempts 终态）；素材不足/终态由编排层标记。
+    if (now.getHours() >= this.schedule.inspirationHour && !lastRuns[inspirationKey] && lastRuns.inspiration !== date) daily.push({ kind: "inspiration", key: inspirationKey });
     return [...daily, ...weekly];
   }
 }

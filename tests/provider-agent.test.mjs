@@ -260,7 +260,7 @@ test("Signal and Priority engines are deterministic and notification-bounded", (
   assert.deepEqual(priority.allocate(20), { digest: 12, ingest: 5, maintenance: 3 });
   const signal = new SignalEngine({ schedule: { morningHour: 8, eveningHour: 20, weeklyDay: 0, maxDailyNotifications: 3 } });
   const now = new Date("2026-07-19T21:00:00+08:00");
-  assert.equal(signal.collect({ now, notificationsToday: 2, highValueEvents: [{ id: "e1" }] }).length, 4); // event + morning + evening + weekly 合并为一个 Bundle
+  assert.equal(signal.collect({ now, notificationsToday: 2, highValueEvents: [{ id: "e1" }] }).length, 5); // event + morning + evening + inspiration + weekly 合并为一个 Bundle
   assert.deepEqual(signal.collect({ now, notificationsToday: 3 }), []);
   assert.match(localDateKey(now), /^2026-07-/);
 });
@@ -382,11 +382,15 @@ test("weekly uses an ISO-week identity and shares the Bundle notification budget
     notificationsToday: 1,
     maxDailyNotifications: 2,
   });
-  assert.deepEqual(evening, [{ kind: "evening", key: "evening:2026-07-19" }]);
+  // D12：21:00 时 evening 与 inspiration（16:00 后 eligible）同时发出；slot 竞争中 evening 在前
+  assert.deepEqual(evening, [
+    { kind: "evening", key: "evening:2026-07-19" },
+    { kind: "inspiration", key: "inspiration:2026-07-19" },
+  ]);
   assert.deepEqual(signal.collect({ now: sunday, notificationsToday: 2, maxDailyNotifications: 2 }), []);
   assert.deepEqual(signal.collect({
     now: new Date("2026-07-19T21:00:00+08:00"),
-    lastRuns: { morning: "2026-07-19", evening: "2026-07-19", weekly: "2026-07-19" },
+    lastRuns: { morning: "2026-07-19", evening: "2026-07-19", inspiration: "2026-07-19", weekly: "2026-07-19" },
     notificationsToday: 0,
     maxDailyNotifications: 2,
   }), [], "v1 cadence keys remain readable during the migration window");

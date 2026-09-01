@@ -61,6 +61,28 @@ function bundlePrompt(bundle) {
   return `这是 Syno 的确定性行动摘要。请基于 today.read 工具，将以下事项整理成不超过 180 字的主人行动建议；保留事项身份和动作，不创建写任务，不扩大权限。\n${items || "请给出今日优先行动。"}${remainder}`;
 }
 
+// D12：灵感生成提示词——要求模型把采样笔记串联出一个具体新观点，不编造笔记外事实
+function inspirationPrompt(notes) {
+  const lines = notes.map((note, index) => {
+    const tags = (note.tags || []).slice(0, 4).join("/");
+    return `${index + 1}. 《${note.title}》${tags ? `（${tags}）` : ""}：${note.excerpt || "（无摘要）"}`;
+  }).join("\n");
+  return `你是主人的知识库管家，正在做「今日灵感」：从知识库采样了几篇笔记，请把它们串联起来，产出一个具体的新观点或意外连接。\n要求：不超过 240 字；必须给出一个具体的串联或观点，不要泛泛的读后感；不得编造笔记里没有的事实；用中文；直接输出灵感正文，不要前后缀。\n今日采样笔记：\n${lines}`;
+}
+
+function inspirationCardMessage(record, notes, bundleId) {
+  const list = notes.map((note, index) => `${index + 1}. ${note.title}`).join("\n");
+  const body = `${record.text}\n\n涉及笔记：\n${list}\n\n回复「有用」或「没用」帮我调准`;
+  return {
+    title: "Syno · 今日灵感",
+    body,
+    text: `Syno · 今日灵感\n${body}`,
+    level: "info",
+    source: "proactive",
+    data: { idempotencyKey: bundleId, signal: "inspiration", inspirationId: record.id },
+  };
+}
+
 // 按信号种类分化文案：晨间突出计划预算、晚间突出进度与到期复习、周复盘突出孤岛主题
 function bodyFor(kind, snapshot, weeklySummary) {
   if (kind === "weekly" && weeklySummary) {
@@ -104,10 +126,10 @@ function prioritiesBody(snapshot) {
 }
 
 class ProactiveOrchestrator {
-  constructor({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery, recordEvent, signalEngine = new SignalEngine(), stateFile = path.join(PATHS.stateRoot, "proactive.json"), stateLock, clock = () => new Date(), quietHours = DEFAULT_QUIET_HOURS } = {}) {
+  constructor({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery, recordEvent, inspirationStore = null, inspirationSampler = null, signalEngine = new SignalEngine(), stateFile = path.join(PATHS.stateRoot, "proactive.json"), stateLock, clock = () => new Date(), quietHours = DEFAULT_QUIET_HOURS } = {}) {
     if (!host || !today || !channels) throw new Error("ProactiveOrchestrator 缺少 host、today 或 channels");
     this.host = host; this.today = today; this.channels = channels; this.conversations = conversations; this.cognitiveRuntime = cognitiveRuntime;
-    this.settingsRegistry = settingsRegistry; this.signalSources = signalSources; this.maintenance = maintenance; this.channelDeliveryOutbox = channelDeliveryOutbox; this.notifications = notifications; this.ownerChannelTargets = ownerChannelTargets; this.wakeDelivery = wakeDelivery; this.recordEvent = recordEvent; this.signalEngine = signalEngine; this.stateFile = stateFile; this.stateLock = stateLock || new ProcessFileLock({ file: `${stateFile}.lock`, timeoutMs: 30_000 }); this.clock = clock; this.quietHours = quietHours; this.timer = null; this.startGeneration = 0;
+    this.settingsRegistry = settingsRegistry; this.signalSources = signalSources; this.maintenance = maintenance; this.channelDeliveryOutbox = channelDeliveryOutbox; this.notifications = notifications; this.ownerChannelTargets = ownerChannelTargets; this.wakeDelivery = wakeDelivery; this.recordEvent = recordEvent; this.inspirationStore = inspirationStore; this.inspirationSampler = inspirationSampler; this.signalEngine = signalEngine; this.stateFile = stateFile; this.stateLock = stateLock || new ProcessFileLock({ file: `${stateFile}.lock`, timeoutMs: 30_000 }); this.clock = clock; this.quietHours = quietHours; this.timer = null; this.startGeneration = 0;
   }
 
   async load({ prepareMigration = true } = {}) {
@@ -184,7 +206,7 @@ class ProactiveOrchestrator {
   #markInactive(state, events, now) {
     const activeKeys = new Set(events.map((event) => String(event.id || event.key || "")));
     for (const subject of Object.values(state.subjects)) {
-      if (subject.active && subject.subjectKey && !activeKeys.has(subject.subjectKey) && !subject.subjectKey.startsWith("morning:") && !subject.subjectKey.startsWith("evening:") && !subject.subjectKey.startsWith("weekly:")) {
+      if (subject.active && subject.subjectKey && !activeKeys.has(subject.subjectKey) && !subject.subjectKey.startsWith("morning:") && !subject.subjectKey.startsWith("evening:") && !subject.subjectKey.startsWith("weekly:") && !subject.subjectKey.startsWith("inspiration:")) {
         subject.active = false;
         subject.resolvedAt = now.toISOString();
         subject.updatedAt = now.toISOString();
@@ -248,12 +270,12 @@ class ProactiveOrchestrator {
         state.subjects[identity.subjectKey].migrationSuppressed = true;
         if (migrationAmbiguous) state.subjects[identity.subjectKey].migrationAmbiguous = true;
       }
-      const scheduledTitles = { morning: "晨间计划", evening: "晚间复盘", weekly: "每周复盘" };
+      const scheduledTitles = { morning: "晨间计划", evening: "晚间复盘", weekly: "每周复盘", inspiration: "今日灵感" };
       return {
         ...signal,
         title: signal.title || scheduledTitles[signal.kind],
         identity,
-        action: signal.action || (signal.kind === "event" ? "请确认下一步处理" : "查看今日安排"),
+        action: signal.action || (signal.kind === "event" ? "请确认下一步处理" : signal.kind === "inspiration" ? "并入本次摘要，明日单独出卡" : "查看今日安排"),
       };
     }).filter((signal) => {
       const subject = state.subjects[signal.identity.subjectKey];
@@ -276,6 +298,53 @@ class ProactiveOrchestrator {
     }
   }
 
+  // D12：灵感卡片生成。失败语义（终态三件套）：
+  // - 素材不足（<2 篇）：当日终态跳过，lastRuns 标记后 SignalEngine 当日不再发出，不投递空卡；
+  // - 生成失败/空文本：attempts 先计数再调用（cap 在 send 之前），lastRuns 不标记，下一 tick 重试；
+  // - 当日 attempts 达 8：终态 failed_terminal，当日不再重试，次日随新 date 重新 eligible。
+  async #composeInspiration(state, bundle, now) {
+    const date = localDateKey(now);
+    if (state.inspiration?.date !== date) state.inspiration = { date, attempts: 0 };
+    let notes = [];
+    try {
+      notes = (await this.inspirationSampler.sample({ now }))?.notes || [];
+    } catch (error) {
+      await this.recordEvent?.("inspiration.sample.failed", { date, error: { code: error?.code || "INSPIRATION_SAMPLE_FAILED", message: String(error?.message || error).slice(0, 300) } }, { level: "error" });
+    }
+    if (notes.length < 2) {
+      state.lastRuns[`inspiration:${date}`] = date;
+      await this.recordEvent?.("inspiration.sample.insufficient", { date, sampled: notes.length });
+      return null;
+    }
+    if (state.inspiration.attempts >= 8) {
+      state.lastRuns[`inspiration:${date}`] = date;
+      await this.recordEvent?.("inspiration.generate.failed_terminal", { date, attempts: state.inspiration.attempts }, { level: "error" });
+      return null;
+    }
+    state.inspiration.attempts += 1;
+    const result = await this.#runAgent(inspirationPrompt(notes), bundle.bundleId);
+    const text = result.job?.status === "completed" ? String(result.job.result?.text || "").trim() : "";
+    if (!text) {
+      await this.recordEvent?.("inspiration.generate.failed", { date, attempts: state.inspiration.attempts, code: result.error?.code || "INSPIRATION_EMPTY_GENERATION" }, { level: "error" });
+      return null;
+    }
+    const record = await this.inspirationStore.create({ date, sampledRefs: notes.map((note) => note.path), text, attempts: state.inspiration.attempts });
+    const message = inspirationCardMessage(record, notes, bundle.bundleId);
+    if (this.cognitiveRuntime?.appendSystemEvent) await this.cognitiveRuntime.appendSystemEvent({ ownerKey: "local-user", threadKey: "main", text: message.text }).catch(() => {});
+    return { message, providerStatus: "completed" };
+  }
+
+  // 灵感记录随 outbox 真实投递落定（覆盖直接投递、drain 回调与重启后 reconcile 三条路径）
+  async #markInspirationDelivered(info, eventId) {
+    const inspirationId = info?.inspirationId;
+    if (!inspirationId || !this.inspirationStore) return;
+    try {
+      await this.inspirationStore.markDelivered(inspirationId, eventId);
+    } catch (error) {
+      await this.recordEvent?.("inspiration.delivered_mark_failed", { inspirationId, eventId, error: { code: error?.code || "INSPIRATION_MARK_FAILED", message: String(error?.message || error).slice(0, 300) } }, { level: "error" });
+    }
+  }
+
   async #deliverBundle(state, bundle, message, now, { deliveryKey: explicitDeliveryKey, shouldContinue = () => true, exclusiveActivePrefix = null } = {}) {
     const targetChannel = this.channels.homeChannel || "web";
     // S1：高精度凭据脱敏门（detectStrictCredential，排除松模式 credential_assignment）。
@@ -294,6 +363,7 @@ class ProactiveOrchestrator {
       targetChannel,
       signalVersions: bundle.signalVersions,
       signalKinds: bundle.signalKinds,
+      inspirationId: message?.data?.inspirationId || null,
       createdAt: now.toISOString(),
     };
     if (this.channelDeliveryOutbox) {
@@ -428,10 +498,14 @@ class ProactiveOrchestrator {
           targetChannel: record.targetChannel,
           signalVersions: payload.signalVersions,
           signalKinds: Array.isArray(payload.signalKinds) ? payload.signalKinds : [],
+          inspirationId: payload.data?.inspirationId || null,
           createdAt: record.createdAt,
         };
       }
-      if (record.status === "delivered") this.#applyBundleDelivered(state, record.sourceId, record.eventId, now);
+      if (record.status === "delivered") {
+        this.#applyBundleDelivered(state, record.sourceId, record.eventId, now);
+        await this.#markInspirationDelivered(state.pendingBundles[record.sourceId], record.eventId);
+      }
     }
   }
 
@@ -441,6 +515,7 @@ class ProactiveOrchestrator {
       const pending = state.pendingBundles?.[bundleId];
       const updated = this.#applyBundleDelivered(state, bundleId, eventId);
       if (!updated) return false;
+      await this.#markInspirationDelivered(pending, eventId);
       await this.save(state);
       if (pending?.targetChannel && this.notifications?.updateDeliveryStatus) {
         await this.notifications.updateDeliveryStatus(`${bundleId}:${pending.targetChannel}:v1`, {
@@ -499,7 +574,7 @@ class ProactiveOrchestrator {
     state.lastEligibleSignals = prepared.length;
     const delivered = [];
     if (prepared.length) {
-      const slot = prepared.find((signal) => ["morning", "evening", "weekly"].includes(signal.kind))?.kind || "event";
+      const slot = prepared.find((signal) => ["morning", "evening", "weekly", "inspiration"].includes(signal.kind))?.kind || "event";
       const bundle = buildProactiveBundle(prepared, { now, slot });
       await this.recordEvent?.("proactive.bundle.created", {
         bundleId: bundle.bundleId,
@@ -509,23 +584,40 @@ class ProactiveOrchestrator {
         status: "created",
       });
       if (!shouldContinue()) return { delivered: [], shouldWake: false };
-      const snapshot = await this.today.snapshot();
-      const weeklySummary = prepared.some((signal) => signal.kind === "weekly") && this.maintenance ? await this.maintenance.weeklySummary() : undefined;
-      const fallback = bundleMessage(bundle, snapshot, weeklySummary);
-      if (!shouldContinue()) return { delivered: [], shouldWake: false };
-      const result = await this.#runAgent(bundlePrompt(bundle), bundle.bundleId);
-      if (!shouldContinue()) return { delivered: [], shouldWake: false };
-      const completedText = result.job?.status === "completed" ? result.job.result?.text : "";
-      const body = completedText ? `${fallback.body}\n\n建议：${completedText}` : fallback.body;
-      const message = completedText ? { ...fallback, body, text: `${fallback.title}\n${body}` } : fallback;
-      if (completedText && this.cognitiveRuntime?.appendSystemEvent) await this.cognitiveRuntime.appendSystemEvent({ ownerKey: "local-user", threadKey: "main", text: message.text }).catch(() => {});
-      if (!shouldContinue()) return { delivered: [], shouldWake: false };
-      const delivery = await this.#deliverBundle(state, bundle, message, now, { shouldContinue });
-      if (delivery.status === "canceled") return { delivered: [], shouldWake: false };
-      if (delivery.status === "delivered") this.#applyBundleDelivered(state, bundle.bundleId, delivery.eventId, now);
-      state.notificationsToday += 1;
-      state.pending[bundle.bundleId] = { signalKey: bundle.bundleId, status: delivery.status };
-      delivered.push({ signal: "bundle", bundleId: bundle.bundleId, providerStatus: result.job?.status, localFallback: !completedText, deliveryStatus: delivery.status, targetChannel: delivery.targetChannel });
+      let message = null;
+      let providerStatus = null;
+      let localFallback = false;
+      if (slot === "inspiration" && this.inspirationSampler && this.inspirationStore) {
+        // D12：灵感卡片自成分支——采样→模型生成→成卡；素材不足/生成失败不投递空卡（详见 #composeInspiration）
+        const composed = await this.#composeInspiration(state, bundle, now);
+        if (!shouldContinue()) return { delivered: [], shouldWake: false };
+        if (composed) ({ message, providerStatus } = composed);
+      } else {
+        const snapshot = await this.today.snapshot();
+        const weeklySummary = prepared.some((signal) => signal.kind === "weekly") && this.maintenance ? await this.maintenance.weeklySummary() : undefined;
+        const fallback = bundleMessage(bundle, snapshot, weeklySummary);
+        if (!shouldContinue()) return { delivered: [], shouldWake: false };
+        const result = await this.#runAgent(bundlePrompt(bundle), bundle.bundleId);
+        if (!shouldContinue()) return { delivered: [], shouldWake: false };
+        const completedText = result.job?.status === "completed" ? result.job.result?.text : "";
+        const body = completedText ? `${fallback.body}\n\n建议：${completedText}` : fallback.body;
+        message = completedText ? { ...fallback, body, text: `${fallback.title}\n${body}` } : fallback;
+        providerStatus = result.job?.status;
+        localFallback = !completedText;
+        if (completedText && this.cognitiveRuntime?.appendSystemEvent) await this.cognitiveRuntime.appendSystemEvent({ ownerKey: "local-user", threadKey: "main", text: message.text }).catch(() => {});
+      }
+      if (message) {
+        if (!shouldContinue()) return { delivered: [], shouldWake: false };
+        const delivery = await this.#deliverBundle(state, bundle, message, now, { shouldContinue });
+        if (delivery.status === "canceled") return { delivered: [], shouldWake: false };
+        if (delivery.status === "delivered") {
+          this.#applyBundleDelivered(state, bundle.bundleId, delivery.eventId, now);
+          await this.#markInspirationDelivered({ inspirationId: message.data?.inspirationId }, delivery.eventId);
+        }
+        state.notificationsToday += 1;
+        state.pending[bundle.bundleId] = { signalKey: bundle.bundleId, status: delivery.status };
+        delivered.push({ signal: "bundle", bundleId: bundle.bundleId, providerStatus, localFallback, deliveryStatus: delivery.status, targetChannel: delivery.targetChannel });
+      }
     }
     if (this.conversations && state.lastPruned !== date) {
       await this.conversations.prune();
@@ -744,7 +836,7 @@ class ProactiveOrchestrator {
       returnAllEligible: true,
     });
     const prepared = this.#prepareSignals(state, signals, now);
-    const slot = prepared.find((signal) => ["morning", "evening", "weekly"].includes(signal.kind))?.kind || "event";
+    const slot = prepared.find((signal) => ["morning", "evening", "weekly", "inspiration"].includes(signal.kind))?.kind || "event";
     const bundle = prepared.length ? buildProactiveBundle(prepared, { now, slot }) : null;
     return {
       enabled: await this.#deliveryEnabled(),

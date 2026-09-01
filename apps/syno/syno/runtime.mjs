@@ -23,6 +23,8 @@ import { IngestWorkflowCoordinator } from "./ingest-workflow-coordinator.mjs";
 import { JobStore } from "./job-store.mjs";
 import { IntakeService } from "./intake.mjs";
 import { KnowledgeStore } from "./knowledge-store.mjs";
+import { InspirationSampler } from "./inspiration-sampler.mjs";
+import { InspirationStore } from "./inspiration-store.mjs";
 import { KnowledgeMaintenanceSource } from "./knowledge-maintenance-source.mjs";
 import { fetchUrlForChat } from "./fetch-url-tool.mjs";
 import { KnowledgeProfileService } from "./knowledge-profile-service.mjs";
@@ -241,6 +243,8 @@ function createSynoRuntime(options = {}) {
   const jobStore = options.jobStore || new JobStore();
   const pendingDecisions = options.pendingDecisions || new PendingDecisionStore();
   const knowledge = options.knowledge || new KnowledgeStore();
+  const inspirationStore = options.inspirationStore || new InspirationStore();
+  const inspirationSampler = options.inspirationSampler || new InspirationSampler({ knowledge, inspirations: inspirationStore });
   const imageStore = options.imageStore || new IsolatedImageStore({
     quarantineRoots: [
       path.join(PATHS.runtimeRoot, "quarantine", "weixin"),
@@ -788,6 +792,7 @@ function createSynoRuntime(options = {}) {
     wakeDelivery: () => drainChannelDeliveryOutbox().catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })),
     imageStore,
     visionClient,
+    inspirationStore,
   });
   if (acceptedRecovery && typeof channelConversationHandler.processAcceptedRequest === "function") {
     acceptedRecovery.processRequest = (request) => channelConversationHandler.processAcceptedRequest(request);
@@ -1102,7 +1107,7 @@ function createSynoRuntime(options = {}) {
   reports = new ReportService({ host, knowledge, notifications, channels, gitGuard });
   const today = options.today || new TodayService({ goals, host, settingsRegistry, signalSources, planner });
   core = new SynoCore({ host, knowledge, notifications, channels, reports, today });
-  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance: knowledgeMaintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery: (deliveryOptions) => drainChannelDeliveryOutbox(deliveryOptions).catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })), recordEvent });
+  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance: knowledgeMaintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, inspirationStore, inspirationSampler, wakeDelivery: (deliveryOptions) => drainChannelDeliveryOutbox(deliveryOptions).catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })), recordEvent });
   const approvalAdvisor = options.approvalAdvisor || new ApprovalAdvisor({ ingest });
   let channelRecoveryTimer = null;
   let providerRecoveryTimer = null;

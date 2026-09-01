@@ -4,7 +4,7 @@ All directories below are durable Markdown records. Terminal states are retained
 
 - `jobs/`: stateful work requests and approvals
 - `actions/`: deterministic side effects
-- `content/`: ContentIdea and ContentBrief records
+- `content/`: ContentIdea, ContentBrief, OutputOpportunity (`content/opportunities/`) and daily inspiration cards (`content/inspirations/`)
 - `memory/`: MemoryProposal records
 - `artifacts/`: intake snapshots and quarantined attachments
 - `events/`: immutable lifecycle events
