@@ -17,6 +17,11 @@ function validateChangedPaths(paths, decision) {
   const normalized = [...new Set((paths || []).map(normalizeRelative).filter(Boolean))];
   const forbidden = normalized.filter((item) => item === ".git" || item.startsWith(".git/") || item.startsWith(".runtime/") || item.includes("../"));
   if (forbidden.length) throw new Error(`检测到禁止变更路径：${forbidden.join(", ")}`);
+  // D10（2026-09-01）：无论 Profile，Job 变更只允许落在 vault/** 与 ops/**；
+  // 源码根/仓库根文件没有任何意图可以写入。
+  const structuralRoots = ["vault/", "ops/"];
+  const offRoot = normalized.filter((item) => !structuralRoots.some((root) => item.startsWith(root)));
+  if (offRoot.length) throw new Error(`变更超出管家允许根（vault/、ops/）：${offRoot.join(", ")}`);
   const allowed = decision.allowedRoots || [];
   if (!allowed.length && normalized.length) throw new Error("只读 Profile 产生了文件变更");
   const outside = normalized.filter((item) => !allowed.some((root) => item === root || item.startsWith(`${root}/`)));

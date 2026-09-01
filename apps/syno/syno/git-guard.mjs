@@ -9,6 +9,11 @@ import { ProcessFileLock } from "./process-lock.mjs";
 
 const execFileAsync = promisify(execFile);
 
+// D10（2026-09-01）：产品自动提交的结构性硬闸门——只允许 vault/** 与 ops/**。
+// 这是所有产品提交（Job 执行、收录合并、报告投递、运行记录）的唯一暂存咽喉，
+// 源码根与仓库根文件永远不可能经产品路径进入提交。
+const PRODUCT_COMMIT_ROOTS = Object.freeze(["vault/", "ops/"]);
+
 async function git(args, { cwd = PATHS.repoRoot, allowExitCodes = [] } = {}) {
   try {
     // 全局禁用 core.quotepath：否则非 ASCII 暂存路径会被八进制转义并加引号输出，
@@ -81,8 +86,7 @@ function diffHash(value) {
 }
 
 class GitGuard {
-  constructor({ repoRoot = PATHS.repoRoot, worktreeRoot = PATHS.worktreeRoot, lockFile } = {}) {
-    this.repoRoot = repoRoot;
+  constructor({ repoRoot = PATHS.repoRoot, worktreeRoot = PATHS.worktreeRoot, lockFile } = {}) {    this.repoRoot = repoRoot;
     this.worktreeRoot = worktreeRoot;
     const resolvedLockFile = lockFile || (path.resolve(repoRoot) === path.resolve(PATHS.repoRoot)
       ? path.join(PATHS.runtimeRoot, "locks", "repository-git.lock")
@@ -142,6 +146,8 @@ class GitGuard {
   async #commitPaths(paths, message, cwd) {
     const normalized = [...new Set(paths.map((item) => item.replace(/\\/g, "/")))];
     if (!normalized.length) return { committed: false, reason: "no_changes" };
+    const outsideRoots = normalized.filter((item) => !PRODUCT_COMMIT_ROOTS.some((root) => item.startsWith(root)));
+    if (outsideRoots.length) throw new Error(`产品自动提交只允许 vault/** 与 ops/**，拒绝暂存：${outsideRoots.join(", ")}`);
     const pathspec = Buffer.from(`${normalized.map((item) => `:(literal)${item}`).join("\0")}\0`, "utf8");
     await gitWithInput(["add", "--pathspec-from-file=-", "--pathspec-file-nul"], pathspec, { cwd });
     const staged = await git(["diff", "--cached", "--name-only"], { cwd });

@@ -19,13 +19,10 @@ const DEFAULT_VALUES = Object.freeze({
   "ui.displayOrder": Object.freeze(["today", "capture", "knowledge", "learn", "create"]),
   "ui.preferences": Object.freeze({ reducedDensity: false }),
   "context.thresholds": null,
-  // trust-but-clarify 安全开关：默认关。仅用户（带 confirmed）可翻；Agent 永不可改。
-  "policy.allowSelfModify": false,
-  "policy.allowSystemControl": false,
 });
 
 function validateValue(key, value) {
-  if ((key === "notifications.proactiveDeliveryEnabled" || key === "policy.allowSelfModify" || key === "policy.allowSystemControl") && typeof value !== "boolean") throw new Error(`${key} 必须为布尔值`);
+  if (key === "notifications.proactiveDeliveryEnabled" && typeof value !== "boolean") throw new Error(`${key} 必须为布尔值`);
   if (key === "notifications.proactiveReleaseEvidence") {
     const valid = value === null || (value
       && typeof value === "object"

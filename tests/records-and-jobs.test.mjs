@@ -206,10 +206,10 @@ test("read-only jobs reject mutations hidden behind an already-dirty path", asyn
   const store = new JobStore({ opsRoot });
   let snapshots = 0;
   const git = {
-    async changedPaths() { return ["apps/syno/public/syno.js"]; },
+    async changedPaths() { return ["vault/hidden-mutation.md"]; },
     async changeSnapshot() {
       snapshots += 1;
-      return [{ status: " M", path: "apps/syno/public/syno.js", kind: "existing", fingerprint: snapshots === 1 ? "before" : "after" }];
+      return [{ status: " M", path: "vault/hidden-mutation.md", kind: "existing", fingerprint: snapshots === 1 ? "before" : "after" }];
     },
     async commitPaths() { return { committed: false }; },
   };

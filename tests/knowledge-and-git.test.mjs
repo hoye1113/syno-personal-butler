@@ -99,20 +99,40 @@ test("GitGuard commits only declared paths", async (t) => {
   await fs.writeFile(path.join(root, "base.md"), "base\n");
   await exec("git", ["add", "--", "base.md"], { cwd: root });
   await exec("git", ["commit", "-m", "base"], { cwd: root });
-  await fs.writeFile(path.join(root, "declared.md"), "declared\n");
+  await fs.mkdir(path.join(root, "vault"), { recursive: true });
+  await fs.writeFile(path.join(root, "vault", "declared.md"), "declared\n");
   await fs.writeFile(path.join(root, "unrelated.md"), "unrelated\n");
   const guard = new GitGuard({ repoRoot: root, worktreeRoot: path.join(root, ".worktrees") });
   assert.equal(guard.writeLock.file, path.join(root, ".runtime", "locks", "repository-git.lock"));
   await fs.mkdir(path.dirname(guard.writeLock.file), { recursive: true });
   await fs.writeFile(guard.writeLock.file, "owned by GitGuard");
-  assert.deepEqual((await guard.changedPaths()).sort(), ["declared.md", "unrelated.md"]);
+  assert.deepEqual((await guard.changedPaths()).sort(), ["unrelated.md", "vault/declared.md"]);
   await fs.rm(guard.writeLock.file, { force: true });
-  const result = await guard.commitPaths(["declared.md"], "test: declared only");
+  const result = await guard.commitPaths(["vault/declared.md"], "test: declared only");
   assert.equal(result.committed, true);
-  assert.deepEqual(result.paths, ["declared.md"]);
+  assert.deepEqual(result.paths, ["vault/declared.md"]);
   assert.deepEqual(await guard.changedPaths(), ["unrelated.md"]);
   const tracked = (await exec("git", ["show", "--name-only", "--format="], { cwd: root })).stdout.trim();
-  assert.equal(tracked, "declared.md");
+  assert.equal(tracked, "vault/declared.md");
+});
+
+test("GitGuard refuses to stage anything outside vault/ and ops/ (D10 structural gate)", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-git-gate-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await exec("git", ["init", "-b", "main"], { cwd: root });
+  await exec("git", ["config", "user.name", "Syno Test"], { cwd: root });
+  await exec("git", ["config", "user.email", "syno-test@localhost"], { cwd: root });
+  await fs.writeFile(path.join(root, "base.md"), "base\n");
+  await exec("git", ["add", "--", "base.md"], { cwd: root });
+  await exec("git", ["commit", "-m", "base"], { cwd: root });
+  await fs.mkdir(path.join(root, "apps"), { recursive: true });
+  await fs.writeFile(path.join(root, "apps", "evil.mjs"), "evil\n");
+  const guard = new GitGuard({ repoRoot: root, worktreeRoot: path.join(root, ".worktrees") });
+  await assert.rejects(guard.commitPaths(["apps/evil.mjs"], "test: must refuse"), /只允许 vault\/\*\* 与 ops\/\*\*/);
+  // 拒绝发生在暂存之前：工作区与暂存区都不应有任何变化。
+  assert.deepEqual(await guard.changedPaths(), ["apps/evil.mjs"]);
+  const head = (await exec("git", ["log", "--oneline"], { cwd: root })).stdout.trim().split(/\r?\n/).length;
+  assert.equal(head, 1);
 });
 
 test("GitGuard commits hundreds of long declared paths without exceeding the Windows command line", async (t) => {
@@ -125,7 +145,8 @@ test("GitGuard commits hundreds of long declared paths without exceeding the Win
   await exec("git", ["add", "--", "base.md"], { cwd: root });
   await exec("git", ["commit", "-m", "base"], { cwd: root });
 
-  const declared = Array.from({ length: 426 }, (_, index) => `note-${String(index).padStart(3, "0")}-${"long-path-".repeat(11)}.md`);
+  const declared = Array.from({ length: 426 }, (_, index) => `vault/note-${String(index).padStart(3, "0")}-${"long-path-".repeat(11)}.md`);
+  await fs.mkdir(path.join(root, "vault"), { recursive: true });
   await Promise.all(declared.map((relative) => fs.writeFile(path.join(root, relative), `${relative}\n`)));
   await fs.writeFile(path.join(root, "unrelated.md"), "must remain untracked\n");
 
@@ -143,7 +164,7 @@ test("GitGuard surfaces git add failures as a clean error without crashing the w
   const guard = new GitGuard({ repoRoot: root, worktreeRoot: path.join(root, ".worktrees") });
   // 非 git 目录：git add 在仓库发现阶段即以 128 退出，根本不读 stdin；超过管道缓冲的 pathspec 经 stdin
   // 写入会触发 EPIPE。真实失败已由 execFile 回调捕获，此处验证对外是干净 reject，而非未捕获 'error' 崩溃 worker。
-  const oversized = Array.from({ length: 600 }, (_, index) => `note-${String(index).padStart(4, "0")}-${"x".repeat(120)}.md`);
+  const oversized = Array.from({ length: 600 }, (_, index) => `vault/note-${String(index).padStart(4, "0")}-${"x".repeat(120)}.md`);
   await assert.rejects(guard.commitPaths(oversized, "non-repo failure", root), (error) => /git add 失败/.test(error.message));
 });
 
@@ -187,11 +208,13 @@ test("GitGuard rejects a branch changed after its diff approval", async (t) => {
   await exec("git", ["commit", "-m", "base"], { cwd: root });
   const guard = new GitGuard({ repoRoot: root, worktreeRoot: path.join(root, ".worktrees") });
   const worktree = await guard.prepareWorktree("pin-test");
-  await fs.writeFile(path.join(worktree.directory, "new.md"), "approved\n");
-  await guard.commitPaths(["new.md"], "approved", worktree.directory);
+  await fs.mkdir(path.join(worktree.directory, "vault"), { recursive: true });
+  await fs.writeFile(path.join(worktree.directory, "vault", "new.md"), "approved\n");
+  await guard.commitPaths(["vault/new.md"], "approved", worktree.directory);
   const approved = await guard.pinWorktree(worktree);
-  await fs.writeFile(path.join(worktree.directory, "later.md"), "not approved\n");
-  await exec("git", ["add", "--", "later.md"], { cwd: worktree.directory });
+  await fs.mkdir(path.join(worktree.directory, "vault"), { recursive: true });
+  await fs.writeFile(path.join(worktree.directory, "vault", "later.md"), "not approved\n");
+  await exec("git", ["add", "--", "vault/later.md"], { cwd: worktree.directory });
   await exec("git", ["commit", "-m", "mutated after preview"], { cwd: worktree.directory });
   await assert.rejects(guard.mergeWorktree({ ...worktree, commit: approved.commit, diffHash: approved.diffHash }), /审批后发生变化/);
   await guard.removeWorktree(worktree);

@@ -43,4 +43,7 @@ test("changed path validator enforces Profile roots", () => {
   assert.throws(() => validateChangedPaths(["vault/a.md"], evaluate({ intent: "create_content_idea" })), /允许范围/);
   assert.throws(() => validateChangedPaths(["ops/a.md"], evaluate({ intent: "search" })), /只读/);
   assert.throws(() => validateChangedPaths(["../secret"], evaluate({ intent: "delete" })), /禁止/);
+  // D10：即使 curate profile（含 vault+ops），源码根/仓库根也被结构性拒绝。
+  assert.throws(() => validateChangedPaths(["apps/syno/x.mjs"], evaluate({ intent: "curate_note" })), /允许根/);
+  assert.throws(() => validateChangedPaths(["AGENTS.md"], evaluate({ intent: "curate_note" })), /允许根/);
 });
