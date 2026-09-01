@@ -12,7 +12,8 @@
 | `AGENTS.md` | Agent 执行契约、权限边界、编码和源码修改规则 | Normative |
 | `docs/ARCHITECTURE.md` | 当前模块边界、数据流和事务边界 | Normative |
 | `docs/POLICY.md` | Owner、Policy、Job、工具和写入权限 | Normative |
-| `docs/project-aware-knowledge-execution-plan.md` | Project-aware Knowledge MVP 的唯一执行事实源 | IN_PROGRESS |
+| `docs/project-aware-knowledge-execution-plan.md` | Project-aware Knowledge MVP 的唯一执行事实源 | IN_PROGRESS（Phase 5 待按新计划关闭为 superseded） |
+| `docs/product-slimming-and-inspiration-plan.md` | 产品精简与今日灵感的执行计划；Owner 批准后成为唯一执行入口 | DRAFT（待 Owner 批准） |
 | `contracts/*.schema.json` | 机器可校验的数据契约 | Normative |
 | `config/deepseek-harness/syno-agent.md` | DSH Syno Agent 的工具与行为边界 | Normative |
 | `vault/AGENTS.md`、`vault/99-System/Agent/` | 知识收录、关联、写作和 MOC 规则 | Normative |
