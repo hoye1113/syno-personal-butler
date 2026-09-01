@@ -193,7 +193,6 @@ class IngestWorkflowCoordinator {
     reconcileExecution = null,
     browserCapture = null,
     browserRuntime = null,
-    projectService = null,
     maxPrepareAttempts = 8,
   } = {}) {
     if (!ingest) throw new Error("IngestWorkflowCoordinator 缺少 IngestService");
@@ -210,7 +209,6 @@ class IngestWorkflowCoordinator {
     this.reconcileExecution = reconcileExecution;
     this.browserCapture = browserCapture;
     this.browserRuntime = browserRuntime;
-    this.projectService = projectService;
     // R2：#prepare 的 retryable 失败此前无上限——C3 把 retryDue 接上 60s timer 后，持续 retryable 错误
     // （如 PROVIDER_RATE_LIMITED）会每 60s 无限重投、永不升终态。镜像 effect-store 的 maxAttempts，
     // 达上限转 failed_terminal（ingest 工作流的合法终态），封堵本系列自身引入的无界重试。
@@ -219,7 +217,7 @@ class IngestWorkflowCoordinator {
     this.receiveTail = Promise.resolve();
   }
 
-  configure({ contextCompiler, analyze, onProposed, onDuplicate, onEvent, decisionExecutor, reconcileExecution, browserCapture, browserRuntime, projectService } = {}) {
+  configure({ contextCompiler, analyze, onProposed, onDuplicate, onEvent, decisionExecutor, reconcileExecution, browserCapture, browserRuntime } = {}) {
     if (contextCompiler) this.contextCompiler = contextCompiler;
     if (analyze) this.analyze = analyze;
     if (onProposed) this.onProposed = onProposed;
@@ -229,7 +227,6 @@ class IngestWorkflowCoordinator {
     if (reconcileExecution) this.reconcileExecution = reconcileExecution;
     if (browserCapture) this.browserCapture = browserCapture;
     if (browserRuntime) this.browserRuntime = browserRuntime;
-    if (projectService) this.projectService = projectService;
     return this;
   }
 
@@ -237,9 +234,8 @@ class IngestWorkflowCoordinator {
     const owner = String(context.ownerKey || "local-user");
     const channel = String(context.channel || "web");
     const messageId = String(context.messageId || "");
-    const projectScope = context.projectRef ? `\0project:${String(context.projectRef)}` : "";
-    if (messageId) return digest(`${owner}\0${channel}\0${messageId}${projectScope}`);
-    return digest(`${owner}\0${input.kind}\0${input.value || input.base64 || ""}${projectScope}`);
+    if (messageId) return digest(`${owner}\0${channel}\0${messageId}`);
+    return digest(`${owner}\0${input.kind}\0${input.value || input.base64 || ""}`);
   }
 
   #sourceIdentityKey(input, context) {
@@ -252,8 +248,7 @@ class IngestWorkflowCoordinator {
     const source = descriptor.canonicalUrl
       ? `url:${descriptor.canonicalUrl}`
       : descriptor.contentSha256 ? `file:${descriptor.contentSha256}` : "";
-    const projectScope = context.projectRef ? `\0project:${String(context.projectRef)}` : "";
-    return source ? digest(`${String(context.ownerKey || "local-user")}\0${source}${projectScope}`) : "";
+    return source ? digest(`${String(context.ownerKey || "local-user")}\0${source}`) : "";
   }
 
   async receive(input, context = {}) {
@@ -292,16 +287,10 @@ class IngestWorkflowCoordinator {
     const originChannel = String(context.channel || "web");
     const threadKey = String(context.threadKey || "main");
     const platformMessageId = String(context.messageId || "");
-    const projectRef = String(context.projectRef || "").trim();
-    if (projectRef) {
-      if (!this.projectService) throw Object.assign(new Error("Project 上下文校验服务未配置"), { code: "PROJECT_CONTEXT_UNAVAILABLE" });
-      await this.projectService.validateProjectReference({ ownerKey, projectRef, forBinding: true });
-    }
     const receipt = await this.ingest.receive(input, {
       ownerId: ownerKey,
       channel: originChannel,
       messageId: platformMessageId,
-      projectRef,
     });
     const now = this.clock().toISOString();
     const workflow = await this.store.create({
@@ -320,7 +309,6 @@ class IngestWorkflowCoordinator {
       updatedAt: now,
       idempotencyKey,
       ...(sourceIdentityKey ? { sourceIdentityKey } : {}),
-      ...(projectRef ? { projectRef } : {}),
       ...(context.replyTarget ? { deliveryTarget: context.replyTarget } : {}),
     });
     this.schedule(() => this.#prepare(workflow.id));
@@ -621,15 +609,12 @@ class IngestWorkflowCoordinator {
     }
   }
 
-  async status(reference, { ownerKey, projectRef, scopeProject = false } = {}) {
+  async status(reference, { ownerKey } = {}) {
     const direct = String(reference || "").startsWith("workflow-") ? await this.store.get(reference) : null;
     const item = direct || (await this.store.list()).find((candidate) => candidate.artifactId === reference) || null;
     if (!item) return null;
     if (ownerKey !== undefined && String(item.ownerKey || "") !== String(ownerKey || "")) {
       throw Object.assign(new Error("不能读取其他 Owner 的收录 Workflow"), { code: "INGEST_WORKFLOW_OWNER_MISMATCH" });
-    }
-    if (scopeProject && String(item.projectRef || "") !== String(projectRef || "")) {
-      throw Object.assign(new Error("当前 Project 不能读取该收录 Workflow"), { code: "PROJECT_CONTEXT_MISMATCH" });
     }
     return item;
   }
@@ -686,13 +671,12 @@ class IngestWorkflowCoordinator {
     }
   }
 
-  async listPending(ownerKey, { projectRef } = {}) {
+  async listPending(ownerKey) {
     if (!String(ownerKey || "").trim()) {
       throw Object.assign(new Error("列出收录 Workflow 缺少 Owner"), { code: "INGEST_WORKFLOW_OWNER_REQUIRED" });
     }
     return (await this.store.list({ ownerKey, includeTerminal: false }))
-      .filter((item) => PENDING_STAGES.has(item.stage))
-      .filter((item) => projectRef === undefined || String(item.projectRef || "") === String(projectRef || ""));
+      .filter((item) => PENDING_STAGES.has(item.stage));
   }
 
   async recover() {
@@ -809,7 +793,6 @@ class IngestWorkflowCoordinator {
     }
     const workflow = await this.status(reference, {
       ownerKey: context.ownerKey,
-      ...(Object.hasOwn(context, "projectRef") ? { projectRef: context.projectRef, scopeProject: true } : {}),
     });
     if (!workflow) throw Object.assign(new Error(`IngestWorkflow 不存在：${reference}`), { code: "INGEST_WORKFLOW_MISSING" });
     if (workflow.browserStatus !== "interaction_required") {
@@ -868,7 +851,6 @@ class IngestWorkflowCoordinator {
   async decide(reference, decision = {}, context = {}) {
     let workflow = await this.status(reference, {
       ownerKey: context.ownerKey,
-      ...(Object.hasOwn(context, "projectRef") ? { projectRef: context.projectRef, scopeProject: true } : {}),
     });
     if (!workflow) throw Object.assign(new Error(`IngestWorkflow 不存在：${reference}`), { code: "INGEST_WORKFLOW_MISSING" });
     if (context.ownerKey && workflow.ownerKey !== context.ownerKey) {
@@ -925,7 +907,6 @@ class IngestWorkflowCoordinator {
           createdAt: now,
           updatedAt: now,
           idempotencyKey: digest(`${workflow.idempotencyKey || workflow.id}\0rules\0${currentBundle.rulesDigest}`),
-          ...(workflow.projectRef ? { projectRef: workflow.projectRef } : {}),
           ...(workflow.deliveryTarget ? { deliveryTarget: workflow.deliveryTarget } : {}),
         });
         this.schedule(() => this.#prepare(replacement.id));

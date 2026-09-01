@@ -530,7 +530,6 @@ class DeepSeekHarnessCognitiveRuntime {
               channel: context.channel,
               messageId: context.messageId,
               runId,
-              ...(context.projectRef ? { projectRef: String(context.projectRef) } : {}),
               allowedTools,
               ...(context.browserWorkflowId ? { browserWorkflowId: context.browserWorkflowId } : {}),
               ...(context.browserCloseAuthorized === true ? { browserCloseAuthorized: true } : {}),

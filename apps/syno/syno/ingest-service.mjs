@@ -217,30 +217,9 @@ class IngestService {
   // 按目标笔记路径串行化 append/link 的读-改-写，避免并发收录决策互相覆盖丢失（R3）。
   #targetLocks = new Map();
 
-  constructor({ intake = new IntakeService(), knowledge, opsRoot = PATHS.opsRoot, stateRoot = path.join(PATHS.stateRoot, "ingest"), clock = () => new Date(), projectService = null } = {}) {
+  constructor({ intake = new IntakeService(), knowledge, opsRoot = PATHS.opsRoot, stateRoot = path.join(PATHS.stateRoot, "ingest"), clock = () => new Date() } = {}) {
     if (!knowledge) throw new Error("IngestService 缺少 KnowledgeStore");
-    this.intake = intake; this.knowledge = knowledge; this.opsRoot = opsRoot; this.stateRoot = stateRoot; this.clock = clock; this.projectService = projectService;
-  }
-
-  async #validateProject(state) {
-    if (!state?.projectRef) return null;
-    if (!this.projectService) throw Object.assign(new Error("Project 上下文校验服务未配置"), { code: "PROJECT_CONTEXT_UNAVAILABLE" });
-    return this.projectService.validateProjectReference({ ownerKey: state.ownerId, projectRef: state.projectRef });
-  }
-
-  async #validateProposalProjects(state) {
-    const expected = state?.projectRef ? [String(state.projectRef)] : [];
-    const actual = [...new Set(Array.isArray(state?.proposal?.suggestedProjectRefs)
-      ? state.proposal.suggestedProjectRefs.map(String)
-      : [])];
-    if (actual.length && (actual.length !== expected.length || actual.some((ref, index) => ref !== expected[index]))) {
-      throw Object.assign(new Error("收录方案中的 Project 关系与请求上下文不一致"), { code: "PROJECT_CONTEXT_PROPOSAL_MISMATCH" });
-    }
-    for (const projectRef of actual) {
-      if (!this.projectService) throw Object.assign(new Error("Project 上下文校验服务未配置"), { code: "PROJECT_CONTEXT_UNAVAILABLE" });
-      await this.projectService.validateProjectReference({ ownerKey: state.ownerId, projectRef });
-    }
-    return actual.length ? actual : expected;
+    this.intake = intake; this.knowledge = knowledge; this.opsRoot = opsRoot; this.stateRoot = stateRoot; this.clock = clock;
   }
 
   // 串行化对同一目标文件的写；空闲后清条目防止 Map 无界增长。
@@ -253,8 +232,7 @@ class IngestService {
     return result;
   }
 
-  async receive(payload, { ownerId = "local-user", channel = "web", messageId = "", projectRef = "" } = {}) {
-    await this.#validateProject({ ownerId, projectRef });
+  async receive(payload, { ownerId = "local-user", channel = "web", messageId = "" } = {}) {
     const now = this.clock().toISOString();
     const id = `artifact-${now.slice(0, 10).replaceAll("-", "")}-${randomUUID().slice(0, 8)}`;
     const serialized = JSON.stringify(payload);
@@ -267,7 +245,7 @@ class IngestService {
       dedupeKey: createHash("sha256").update(serialized).digest("hex"),
     };
     const localFile = path.join(this.stateRoot, `${id}.json`);
-    await atomicJson(localFile, { payload, ownerId, channel, messageId, status: "received", created: now, artifact: record, ...(projectRef ? { projectRef } : {}) });
+    await atomicJson(localFile, { payload, ownerId, channel, messageId, status: "received", created: now, artifact: record });
     return { artifact: record, proposalPending: true };
   }
 
@@ -298,7 +276,6 @@ class IngestService {
   async propose(id) {
     const stateFile = path.join(this.stateRoot, `${id}.json`);
     const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
-    await this.#validateProject(state);
     if (state.status === "proposed" && state.candidate && state.proposal) {
       return { candidate: state.candidate, proposal: state.proposal };
     }
@@ -307,7 +284,7 @@ class IngestService {
         ? { ...state.payload, browserSnapshot: state.browserSnapshot }
         : state.payload);
     const title = titleFromPrepared(prepared, state.payload);
-    const titleMatches = await this.knowledge.search(title, { limit: 5, projectRef: state.projectRef || "" });
+    const titleMatches = await this.knowledge.search(title, { limit: 5 });
     const now = this.clock().toISOString();
     const candidate = {
       id: `candidate-${randomUUID().slice(0, 8)}`, artifactId: id, title, summary: String(prepared.content || prepared.text || "").slice(0, 280),
@@ -347,7 +324,6 @@ class IngestService {
       ],
       validators: ["source-traceability", "duplicate", "frontmatter", "vault-contract"],
       sourceDigest,
-      ...(state.projectRef ? { suggestedProjectRefs: [state.projectRef] } : {}),
       ...(matches[0] ? { existingNoteRef: matches[0].path } : {}),
     };
     const proposal = { ...proposalBase, proposalDigest: objectDigest(proposalBase) };
@@ -363,8 +339,6 @@ class IngestService {
   async revise(id, revisionRequest) {
     const stateFile = path.join(this.stateRoot, `${id}.json`);
     const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
-    await this.#validateProject(state);
-    await this.#validateProposalProjects(state);
     if (!state.proposal) throw Object.assign(new Error("收录方案尚未生成"), { code: "INGEST_PROPOSAL_MISSING" });
     const revision = String(revisionRequest || "").trim();
     if (!revision) throw Object.assign(new Error("修改要求不能为空"), { code: "INGEST_REVISION_REQUIRED" });
@@ -388,8 +362,6 @@ class IngestService {
     const stateFile = path.join(this.stateRoot, `${id}.json`);
     const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
     if (!state.proposal) throw Object.assign(new Error("收录方案尚未生成"), { code: "INGEST_PROPOSAL_MISSING" });
-    await this.#validateProject(state);
-    await this.#validateProposalProjects(state);
     const allowedRelations = new Set(["supports", "extends", "contradicts", "limits", "depends_on", "applies_to", "example_of"]);
     const relationInputs = Array.isArray(analysis.relations) ? analysis.relations : state.proposal.relations;
     const allowedRelationTargets = new Set(state.candidate?.dedupeMatches || []);
@@ -482,7 +454,7 @@ class IngestService {
     const proposal = state.proposal || {};
     const payload = state.payload || {};
     const relationCandidates = candidate.title && typeof this.knowledge.search === "function"
-      ? (await this.knowledge.search(candidate.title, { limit: 5, projectRef: state.projectRef || "" }))
+      ? (await this.knowledge.search(candidate.title, { limit: 5 }))
         .filter((item) => item.path && item.excerpt && item.sensitive !== true)
         .map((item) => ({ path: item.path, title: item.title, excerpt: String(item.excerpt).slice(0, 800) }))
       : [];
@@ -516,17 +488,12 @@ class IngestService {
     return pending.sort((a, b) => String(b.created || "").localeCompare(String(a.created || ""))).slice(0, limit);
   }
 
-  async apply(id, { workspace = PATHS.repoRoot, decision, expectedOwnerKey, expectedProjectRef } = {}) {
+  async apply(id, { workspace = PATHS.repoRoot, decision, expectedOwnerKey } = {}) {
     const state = JSON.parse(await fs.readFile(path.join(this.stateRoot, `${id}.json`), "utf8"));
     if (!state.proposal) throw Object.assign(new Error("收录方案尚未生成"), { code: "INGEST_PROPOSAL_MISSING" });
     if (expectedOwnerKey !== undefined && String(state.ownerId || "") !== String(expectedOwnerKey || "")) {
-      throw Object.assign(new Error("收录 Workflow 与执行 Job 的 Owner 不一致"), { code: "PROJECT_WORKFLOW_OWNER_MISMATCH" });
+      throw Object.assign(new Error("收录 Workflow 与执行 Job 的 Owner 不一致"), { code: "INGEST_WORKFLOW_OWNER_MISMATCH" });
     }
-    if (expectedProjectRef !== undefined && String(state.projectRef || "") !== String(expectedProjectRef || "")) {
-      throw Object.assign(new Error("收录 Workflow 与执行 Job 的 Project 不一致"), { code: "PROJECT_WORKFLOW_PROJECT_MISMATCH" });
-    }
-    await this.#validateProject(state);
-    const projectRefs = await this.#validateProposalProjects(state);
     const action = String(decision?.action || "");
     if (!action) throw Object.assign(new Error("必须提供显式收录决策"), { code: "INGEST_DECISION_REQUIRED" });
     const allowed = state.proposal.risk === "additive"
@@ -554,11 +521,8 @@ class IngestService {
     const factualStatus = bilibiliProfile?.factualStatus || (descriptor.verificationStatus === "verified" ? "partial" : "unverified");
     const specialized = renderBilibiliFrontmatter(bilibiliProfile, state.proposal.materialTier);
     const genericSource = bilibiliProfile ? "" : `factual_status: ${factualStatus}\n`;
-    const projectFrontmatter = (action === "create" || action === "keep-separate") && projectRefs.length
-      ? `project_refs: ${JSON.stringify(projectRefs)}\n`
-      : "";
     const noteBody = bilibiliProfile ? state.proposal.canonicalBody : (state.prepared.content || state.prepared.text);
-    const content = `---\ntitle: ${JSON.stringify(state.candidate.title)}\ntags: ${JSON.stringify(canonicalTags)}\n${projectFrontmatter}created: ${String(state.created).slice(0, 10)}\nsource: ${JSON.stringify(sourceRef)}\ndescription: ${JSON.stringify(description)}\nknowledge_state: captured\nlink_status: ${relations.length ? "connected" : "orphan"}\n${genericSource}${specialized}source_kind: ${descriptor.kind}\nsource_reliability: ${descriptor.reliability}\nsource_verification: ${descriptor.verificationStatus}\n${sourceUrl}${sourceDigest}${sourceFileDigest}---\n\n# ${state.candidate.title}\n\n${noteBody}\n\n## 关系状态\n\n${renderRelations(relations)}\n`;
+    const content = `---\ntitle: ${JSON.stringify(state.candidate.title)}\ntags: ${JSON.stringify(canonicalTags)}\ncreated: ${String(state.created).slice(0, 10)}\nsource: ${JSON.stringify(sourceRef)}\ndescription: ${JSON.stringify(description)}\nknowledge_state: captured\nlink_status: ${relations.length ? "connected" : "orphan"}\n${genericSource}${specialized}source_kind: ${descriptor.kind}\nsource_reliability: ${descriptor.reliability}\nsource_verification: ${descriptor.verificationStatus}\n${sourceUrl}${sourceDigest}${sourceFileDigest}---\n\n# ${state.candidate.title}\n\n${noteBody}\n\n## 关系状态\n\n${renderRelations(relations)}\n`;
     const changedPaths = [];
     if (action === "create" || action === "keep-separate") {
       // 「存在性检查 + 写」也按目标串行化，避免并发同路径新建的 TOCTOU（两者都见 ENOENT 后互相覆盖）（R3 补齐）。

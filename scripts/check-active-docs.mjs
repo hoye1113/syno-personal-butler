@@ -26,8 +26,6 @@ const forbidden = [
 const required = new Map([
   ["docs/INDEX.md", ["Normative", "Historical", "Generated", "project-aware-knowledge-execution-plan.md"]],
   ["docs/project-aware-knowledge-execution-plan.md", ["projectRef", "PROJECT_BOOST = 3", "DEFERRED_EXISTING_NOTE_PROJECT_LINK", "BLOCKED_DESIGN_DEVIATION", "paused → active", "ToolLoopExecutor", "Job ID", "UI/DOM"]],
-  ["docs/ARCHITECTURE.md", ["projects.list", "projects.create", "projects.update_status"]],
-  ["docs/POLICY.md", ["projects.list", "projects.create", "projects.update_status"]],
 ]);
 
 const violations = [];

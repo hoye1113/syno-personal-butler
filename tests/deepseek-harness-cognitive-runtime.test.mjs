@@ -157,7 +157,7 @@ test("chat tool requests cannot expand the core set while capture keeps its brow
       "syno_browser_snapshot",
     ],
   });
-  // D6 后 core 集只放行 knowledge/capture/projects/jobs 等聊天工具；goals/claims/浏览器机械工具被滤掉
+  // D6 后 core 集只放行 knowledge/capture/jobs 等聊天工具；goals/claims/浏览器机械工具被滤掉
   assert.deepEqual([...tools.calls[0].allowedTools].sort(), [
     "syno_knowledge_fetch_url",
   ].sort());

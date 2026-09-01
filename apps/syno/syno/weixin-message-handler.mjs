@@ -3,7 +3,6 @@ import path from "node:path";
 
 import { PATHS, resolveInside } from "./paths.mjs";
 import { isImageMime } from "./image-mime.mjs";
-import { parseProjectDirective } from "./project-directive.mjs";
 
 function parseWeixinApproval(text) {
   const match = /^批准\s+(job-\d{8}-[a-f0-9]{8})\s+([a-f0-9]{6})$/iu.exec(String(text || "").trim());
@@ -45,14 +44,12 @@ function createWeixinMessageHandler({
   });
   return async (message) => {
     try {
-      const directive = parseProjectDirective(message.text);
-      const approval = parseWeixinApproval(directive.textWithoutDirective);
+      const approval = parseWeixinApproval(message.text);
       if (approval) {
         const result = await core.approve(approval.jobId, {
           channel: "weixin",
           senderId: message.senderId,
           ownerKey: "local-user",
-          projectRef: directive.projectRef || "",
           code: approval.code,
         });
         return {

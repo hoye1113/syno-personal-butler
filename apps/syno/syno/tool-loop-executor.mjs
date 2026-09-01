@@ -60,7 +60,6 @@ class ToolLoopExecutor {
       ownerKey: job.ownerKey || "local-user",
       threadKey: job.threadKey || "main",
       messageId: job.requestKey || job.id,
-      ...(job.projectRef ? { projectRef: String(job.projectRef) } : {}),
       workspace: options.workspace,
       onStart: options.onStart,
       onEvent: options.onEvent,

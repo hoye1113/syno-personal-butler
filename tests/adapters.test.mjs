@@ -321,7 +321,7 @@ test("Weixin approval commands are parsed deterministically", () => {
   assert.equal(parseWeixinApproval("批准全部任务"), null);
 });
 
-test("legacy Weixin approval carries an explicit Project scope", async () => {
+test("legacy Weixin approval reaches core.approve with the bound Owner", async () => {
   let received;
   const handler = createWeixinMessageHandler({
     core: {
@@ -335,13 +335,13 @@ test("legacy Weixin approval carries an explicit Project scope", async () => {
     conversationRouter: { async resolve() { return "conversation-1"; } },
   });
   const result = await handler({
-    text: "/project project-20260824-aaaaaaaa\n批准 job-20260717-a1b2c3d4 0f12ab",
+    text: "批准 job-20260717-a1b2c3d4 0f12ab",
     senderId: "owner",
     id: "message-1",
   });
   assert.match(result.text, /已确认/);
   assert.equal(received.ownerKey, "local-user");
-  assert.equal(received.projectRef, "project-20260824-aaaaaaaa");
+  assert.equal(received.code, "0F12AB");
 });
 
 test("Feishu long connection accepts only owner DMs and deduplicates messages", async (t) => {

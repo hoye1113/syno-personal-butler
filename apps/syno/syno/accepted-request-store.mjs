@@ -96,7 +96,6 @@ class AcceptedRequestStore {
     threadKey = "main",
     payloadKind = "text",
     payload,
-    projectRef,
     deliveryTarget = null,
     receivedAt = this.clock().toISOString(),
   } = {}) {
@@ -131,7 +130,6 @@ class AcceptedRequestStore {
         payloadRef: ref,
         payloadDigest: digest(body),
         payloadKind: String(payloadKind || "text"),
-        ...(projectRef !== undefined ? { projectRef: String(projectRef || "") } : {}),
         status: "accepted",
         route: null,
         ackEventId: null,
@@ -167,11 +165,10 @@ class AcceptedRequestStore {
     return { ...record, payload };
   }
 
-  async list({ status, ownerKey, projectRef, limit = 100 } = {}) {
+  async list({ status, ownerKey, limit = 100 } = {}) {
     const records = await this.#listMetadataUnlocked();
     return records.filter((item) => (!status || item.status === status)
-      && (!ownerKey || item.ownerKey === ownerKey)
-      && (projectRef === undefined || String(item.projectRef || "") === String(projectRef || "")))
+      && (!ownerKey || item.ownerKey === ownerKey))
       .slice(-Math.max(1, Number(limit) || 100));
   }
 

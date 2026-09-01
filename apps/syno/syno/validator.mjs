@@ -173,7 +173,8 @@ function parseContractValue(value) {
 }
 
 function contractForPath(relative) {
-  if (/^ops\/projects\/[^/]+\.md$/.test(relative)) return "project";
+  // D6（2026-09-01）：ops/projects/*.md 历史记录保留只读，project 契约已随子系统删除，
+  // 不再为其做变更校验（这些文件也不应再变化）。
   if (/^ops\/content\/briefs\/.*\.md$/.test(relative)) return "content-brief";
   if (/^ops\/content\/ideas\/.*\.md$/.test(relative)) return "content-idea";
   if (/^ops\/actions\/.*\.md$/.test(relative)) return "action";

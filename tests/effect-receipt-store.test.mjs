@@ -73,7 +73,9 @@ test("SynoToolBridge uses durable receipts across bridge instances and never rep
   assert.equal(executions, 1);
 });
 
-test("SynoToolBridge scopes idempotency and effect receipts by Project context", async (t) => {
+test("SynoToolBridge keeps invocation identity stable after Project removal (persisted-key compatibility)", async (t) => {
+  // D6（2026-09-01）：Project 子系统已移除，但历史 effect receipt 的键以 `<none>` 段收尾——
+  // 同一 messageId 的调用跨重启必须仍命中同一条 receipt（重放，不重复执行写副作用）。
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-effect-project-scope-"));
   t.after(() => cleanup(root));
   const store = makeStore(root);
@@ -87,21 +89,19 @@ test("SynoToolBridge scopes idempotency and effect receipts by Project context",
     execute: async (_input, context) => { executions += 1; contexts.push(context); return { changed: true }; },
   }]);
   const call = (id) => ({ authorization: "Bearer secret", body: { jsonrpc: "2.0", id, method: "tools/call", params: { name: "settings_adjust", arguments: { key: "quiet" } } } });
-  const run = async (projectRef, id) => {
+  const run = async (id) => {
     const bridge = new SynoToolBridge({ tools, token: "secret", effectReceipts: store });
-    const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "same-message", projectRef, allowedTools: ["settings_adjust"] });
+    const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "same-message", allowedTools: ["settings_adjust"] });
     const result = await bridge.handle(call(id));
     release();
     return result;
   };
-  const first = await run("project-20260824-aaaaaaaa", 1);
-  const second = await run("project-20260824-bbbbbbbb", 2);
-  const third = await run("", 3);
+  const first = await run(1);
+  const second = await run(2);
   assert.equal(first.result.directEffect.status, "committed");
-  assert.equal(second.result.directEffect.status, "committed");
-  assert.equal(third.result.directEffect.status, "committed");
-  assert.equal(executions, 3);
-  assert.equal(new Set(contexts.map((context) => context.conversationId)).size, 3);
+  assert.equal(executions, 1);
+  assert.equal(second.result.isError, false);
+  assert.match(contexts[0].conversationId, /:<none>:/);
 });
 
 test("Replay branch routes an array-shaped committed result through the serializer (no structuredContent)", async (t) => {

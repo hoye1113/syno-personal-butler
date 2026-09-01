@@ -28,7 +28,7 @@ function diffAssessment(decision, changes = []) {
 }
 
 class AgentHost {
-  constructor({ store, executor, gitGuard, policy = evaluate, validator = validateRepositoryChange, onCommitted = async () => {}, processLockRoot, projectService = null } = {}) {
+  constructor({ store, executor, gitGuard, policy = evaluate, validator = validateRepositoryChange, onCommitted = async () => {}, processLockRoot } = {}) {
     if (!store || !executor || !gitGuard) throw new Error("AgentHost 缺少必要 Adapter");
     this.store = store;
     this.executor = executor;
@@ -36,7 +36,6 @@ class AgentHost {
     this.policy = policy;
     this.validator = validator;
     this.onCommitted = onCommitted;
-    this.projectService = projectService;
     this.activeRuns = new Map();
     this.jobLocks = new Map();
     this.mergeTail = Promise.resolve();
@@ -46,19 +45,6 @@ class AgentHost {
   async receive(request, context = {}) {
     const mergedContext = context;
     const ownerKey = String(mergedContext.ownerKey || "local-user");
-    const projectRef = String(mergedContext.projectRef || "").trim();
-    if (projectRef) {
-      if (!this.projectService) throw Object.assign(new Error("Project 上下文校验服务未配置"), { code: "PROJECT_CONTEXT_UNAVAILABLE" });
-      const validationMode = mergedContext.projectValidationMode || "new-binding";
-      if (!new Set(["new-binding", "historical", "lifecycle"]).has(validationMode)) {
-        throw Object.assign(new Error("Project 校验模式无效"), { code: "PROJECT_VALIDATION_MODE_INVALID" });
-      }
-      await this.projectService.validateProjectReference({
-        ownerKey,
-        projectRef,
-        forBinding: validationMode === "new-binding",
-      });
-    }
     const decision = this.policy(request, mergedContext);
     const job = await this.store.create({
       request,
@@ -71,12 +57,8 @@ class AgentHost {
       requestKey: mergedContext.messageId
         ? `${mergedContext.channel || "web"}:${mergedContext.senderId || "local-user"}:${mergedContext.messageId}`
         : "",
-      projectRef,
     });
     if (job.deduplicated) {
-      if ((job.projectRef || "") !== projectRef) {
-        throw Object.assign(new Error("同一请求身份不能切换 Project 上下文"), { code: "PROJECT_CONTEXT_IDENTITY_CONFLICT" });
-      }
       return { job, deduplicated: true, requiresApproval: job.status === "awaiting_approval" };
     }
     if (decision.allowed === false) {
@@ -386,12 +368,9 @@ class AgentHost {
     return this.gitGuard.commitPaths(records, message, PATHS.repoRoot);
   }
 
-  #assertJobScope(job, { ownerKey, projectRef } = {}) {
+  #assertJobScope(job, { ownerKey } = {}) {
     if (ownerKey !== undefined && String(job.ownerKey || "local-user") !== String(ownerKey || "local-user")) {
       throw Object.assign(new Error("Job 不属于当前 Owner"), { code: "JOB_OWNER_MISMATCH", statusCode: 403 });
-    }
-    if (projectRef !== undefined && String(job.projectRef || "") !== String(projectRef || "")) {
-      throw Object.assign(new Error("Job 不属于当前 Project"), { code: "PROJECT_CONTEXT_MISMATCH", statusCode: 403 });
     }
     return job;
   }
