@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { PATHS, resolveInside } from "./paths.mjs";
+import { PATHS, relativeToRoot, resolveInside } from "./paths.mjs";
 import { frontmatterData } from "./validator.mjs";
 import { inspectRemoteContent } from "./sensitive-content.mjs";
 
@@ -54,9 +54,10 @@ class KnowledgeStore {
   constructor({ vaultRoot = PATHS.vaultRoot, indexFile = path.join(PATHS.runtimeRoot, "knowledge-index-v1.json") } = {}) {
     this.vaultRoot = path.resolve(vaultRoot); this.indexFile = path.resolve(indexFile); this.cache = null; this.fingerprint = "";
   }
-  // 逻辑路径恒为 "<vault 父目录相对>" 形态（默认根下即 vault/...）；实例根优先于进程级 PATHS。
+  // 逻辑路径恒为 "<vault 父目录相对>" 形态（默认根下即 vault/...）；实例根优先于进程级 PATHS；
+  // relativeToRoot 保持越界断言（仓外输入抛 PATH_OUTSIDE_ROOT）。
   #logicalPath(file) {
-    return path.relative(path.dirname(this.vaultRoot), file).replace(/\\/g, "/");
+    return relativeToRoot(path.dirname(this.vaultRoot), file);
   }
   async #inventory() {
     const files = await walkMarkdown(this.vaultRoot);

@@ -53,7 +53,10 @@ async function inspectProcessLock(file, { verifyIdentity = false } = {}) {
       entrypoint: owner.entrypoint || null,
     },
   };
-  if (verifyIdentity && owner.processStartedAt) {
+  if (verifyIdentity && (owner.processStartedAt || owner.createdAt)) {
+    // 身份基准 = processStartedAt（当代格式）；旧世代锁只有 {pid, createdAt}——
+    // createdAt 兜底：PID 复用进程启动时间必然晚于锁创建，|实际-锁创建| > 10s → stale。
+    const expectedIso = owner.processStartedAt || owner.createdAt;
     const actualStartedAt = await readWindowsProcessStart(owner.pid);
     if (actualStartedAt === "") return {
       status: "stale",
@@ -75,7 +78,7 @@ async function inspectProcessLock(file, { verifyIdentity = false } = {}) {
         entrypoint: owner.entrypoint || null,
       },
     };
-    const expectedMs = Date.parse(owner.processStartedAt);
+    const expectedMs = Date.parse(expectedIso);
     const actualMs = Date.parse(actualStartedAt);
     if (!Number.isFinite(expectedMs) || !Number.isFinite(actualMs) || Math.abs(expectedMs - actualMs) > 10_000) return {
       status: "stale",
@@ -170,7 +173,10 @@ class ProcessFileLock {
           await fs.rm(this.file, { force: true }).catch(() => {});
           continue;
         }
-        if (!processIsAlive(owner.pid)) {
+        // PID 存活不足以证明持锁者还在（进程被杀/重启后 PID 复用会让死锁误判为活锁）：
+        // 一律走进程启动时间身份校验——确定过期（含身份不匹配）才移除，无法确认身份则继续等待。
+        const inspection = await inspectProcessLock(this.file, { verifyIdentity: true });
+        if (inspection.status === "stale") {
           await fs.rm(this.file, { force: true }).catch(() => {});
           continue;
         }
@@ -189,4 +195,4 @@ class ProcessFileLock {
   }
 }
 
-export { ProcessFileLock, inspectProcessLock, processIsAlive, removeConfirmedStaleProcessLock };
+export { ProcessFileLock, inspectProcessLock, processIsAlive, readWindowsProcessStart, removeConfirmedStaleProcessLock };

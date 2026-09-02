@@ -41,6 +41,15 @@ function relativeToKnowledge(candidate) {
   return path.relative(KNOWLEDGE_ROOT, absolute).replace(/\\/g, "/") || ".";
 }
 
+// 实例根逻辑路径：对调用方给定的仓库根求相对并 confine（越界抛 PATH_OUTSIDE_ROOT）。
+// 与 relativeToKnowledge 的区别：根由调用方给出（store 实例根优先于进程级 env，D13.6），
+// 且保持 v1 的越界断言——裸 path.relative 会静默产出仓外绝对串，丢防御面。
+function relativeToRoot(root, candidate) {
+  const resolvedRoot = path.resolve(root);
+  const absolute = resolveInside(resolvedRoot, candidate);
+  return path.relative(resolvedRoot, absolute).replace(/\\/g, "/") || ".";
+}
+
 // Canonical local web port. Host listens here (apps/syno/server.mjs); every probe/script mirrors it.
 // PORT env overrides. This is the single JS source of truth — PowerShell scripts mirror with `$env:PORT || 8888`.
 const DEFAULT_WEB_PORT = 8888;
@@ -58,4 +67,4 @@ const PATHS = Object.freeze({
   stateRoot: path.join(localDataRoot(), "state"),
 });
 
-export { DEFAULT_WEB_PORT, PATHS, relativeToKnowledge, relativeToRepo, resolveInside };
+export { DEFAULT_WEB_PORT, PATHS, relativeToKnowledge, relativeToRepo, relativeToRoot, resolveInside };

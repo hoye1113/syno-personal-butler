@@ -1,39 +1,24 @@
+import { execFileSync } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ignored = new Set([
-  ".git",
-  ".runtime",
-  ".worktrees",
-  ".pnpm-store",
-  ".playwright-cli",
-  ".pytest_cache",
-  "__pycache__",
-  "node_modules",
-  // 测试产物日志（*.log 已被 .gitignore 忽略；计数不应随本机残留浮动）
-  ".runtime-test-mobile-mode.log",
-]);
-const ignoredRelativeDirectories = new Set(["ops/artifacts/quarantine"]);
 const textExtensions = new Set([".md", ".mjs", ".js", ".json", ".ps1", ".py", ".toml", ".yml", ".yaml", ".html", ".css"]);
 const errors = [];
 
-async function walk(directory) {
-  const files = [];
-  for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
-    if (ignored.has(entry.name)) continue;
-    const candidate = path.join(directory, entry.name);
-    const relativeCandidate = path.relative(ROOT, candidate).replace(/\\/g, "/");
-    if (entry.isDirectory() && ignoredRelativeDirectories.has(relativeCandidate)) continue;
-    if (!entry.isDirectory() && /^apps\/syno\/public\/assets\/syno\/[^/]+-key\.png$/.test(relativeCandidate)) continue;
-    if (entry.isDirectory()) files.push(...await walk(candidate));
-    else files.push(candidate);
-  }
-  return files;
+// 工作区文件以 git 语义枚举：tracked + untracked-non-ignored（= `git status` 可见面）。
+// 取代手写 walk 的白名单忽略集：不再随测试产物（*.log、临时夹具等）漂移计数，
+// 忽略规则一次维护在 .gitignore；quarantine（历史 ops 内敏感隔离区，仅回滚形态存在）仍显式排除。
+function gitFileList() {
+  const tracked = execFileSync("git", ["-c", "core.quotepath=false", "ls-files"], { cwd: ROOT, encoding: "utf8", windowsHide: true });
+  const others = execFileSync("git", ["-c", "core.quotepath=false", "ls-files", "--others", "--exclude-standard"], { cwd: ROOT, encoding: "utf8", windowsHide: true });
+  return [...new Set([...tracked.split(/\r?\n/), ...others.split(/\r?\n/)].filter(Boolean))].sort();
 }
 
-const files = await walk(ROOT);
+const files = gitFileList()
+  .filter((relative) => !relative.startsWith("ops/artifacts/quarantine/"))
+  .map((relative) => path.join(ROOT, relative));
 for (const file of files) {
   const relative = path.relative(ROOT, file).replace(/\\/g, "/");
   if (path.extname(file) === ".json") {
@@ -72,7 +57,6 @@ for (const relative of required) {
 // fresh clone 的代码仓不含知识内容；设置 env 时追加知识仓形态检查。
 if (process.env.SYNO_KNOWLEDGE_ROOT) {
   const knowledgeRoot = path.resolve(process.env.SYNO_KNOWLEDGE_ROOT);
-  const { execFileSync } = await import("node:child_process");
   for (const entry of ["vault", "ops", ".git", "vault/AGENTS.md", "ops/README.md"]) {
     try { await fs.access(path.join(knowledgeRoot, entry)); } catch { errors.push(`知识仓库缺少：${entry}`); }
   }

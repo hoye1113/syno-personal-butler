@@ -15,7 +15,7 @@ await fs.mkdir(path.join(knowledgeRoot, "ops"), { recursive: true });
 await fs.mkdir(path.join(contractRoot, "config"), { recursive: true });
 process.env.SYNO_KNOWLEDGE_ROOT = knowledgeRoot;
 
-const { PATHS, relativeToKnowledge, relativeToRepo } = await import("../apps/syno/syno/paths.mjs");
+const { PATHS, relativeToKnowledge, relativeToRepo, relativeToRoot } = await import("../apps/syno/syno/paths.mjs");
 const { GitGuard } = await import("../apps/syno/syno/git-guard.mjs");
 const { validateVaultContract } = await import("../apps/syno/syno/validator.mjs");
 
@@ -38,6 +38,10 @@ test("PATHS 拆库解析：知识根派生 vault/ops，逻辑路径对知识根�
   assert.equal(relativeToKnowledge(noteFile), "vault/02-Resources/x.md");
   // 知识文件已在代码仓外：对 repoRoot 求相对必须结构性拒绝（防复活通道）
   assert.throws(() => relativeToRepo(noteFile), /PATH_OUTSIDE_ROOT|路径超出允许范围/);
+  // 实例根逻辑路径（D13.6 修正三处 store 的公共原语）：仓内 OK、越界仍抛（防御面不因实例根丢失）
+  const instanceRoot = path.dirname(PATHS.vaultRoot);
+  assert.equal(relativeToRoot(instanceRoot, noteFile), "vault/02-Resources/x.md");
+  assert.throws(() => relativeToRoot(instanceRoot, path.join(contractRoot, "config", "vault-contract.json")), /PATH_OUTSIDE_ROOT|路径超出允许范围/);
 });
 
 test("GitGuard 拆库形态：知识仓提交、D10 闸门与 productBranch 断言", async (t) => {

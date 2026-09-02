@@ -1552,6 +1552,12 @@ function createSynoRuntime(options = {}) {
         workflowRetryTimer = setInterval(() => ingestWorkflows.retryDue().catch((error) =>
           recordEvent("ingest.workflow.retry_failed", { error }, { level: "error" }).catch(() => {}),
         ), 60_000);
+        // D13 拆库：回退形态（未设 SYNO_KNOWLEDGE_ROOT）下本机代码仓无 vault/——fresh clone 与测试
+        // 合法使用该形态，不阻断启动；但生产漏设 env 属运维事故，必须让启动可见（warning 级只读）。
+        if (process.env.NODE_ENV !== "test" && path.resolve(PATHS.knowledgeRoot) === path.resolve(PATHS.repoRoot)) {
+          try { await fs.access(PATHS.vaultRoot); }
+          catch { await recordEvent("runtime.fallback_no_vault", { vaultRoot: PATHS.vaultRoot }, { level: "warning" }); }
+        }
         await recordEvent("syno.initialize.completed", { worker, runtimeMode, state: lifecycleState });
         return core.snapshot();
       })().catch(async (error) => {

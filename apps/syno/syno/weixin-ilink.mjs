@@ -4,6 +4,7 @@ import path from "node:path";
 import QRCode from "qrcode";
 
 import { PATHS, resolveInside } from "./paths.mjs";
+import { ProcessFileLock } from "./process-lock.mjs";
 import { runDpapi } from "./provider-credential-store.mjs";
 import { redactString } from "./runtime-journal.mjs";
 import { stripMarkdown, wxBreaks } from "./weixin-text-format.mjs";
@@ -240,38 +241,27 @@ class LocalCredentialStore {
   }
 }
 
+// 轮询器互斥锁：委托共享 ProcessFileLock（failFast——身份无法确认时立即失败而非静默自锁）。
+// 事故基础：旧实现只写 {pid, createdAt} 且仅 process.kill 探活——死锁文件的 PID 被 Windows
+// 复用后判「存活」，轮询器永远拿不到锁（2026-09-02 微信入站静默死锁即此根因）。
+// 布尔 API 保持既有调用方与测试契约不变；ProcessFileLock 写全身份元数据，PID 复用按 stale 判。
 class LocalProcessLock {
   constructor({ file = path.join(PATHS.stateRoot, "weixin-poller.lock") } = {}) {
-    this.file = file;
-    this.handle = null;
+    this.inner = new ProcessFileLock({ file, failFast: true, metadata: { entrypoint: "weixin-poller" } });
+    this.lease = null;
   }
   async acquire() {
-    await fs.mkdir(path.dirname(this.file), { recursive: true });
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        this.handle = await fs.open(this.file, "wx", 0o600);
-        await this.handle.writeFile(`${JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() })}\n`, "utf8");
-        return true;
-      } catch (error) {
-        if (error.code !== "EEXIST") throw error;
-        let owner = null;
-        try { owner = JSON.parse(await fs.readFile(this.file, "utf8")); } catch {}
-        let alive = false;
-        if (Number.isInteger(owner?.pid)) {
-          try { process.kill(owner.pid, 0); alive = true; } catch (probeError) { alive = probeError.code === "EPERM"; }
-        }
-        if (alive || attempt > 0) return false;
-        await fs.rm(this.file, { force: true });
-      }
+    try {
+      this.lease = await this.inner.acquire();
+      return true;
+    } catch (error) {
+      if (error.code === "PROCESS_LOCK_HELD" || error.code === "PROCESS_LOCK_IDENTITY_UNKNOWN") return false;
+      throw error;
     }
-    return false;
   }
   async release() {
-    await this.handle?.close().catch(() => {});
-    this.handle = null;
-    let owner = null;
-    try { owner = JSON.parse(await fs.readFile(this.file, "utf8")); } catch {}
-    if (!owner || owner.pid === process.pid) await fs.rm(this.file, { force: true });
+    await this.lease?.release().catch(() => {});
+    this.lease = null;
   }
 }
 

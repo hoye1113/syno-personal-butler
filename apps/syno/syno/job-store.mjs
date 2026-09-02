@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { readRecord, writeRecord } from "./markdown-record.mjs";
-import { PATHS } from "./paths.mjs";
+import { PATHS, relativeToRoot } from "./paths.mjs";
 
 const TERMINAL = new Set(["completed", "failed", "rejected", "canceled"]);
 const TRANSITIONS = Object.freeze({
@@ -91,9 +91,10 @@ class JobStore {
     return path.join(this.opsRoot, "jobs", year, month, `${job.id}.md`);
   }
 
-  // 逻辑路径（ops/...）对本实例 opsRoot 的父目录求相对（D13.6 修正：实例根优先于进程级 PATHS）。
+  // 逻辑路径（ops/...）对本实例 opsRoot 的父目录求相对（D13.6 修正：实例根优先于进程级 PATHS）；
+  // relativeToRoot 保持越界断言——仓外输入抛 PATH_OUTSIDE_ROOT 而非静默产出绝对串。
   #logicalPath(file) {
-    return path.relative(path.dirname(path.resolve(this.opsRoot)), path.resolve(file)).replace(/\\/g, "/");
+    return relativeToRoot(path.dirname(path.resolve(this.opsRoot)), file);
   }
 
   async save(job) {
