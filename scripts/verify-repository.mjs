@@ -12,6 +12,8 @@ const ignored = new Set([
   ".pytest_cache",
   "__pycache__",
   "node_modules",
+  // 测试产物日志（*.log 已被 .gitignore 忽略；计数不应随本机残留浮动）
+  ".runtime-test-mobile-mode.log",
 ]);
 const ignoredRelativeDirectories = new Set(["ops/artifacts/quarantine"]);
 const textExtensions = new Set([".md", ".mjs", ".js", ".json", ".ps1", ".py", ".toml", ".yml", ".yaml", ".html", ".css"]);
