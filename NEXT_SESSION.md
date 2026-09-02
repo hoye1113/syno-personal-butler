@@ -10,7 +10,7 @@
 - 已完成：边界加固①/②（`e49a66c`、`b634efd`）；拆墙①/②（`f23954d`、`ec068b9`）；封板 #8（`1b66dec`+`14f6678`）；今日灵感①/②（`c5fa1bf`、`67cb311`）；拆库①/②（`98cd3ed`、`24e97af`+`97e557a`+`60a8c43`）；**拆库③ #16 封板（本轮）**——复审补强 `391d654`（productBranch 闸门覆盖合回路径）。
 - 封板回归快照（2026-09-02 当轮实测）：拆库形态（env 设置）`pnpm test` 713/713 pass、0 fail；回退形态（env 缺席）712 pass + 1 skip（知识检索集成用例按设计安静跳过）；`pnpm run verify`（env 设置）通过（Repository verification 341 files——拆库前 1655，代码仓已零知识内容；active docs 8 files）；`git diff --check` 通过。验收证据：知识仓 `ops/acceptance/repo-split/`。
 - 兼容要点：效应幂等键保留 `<none>` 段字面量，跨重启去重连续；历史 Job/Workflow/Note 的 projectRef/project_refs 字段保留只读（契约留 optional 属性供旧记录 round-trip，读取方忽略，不再写入）。
-- 运行态：8888 Host 运行代码=`60a8c43` 时点（`97e557a` 为实例根修正，生产默认根下行为等价，随下次自然重启生效）；`/api/health` ok。**验收阻塞**：微信主动投递连续失败 64+ 次（`PROACTIVE_DELIVERY_EXHAUSTED`，context token 过期）——Owner 发任意微信消息即刷新持久 token，drain 自动补投；灵感卡每日 16:00 出卡，可回「有用/没用/一般」。
+- 运行态：8888 Host 运行代码=`60a8c43` 时点（`97e557a` 为实例根修正，生产默认根下行为等价，随下次自然重启生效）；`/api/health` ok。**验收阻塞**：微信主动投递连续失败 64+ 次（`PROACTIVE_DELIVERY_EXHAUSTED`，context token 过期）——Owner 发任意微信消息即刷新持久 token，drain 自动补投；灵感卡每日 12:30 出卡（Owner 2026-09-02 自 16:00 调整），可回「有用/没用/一般」。
 - 运行时事实不变：产品只走 `DeepSeekHarnessCognitiveRuntime`；生产 chat = `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`，8888 是控制面；模型链 `deepseek/deepseek-v4-flash-vision-exp → deepseek/deepseek-v4-flash`，不使用 Pro；`SYNO_DSH_ROOT` clone 必须 `pnpm run build`；图片走 Host `syno_image_read`（Zen `mimo-v2.5-free`）；chat `web_search` 已启用。
 - 下一步：#11 今日灵感③ Owner 验收（连续数日收卡并回「有用/没用/一般」，证据落知识仓 `ops/acceptance/inspiration/` 后封板）——自动化侧无待办。注意：本会话 shell 不继承用户级 `SYNO_KNOWLEDGE_ROOT`（注册表已设，新开终端/登录任务会继承）；双仓回归需显式 env 或新开终端。
 - 停止条件（计划 D8）：任一阶段若需删除 Job 治理链、改动渠道去重/Outbox 语义、批量改写 vault 历史笔记，立即记录 `BLOCKED_SCOPE_DEVIATION` 并暂停回 Owner。

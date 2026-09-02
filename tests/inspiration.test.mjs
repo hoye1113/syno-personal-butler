@@ -122,15 +122,15 @@ test("InspirationSampler treats recently sampled notes as visited and reports in
 
 // ---------- SignalEngine ----------
 
-test("SignalEngine emits the daily inspiration signal after 16:00 and dedups per day", () => {
+test("SignalEngine emits the daily inspiration signal after 12:30 and dedups per day", () => {
   const engine = new SignalEngine();
-  const before = engine.collect({ now: new Date("2026-09-01T15:59:00+08:00"), lastRuns: {}, highValueEvents: [], notificationsToday: 0, maxDailyNotifications: 3 });
+  const before = engine.collect({ now: new Date("2026-09-01T12:29:00+08:00"), lastRuns: {}, highValueEvents: [], notificationsToday: 0, maxDailyNotifications: 3 });
   assert.equal(before.some((signal) => signal.kind === "inspiration"), false);
-  const at = engine.collect({ now: new Date("2026-09-01T16:00:00+08:00"), lastRuns: {}, highValueEvents: [], notificationsToday: 0, maxDailyNotifications: 3 });
+  const at = engine.collect({ now: new Date("2026-09-01T12:30:00+08:00"), lastRuns: {}, highValueEvents: [], notificationsToday: 0, maxDailyNotifications: 3 });
   assert.deepEqual(at.filter((signal) => signal.kind === "inspiration").map((signal) => signal.key), ["inspiration:2026-09-01"]);
-  const alreadyRan = engine.collect({ now: new Date("2026-09-01T17:00:00+08:00"), lastRuns: { "inspiration:2026-09-01": "2026-09-01" }, highValueEvents: [], notificationsToday: 1, maxDailyNotifications: 3 });
+  const alreadyRan = engine.collect({ now: new Date("2026-09-01T13:00:00+08:00"), lastRuns: { "inspiration:2026-09-01": "2026-09-01" }, highValueEvents: [], notificationsToday: 1, maxDailyNotifications: 3 });
   assert.equal(alreadyRan.some((signal) => signal.kind === "inspiration"), false);
-  const budgetSpent = engine.collect({ now: new Date("2026-09-01T16:00:00+08:00"), lastRuns: {}, highValueEvents: [], notificationsToday: 3, maxDailyNotifications: 3 });
+  const budgetSpent = engine.collect({ now: new Date("2026-09-01T12:30:00+08:00"), lastRuns: {}, highValueEvents: [], notificationsToday: 3, maxDailyNotifications: 3 });
   assert.equal(budgetSpent.length, 0);
 });
 
