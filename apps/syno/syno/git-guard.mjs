@@ -155,13 +155,7 @@ class GitGuard {
     if (!normalized.length) return { committed: false, reason: "no_changes" };
     const outsideRoots = normalized.filter((item) => !PRODUCT_COMMIT_ROOTS.some((root) => item.startsWith(root)));
     if (outsideRoots.length) throw new Error(`产品自动提交只允许 vault/** 与 ops/**，拒绝暂存：${outsideRoots.join(", ")}`);
-    if (this.productBranch && path.resolve(cwd) === path.resolve(this.repoRoot)) {
-      // symbolic-ref 在未出生分支（空仓首提交前）也可读，rev-parse HEAD 会炸
-      const { stdout: branch } = await git(["symbolic-ref", "--short", "-q", "HEAD"], { cwd });
-      if (branch.trim() !== this.productBranch) {
-        throw new Error(`产品提交只允许在 ${this.productBranch} 分支的主检出进行，当前分支：${branch.trim() || "(detached)"}`);
-      }
-    }
+    await this.#assertProductBranch(cwd);
     const pathspec = Buffer.from(`${normalized.map((item) => `:(literal)${item}`).join("\0")}\0`, "utf8");
     await gitWithInput(["add", "--pathspec-from-file=-", "--pathspec-file-nul"], pathspec, { cwd });
     const staged = await git(["diff", "--cached", "--name-only"], { cwd });
@@ -193,11 +187,23 @@ class GitGuard {
     return { branch, directory, base };
   }
 
+  // productBranch 闸门：只在主检出（cwd===repoRoot）生效；worktree（syno/job/*）提交不受限。
+  // symbolic-ref 在未出生分支（空仓首提交前）也可读，rev-parse HEAD 会炸。
+  async #assertProductBranch(cwd) {
+    if (!this.productBranch || path.resolve(cwd) !== path.resolve(this.repoRoot)) return;
+    const { stdout: branch } = await git(["symbolic-ref", "--short", "-q", "HEAD"], { cwd });
+    if (branch.trim() !== this.productBranch) {
+      throw new Error(`产品提交只允许在 ${this.productBranch} 分支的主检出进行，当前分支：${branch.trim() || "(detached)"}`);
+    }
+  }
+
   async mergeWorktree({ branch, commit, base, diffHash: expectedDiffHash }) {
     return this.writeLock.run(() => this.#mergeWorktree({ branch, commit, base, diffHash: expectedDiffHash }));
   }
 
   async #mergeWorktree({ branch, commit, base, diffHash: expectedDiffHash }) {
+    // D13.4 同一闸门：合回也只在 productBranch 主检出进行，堵「job 合入功能分支」的旁路
+    await this.#assertProductBranch(this.repoRoot);
     const dirty = await this.changedPaths(this.repoRoot);
     if (dirty.length) throw new Error(`主工作区存在未提交变更，拒绝自动合并：${dirty.join(", ")}`);
     const pinned = await this.pinWorktree({ branch, base });

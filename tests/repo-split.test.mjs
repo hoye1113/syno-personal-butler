@@ -60,8 +60,7 @@ test("GitGuard 拆库形态：知识仓提交、D10 闸门与 productBranch 断�
   await fs.writeFile(note, "---\ntags: [x]\n---\n改动\n", "utf8");
   await assert.rejects(guard.commitPaths(["vault/note.md"], "nope"), /只允许在 main 分支/);
   git(knowledgeRoot, ["checkout", "-q", "main"]);
-
-  // worktree 分支提交不受 productBranch 限制（job 隔离执行语义不变）
+  git(knowledgeRoot, ["restore", "vault/note.md"]);
   const worktree = await guard.prepareWorktree("job-split-1");
   assert.equal(worktree.branch, "syno/job/job-split-1");
   assert.equal(path.dirname(worktree.directory), path.resolve(worktreeRoot));
@@ -69,6 +68,18 @@ test("GitGuard 拆库形态：知识仓提交、D10 闸门与 productBranch 断�
   await fs.writeFile(worktreeNote, "---\ntags: [y]\n---\n隔离写入\n", "utf8");
   const worktreeCommit = await guard.commitPaths(["vault/worktree-note.md"], "syno: execute job-split-1", worktree.directory);
   assert.equal(worktreeCommit.committed, true);
+
+  // 合回同一闸门：主检出在功能分支时 mergeWorktree 同样被拒（堵合入旁路），回 main 后放行
+  const mergeArgs = { branch: worktree.branch, commit: worktreeCommit.commit, base: worktree.base };
+  git(knowledgeRoot, ["checkout", "-q", "-b", "feature-merge"]);
+  await assert.rejects(guard.mergeWorktree(mergeArgs), /只允许在 main 分支/);
+  git(knowledgeRoot, ["checkout", "-q", "main"]);
+  git(knowledgeRoot, ["branch", "-q", "-D", "feature-merge"]);
+  const merged = await guard.mergeWorktree(mergeArgs);
+  assert.equal(merged.merged, true);
+  // merge 提交的 combined diff 为空；直接比第二父引入的文件（merge 提交 git show 不适用）
+  assert.equal(git(knowledgeRoot, ["diff", "--name-only", "HEAD^1", "HEAD"]).trim(), "vault/worktree-note.md");
+
   await guard.removeWorktree(worktree);
   t.after(() => fs.rm(worktreeRoot, { recursive: true, force: true }));
 });
