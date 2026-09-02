@@ -1,19 +1,20 @@
 # Syno 执行语义与移动可靠交付交接（2026-07-29）
 
-## 2026-09-01 当前交接：产品精简拆墙已封板，进入今日灵感
+## 2026-09-02 当前交接：拆库封板（#14~#16 完成），唯一剩余任务 #11 等 Owner 微信验收
 
 当前唯一执行入口是 [`docs/product-slimming-and-inspiration-plan.md`](docs/product-slimming-and-inspiration-plan.md)（Owner 2026-09-01 经 /goal 批准，指示一次性执行完全部任务）；本文下方 2026-08/07 内容仅作历史背景，不覆盖该执行计划。
 
 - 产品范围（Owner 2026-09-01 决策）：搜索、收录、深度探索分析、知识库查找、今日灵感（整合知识库文章产出串联/新观点的"做梦"功能）。学习与项目管理不在范围内。
-- 当前分支/提交：`main` @ `e033e18`（本地，沿用现规不自动 Push）；工作树干净。
-- 已完成：边界加固① `e49a66c`（`code_change` 意图、`allowSelfModify`/`allowSystemControl` 开关、Windows 服务注册操作物理删除）；边界加固② `b634efd`（模型可声明写入路径仅 `vault/**`，自动提交结构性硬闸门只准暂存 `vault/**`、`ops/**`）；拆墙① `f23954d`（学习子系统物理移除，47 files +151/−1439）；拆墙② `ec068b9`（项目子系统与 `/project` 链路物理移除，44 files +145/−2560）；封板 #8 `1b66dec`+`14f6678`（Phase 5 SUPERSEDED、文档同步、封板回归、fresh clone 证据）；今日灵感① `c5fa1bf`（D12 设计冻结：独立灵感仓 `ops/content/inspirations/`、每日 16:00 inspiration 信号、2 近期+2 久未回访采样、反馈确定性路由）；今日灵感② `67cb311`（契约+仓+采样器+编排分支+反馈路由实现，`tests/inspiration.test.mjs` 11 例）。
-- 封板回归快照（2026-09-01 当轮实测）：`pnpm test` 710 tests / 710 pass / 0 fail；`pnpm run verify` 通过（Repository verification 1655 files、active docs 8 files——project-aware 计划已归历史文档）；`git diff --check` 通过。
+- 当前代码基线：`main` @ `391d654`（本地，沿现规不自动 Push）；工作树干净。
+- **双仓形态（2026-09-01 D13 拆库，已封板）**：知识仓 `D:\workSpace\syno-knowledge`（`git init -b main`；HEAD `ec57a03`）持有 `vault/`（长期知识事实源）+ `ops/`（任务/行动/记录事实源）；代码仓经用户级 `SYNO_KNOWLEDGE_ROOT` 指向它，未设置时回退单库形态。GitGuard 默认根=知识仓，主检出非 `main` 拒绝产品提交与合回（`productBranch: "main"`；worktree `syno/job/*` 不受限）；validator 双根（vault 扫描/HEAD 在知识仓、`config/vault-contract.json` 在代码仓）；verify 双模式；管家的全部读写与产品提交只落知识仓 main。**地雷**：不得从拆库前（<`60a8c43`）分支/提交启动 Host；回滚=unset env + revert `60a8c43`；旧历史 bundle `C:\tmp\syno-pre-split-24e97af.bundle`（36MB）。细节见 `docs/OPERATIONS.md`「知识仓库拆分」。
+- 已完成：边界加固①/②（`e49a66c`、`b634efd`）；拆墙①/②（`f23954d`、`ec068b9`）；封板 #8（`1b66dec`+`14f6678`）；今日灵感①/②（`c5fa1bf`、`67cb311`）；拆库①/②（`98cd3ed`、`24e97af`+`97e557a`+`60a8c43`）；**拆库③ #16 封板（本轮）**——复审补强 `391d654`（productBranch 闸门覆盖合回路径）。
+- 封板回归快照（2026-09-02 当轮实测）：拆库形态（env 设置）`pnpm test` 713/713 pass、0 fail；回退形态（env 缺席）712 pass + 1 skip（知识检索集成用例按设计安静跳过）；`pnpm run verify`（env 设置）通过（Repository verification 342 files——拆库前 1655，代码仓已零知识内容；active docs 8 files）；`git diff --check` 通过。验收证据：知识仓 `ops/acceptance/repo-split/`。
 - 兼容要点：效应幂等键保留 `<none>` 段字面量，跨重启去重连续；历史 Job/Workflow/Note 的 projectRef/project_refs 字段保留只读（契约留 optional 属性供旧记录 round-trip，读取方忽略，不再写入）。
-- 运行态：8888 Host 已部署今日灵感新代码——旧 PID 20828 kill 后 start-syno.ps1 自监督重拉，新 PID 24096（2026-09-01 22:26 本地），`/api/health` ok。真实 vault 采样探针通过（2 近期 2026-08-13 + 2 久未回访 2026-05-19）。**验收阻塞**：微信主动投递连续失败 64 次（`PROACTIVE_DELIVERY_EXHAUSTED`，context token 约 5.5 天未刷新）——Owner 发任意微信消息即刷新持久 token，drain 自动补投；灵感卡每日 16:00 出卡，可回「有用/没用/一般」。
+- 运行态：8888 Host 运行代码=`60a8c43` 时点（`97e557a` 为实例根修正，生产默认根下行为等价，随下次自然重启生效）；`/api/health` ok。**验收阻塞**：微信主动投递连续失败 64+ 次（`PROACTIVE_DELIVERY_EXHAUSTED`，context token 过期）——Owner 发任意微信消息即刷新持久 token，drain 自动补投；灵感卡每日 16:00 出卡，可回「有用/没用/一般」。
 - 运行时事实不变：产品只走 `DeepSeekHarnessCognitiveRuntime`；生产 chat = `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`，8888 是控制面；模型链 `deepseek/deepseek-v4-flash-vision-exp → deepseek/deepseek-v4-flash`，不使用 Pro；`SYNO_DSH_ROOT` clone 必须 `pnpm run build`；图片走 Host `syno_image_read`（Zen `mimo-v2.5-free`）；chat `web_search` 已启用。
-- 下一步：#15 拆库②迁移实施与 cutover（设计已冻结为计划文档 D13.1~D13.13：物理迁出至 `SYNO_KNOWLEDGE_ROOT`、弃用 junction（checkout 穿透写实测确认）、GitGuard 默认根翻转+`productBranch:main` 断言、validator 双根、workspace 默认值翻转、verify 双模式；cutover 需停 host，回滚=unset env+revert 删除提交）。#11 今日灵感③的 Owner 面对验收并行累积中（连续数日收卡并回「有用/没用」，随后把验收证据落 `ops/acceptance/inspiration/` 封板）。
+- 下一步：#11 今日灵感③ Owner 验收（连续数日收卡并回「有用/没用/一般」，证据落知识仓 `ops/acceptance/inspiration/` 后封板）——自动化侧无待办。注意：本会话 shell 不继承用户级 `SYNO_KNOWLEDGE_ROOT`（注册表已设，新开终端/登录任务会继承）；双仓回归需显式 env 或新开终端。
 - 停止条件（计划 D8）：任一阶段若需删除 Job 治理链、改动渠道去重/Outbox 语义、批量改写 vault 历史笔记，立即记录 `BLOCKED_SCOPE_DEVIATION` 并暂停回 Owner。
-- 提交规则：按 Job 声明精确路径暂存；禁止 `git add -A`；不自动 Push；commit 结尾不加 Co-Authored-By。
+- 提交规则：按 Job 声明精确路径暂存；禁止 `git add -A`；不自动 Push；commit 结尾不加 Co-Authored-By；跨仓库 git 一律 `git -C` 绝对路径。
 
 ## 2026-08-26 历史交接：Project-aware DSH Phase 5（已 SUPERSEDED，仅追溯）
 

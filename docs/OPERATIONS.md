@@ -2,16 +2,26 @@
 
 ## 状态分层
 
-- Git 跟踪：`vault/`、`ops/`、`contracts/`、应用源码与文档。
+- 知识仓库（`SYNO_KNOWLEDGE_ROOT`，本机 `D:\workSpace\syno-knowledge`）：Git 跟踪 `vault/`、`ops/`——长期知识与全部运行记录的事实源。
+- 代码仓库（本仓）：Git 跟踪 `contracts/`、`config/`、应用源码、脚本与文档；拆库后不含 vault/ops（`.gitignore` 防御性排除）。
 - 本地可重建：`.runtime/` 的索引、锁、队列快照、投递通知和临时状态。
 - 本地敏感：`%LOCALAPPDATA%\Syno\credentials` 的 DPAPI 凭据；严禁复制到仓库、日志或工单。
 - 本地持久：对话、等待重试的 Job、未完成摄取状态。清理前先停 Syno Host 并备份。
+
+## 知识仓库拆分（2026-09-01，D13）
+
+- 布局：知识仓根 = `vault/` + `ops/` 原样平移，全部逻辑路径（`vault/...`、`ops/...`）不变；代码仓经 `SYNO_KNOWLEDGE_ROOT`（用户级环境变量）找到知识仓，未设置时回退单库模式（行为与拆库前一致，fresh clone 与测试用此形态）。
+- 管家的全部读写与产品提交只落在知识仓 `main`：GitGuard 默认根即知识仓，且主检出非 `main` 时拒绝产品提交（`productBranch` 断言）；Job 隔离 worktree 仍在代码仓 `.worktrees/`（知识仓零杂物）；git 锁恒在代码仓 `.runtime/locks/`。
+- 运行态依赖：Host 进程环境须含 `SYNO_KNOWLEDGE_ROOT`（用户级变量，计划任务登录启动自动继承）；planner 的 `topic-planner.config.json`（`%LOCALAPPDATA%\Syno\state\`）的 `vaultRoot` 指向知识仓根。改代码后按 runbook 重拉 Host（kill + 自监督重启或 `Start-ScheduledTask Syno`）。
+- 地雷：不要从拆库前（`< 60a8c43`）的历史分支/提交启动 Host——旧代码不含知识根解析，会把代码仓当单库写；也不要在代码仓 checkout 旧分支后启动（旧分支会把 vault/ops 跟踪内容还原到代码仓工作树）。
+- 回滚预案：停止 Host → 清除 `SYNO_KNOWLEDGE_ROOT` 用户变量 → 代码仓 `git revert 60a8c43`（vault/ops 从删除前快照还原）→ planner vaultRoot 改回代码仓根 → 重启 Host。知识仓在拆库后的新提交需先 cherry-pick 或手工并回。
+- 旧历史：代码仓 `60a8c43` 之前的历史完整保留拆库前 vault/ops 内容，即旧知识档案；cutover 前全量备份 bundle 在 `C:\tmp\syno-pre-split-24e97af.bundle`（36MB）。filter-repo 提取知识历史为备选，未执行。
 
 ## 备份
 
 1. 停止 Syno Host（Windows 任务或 `pnpm start` 进程），确认没有 `running` Job。
 2. 记录当前 Git commit 和 `git status --short`；未跟踪的用户资料不得遗漏。
-3. 备份仓库的 `vault/`、`ops/` 与配置文档。
+3. 备份知识仓库（`vault/`、`ops/` 全量或 `git bundle create --all`）与代码仓配置文档。
 4. 对本机状态做加密备份；DPAPI 凭据只能在同一 Windows 用户上下文恢复。Token 更推荐在新机器重新输入。
 5. `.runtime/` 可省略；恢复后重建索引。
 

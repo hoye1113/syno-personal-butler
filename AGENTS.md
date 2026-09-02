@@ -2,8 +2,7 @@
 
 ## 项目事实源
 
-- `vault/`：长期知识事实源。
-- `ops/`：任务、行动、内容、记忆候选、产物和事件事实源。
+- 知识仓库（`SYNO_KNOWLEDGE_ROOT`，本机部署路径见 `docs/OPERATIONS.md`「知识仓库拆分」）：`vault/` 长期知识事实源；`ops/` 任务、行动、内容、记忆候选、产物和事件事实源。管家的全部读写与产品提交只落在知识仓。
 - `contracts/`：机器可校验的数据契约。
 - `.runtime/`：可删除、可重建的缓存和运行状态，禁止提交。
 
@@ -24,7 +23,7 @@
 - 模型链固定为 DeepSeek 官方两档：`deepseek/deepseek-v4-flash-vision-exp` → `deepseek/deepseek-v4-flash`。Adapter 为 `deepseek-harness-sdk`（CognitiveRuntime v3）。key 来源 = host 环境变量 `DEEPSEEK_API_KEY` 优先，缺省时 supervisor 读用户本机已有 deepseek 凭据（`~/.local/share/opencode/auth.json` 的 deepseek 条目）注入子进程。根路径必须由 `SYNO_DSH_ROOT` 指定（说明见 `docs/OPERATIONS.md`）；不要把 Harness 源码 vendoring 进本仓库。
 - 仅在不可用、限流、连接失败、超时、5xx、空响应或契约校验失败，且本次尝试尚未产生不可逆副作用时，才由 Syno 按上述顺序确定性回退。
 - Agent 不得选择模型、Provider 或回退目标；全部失败时进入 `waiting_provider`。禁止动态 MCP。
-- Harness 聊天会话允许沙箱 `workspace-write` 下的终端、工作区写盘、`web_search` 和 `web_fetch`，并继续暴露 `syno_*` Bridge。搜索后端固定为官方 `@deepseek-ai/dsh-web-search-deepseek`（复用 `DEEPSEEK_API_KEY`），不安装社区 hub 插件或动态 MCP。看图用 Host 工具 `syno_image_read`（Zen HTTP `mimo-v2.5-free`，不进模型链）。生产 chat 是受控 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（与微信同一 session；`dsh web` 是 `--profile web` 别名，不是生产）。收录分析 / 浏览器兜底仍用 `syno-capture.cordis.yml` jsonrpc（无 bash/fs/web）。8888 是控制面。知识写入、覆盖 canonical 笔记、改 `apps/` 源码仍走 Job / Proposal / `policy.allowSelfModify`。生产 profile 禁止 `dsh plugin add`，禁止把 `danger-full-access` 写进 `@syno/dsh-plugin` 的 permission 表。本机 clone 必须 `pnpm run build`；事件通道是 WebSocket 不是 SSE。踩坑清单见 `docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」。
+- Harness 聊天会话允许沙箱 `workspace-write` 下的终端、工作区写盘、`web_search` 和 `web_fetch`，并继续暴露 `syno_*` Bridge。搜索后端固定为官方 `@deepseek-ai/dsh-web-search-deepseek`（复用 `DEEPSEEK_API_KEY`），不安装社区 hub 插件或动态 MCP。看图用 Host 工具 `syno_image_read`（Zen HTTP `mimo-v2.5-free`，不进模型链）。生产 chat 是受控 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（与微信同一 session；`dsh web` 是 `--profile web` 别名，不是生产）。收录分析 / 浏览器兜底仍用 `syno-capture.cordis.yml` jsonrpc（无 bash/fs/web）。8888 是控制面。知识写入与覆盖 canonical 笔记仍走 Job / Proposal；改 `apps/` 源码不属于管家能力（D9），只有开发 Agent 的人工开发流程能改。生产 profile 禁止 `dsh plugin add`，禁止把 `danger-full-access` 写进 `@syno/dsh-plugin` 的 permission 表。本机 clone 必须 `pnpm run build`；事件通道是 WebSocket 不是 SSE。踩坑清单见 `docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」。
 
 ## 源码修改原则
 
@@ -60,5 +59,5 @@
 
 ## 知识任务
 
-`vault/AGENTS.md` 及 `vault/99-System/Agent/` 中的 canonical Skill 继续约束知识收录、关联、写作和 MOC。平台入口只负责转发，不复制业务规则。
+知识仓 `vault/AGENTS.md` 及 `vault/99-System/Agent/` 中的 canonical Skill 继续约束知识收录、关联、写作和 MOC。平台入口只负责转发，不复制业务规则。
 

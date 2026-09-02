@@ -76,11 +76,12 @@ Job files and immutable events are the recovery log. Per-job locks serialize sta
 
 ## Runtime locations
 
-- Repository truth: `vault/`, `ops/`, `config/`, `contracts/`.
+- Repository truth (knowledge repo, `SYNO_KNOWLEDGE_ROOT`; unset falls back single-repo): `vault/`, `ops/`.
+- Repository truth (code repo): `config/`, `contracts/`, source, docs.
 - Rebuildable cache: `.runtime/`.
 - Secrets: `%LOCALAPPDATA%\Syno\credentials`.
 - Durable local execution state, channel delivery and encrypted recovery payloads: `%LOCALAPPDATA%\Syno\state`.
-- All write worktrees: `.worktrees/syno-job-<id>`.
+- All write worktrees (job checkouts of the knowledge repo): `.worktrees/syno-job-<id>`.
 
 Harness conversation bindings expire after 30 days; confirmed raw voice remains 7 days, failed payloads 30 days, and unfinished jobs remain until terminal state. Model outage never switches provider or runtime: deterministic local features continue and LLM jobs remain durable for retry.
 

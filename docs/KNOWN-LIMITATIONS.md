@@ -7,6 +7,7 @@
 - 学习子系统与项目子系统已整体物理移除（`f23954d`、`ec068b9`）：`learning.*`/`projects.*` 工具、`/project` 指令、Job/Workflow/Note 的 projectRef 传播与检索加权均不再存在。历史 ops 记录（含 `ops/projects/*.md` 与学习相关记录）保留只读；新记录不再写入 projectRef/project_refs，旧记录中这些字段被读取方忽略。
 - Project-aware Knowledge MVP 已关闭为 SUPERSEDED（Owner 2026-09-01 产品方向决策），Owner 主观召回观察不再回填；live 证据保留在 `ops/acceptance/project-aware-knowledge-mvp/` 仅作追溯。下文 2026-08-26 起关于 Project 边界的描述均为历史记录。
 - 用户入口边界已结构性加固（`e49a66c`、`b634efd`）：`code_change` 意图、`allowSelfModify`/`allowSystemControl` 开关与 Windows 服务安装/卸载操作已物理删除——不是开关关闭，而是代码不存在，没有任何配置能让聊天入口改代码或控制系统。模型可声明的写入路径只有 `vault/**`；`ops/` 仅系统内部固定记录器写入；自动提交只准暂存 `vault/**`、`ops/**`，永不自动 Push。
+- 知识仓库已拆出（2026-09-01 D13，`24e97af`+`97e557a`、删除提交 `60a8c43`）：`vault/` 与 `ops/` 现居独立知识仓库（本机 `D:\workSpace\syno-knowledge`），代码仓库经用户级 `SYNO_KNOWLEDGE_ROOT` 指向它，未设置时回退单库形态（新机器 fresh clone 零配置可跑）。**旧分支地雷**：不得从拆库前（<`60a8c43`）的分支/提交启动 Host——旧代码会在代码仓库根就地重建 `vault/`/`ops/` 并写入，与知识仓双轨漂移。回滚预案见 `docs/OPERATIONS.md`「知识仓库拆分」。
 - 当前唯一执行事实源为 `docs/product-slimming-and-inspiration-plan.md`；当轮回归基线快照见 `NEXT_SESSION.md`。
 
 ## 发布门槛状态
@@ -57,8 +58,8 @@ Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导�
 - Bilibili 专用 canonical 规则、HTML/DOCX 边界和来源更新组合场景已有 Spec/组合测试；Bilibili 未完成语义审阅时保持 incomplete，不伪报 verified。
 - 当前差异的 Standards、Spec、Security 最终复审均完成，未解决 P0/P1 为 0。
 - 当前项目没有 TypeScript 源码、`tsconfig` 或 `typecheck` 脚本；`pnpm run typecheck` 会返回 `ERR_PNPM_NO_SCRIPT`，JavaScript 语法与行为由 Node 全量测试覆盖。
-- `vault/` 是唯一可写知识事实源。原始 Obsidian 仓库只读，不双向同步；渠道会话和飞书文档不是知识事实源。
-- 状态归档只包含 `%LOCALAPPDATA%\Syno\state`，不包含 DPAPI credentials，也不代替对 Git 跟踪的 `vault/`、`ops/` 和配置文档做备份。
+- 知识仓 `vault/` 是唯一可写知识事实源。原始 Obsidian 仓库只读，不双向同步；渠道会话和飞书文档不是知识事实源。
+- 状态归档只包含 `%LOCALAPPDATA%\Syno\state`，不包含 DPAPI credentials，也不代替对 Git 跟踪的知识仓 `vault/`、`ops/` 和代码仓配置文档做备份。
 - Web/系统投递通知是可重建运行状态，只写 `.runtime/notifications`，不会因 Host 启动自动污染 `ops/`；需要长期保留的任务与待决策项仍写入 canonical `ops/`。
 - 自动收录先形成 `IngestProposal`；覆盖、移动、合并、新 tag 和新 MOC 在隔离工作区自动执行，整理冲突时暂停澄清，以降低错误整理的不可逆成本。
 - 飞书消息长连接使用 Syno 注册的 Feishu App；日历排期仍使用历史 `lark-cli` 授权。两者共享 Syno Policy 和 Markdown 事实源，但当前需要分别完成消息与日历授权，后续可统一凭据体验。

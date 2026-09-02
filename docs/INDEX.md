@@ -2,7 +2,7 @@
 
 本文只负责说明文档分类、唯一权威性和当前状态；具体产品规则以对应 Normative 文档为准。
 
-2026-09-01 Owner 决策产品范围收敛为搜索、收录、深度探索分析、知识库查找与今日灵感；学习子系统与项目子系统已物理移除（`f23954d`、`ec068b9`），用户入口只允许更改知识库（`e49a66c`、`b634efd`）。当前唯一执行事实源是 `docs/product-slimming-and-inspiration-plan.md`。Project-aware Knowledge MVP 已关闭为 SUPERSEDED，其计划文档与 `ops/acceptance/project-aware-knowledge-mvp/` 证据仅作历史追溯。
+2026-09-01 Owner 决策产品范围收敛为搜索、收录、深度探索分析、知识库查找与今日灵感；学习子系统与项目子系统已物理移除（`f23954d`、`ec068b9`），用户入口只允许更改知识库（`e49a66c`、`b634efd`）。同日完成知识仓库拆分（D13）：`vault/` 与 `ops/` 已迁入独立知识仓库，代码仓库由 `SYNO_KNOWLEDGE_ROOT` 指向它，未设置时回退单库形态。当前唯一执行事实源是 `docs/product-slimming-and-inspiration-plan.md`。Project-aware Knowledge MVP 已关闭为 SUPERSEDED，其计划文档与知识仓 `ops/acceptance/project-aware-knowledge-mvp/` 证据仅作历史追溯。
 
 ## Normative
 
@@ -15,14 +15,14 @@
 | `docs/product-slimming-and-inspiration-plan.md` | 产品精简与今日灵感的唯一执行事实源 | IN_PROGRESS（Owner 2026-09-01 批准，执行中） |
 | `contracts/*.schema.json` | 机器可校验的数据契约 | Normative |
 | `config/deepseek-harness/syno-agent.md` | DSH Syno Agent 的工具与行为边界 | Normative |
-| `vault/AGENTS.md`、`vault/99-System/Agent/` | 知识收录、关联、写作和 MOC 规则 | Normative |
+| 知识仓 `vault/AGENTS.md`、`vault/99-System/Agent/` | 知识收录、关联、写作和 MOC 规则 | Normative |
 
 ## Current
 
 | 文档 | 用途 | 状态 |
 |---|---|---|
 | `NEXT_SESSION.md` | 当前会话交接、基线、下一步和停止条件 | Current handoff |
-| `ops/README.md` | durable `ops/` 记录目录说明 | Current |
+| 知识仓 `ops/README.md` | durable `ops/` 记录目录说明 | Current |
 | `docs/KNOWN-LIMITATIONS.md` | 已知限制和未完成验收 | Current |
 
 ## Historical
@@ -31,8 +31,8 @@
 
 ## Generated
 
-- Node 测试输出：命令行 `pnpm test`；如需持久化验收材料，保存到 `ops/acceptance/`。
-- Project-aware DSH live 证据：`ops/acceptance/project-aware-knowledge-mvp/`；默认不调用真实模型，只有显式 `SYNO_RUN_REAL_DSH=1` 才运行。
+- Node 测试输出：命令行 `pnpm test`；如需持久化验收材料，保存到知识仓 `ops/acceptance/`。
+- Project-aware DSH live 证据：知识仓 `ops/acceptance/project-aware-knowledge-mvp/`；默认不调用真实模型，只有显式 `SYNO_RUN_REAL_DSH=1` 才运行。
 - 仓库与 active-doc 检查：`pnpm run verify`。
 - 运行缓存和索引：`.runtime/`，可删除、可重建、禁止提交。
 - 本机 Harness/渠道运行状态：`%LOCALAPPDATA%\Syno\state` 和日志目录，不是仓库事实源。
