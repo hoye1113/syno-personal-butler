@@ -62,6 +62,7 @@ class DeepSeekHarnessWebClient {
     requestTimeoutMs = 180_000,
     initializeTimeoutMs = 30_000,
     turnTimeoutMs,
+    turnSettleQuietMs = 400,
     onNotice = null,
   } = {}) {
     if (!origin) throw new Error("DeepSeekHarnessWebClient 缺少 origin");
@@ -74,6 +75,7 @@ class DeepSeekHarnessWebClient {
     this.requestTimeoutMs = requestTimeoutMs;
     this.initializeTimeoutMs = initializeTimeoutMs;
     this.turnTimeoutMs = turnTimeoutMs ?? requestTimeoutMs;
+    this.turnSettleQuietMs = turnSettleQuietMs;
     this.onNotice = typeof onNotice === "function" ? onNotice : null;
     this.initialized = false;
     this.closed = false;
@@ -111,6 +113,12 @@ class DeepSeekHarnessWebClient {
     const notifications = [];
     let sawRunning = false;
     let idleAfterRunning = false;
+    let promptAccepted = false;
+    // 本轮 turn 号（取自 turn/start）；true = 见过 turn/start 但未带 turn 号。
+    // turn/end 必须与它配对才采信——若上一轮因竞态被提前结算，其迟到的
+    // turn/end 会落进本轮事件列表，只有配对能挡住这种自我污染。
+    let activeTurn = null;
+    let turnEnded = false;
     const result = () => ({ sessionId, finalResponse: assistantText(events), events, notifications });
     return new Promise((resolve, reject) => {
       let settled = false;
@@ -129,15 +137,29 @@ class DeepSeekHarnessWebClient {
       const onAbort = () => {
         finish(signal?.reason || runtimeError("HARNESS_CANCELED", "DeepSeek Harness turn 已取消"));
       };
+      // 兜底结算（兼容面）：未发 turn/start 的对端（旧版/假面）没有权威终态
+      // 事件，沿用 idle + 静默期结算，期间每个新帧重置计时，让晚到的事件帧
+      // 落定后再取文本——host 状态流与 mux 事件流是两条独立连接，idle 可能
+      // 先于最终 assistant/message 到达（2026-09-03 生产实证：抢先 21ms，
+      // 工具轮次的 step-1 预告文本被当作最终答复投递，step-2 答案被丢弃）。
+      // 正常 turn 不走这里：见过 turn/start 后只认 turn/end 或超时。
+      const armQuietPeriod = () => {
+        if (drainTimer) clearTimeout(drainTimer);
+        drainTimer = setTimeout(() => finish(null, result()), this.turnSettleQuietMs);
+        drainTimer.unref?.();
+      };
       const maybeSettle = () => {
-        if (!idleAfterRunning) return;
-        if (assistantText(events)) {
+        // 主信号：本轮 turn/end 是权威终态——mux 流 seq 有序，turn/end 必排
+        // 在最终 assistant/message 之后，不受双流竞速影响。
+        if (turnEnded) {
           finish(null, result());
           return;
         }
-        if (drainTimer) return;
-        drainTimer = setTimeout(() => finish(null, result()), 40);
-        drainTimer.unref?.();
+        if (!idleAfterRunning) return;
+        // turn 活跃中（已见 turn/start、未见 turn/end）：只认 turn/end 或超
+        // 时，idle 一律不结算——它与最终答案之间没有顺序保证。
+        if (activeTurn !== null) return;
+        armQuietPeriod();
       };
       const unsubscribe = this.subscribe((notification) => {
         notifications.push(notification);
@@ -147,12 +169,26 @@ class DeepSeekHarnessWebClient {
           if (notification.params.status === "idle" && sawRunning) idleAfterRunning = true;
         }
         if (notification.method === "session.event" && notification.params.sessionId === sessionId) {
-          events.push(notification.params.event);
+          const event = notification.params.event;
+          events.push(event);
+          if (promptAccepted && event?.type === "turn/start") {
+            activeTurn = typeof event?.data?.turn === "number" ? event.data.turn : true;
+            // turn 有了权威终态信号，idle 静默期兜底即刻作废（竞态下它可能
+            // 已在计时——idle 先于 turn/start 到达的病态帧序）。
+            if (drainTimer) {
+              clearTimeout(drainTimer);
+              drainTimer = null;
+            }
+          }
+          if (promptAccepted && activeTurn !== null && event?.type === "turn/end") {
+            const endedTurn = event?.data?.turn;
+            if (activeTurn === true || typeof endedTurn !== "number" || endedTurn === activeTurn) turnEnded = true;
+          }
         }
         maybeSettle();
       });
       timer = setTimeout(() => {
-        finish(runtimeError("HARNESS_TURN_TIMEOUT", "DeepSeek Harness Web turn 等待 idle 超时", { retryable: true }));
+        finish(runtimeError("HARNESS_TURN_TIMEOUT", "DeepSeek Harness Web turn 等待 turn/end 或 idle 静默超时", { retryable: true }));
       }, this.turnTimeoutMs);
       timer.unref?.();
       if (signal?.aborted) {
@@ -165,6 +201,7 @@ class DeepSeekHarnessWebClient {
         mode: "queue",
         content: toPromptContent(contentBlocks),
       }, signal).then(() => {
+        promptAccepted = true;
         maybeSettle();
       }).catch((error) => finish(error));
     });

@@ -210,6 +210,57 @@ test("DeepSeekHarnessWebClient settles on running-then-idle even without assista
   assert.ok(Date.now() - started < 700);
 });
 
+test("DeepSeekHarnessWebClient waits for turn/end when idle races ahead of the final answer", async (t) => {
+  // 2026-09-03 生产事故复现：工具轮次中 host 状态流的 idle 比 mux 事件流的
+  // step-2 最终答案抢先到达，旧逻辑把 step-1 预告文本当最终答复结算投递。
+  let step2Sent = false;
+  const fake = await startFakeWeb({
+    onPrompt({ sessionId, hostStream, muxStream }) {
+      // 上一轮迟到的 turn/end（竞态提前结算的自我污染场景）必须被配对逻辑挡住
+      muxStream?.send({ type: "session/event", sessionId, event: { type: "turn/end", data: { turn: 0, reason: { kind: "completed" } } } });
+      hostStream?.send({ type: "host/session-status", sessionId, running: true });
+      muxStream?.send({ type: "session/event", sessionId, event: { type: "turn/start", data: { turn: 1 } } });
+      muxStream?.send({
+        type: "session/event", sessionId,
+        event: { type: "assistant/message", data: { step: 1, message: { content: [
+          { type: "text", text: "我来读取这个链接的内容。" },
+          { type: "tool-call", id: "call_1" },
+        ] } } },
+      });
+      muxStream?.send({ type: "session/event", sessionId, event: { type: "tool/result", data: {} } });
+      // idle 先于 step-2 到达（两条独立连接的竞速）
+      hostStream?.send({ type: "host/session-status", sessionId, running: false });
+      setTimeout(() => {
+        step2Sent = true;
+        muxStream?.send({
+          type: "session/event", sessionId,
+          event: { type: "assistant/message", data: { step: 2, message: { content: [{ type: "text", text: "最终答案：抓取被反爬拦截" }] } } },
+        });
+        muxStream?.send({ type: "session/event", sessionId, event: { type: "turn/end", data: { turn: 1, reason: { kind: "completed" } } } });
+      }, 250);
+    },
+  });
+  t.after(() => fake.close());
+  const client = new DeepSeekHarnessWebClient({
+    origin: `http://127.0.0.1:${fake.port}`,
+    cwd: "/tmp/workspace",
+    initializeTimeoutMs: 5_000,
+    turnTimeoutMs: 5_000,
+    turnSettleQuietMs: 60,
+  });
+  t.after(() => client.close());
+  await client.initialize({ cwd: "/tmp/workspace", provider: "deepseek-official", model: "deepseek-v4-flash" });
+  let resolvedAt = 0;
+  const pending = client.runTurn("syno-race", [{ type: "text", text: "读这个链接" }]).then((result) => {
+    resolvedAt = Date.now();
+    return result;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  assert.equal(resolvedAt, 0, "idle 抢跑时不得在 step-2 到达前结算");
+  const result = await pending;
+  assert.equal(result.finalResponse, "最终答案：抓取被反爬拦截");
+});
+
 test("DeepSeekHarnessWebClient keeps event streams after initializeTimeoutMs", async (t) => {
   const fake = await startFakeWeb();
   t.after(() => fake.close());
