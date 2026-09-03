@@ -10,4 +10,4 @@ description: 低成本维护来源、孤岛、死链、时效性和知识结构�
 3. 无真实关系时保留 orphan，不用无关链接消除孤岛。
 4. 新标签、新 MOC、覆盖、移动或删除必须生成真实差异，并在受控工作区自动执行（自动落盘 + 差异审计）；整理冲突时由主人澄清，不再逐次人工审批。
 5. 大批问题进入周度摘要，不在日常对话中刷屏。
-6. canonical 规则必须通过 `syno_workflow_context` 获取，不复制第二套知识分类。
+6. canonical 规则以 vault 内 99-System 的 canonical 笔记为准（用 `syno_knowledge_search` 查找），不复制第二套知识分类。

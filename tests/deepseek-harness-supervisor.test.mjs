@@ -59,11 +59,20 @@ test("native syno_* names are used instead of MCP prefixes", () => {
 });
 
 test("core chat tool set is shared by the DSH plugin and excludes hidden domain tools", () => {
+  // #21（2026-09-03）实证摘除后保留 6 件：知识三件套 + today.read + capture.start + image.read；
+  // 已摘工具（capture.list_pending 等）不得回流。
   const knowledgeLoopTools = [
     "knowledge.fetch_url",
+  ];
+  const evictedTools = [
+    "workflow.context",
+    "capture.status",
     "capture.list_pending",
+    "jobs.list",
+    "jobs.submit",
   ];
   assert.deepEqual(CORE_CHAT_TOOL_NAMES.filter((name) => knowledgeLoopTools.includes(name)), knowledgeLoopTools);
+  assert.deepEqual(CORE_CHAT_TOOL_NAMES.filter((name) => evictedTools.includes(name)), []);
   const definitions = [
     ...CORE_CHAT_TOOL_NAMES.map((name) => ({ name: name.replaceAll(".", "_"), description: name })),
     { name: "claims_propose", description: "hidden" },
