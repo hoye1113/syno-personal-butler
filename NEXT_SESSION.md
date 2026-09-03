@@ -1,18 +1,19 @@
 # Syno 执行语义与移动可靠交付交接（2026-07-29）
 
-## 2026-09-02 当前交接：拆库封板（#14~#16 完成），唯一剩余任务 #11 等 Owner 微信验收
+## 2026-09-03 当前交接：#11 验收中（Day 2 预算饥饿缺陷已修复补卡），封板后接 #17
 
 当前唯一执行入口是 [`docs/product-slimming-and-inspiration-plan.md`](docs/product-slimming-and-inspiration-plan.md)（Owner 2026-09-01 经 /goal 批准，指示一次性执行完全部任务）；本文下方 2026-08/07 内容仅作历史背景，不覆盖该执行计划。
 
 - 产品范围（Owner 2026-09-01 决策）：搜索、收录、深度探索分析、知识库查找、今日灵感（整合知识库文章产出串联/新观点的"做梦"功能）。学习与项目管理不在范围内。
-- 当前代码基线：`main` @ `391d654`（本地，沿现规不自动 Push）；工作树干净。
+- 当前代码基线：`main` @ `c0111c3`（本地，沿现规不自动 Push）；工作树干净。
 - **双仓形态（2026-09-01 D13 拆库，已封板）**：知识仓（`SYNO_KNOWLEDGE_ROOT` 指向；本机路径与回滚预案见 `docs/OPERATIONS.md`「知识仓库拆分」；HEAD `ec57a03`）持有 `vault/`（长期知识事实源）+ `ops/`（任务/行动/记录事实源）；代码仓经用户级 `SYNO_KNOWLEDGE_ROOT` 指向它，未设置时回退单库形态。GitGuard 默认根=知识仓，主检出非 `main` 拒绝产品提交与合回（`productBranch: "main"`；worktree `syno/job/*` 不受限）；validator 双根（vault 扫描/HEAD 在知识仓、`config/vault-contract.json` 在代码仓）；verify 双模式；管家的全部读写与产品提交只落知识仓 main。**地雷**：不得从拆库前（<`60a8c43`）分支/提交启动 Host；回滚=unset env + revert `60a8c43`；旧历史 bundle `C:\tmp\syno-pre-split-24e97af.bundle`（36MB）。细节见 `docs/OPERATIONS.md`「知识仓库拆分」。
 - 已完成：边界加固①/②（`e49a66c`、`b634efd`）；拆墙①/②（`f23954d`、`ec068b9`）；封板 #8（`1b66dec`+`14f6678`）；今日灵感①/②（`c5fa1bf`、`67cb311`）；拆库①/②（`98cd3ed`、`24e97af`+`97e557a`+`60a8c43`）；**拆库③ #16 封板（本轮）**——复审补强 `391d654`（productBranch 闸门覆盖合回路径）。
 - 封板回归快照（2026-09-02 当轮实测）：拆库形态（env 设置）`pnpm test` 713/713 pass、0 fail；回退形态（env 缺席）712 pass + 1 skip（知识检索集成用例按设计安静跳过）；`pnpm run verify`（env 设置）通过（Repository verification 341 files——拆库前 1655，代码仓已零知识内容；active docs 8 files）；`git diff --check` 通过。验收证据：知识仓 `ops/acceptance/repo-split/`。
+- 当前回归基线（2026-09-03 B1+L0a 当轮实测）：双形态 `pnpm test` 719/719 pass、0 fail；`pnpm run verify` 通过（341 files、8 docs）。
 - 兼容要点：效应幂等键保留 `<none>` 段字面量，跨重启去重连续；历史 Job/Workflow/Note 的 projectRef/project_refs 字段保留只读（契约留 optional 属性供旧记录 round-trip，读取方忽略，不再写入）。
-- 运行态：8888 Host 运行代码=`60a8c43` 时点（`97e557a` 为实例根修正，生产默认根下行为等价，随下次自然重启生效）；`/api/health` ok。**验收阻塞**：微信主动投递连续失败 64+ 次（`PROACTIVE_DELIVERY_EXHAUSTED`，context token 过期）——Owner 发任意微信消息即刷新持久 token，drain 自动补投；灵感卡每日 12:30 出卡（Owner 2026-09-02 自 16:00 调整），可回「有用/没用/一般」。
+- 运行态：8888 Host 运行代码=`c0111c3`（2026-09-03 13:29 重启部署 B1+L0a）；`/api/health` ok；微信轮询新格式锁正常、心跳新鲜。**09-02 的验收阻塞已全清**（token 刷新 + 锁 PID 复用修复上线）。#11 验收快照：Day 1（09-02）12:30 首卡全链路一次成功 + 09-03 10:52 反馈口令 23ms 确定性落账（useful）；Day 2（09-03）预算饥饿缺陷发现→B1 修复→13:29 当日补卡首投即成（budget_suppressed 记 21 条 event 抑制，可观测性生效）。灵感卡每日 12:30 出卡，回「有用/没用/一般」即可。
 - 运行时事实不变：产品只走 `DeepSeekHarnessCognitiveRuntime`；生产 chat = `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`，8888 是控制面；模型链 `deepseek/deepseek-v4-flash-vision-exp → deepseek/deepseek-v4-flash`，不使用 Pro；`SYNO_DSH_ROOT` clone 必须 `pnpm run build`；图片走 Host `syno_image_read`（Zen `mimo-v2.5-free`）；chat `web_search` 已启用。
-- 下一步：#11 今日灵感③ Owner 验收（连续数日收卡并回「有用/没用/一般」，证据落知识仓 `ops/acceptance/inspiration/` 后封板）——自动化侧无待办。注意：本会话 shell 不继承用户级 `SYNO_KNOWLEDGE_ROOT`（注册表已设，新开终端/登录任务会继承）；双仓回归需显式 env 或新开终端。
+- 下一步：#11 今日灵感③ 验收续跑——触发/投递/反馈路由/次日出卡四项已验，剩「连续多日稳定性」（自 09-03 B1 修复后重新累计，目标 ≥3 天），证据落知识仓 `ops/acceptance/inspiration/` 后封板。封板后接 #17（严格串行：L0b tick 三段重构+组合租约 → L2 投递成功后回写 → P1 反馈工具化；设计冻结于 plans/idempotent-knitting-toast.md，该文件在计划审批后归档于本仓 plans 目录之外、以会话计划为准）。注意：本会话 shell 不继承用户级 `SYNO_KNOWLEDGE_ROOT`（注册表已设，新开终端/登录任务会继承）；双仓回归需显式 env 或新开终端。
 - 停止条件（计划 D8）：任一阶段若需删除 Job 治理链、改动渠道去重/Outbox 语义、批量改写 vault 历史笔记，立即记录 `BLOCKED_SCOPE_DEVIATION` 并暂停回 Owner。
 - 提交规则：按 Job 声明精确路径暂存；禁止 `git add -A`；不自动 Push；commit 结尾不加 Co-Authored-By；跨仓库 git 一律 `git -C` 绝对路径。
 
