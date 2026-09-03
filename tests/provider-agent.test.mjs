@@ -261,11 +261,14 @@ test("Signal and Priority engines are deterministic and notification-bounded", (
   const signal = new SignalEngine({ schedule: { morningHour: 8, eveningHour: 20, weeklyDay: 0, maxDailyNotifications: 3 } });
   const now = new Date("2026-07-19T21:00:00+08:00");
   assert.equal(signal.collect({ now, notificationsToday: 2, highValueEvents: [{ id: "e1" }] }).length, 5); // event + morning + evening + inspiration + weekly 合并为一个 Bundle
-  assert.deepEqual(signal.collect({ now, notificationsToday: 3 }), []);
+  // B1：事件预算耗尽只抑制 event 类——预约信号（morning/evening/inspiration/weekly）恒 eligible
+  const exhausted = signal.collect({ now, notificationsToday: 3, highValueEvents: [{ id: "e2" }] });
+  assert.equal(exhausted.some((s) => s.kind === "event"), false);
+  assert.equal(exhausted.some((s) => s.kind === "inspiration"), true);
   assert.match(localDateKey(now), /^2026-07-/);
 });
 
-test("ProactiveOrchestrator drives the single Agent but keeps local fallback and budget", async (t) => {
+test("ProactiveOrchestrator drives the single Agent, keeps local fallback, and appointments bypass the event budget (B1)", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-proactive-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const messages = [];
@@ -299,7 +302,11 @@ test("ProactiveOrchestrator drives the single Agent but keeps local fallback and
   assert.equal(first.length, 1);
   assert.equal(first[0].localFallback, true);
   assert.match(messages[0].body, /复习 Tool Loop/);
-  assert.deepEqual(await proactive.tick({ now: new Date("2026-07-20T20:30:00+08:00") }), []);
+  // B1：maxDailyNotifications:1 只限事件型推送——预约的 evening 照常投递（本地回退文案）
+  const second = await proactive.tick({ now: new Date("2026-07-20T20:30:00+08:00") });
+  assert.equal(second.length, 1);
+  assert.equal(second[0].localFallback, true);
+  assert.equal(messages.length, 2);
   assert.equal(isQuietTime(new Date("2026-07-20T23:30:00+08:00"), { start: "23:00", end: "07:00" }), true);
 });
 
@@ -369,25 +376,27 @@ test("ProactiveOrchestrator weekly signal calls maintenance.weeklySummary and ta
   assert.ok(weeklySend.message.text.includes(weeklySend.message.title), "message should carry self-contained text for weixin/feishu");
 });
 
-test("weekly uses an ISO-week identity and shares the Bundle notification budget", () => {
+test("weekly uses an ISO-week identity; appointments stay eligible past the event budget (B1)", () => {
   const signal = new SignalEngine({ schedule: { morningHour: 8, eveningHour: 20, weeklyDay: 0, maxDailyNotifications: 2 } });
   const sunday = new Date("2026-07-19T09:00:00+08:00"); // 周日早晨
   const morning = signal.collect({ now: sunday, notificationsToday: 0, maxDailyNotifications: 2 });
   assert.ok(morning.some((s) => s.key === "weekly:2026-W29"), "weekly fires once for the ISO week");
   assert.ok(morning.some((s) => s.kind === "morning"), "morning also fires");
-  // morning + weekly 同 tick 合并为一个 Bundle，因此这里只消耗一次预算。
+  // morning + weekly 同 tick 合并为一个 Bundle；B1 起预约信号本就不消耗事件预算。
   const evening = signal.collect({
     now: new Date("2026-07-19T21:00:00+08:00"),
     lastRuns: { "morning:2026-07-19": "2026-07-19", "weekly:2026-W29": "2026-07-19" },
     notificationsToday: 1,
     maxDailyNotifications: 2,
   });
-  // D12：21:00 时 evening 与 inspiration（16:00 后 eligible）同时发出；slot 竞争中 evening 在前
+  // D12：21:00 时 evening 与 inspiration（12:30 后 eligible）同时发出；slot 竞争中 evening 在前
   assert.deepEqual(evening, [
     { kind: "evening", key: "evening:2026-07-19" },
     { kind: "inspiration", key: "inspiration:2026-07-19" },
   ]);
-  assert.deepEqual(signal.collect({ now: sunday, notificationsToday: 2, maxDailyNotifications: 2 }), []);
+  // B1：预算耗尽只抑制 event 类；预约信号照常（周日 09:00 → morning + weekly）
+  const sundayExhausted = signal.collect({ now: sunday, notificationsToday: 2, maxDailyNotifications: 2 });
+  assert.deepEqual(sundayExhausted.map((s) => s.kind), ["morning", "weekly"]);
   assert.deepEqual(signal.collect({
     now: new Date("2026-07-19T21:00:00+08:00"),
     lastRuns: { morning: "2026-07-19", evening: "2026-07-19", inspiration: "2026-07-19", weekly: "2026-07-19" },

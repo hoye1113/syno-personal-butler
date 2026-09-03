@@ -130,8 +130,31 @@ test("SignalEngine emits the daily inspiration signal after 12:30 and dedups per
   assert.deepEqual(at.filter((signal) => signal.kind === "inspiration").map((signal) => signal.key), ["inspiration:2026-09-01"]);
   const alreadyRan = engine.collect({ now: new Date("2026-09-01T13:00:00+08:00"), lastRuns: { "inspiration:2026-09-01": "2026-09-01" }, highValueEvents: [], notificationsToday: 1, maxDailyNotifications: 3 });
   assert.equal(alreadyRan.some((signal) => signal.kind === "inspiration"), false);
+  // B1：事件预算耗尽只抑制 event 类——预约的灵感信号恒 eligible
   const budgetSpent = engine.collect({ now: new Date("2026-09-01T12:30:00+08:00"), lastRuns: {}, highValueEvents: [], notificationsToday: 3, maxDailyNotifications: 3 });
-  assert.equal(budgetSpent.length, 0);
+  assert.equal(budgetSpent.some((signal) => signal.kind === "inspiration"), true);
+});
+
+test("SignalEngine suppresses only event signals on budget exhaustion and reports them via onBudgetSuppressed", () => {
+  const engine = new SignalEngine();
+  const highValueEvents = [{ id: "ingest-pending:x", kind: "ingest-pending", title: "待办", action: "处理", priority: 50, ref: {} }];
+  const suppressedLog = [];
+  const exhausted = engine.collect({
+    now: new Date("2026-09-01T12:30:00+08:00"),
+    lastRuns: {},
+    highValueEvents,
+    notificationsToday: 2,
+    maxDailyNotifications: 2,
+    onBudgetSuppressed: (keys) => suppressedLog.push(keys),
+  });
+  assert.equal(exhausted.some((signal) => signal.kind === "event"), false);
+  assert.equal(exhausted.some((signal) => signal.kind === "inspiration"), true);
+  assert.deepEqual(suppressedLog, [["event:ingest-pending:x"]]);
+  // 预算未耗尽：事件正常 eligible，不上报
+  const withinBudgetLog = [];
+  const withinBudget = engine.collect({ now: new Date("2026-09-01T12:30:00+08:00"), lastRuns: {}, highValueEvents, notificationsToday: 1, maxDailyNotifications: 2, onBudgetSuppressed: (keys) => withinBudgetLog.push(keys) });
+  assert.equal(withinBudget.some((signal) => signal.kind === "event"), true);
+  assert.deepEqual(withinBudgetLog, []);
 });
 
 // ---------- ProactiveOrchestrator × 灵感分支 ----------
@@ -174,7 +197,7 @@ async function makeInspirationProactive(t, { sample, agentRun, eventsLog = [] } 
     stateFile: path.join(root, "proactive.json"),
     quietHours: { start: "23:00", end: "07:00" },
   });
-  return { proactive, store, messages, agentCalls, eventsLog };
+  return { proactive, store, messages, agentCalls, eventsLog, stateFile: path.join(root, "proactive.json") };
 }
 
 const SAMPLE = {
@@ -229,6 +252,65 @@ test("generation failure delivers no empty card, retries, and settles terminally
   // 次日重新 eligible
   await proactive.tick({ now: new Date("2026-09-02T16:30:00+08:00") });
   assert.equal(agentCalls.length, 9);
+});
+
+// ---------- B1：预算语义（2026-09-03 验收期缺陷修复） ----------
+
+test("event budget exhaustion never starves the appointment card, and appointments do not consume the budget", async (t) => {
+  const { proactive, store, messages, stateFile } = await makeInspirationProactive(t, {
+    sample: SAMPLE,
+    agentRun: async () => ({ text: "预算耗尽日照常出卡。" }),
+  });
+  // 预置：今日事件预算已耗尽（balanced=2，两条事件推送已发；version:2 绕过迁移门）
+  await fs.writeFile(stateFile, JSON.stringify({ version: 2, date: "2026-09-01", notificationsToday: 2, lastRuns: {}, pending: {} }));
+  const delivered = await proactive.tick({ now: new Date("2026-09-01T16:30:00+08:00") });
+  assert.equal(delivered.length, 1);
+  assert.equal(messages.length, 1);
+  assert.match(messages[0].text, /Syno · 今日灵感/);
+  assert.equal((await store.list()).length, 1);
+  // 预约投递不消耗事件预算
+  const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
+  assert.equal(state.notificationsToday, 2);
+});
+
+test("budget suppression is journaled once per day instead of silently swallowing signals", async (t) => {
+  const eventsLog = [];
+  const { proactive, stateFile, agentCalls } = await makeInspirationProactive(t, {
+    sample: SAMPLE,
+    agentRun: async () => ({ text: "不应被调用" }),
+    eventsLog,
+  });
+  await fs.writeFile(stateFile, JSON.stringify({ version: 2, date: "2026-09-01", notificationsToday: 2, lastRuns: {}, pending: {} }));
+  const highValueEvents = [{ id: "ingest-pending:x", kind: "ingest-pending", title: "待办", action: "处理", priority: 50, ref: {} }];
+  // 15:30 早于 inspirationHour(16)：只剩 event 信号，被预算抑制
+  assert.deepEqual(await proactive.tick({ now: new Date("2026-09-01T15:30:00+08:00"), highValueEvents }), []);
+  assert.deepEqual(await proactive.tick({ now: new Date("2026-09-01T15:31:00+08:00"), highValueEvents }), []);
+  assert.equal(agentCalls.length, 0);
+  const suppressed = eventsLog.filter((event) => event.name === "proactive.signal.budget_suppressed");
+  assert.equal(suppressed.length, 1);
+  assert.equal(suppressed[0].data.count, 1);
+  assert.deepEqual(suppressed[0].data.suppressed, ["event:ingest-pending:x"]);
+});
+
+// ---------- L0a：tick 计时观测（加法） ----------
+
+test("tick journaling records completed for productive ticks and stays quiet on fast idle ticks", async (t) => {
+  const eventsLog = [];
+  const { proactive } = await makeInspirationProactive(t, {
+    sample: SAMPLE,
+    agentRun: async () => ({ text: "观测用。" }),
+    eventsLog,
+  });
+  await proactive.tick({ now: new Date("2026-09-01T16:30:00+08:00") });
+  const completed = eventsLog.filter((event) => event.name === "proactive.tick.completed");
+  assert.equal(completed.length, 1);
+  assert.equal(completed[0].data.outcome, "enqueued");
+  assert.equal(completed[0].data.deliveredCount, 1);
+  assert.equal(typeof completed[0].data.durationMs, "number");
+  // 当日已出卡：快速空转的 tick 不落 completed（低于 tickObservationMinMs 阈值）
+  eventsLog.length = 0;
+  await proactive.tick({ now: new Date("2026-09-01T16:45:00+08:00") });
+  assert.equal(eventsLog.filter((event) => event.name === "proactive.tick.completed").length, 0);
 });
 
 test("insufficient sampling material skips the day quietly with a terminal mark", async (t) => {

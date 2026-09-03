@@ -181,6 +181,7 @@ test("proactive Bundle lifecycle emits redacted created, enqueued, and delivered
   assert.deepEqual(eventsLog.map((item) => item.name), [
     "proactive.bundle.created",
     "proactive.bundle.enqueued",
+    "proactive.tick.completed",
     "proactive.bundle.delivered",
   ]);
   assert.doesNotMatch(JSON.stringify(eventsLog), /PRIVATE TITLE/);

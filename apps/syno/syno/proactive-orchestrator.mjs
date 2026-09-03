@@ -126,10 +126,10 @@ function prioritiesBody(snapshot) {
 }
 
 class ProactiveOrchestrator {
-  constructor({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery, recordEvent, inspirationStore = null, inspirationSampler = null, signalEngine = new SignalEngine(), stateFile = path.join(PATHS.stateRoot, "proactive.json"), stateLock, clock = () => new Date(), quietHours = DEFAULT_QUIET_HOURS } = {}) {
+  constructor({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery, recordEvent, inspirationStore = null, inspirationSampler = null, signalEngine = new SignalEngine(), stateFile = path.join(PATHS.stateRoot, "proactive.json"), stateLock, clock = () => new Date(), quietHours = DEFAULT_QUIET_HOURS, tickObservationMinMs = 5_000 } = {}) {
     if (!host || !today || !channels) throw new Error("ProactiveOrchestrator 缺少 host、today 或 channels");
     this.host = host; this.today = today; this.channels = channels; this.conversations = conversations; this.cognitiveRuntime = cognitiveRuntime;
-    this.settingsRegistry = settingsRegistry; this.signalSources = signalSources; this.maintenance = maintenance; this.channelDeliveryOutbox = channelDeliveryOutbox; this.notifications = notifications; this.ownerChannelTargets = ownerChannelTargets; this.wakeDelivery = wakeDelivery; this.recordEvent = recordEvent; this.inspirationStore = inspirationStore; this.inspirationSampler = inspirationSampler; this.signalEngine = signalEngine; this.stateFile = stateFile; this.stateLock = stateLock || new ProcessFileLock({ file: `${stateFile}.lock`, timeoutMs: 30_000 }); this.clock = clock; this.quietHours = quietHours; this.timer = null; this.startGeneration = 0;
+    this.settingsRegistry = settingsRegistry; this.signalSources = signalSources; this.maintenance = maintenance; this.channelDeliveryOutbox = channelDeliveryOutbox; this.notifications = notifications; this.ownerChannelTargets = ownerChannelTargets; this.wakeDelivery = wakeDelivery; this.recordEvent = recordEvent; this.inspirationStore = inspirationStore; this.inspirationSampler = inspirationSampler; this.signalEngine = signalEngine; this.stateFile = stateFile; this.stateLock = stateLock || new ProcessFileLock({ file: `${stateFile}.lock`, timeoutMs: 30_000 }); this.clock = clock; this.quietHours = quietHours; this.tickObservationMinMs = tickObservationMinMs; this.timer = null; this.startGeneration = 0;
   }
 
   async load({ prepareMigration = true } = {}) {
@@ -569,7 +569,20 @@ class ProactiveOrchestrator {
     const cadenceBudget = { minimal: 1, balanced: 2, active: 3 }[cadence] || 2;
     this.#markInactive(state, events, now);
     this.#pruneResolvedSubjects(state, now);
-    const signals = this.signalEngine.collect({ now, lastRuns: state.lastRuns, highValueEvents: events, notificationsToday: state.notificationsToday, maxDailyNotifications: cadenceBudget, returnAllEligible: true });
+    const signals = this.signalEngine.collect({
+      now,
+      lastRuns: state.lastRuns,
+      highValueEvents: events,
+      notificationsToday: state.notificationsToday,
+      maxDailyNotifications: cadenceBudget,
+      returnAllEligible: true,
+      // B1：预算抑制 event 信号必须有痕迹；每日至多记一次（下一拍同因抑制不重复刷 journal）。
+      onBudgetSuppressed: (keys) => {
+        if (state.lastBudgetSuppressed === date) return;
+        state.lastBudgetSuppressed = date;
+        this.recordEvent?.("proactive.signal.budget_suppressed", { date, count: keys.length, suppressed: keys.slice(0, 20) }, { level: "warning" }).catch(() => {});
+      },
+    });
     const prepared = this.#prepareSignals(state, signals, now);
     state.lastEligibleSignals = prepared.length;
     const delivered = [];
@@ -614,7 +627,8 @@ class ProactiveOrchestrator {
           this.#applyBundleDelivered(state, bundle.bundleId, delivery.eventId, now);
           await this.#markInspirationDelivered({ inspirationId: message.data?.inspirationId }, delivery.eventId);
         }
-        state.notificationsToday += 1;
+        // B1：只有事件型推送消耗防打扰预算；预约投递（morning/evening/weekly/inspiration）不计数。
+        if (slot === "event") state.notificationsToday += 1;
         state.pending[bundle.bundleId] = { signalKey: bundle.bundleId, status: delivery.status };
         delivered.push({ signal: "bundle", bundleId: bundle.bundleId, providerStatus, localFallback, deliveryStatus: delivery.status, targetChannel: delivery.targetChannel });
       }
@@ -632,10 +646,26 @@ class ProactiveOrchestrator {
     };
   }
 
+  // L0a（2026-09-03，验收期加法）：tick 全程计时观测。快速空转（idle 且耗时 < tickObservationMinMs）
+  // 不落事件，避免 60s 一拍刷 journal；慢空转（锁等待/长任务征兆）与有产出的 tick 都有 completed 记录。
+  // 失败路径把耗时挂上 error，由 start() 的 interval catch 一并落 journal（:867 附近）。
   async tick(options = {}) {
-    const result = await this.stateLock.run(() => this.#tickLocked(options));
-    if (result.shouldWake) await this.wakeDelivery?.();
-    return result.delivered;
+    const startedAt = Date.now();
+    try {
+      const result = await this.stateLock.run(() => this.#tickLocked(options));
+      const outcome = result.delivered.length
+        ? (result.delivered.some((item) => item.deliveryStatus === "delivered") ? "delivered" : "enqueued")
+        : "idle";
+      const durationMs = Date.now() - startedAt;
+      if (outcome !== "idle" || durationMs >= this.tickObservationMinMs) {
+        await this.recordEvent?.("proactive.tick.completed", { durationMs, outcome, deliveredCount: result.delivered.length });
+      }
+      if (result.shouldWake) await this.wakeDelivery?.();
+      return result.delivered;
+    } catch (error) {
+      if (error && typeof error === "object") error.tickDurationMs = Date.now() - startedAt;
+      throw error;
+    }
   }
 
   async #deliveryEnabled() {
@@ -864,7 +894,7 @@ class ProactiveOrchestrator {
     if (generation !== this.startGeneration) return;
     this.timer = setInterval(() => tickIfEnabled().catch((error) => {
       // tick 失败此前被完全静默（save IO 错 / enqueue 冲突 / snapshot 错都消失）；落 journal 可观测，不阻断下一 tick。
-      this.recordEvent?.("proactive.tick.failed", { error: { code: error?.code, message: String(error?.message || error).slice(0, 500) } }, { level: "error" }).catch(() => {});
+      this.recordEvent?.("proactive.tick.failed", { error: { code: error?.code, message: String(error?.message || error).slice(0, 500) }, durationMs: error?.tickDurationMs }, { level: "error" }).catch(() => {});
     }), 60_000);
   }
 
