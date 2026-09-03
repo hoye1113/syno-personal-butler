@@ -627,7 +627,7 @@ class ChannelConversationHandler {
         if (residual.length > 0 && residual.length <= 30
           && /(?:访问|读取|获取|看看|看一下|读一读|读一下|读读|帮我读|打开|总结|分析|讲一讲|解读|解释|什么意思|说了啥|说了什么|内容)/u.test(residual)) {
           await this.#record("channel.read_link.requested", { ...trace, sourceKind: "url" });
-          runText = `${text}\n\n（系统提示：主人想让你读取这个链接并回答问题。请调用 knowledge.fetch_url 读取正文后回答；抓取失败或内容被安全策略拦截时如实说明原因，不要编造。主人没有要求收录，不要主动调用收录类工具。）`;
+          runText = `${text}\n\n（系统提示：主人想让你读取这个链接并回答问题。请调用 knowledge.fetch_url 读取正文后回答；直抓被反爬拦截时它会自动改用主人的浏览器读取，若需人工验证，如实告知主人在浏览器里完成后回复「继续」。内容被安全策略拦截时如实说明原因，不要编造。主人没有要求收录，不要主动调用收录类工具。）`;
         }
       }
       if (Array.isArray(message.__imageArtifacts) && message.__imageArtifacts.length) {

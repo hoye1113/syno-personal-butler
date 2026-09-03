@@ -93,3 +93,134 @@ test("createSynoRuntime registers knowledge.fetch_url and exposes it through the
   assert.ok(runtime.tools.list().find((item) => item.name === "image.read"), "ToolRegistry 应有 image.read");
   assert.ok(runtime.toolBridge.exposed.has("image_read"), "桥接应暴露 image_read");
 });
+
+// ---------- #20 反爬墙检测与浏览器升级（2026-09-03 生产实证建模） ----------
+
+function fakeBrowserAdapter(behavior) {
+  const calls = [];
+  return {
+    calls,
+    observation({ workflowId }) { return behavior.observations?.[workflowId] || null; },
+    async capture({ workflowId, exactUrl }) { calls.push(["capture", workflowId, exactUrl]); return behavior.capture; },
+    async continue({ workflowId }) { calls.push(["continue", workflowId]); return behavior.continue; },
+  };
+}
+
+const WX_WALL_TEXT = "当前环境异常，完成验证后即可继续访问。去验证";
+const chatContext = { channel: "weixin", ownerId: "local-user", threadKey: "main", conversationId: "m1" };
+
+test("detectAntiBotWall recognizes the WeChat verification wall and spares normal pages", async () => {
+  const { detectAntiBotWall } = await import("../apps/syno/syno/fetch-url-tool.mjs");
+  assert.equal(detectAntiBotWall({ sourceUrl: "https://mp.wappoc_appmsgcaptcha.example/x", text: "" }), "verification_redirect");
+  assert.equal(detectAntiBotWall({ sourceUrl: "https://mp.weixin.qq.com/s/abc", text: WX_WALL_TEXT }), "verification_page");
+  assert.equal(detectAntiBotWall({ sourceUrl: "https://example.com", text: "验证码 " }), "short_verification_page");
+  // 长文提及"验证码/登录"不是墙
+  assert.equal(detectAntiBotWall({ sourceUrl: "https://example.com", text: `验证码设计漫谈${"正文".repeat(600)}` }), null);
+  assert.equal(detectAntiBotWall({ sourceUrl: "https://example.com/post", text: "正常正文内容" }), null);
+});
+
+test("fetchUrlForChat escalates an anti-bot wall to the browser in a live chat context", async () => {
+  const adapter = fakeBrowserAdapter({
+    capture: { status: "completed", finalUrl: "https://mp.weixin.qq.com/s/abc", title: "吃透 AI Agent 开发", content: "公众号正文全文" },
+  });
+  const result = await fetchUrlForChat({
+    url: "https://mp.weixin.qq.com/s/abc",
+    fetcher: async (value) => ({ url: "https://mp.wappoc_appmsgcaptcha.example/verify", contentType: "text/html", text: WX_WALL_TEXT, truncated: false }),
+    browserCapture: adapter,
+    context: chatContext,
+  });
+  assert.equal(result.via, "browser");
+  assert.equal(result.title, "吃透 AI Agent 开发");
+  assert.match(result.content, /公众号正文全文/);
+  assert.match(result.content, /经主人本地浏览器取得/);
+  assert.match(adapter.calls[0][1], /^workflow-chatread-[0-9a-f]{16}$/);
+  assert.equal(adapter.calls[0][2], "https://mp.weixin.qq.com/s/abc");
+});
+
+test("fetchUrlForChat reports interaction_required with a continue hint", async () => {
+  const adapter = fakeBrowserAdapter({
+    capture: { status: "interaction_required", title: "验证页", interactionHint: "请在浏览器完成登录或验证后回复继续" },
+  });
+  const result = await fetchUrlForChat({
+    url: "https://mp.weixin.qq.com/s/abc",
+    fetcher: async () => { throw new Error("来源返回 HTTP 403"); },
+    browserCapture: adapter,
+    context: chatContext,
+  });
+  assert.equal(result.via, "browser");
+  assert.equal(result.blocked, "interaction_required");
+  assert.match(result.content, /完成验证后回复/);
+});
+
+test("fetchUrlForChat never opens the browser outside live chat (scheduler/proactive)", async () => {
+  const adapter = fakeBrowserAdapter({ capture: { status: "completed", title: "t", content: "c" } });
+  const result = await fetchUrlForChat({
+    url: "https://mp.weixin.qq.com/s/abc",
+    fetcher: async (value) => ({ url: value, contentType: "text/html", text: WX_WALL_TEXT, truncated: false }),
+    browserCapture: adapter,
+    context: { channel: "scheduler", ownerId: "local-user", threadKey: "proactive", conversationId: "bundle-1" },
+  });
+  assert.equal(result.via, "direct");
+  assert.equal(result.blocked, "verification_page");
+  assert.equal(adapter.calls.length, 0, "后台上下文绝不调用浏览器");
+});
+
+test("fetchUrlForChat keeps throwing the original HTTP error when no browser channel exists", async () => {
+  await assert.rejects(
+    fetchUrlForChat({ url: "https://example.com/x", fetcher: async () => { throw new Error("来源返回 HTTP 403"); } }),
+    /来源返回 HTTP 403/,
+  );
+  // 有墙无浏览器：直抓文本结果带 blocked 标记如实返回
+  const result = await fetchUrlForChat({
+    url: "https://mp.weixin.qq.com/s/abc",
+    fetcher: async (value) => ({ url: value, contentType: "text/html", text: WX_WALL_TEXT, truncated: false }),
+    context: chatContext,
+  });
+  assert.equal(result.via, "direct");
+  assert.equal(result.blocked, "verification_page");
+});
+
+test("fetchUrlForChat reuses the deterministic browser session for continue and re-captures after expiry", async () => {
+  const observations = {};
+  const adapter = fakeBrowserAdapter({
+    observations, // 首轮后由 capture 调用方补写——这里直接预置一个已有观察
+    continue: { status: "failed", error: { code: "BROWSER_SESSION_EXPIRED", message: "过期" } },
+    capture: { status: "completed", finalUrl: "https://example.com/a", title: "重开", content: "重开后的正文" },
+  });
+  // 预置任意观察使 observation() 命中（真实 id 由工具内部决定，fake 用通配）
+  adapter.observation = ({ workflowId }) => { observations.seen = workflowId; return { status: "interaction_required" }; };
+  const result = await fetchUrlForChat({
+    url: "https://example.com/a",
+    fetcher: async (value) => ({ url: value, contentType: "text/html", text: WX_WALL_TEXT, truncated: false }),
+    browserCapture: adapter,
+    context: chatContext,
+  });
+  assert.equal(result.via, "browser");
+  assert.match(result.content, /重开后的正文/);
+  assert.deepEqual(adapter.calls.map((c) => c[0]), ["continue", "capture"], "先续抓、过期后重开");
+  // 确定性：同（主人,会话,URL）两次调用同一 workflowId
+  const again = await fetchUrlForChat({
+    url: "https://example.com/a",
+    fetcher: async (value) => ({ url: value, contentType: "text/html", text: WX_WALL_TEXT, truncated: false }),
+    browserCapture: adapter,
+    context: chatContext,
+  });
+  assert.ok(again.via);
+  const ids = adapter.calls.map((c) => c[1]).filter(Boolean);
+  assert.ok(new Set(ids).size === 1, "workflowId 确定不变");
+});
+
+test("fetchUrlForChat honestly degrades when the browser daemon is unavailable", async () => {
+  const adapter = fakeBrowserAdapter({
+    capture: { status: "unavailable", error: { code: "BROWSER_DAEMON_UNAVAILABLE", message: "daemon 未运行" } },
+  });
+  const result = await fetchUrlForChat({
+    url: "https://mp.weixin.qq.com/s/abc",
+    fetcher: async (value) => ({ url: value, contentType: "text/html", text: WX_WALL_TEXT, truncated: false }),
+    browserCapture: adapter,
+    context: chatContext,
+  });
+  assert.equal(result.via, "browser");
+  assert.equal(result.blocked, "browser_unavailable");
+  assert.match(result.content, /daemon 未运行/);
+});
