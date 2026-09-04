@@ -1,17 +1,17 @@
 # Syno 执行语义与移动可靠交付交接（2026-07-29）
 
-## 2026-09-03 当前交接：#11 验收中（Day 2 证据齐）；#19/#20/#21 全部生产验证通过销项，封板后接 #17
+## 2026-09-04 当前交接：#11 验收中（今日 12:30 = Day 2）；#19/#20/#21 销项 + 代码审查整改（7374798+43fd74d）已部署，封板后接 #17
 
 当前唯一执行入口是 [`docs/product-slimming-and-inspiration-plan.md`](docs/product-slimming-and-inspiration-plan.md)（Owner 2026-09-01 经 /goal 批准，指示一次性执行完全部任务）；本文下方 2026-08/07 内容仅作历史背景，不覆盖该执行计划。
 
 - 产品范围（Owner 2026-09-01 决策）：搜索、收录、深度探索分析、知识库查找、今日灵感（整合知识库文章产出串联/新观点的"做梦"功能）。学习与项目管理不在范围内。
-- 当前代码基线：`main` @ `f8e2cca`（本地，沿现规不自动 Push）；工作树干净。
+- 当前代码基线：`main` @ `43fd74d`（本地，沿现规不自动 Push）；工作树干净。
 - **双仓形态（2026-09-01 D13 拆库，已封板）**：知识仓（`SYNO_KNOWLEDGE_ROOT` 指向；本机路径与回滚预案见 `docs/OPERATIONS.md`「知识仓库拆分」；HEAD `ec57a03`）持有 `vault/`（长期知识事实源）+ `ops/`（任务/行动/记录事实源）；代码仓经用户级 `SYNO_KNOWLEDGE_ROOT` 指向它，未设置时回退单库形态。GitGuard 默认根=知识仓，主检出非 `main` 拒绝产品提交与合回（`productBranch: "main"`；worktree `syno/job/*` 不受限）；validator 双根（vault 扫描/HEAD 在知识仓、`config/vault-contract.json` 在代码仓）；verify 双模式；管家的全部读写与产品提交只落知识仓 main。**地雷**：不得从拆库前（<`60a8c43`）分支/提交启动 Host；回滚=unset env + revert `60a8c43`；旧历史 bundle `C:\tmp\syno-pre-split-24e97af.bundle`（36MB）。细节见 `docs/OPERATIONS.md`「知识仓库拆分」。
 - 已完成：边界加固①/②（`e49a66c`、`b634efd`）；拆墙①/②（`f23954d`、`ec068b9`）；封板 #8（`1b66dec`+`14f6678`）；今日灵感①/②（`c5fa1bf`、`67cb311`）；拆库①/②（`98cd3ed`、`24e97af`+`97e557a`+`60a8c43`）；**拆库③ #16 封板（本轮）**——复审补强 `391d654`（productBranch 闸门覆盖合回路径）。
 - 封板回归快照（2026-09-02 当轮实测）：拆库形态（env 设置）`pnpm test` 713/713 pass、0 fail；回退形态（env 缺席）712 pass + 1 skip（知识检索集成用例按设计安静跳过）；`pnpm run verify`（env 设置）通过（Repository verification 341 files——拆库前 1655，代码仓已零知识内容；active docs 8 files）；`git diff --check` 通过。验收证据：知识仓 `ops/acceptance/repo-split/`。
-- 当前回归基线（2026-09-03 #20+#21 当轮实测）：双形态 `npm test` 全绿——默认形态 727/727 pass；显式 `SYNO_KNOWLEDGE_ROOT=.runtime-test-knowledge` 形态 726 pass + 1 skip（变异对照：stash 基线同形态 719 pass + 同一 skip，非本次引入）、0 fail；`node scripts/verify-repository.mjs` 通过（341 files）。
+- 当前回归基线（2026-09-04 代码审查整改当轮实测）：双形态 `npm test` 全绿——默认形态 729/729 pass；显式 `SYNO_KNOWLEDGE_ROOT=.runtime-test-knowledge` 形态 728 pass + 1 skip（既有，stash 基线对照同）、0 fail；`node scripts/verify-repository.mjs` 通过（341 files）。
 - 兼容要点：效应幂等键保留 `<none>` 段字面量，跨重启去重连续；历史 Job/Workflow/Note 的 projectRef/project_refs 字段保留只读（契约留 optional 属性供旧记录 round-trip，读取方忽略，不再写入）。
-- 运行态：8888 Host 运行代码=`f8e2cca`（2026-09-03 20:03 重启部署 #20+#21，启动期 503 属正常引导、24s 后健康）；`/api/health` ok；dsh-web:3088 在听；kimi-webbridge daemon（10086）在线。微信轮询新格式锁正常、心跳新鲜。**09-02 的验收阻塞已全清**（token 刷新 + 锁 PID 复用修复上线）。#11 验收快照：Day 1（09-02）12:30 首卡全链路一次成功 + 09-03 10:52 反馈口令 23ms 确定性落账（useful）；Day 2（09-03）预算饥饿缺陷发现→B1 修复→13:29 当日补卡首投即成（budget_suppressed 记 21 条 event 抑制，可观测性生效）。灵感卡每日 12:30 出卡，回「有用/没用/一般」即可。
+- 运行态：8888 Host 运行代码=`43fd74d`（=原合并提交 a592f3a 内容拆分为 ①②，字节一致无需重部署；2026-09-04 09:22 重启部署审查整改；前次 20:03 部署 #20+#21）；`/api/health` ok；dsh-web:3088 在听；kimi-webbridge daemon（10086）在线。微信轮询新格式锁正常、心跳新鲜。**09-02 的验收阻塞已全清**（token 刷新 + 锁 PID 复用修复上线）。#11 验收快照：Day 1（09-02）12:30 首卡全链路一次成功 + 09-03 10:52 反馈口令 23ms 确定性落账（useful）；Day 2（09-03）预算饥饿缺陷发现→B1 修复→13:29 当日补卡首投即成（budget_suppressed 记 21 条 event 抑制，可观测性生效）。灵感卡每日 12:30 出卡，回「有用/没用/一般」即可。
 - 运行时事实不变：产品只走 `DeepSeekHarnessCognitiveRuntime`；生产 chat = `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`，8888 是控制面；模型链 `deepseek/deepseek-v4-flash-vision-exp → deepseek/deepseek-v4-flash`，不使用 Pro；`SYNO_DSH_ROOT` clone 必须 `pnpm run build`；图片走 Host `syno_image_read`（Zen `mimo-v2.5-free`）；chat `web_search` 已启用。
 - #19（验收期缺陷修复，`92a04f7`）：web client turn 结算竞态——工具轮次只投递 step-1 预告文本、step-2 最终答案丢弃（生产实证：host 状态流 idle 比 mux 事件流最终消息抢先 21ms）。修复=结算锚 mux 流 `turn/end`（`turn/start` 配对 + `promptAccepted` 门防陈旧帧自我污染），idle 降为无 turn/start 兼容面的静默期兜底（`turnSettleQuietMs=400`）；竞态复现测试 + 变异检查（旧码必挂）守门。**生产验证已通过**（Owner 确认收到完整答复；当时答复内容=公众号反爬拦截如实告知，催生 #20）。同轮运维（Owner 指令）：收录积压 20 条 pending 全删，5 条失状态 failed_retryable legacy workflow 翻 `failed_terminal`（`INGEST_STATE_PURGED`）收束；机制 gap 留档：failed 态混入 pending 信号，#17 后评估。
 - #20（`9b00e90`）：fetch_url 内置浏览器升级——直抓命中反爬验证码墙（微信 wappoc_appmsgcaptcha 重定向/「完成验证后即可继续访问」正文特征/短正文验证码特征）或 HTTP 401/403/429 时，活聊天上下文（weixin/feishu/web）自动改用主人本地浏览器（kimi-webbridge BrowserCaptureAdapter）读取，对模型透明（工具数不变）；确定性 `workflow-chatread-<sha256(owner|thread|url)[:16]>` 支撑主人说「继续」原地续抓（observation→continue→过期重开）；scheduler/proactive/capture 后台上下文绝不升级（不在主人不知情时开浏览器标签）；interaction_required 与 daemon 不可用均如实降级。测试 7 条新增（墙检测/升级/门禁矩阵/续抓/降级），文件 13/13。

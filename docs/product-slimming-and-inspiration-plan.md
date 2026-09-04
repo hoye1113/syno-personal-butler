@@ -100,3 +100,7 @@ Owner 2026-09-01 决策：产品范围收敛为**搜索、收录、深度探索�
 ### 2026-09-03 #20+#21 生产终验：通过
 
 Owner 20:18 重发公众号链接（mp.weixin.qq.com/s/0FUG...nh55g）。会话存证（syno-main-87ac…，turn 14）确认全链路：直抓仍被微信反爬拦截 → #20 升级路径真实命中（tool/result 正文为浏览器变体「经主人本地浏览器取得」，标题「Agent 下半场：真正能自进化的 Agent 应该是什么样的？」）→ 未触发人工验证（主人浏览器登录态直接通过）→ turn/end completed → 结构化总结送达微信。同轮在瘦身后的 6 工具面下运行，fetch_url 注册与调用正常，#21 一并视为生产验证通过（21:00 晚报继续被动观察）。#20/#21 销项。
+
+### 2026-09-04 代码审查（B1/#19/#20/#21 四提交回溯）与整改
+
+按 /code-review 深度审查（a880598…cf7f972，573 行）：0 Required、2 Optional、3 FYI。整改拆分为 ①`7374798`（截断同口径）②`43fd74d`（升级可观测）：①fetch_url 浏览器路径与直抓同口径 maxChars 截断（超长标 truncated）；②升级路径落 journal `knowledge.fetch_url.escalation{host,wall,outcome}`（五终态；只带 host 不带完整 URL）。FYI 按其自身建议处理：L0a 阈值校准并入 #17 L0b（7-10s/拍正是锁收窄要的基线）；#19 陈旧帧残留窗口留档观察（不改动）；浏览器升级攻击面边界留档（Owner 背书的设计意图，缓解链完整）。新增测试 2 条，文件 15/15；双形态 729/729+728（1 既有 skip）；verify 341。09:22 重启部署。数据点：本轮一次 process-lock IDENTITY_UNKNOWN 瞬断未复现（Windows PID/StartTime 竞争环境性抖动，与改动无关——改动不含锁路径）。
