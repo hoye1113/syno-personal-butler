@@ -10,16 +10,6 @@ import { visionResultToIntakePayload } from "./vision-intake.mjs";
 const URL_IN_TEXT_PATTERN = /https?:\/\/[^\s⺀-鿿豈-﫿＀-￯　-〿]+/gi;
 const EXPLICIT_INGEST_PATTERN = /(?:收录|保存到知识库|记下来|存进知识库)/u;
 const BARE_URL_PATTERN = /^https?:\/\/[^\s⺀-鿿豈-﫿＀-￯　-〿]+$/i;
-// D12：今日灵感反馈口令——仅全文精确匹配才拦截；无待反馈卡片时落到正常对话
-const INSPIRATION_FEEDBACK_PATTERN = /^(有用|有启发|没用|没启发|一般)[!！。~]*$/u;
-
-function parseInspirationFeedback(text) {
-  const match = INSPIRATION_FEEDBACK_PATTERN.exec(String(text || "").trim());
-  if (!match) return null;
-  if (match[1] === "一般") return "neutral";
-  return match[1].startsWith("没") ? "not_useful" : "useful";
-}
-
 const WORKFLOW_STATUS_LABELS = Object.freeze({
   received: "已接收",
   extracting: "正在直接抓取",
@@ -57,7 +47,7 @@ function captureReceiptText(receipt, { attachment = false } = {}) {
 }
 
 class ChannelConversationHandler {
-  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery, imageStore = null, visionClient = null, inspirationStore = null } = {}) {
+  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery, imageStore = null, visionClient = null } = {}) {
     if (!runtime || !core || (!ingest && !ingestWorkflows) || !pendingDecisions) throw new Error("ChannelConversationHandler 缺少 Runtime、Core、IngestWorkflow 或 PendingDecision Store");
     this.runtime = runtime;
     this.core = core;
@@ -77,7 +67,6 @@ class ChannelConversationHandler {
     this.wakeDelivery = wakeDelivery;
     this.imageStore = imageStore;
     this.visionClient = visionClient;
-    this.inspirationStore = inspirationStore;
   }
 
   #record(event, data = {}, options) {
@@ -410,21 +399,8 @@ class ChannelConversationHandler {
         await this.#record("channel.recent_interaction.resolved", { ...trace, action: recentReference.action, kind: resolution.kind, itemId: resolution.item?.id || null });
         return { text: resolution.text };
       }
-      // D12：今日灵感反馈（确定性路由，不过模型）——仅存在 24h 内已投递且未反馈的卡片时拦截
-      const inspirationFeedback = pendingChatImages || !this.inspirationStore ? null : parseInspirationFeedback(text);
-      if (inspirationFeedback) {
-        const card = await this.inspirationStore.latestAwaitingFeedback().catch(() => null);
-        if (card) {
-          await this.inspirationStore.recordFeedback(card.id, inspirationFeedback);
-          await this.#record("channel.inspiration.feedback", { ...trace, inspirationId: card.id, feedback: inspirationFeedback });
-          const reply = inspirationFeedback === "useful"
-            ? "已记下：这条灵感有用。反馈已存入灵感档案。"
-            : inspirationFeedback === "neutral"
-              ? "已记下：一般。反馈已存入灵感档案。"
-              : "已记下：这条灵感不对味。反馈已存入灵感档案。";
-          return { text: reply };
-        }
-      }
+      // P1（2026-09-04）：灵感反馈口令拦截已删除——「有用/没用/一般」落进正常对话，由模型经
+      // inspiration.record_feedback 工具落账（工具内约束：无待反馈卡 recorded:false）。
       if (!pendingChatImages && isDecisionReply(text)) {
         await this.#record("channel.decision.requested", { ...trace });
         if (message.privateConversation !== true) {

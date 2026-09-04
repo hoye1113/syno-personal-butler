@@ -50,7 +50,7 @@ test("InspirationStore round-trips a generated card through the contract and rej
   assert.equal("unexpected" in withExtra, false);
 });
 
-test("InspirationStore feedback lifecycle: deliver first, feedback once, TTL gates the deterministic route", async (t) => {
+test("InspirationStore feedback lifecycle: deliver first, feedback once, TTL gates eligibility", async (t) => {
   const root = await tempRoot(t, "syno-inspiration-feedback-");
   let now = new Date("2026-09-01T16:35:00.000Z");
   const store = new InspirationStore({ opsRoot: root, clock: () => now });
@@ -373,9 +373,9 @@ test("a mixed evening bundle consumes inspiration as a plain line (D12 degradati
   assert.equal((await store.list()).length, 1);
 });
 
-// ---------- 反馈确定性路由 ----------
+// ---------- 反馈路由（P1：LLM 化，handler 不再拦截） ----------
 
-test("handler records inspiration feedback deterministically and never hijacks ordinary chat", async (t) => {
+test("handler no longer intercepts feedback phrases — they flow to runtime.run for the model to route", async (t) => {
   const root = await tempRoot(t, "syno-inspiration-route-");
   const store = new InspirationStore({ opsRoot: root });
   const card = await store.create({ date: "2026-09-01", sampledRefs: ["vault/a.md", "vault/b.md"], text: "串联" });
@@ -386,22 +386,18 @@ test("handler records inspiration feedback deterministically and never hijacks o
     core: {},
     ingest: {},
     pendingDecisions: {},
-    inspirationStore: store,
   });
+  // P1：有待反馈卡 + 口令文本也不拦截——落进 runtime.run，由模型经 inspiration.record_feedback 落账
   const feedbackReply = await handler.handle({ id: "wx-fb-1", ownerKey: "owner", senderId: "owner", channel: "weixin", text: "没用！" });
-  assert.match(feedbackReply.text, /不对味/);
-  assert.equal(runs.length, 0);
-  const updated = (await store.list())[0];
-  assert.equal(updated.status, "feedback");
-  assert.equal(updated.feedback, "not_useful");
-
-  // 反馈已回填后，同样的口令落入正常对话
-  const normal = await handler.handle({ id: "wx-fb-2", ownerKey: "owner", senderId: "owner", channel: "weixin", text: "没用" });
-  assert.equal(normal.text, "reply:没用");
+  assert.equal(feedbackReply.text, "reply:没用！");
   assert.equal(runs.length, 1);
+  const unchanged = (await store.list())[0];
+  assert.equal(unchanged.status, "delivered", "handler 不落账，卡片保持待反馈");
+  assert.equal(unchanged.feedback || null, null);
 
-  // 非口令文本从不触发反馈路由
+  // 普通文本同样直落 runtime.run
   const chat = await handler.handle({ id: "wx-fb-3", ownerKey: "owner", senderId: "owner", channel: "weixin", text: "这篇文章有用吗" });
   assert.equal(chat.text, "reply:这篇文章有用吗");
+  assert.equal(runs.length, 2);
   assert.equal((await store.list()).length, 1);
 });

@@ -2,7 +2,8 @@
 // capture.list_pending / jobs.list / jobs.submit 零调用，且 capture 待办有确定性路由
 // （pendingDecisions）兜底，jobs 管理走 CLI/ops。摘除只收窄聊天面——ToolRegistry 注册不动，
 // 收录 workflow 的显式 allowedTools 与降级目录 FALLBACK_TOOLS（capture cordis toolSet=all）不受影响。
-// 6 件 = 知识三件套（search/read_snippet/fetch_url）+ 今日快照 + 收录入口 + 读图。
+// 2026-09-04 P1：+inspiration.record_feedback——灵感反馈路由 LLM 化（替代 handler 确定性口令拦截）。
+// 7 件 = 知识三件套（search/read_snippet/fetch_url）+ 今日快照 + 收录入口 + 读图 + 灵感反馈。
 const CORE_CHAT_TOOL_NAMES = Object.freeze([
   "knowledge.search",
   "knowledge.read_snippet",
@@ -10,6 +11,7 @@ const CORE_CHAT_TOOL_NAMES = Object.freeze([
   "today.read",
   "capture.start",
   "image.read",
+  "inspiration.record_feedback",
 ]);
 
 const CORE_CHAT_BRIDGE_TOOL_NAMES = Object.freeze(

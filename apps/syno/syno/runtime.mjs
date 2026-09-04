@@ -25,6 +25,7 @@ import { IntakeService } from "./intake.mjs";
 import { KnowledgeStore } from "./knowledge-store.mjs";
 import { InspirationSampler } from "./inspiration-sampler.mjs";
 import { InspirationStore } from "./inspiration-store.mjs";
+import { createInspirationFeedbackTool } from "./inspiration-feedback-tool.mjs";
 import { KnowledgeMaintenanceSource } from "./knowledge-maintenance-source.mjs";
 import { fetchUrlForChat } from "./fetch-url-tool.mjs";
 import { KnowledgeProfileService } from "./knowledge-profile-service.mjs";
@@ -515,6 +516,8 @@ function createSynoRuntime(options = {}) {
       outputSchema: { type: "object", required: ["key", "value", "group", "updatedAt"], properties: { key: { type: "string" }, value: {}, group: { enum: ["agentAdjustable"] }, updatedAt: { type: "string" } } },
       execute: ({ key, value }) => settingsRegistry.set(key, value, { actor: "agent" }),
     },
+    // P1：灵感反馈工具化——主人评价「今日灵感」卡由模型路由到这里（替代确定性口令拦截）
+    createInspirationFeedbackTool({ inspirationStore, recordEvent }),
     ...createBrowserCaptureTools(browserCapture),
   ]);
   // 旧 ContextManager 尚保留到 R6；它提取的候选也必须进入唯一的可恢复 Workflow。
@@ -792,7 +795,6 @@ function createSynoRuntime(options = {}) {
     wakeDelivery: () => drainChannelDeliveryOutbox().catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })),
     imageStore,
     visionClient,
-    inspirationStore,
   });
   if (acceptedRecovery && typeof channelConversationHandler.processAcceptedRequest === "function") {
     acceptedRecovery.processRequest = (request) => channelConversationHandler.processAcceptedRequest(request);

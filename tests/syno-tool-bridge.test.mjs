@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import { SynoToolBridge } from "../apps/syno/syno/syno-tool-bridge.mjs";
 import { ToolRegistry } from "../apps/syno/syno/tool-registry.mjs";
 import { createBrowserCaptureTools } from "../apps/syno/syno/browser-capture-tools.mjs";
+import { createInspirationFeedbackTool } from "../apps/syno/syno/inspiration-feedback-tool.mjs";
+import { InspirationStore } from "../apps/syno/syno/inspiration-store.mjs";
 import { CORE_CHAT_TOOL_NAMES } from "../config/deepseek-harness/syno-tool-sets.mjs";
 
 function registry() {
@@ -389,4 +394,48 @@ test("SynoToolBridge passes browser Workflow context and blocks it outside captu
   captureRelease();
   assert.deepEqual(allowed.result.structuredContent, { available: true });
   assert.deepEqual(received, { workflowId: "workflow-1" });
+});
+
+test("SynoToolBridge exposes inspiration_record_feedback, executes idempotently per message and returns a receipt", async (t) => {
+  // P1：反馈工具桥层行为——tools/list 可见（桥命名 inspiration_record_feedback）、
+  // 同 messageId 重复调用只落账一次（桥幂等键）、效应收据版本前进。
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-bridge-fb-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const store = new InspirationStore({ opsRoot: path.join(root, "ops") });
+  const card = await store.create({ date: "2026-09-04", sampledRefs: ["vault/a.md", "vault/b.md"], text: "串联" });
+  await store.markDelivered(card.id, "event-1");
+  const tools = new ToolRegistry([createInspirationFeedbackTool({ inspirationStore: store })]);
+  let resultContext;
+  const bridge = new SynoToolBridge({
+    tools,
+    token: "bridge-secret",
+    onResult: async (context) => { resultContext = context; },
+  });
+  const listed = await bridge.handle({
+    authorization: "Bearer bridge-secret",
+    body: { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} },
+  });
+  assert.deepEqual(listed.result.tools.map((tool) => tool.name), ["inspiration_record_feedback"]);
+  const release = bridge.bindContext({
+    ownerKey: "owner",
+    threadKey: "main",
+    channel: "weixin",
+    messageId: "wx-fb-77",
+    allowedTools: ["inspiration_record_feedback"],
+  });
+  const call = {
+    authorization: "Bearer bridge-secret",
+    body: { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "inspiration_record_feedback", arguments: { feedback: "useful" } } },
+  };
+  const first = await bridge.handle(call);
+  const second = await bridge.handle({ ...call, body: { ...call.body, id: 3 } });
+  release();
+  assert.equal(first.result.isError || false, false);
+  assert.equal(first.result.structuredContent.recorded, true);
+  assert.equal(second.result.structuredContent.recorded, true, "幂等重放返回同一收据");
+  const records = (await store.list()).filter((record) => record.feedback);
+  assert.equal(records.length, 1, "同 messageId 重复调用只落账一次");
+  assert.equal(records[0].feedback, "useful");
+  assert.equal(bridge.effectVersion(), 1, "效应收据只前进一次");
+  assert.equal(resultContext.threadKey, "main");
 });
