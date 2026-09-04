@@ -225,7 +225,7 @@ test("fetchUrlForChat honestly degrades when the browser daemon is unavailable",
   assert.match(result.content, /daemon 未运行/);
 });
 
-// ---------- 代码审查整改①（2026-09-04）：浏览器路径 maxChars 同口径截断 ----------
+// ---------- 代码审查整改（2026-09-04）：maxChars 同口径 + 升级可观测 ----------
 
 test("browser-escalated content honors maxChars and marks truncation honestly", async () => {
   const adapter = fakeBrowserAdapter({
@@ -244,3 +244,40 @@ test("browser-escalated content honors maxChars and marks truncation honestly", 
   assert.ok(result.content.length < 3000, `正文应按 maxChars 截断，实际 ${result.content.length}`);
 });
 
+test("escalation outcomes are journaled with host and wall only (no full URL)", async () => {
+  const events = [];
+  const recordEvent = (name, data, settings) => { events.push({ name, data, settings }); return Promise.resolve(); };
+  const adapter = fakeBrowserAdapter({
+    capture: { status: "completed", finalUrl: "https://mp.weixin.qq.com/s/abc", title: "t", content: "正文" },
+  });
+  await fetchUrlForChat({
+    url: "https://mp.weixin.qq.com/s/abc?token=secret-should-not-leak",
+    fetcher: async (value) => ({ url: value, contentType: "text/html", text: WX_WALL_TEXT, truncated: false }),
+    browserCapture: adapter,
+    context: chatContext,
+    recordEvent,
+  });
+  assert.equal(events.length, 1);
+  assert.equal(events[0].name, "knowledge.fetch_url.escalation");
+  assert.deepEqual(events[0].data, { host: "mp.weixin.qq.com", wall: "verification_page", outcome: "completed" });
+  assert.ok(!JSON.stringify(events).includes("secret-should-not-leak"), "journal 不得带完整 URL");
+  // 后台上下文有墙不升级：同样留痕，outcome=not_escalated
+  events.length = 0;
+  await fetchUrlForChat({
+    url: "https://mp.weixin.qq.com/s/abc",
+    fetcher: async (value) => ({ url: value, contentType: "text/html", text: WX_WALL_TEXT, truncated: false }),
+    browserCapture: adapter,
+    context: { channel: "scheduler", ownerId: "local-user", threadKey: "proactive", conversationId: "b1" },
+    recordEvent,
+  });
+  assert.deepEqual(events.map((e) => e.data.outcome), ["not_escalated"]);
+  // 无墙直抓：不产生升级事件
+  events.length = 0;
+  await fetchUrlForChat({
+    url: "https://example.com/clean",
+    fetcher: async (value) => ({ url: value, contentType: "text/html", text: "正常正文", truncated: false }),
+    context: chatContext,
+    recordEvent,
+  });
+  assert.equal(events.length, 0);
+});

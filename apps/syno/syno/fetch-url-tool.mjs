@@ -95,7 +95,16 @@ function chatReadWorkflowId(context, url) {
   return `workflow-chatread-${createHash("sha256").update(basis, "utf8").digest("hex").slice(0, 16)}`;
 }
 
-async function escalateViaBrowser({ url, browserCapture, context, wall, maxText }) {
+// 升级路径落 journal（2026-09-03 代码审查 Optional②）：此前墙检测/升级/终态全静默，
+// 生产终验只能靠解压会话存证 forensic。payload 只带 host，不带完整 URL（查询参数可能敏感）。
+// recordEvent 可选且按 runtime 契约 fail-safe；?. 短链保证缺席时整链短路。
+function reportEscalation(recordEvent, { url, wall, outcome }) {
+  let host = "";
+  try { host = new URL(String(url || "")).host; } catch { /* 非法 URL 只丢 host，不影响主流程 */ }
+  recordEvent?.("knowledge.fetch_url.escalation", { host, wall: String(wall || ""), outcome }, { level: "info" })?.catch(() => {});
+}
+
+async function escalateViaBrowser({ url, browserCapture, context, wall, maxText, recordEvent }) {
   const workflowId = chatReadWorkflowId(context, url);
   let observation = null;
   // 已有观察记录 = 同（主人, 会话, URL）的浏览器会话可能还在——原地续抓（「继续」场景）；
@@ -110,7 +119,8 @@ async function escalateViaBrowser({ url, browserCapture, context, wall, maxText 
     observation = await browserCapture.capture({ workflowId, exactUrl: url });
   }
   if (observation?.status === "completed") {
-    // 与直抓同口径的截断（代码审查整改）：adapter 上限 100k 不等于调用方要的 maxChars，
+    reportEscalation(recordEvent, { url, wall, outcome: "completed" });
+    // 与直抓同口径的截断（代码审查 Optional①）：adapter 上限 100k 不等于调用方要的 maxChars，
     // 超长如实标 truncated，不把 100k 灌进聊天上下文。
     const full = String(observation.content || "");
     const clipped = full.length > maxText;
@@ -124,6 +134,7 @@ async function escalateViaBrowser({ url, browserCapture, context, wall, maxText 
     });
   }
   if (observation?.status === "interaction_required") {
+    reportEscalation(recordEvent, { url, wall, outcome: "interaction_required" });
     return {
       sourceUrl: url,
       contentType: "browser/interaction",
@@ -140,6 +151,7 @@ async function escalateViaBrowser({ url, browserCapture, context, wall, maxText 
     };
   }
   // unavailable / failed：两条路都没走通，如实告知（主人确认浏览器与 WebBridge 在线后可重试）
+  reportEscalation(recordEvent, { url, wall, outcome: "browser_unavailable" });
   return {
     sourceUrl: url,
     contentType: "none",
@@ -155,7 +167,7 @@ async function escalateViaBrowser({ url, browserCapture, context, wall, maxText 
   };
 }
 
-async function fetchUrlForChat({ url, maxChars = DEFAULT_MAX_CHARS, fetcher = fetchSourceText, browserCapture = null, context = null } = {}) {
+async function fetchUrlForChat({ url, maxChars = DEFAULT_MAX_CHARS, fetcher = fetchSourceText, browserCapture = null, context = null, recordEvent = null } = {}) {
   const target = String(url || "");
   const maxText = Math.min(MAX_SOURCE_TEXT, Math.max(1_000, Number(maxChars) || DEFAULT_MAX_CHARS));
   let snapshot = null;
@@ -171,9 +183,10 @@ async function fetchUrlForChat({ url, maxChars = DEFAULT_MAX_CHARS, fetcher = fe
     : detectAntiBotWall({ sourceUrl: snapshot.url, text: snapshot.text });
   if (wall && browserCapture && LIVE_CHAT_CHANNELS.has(String(context?.channel || ""))) {
     try {
-      return await escalateViaBrowser({ url: target, browserCapture, context, wall, maxText });
+      return await escalateViaBrowser({ url: target, browserCapture, context, wall, maxText, recordEvent });
     } catch (error) {
       // 升级路径自身故障不得吞掉直抓结果——降级为带 blocked 标记的直抓结果（或原 HTTP 错误）
+      reportEscalation(recordEvent, { url: target, wall, outcome: "escalation_error" });
       if (httpBlocked) throw httpBlocked;
       return wrapUntrusted({
         sourceUrl: snapshot.url,
@@ -187,6 +200,7 @@ async function fetchUrlForChat({ url, maxChars = DEFAULT_MAX_CHARS, fetcher = fe
   }
   // 无墙：正常返回。有墙但不可升级（后台上下文/无浏览器通道）：直抓结果如实返回并标 blocked，
   // HTTP 层封锁维持原样上抛（既有契约）。
+  if (wall) reportEscalation(recordEvent, { url: target, wall, outcome: "not_escalated" });
   if (httpBlocked) throw httpBlocked;
   return wrapUntrusted({
     sourceUrl: snapshot.url,
