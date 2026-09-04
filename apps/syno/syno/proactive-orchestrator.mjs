@@ -1,5 +1,5 @@
 import { constants as fsConstants, promises as fs } from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 
 import { PATHS } from "./paths.mjs";
@@ -126,10 +126,10 @@ function prioritiesBody(snapshot) {
 }
 
 class ProactiveOrchestrator {
-  constructor({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery, recordEvent, inspirationStore = null, inspirationSampler = null, signalEngine = new SignalEngine(), stateFile = path.join(PATHS.stateRoot, "proactive.json"), stateLock, clock = () => new Date(), quietHours = DEFAULT_QUIET_HOURS, tickObservationMinMs = 5_000 } = {}) {
+  constructor({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery, recordEvent, inspirationStore = null, inspirationSampler = null, signalEngine = new SignalEngine(), stateFile = path.join(PATHS.stateRoot, "proactive.json"), stateLock, clock = () => new Date(), quietHours = DEFAULT_QUIET_HOURS, tickObservationMinMs = 5_000, compositionLeaseMs = 300_000 } = {}) {
     if (!host || !today || !channels) throw new Error("ProactiveOrchestrator 缺少 host、today 或 channels");
     this.host = host; this.today = today; this.channels = channels; this.conversations = conversations; this.cognitiveRuntime = cognitiveRuntime;
-    this.settingsRegistry = settingsRegistry; this.signalSources = signalSources; this.maintenance = maintenance; this.channelDeliveryOutbox = channelDeliveryOutbox; this.notifications = notifications; this.ownerChannelTargets = ownerChannelTargets; this.wakeDelivery = wakeDelivery; this.recordEvent = recordEvent; this.inspirationStore = inspirationStore; this.inspirationSampler = inspirationSampler; this.signalEngine = signalEngine; this.stateFile = stateFile; this.stateLock = stateLock || new ProcessFileLock({ file: `${stateFile}.lock`, timeoutMs: 30_000 }); this.clock = clock; this.quietHours = quietHours; this.tickObservationMinMs = tickObservationMinMs; this.timer = null; this.startGeneration = 0;
+    this.settingsRegistry = settingsRegistry; this.signalSources = signalSources; this.maintenance = maintenance; this.channelDeliveryOutbox = channelDeliveryOutbox; this.notifications = notifications; this.ownerChannelTargets = ownerChannelTargets; this.wakeDelivery = wakeDelivery; this.recordEvent = recordEvent; this.inspirationStore = inspirationStore; this.inspirationSampler = inspirationSampler; this.signalEngine = signalEngine; this.stateFile = stateFile; this.stateLock = stateLock || new ProcessFileLock({ file: `${stateFile}.lock`, timeoutMs: 30_000 }); this.clock = clock; this.quietHours = quietHours; this.tickObservationMinMs = tickObservationMinMs; this.compositionLeaseMs = compositionLeaseMs; this.timer = null; this.startGeneration = 0;
   }
 
   async load({ prepareMigration = true } = {}) {
@@ -248,6 +248,22 @@ class ProactiveOrchestrator {
     };
   }
 
+  // 信号是否已落定（投递达到）：#prepareSignals 过滤与 commit 的 signals_settled 守卫共用同一判定。
+  #subjectSettled(subject, identity) {
+    return Boolean(subject)
+      && subject.lastDeliveredVersion === identity.businessVersion
+      && Number(subject.lastDeliveredEpisode || subject.episode || 1) === identity.episode;
+  }
+
+  // 信号是否在飞：已有未落定投递（pendingBundles）或持有组合租约（pendingCompositions，L0b）。
+  // decide 每拍先扫过期租约，走到这里的租约都视为活的。
+  #signalInFlight(state, identity) {
+    const covered = (entries) => Object.values(entries || {}).some((entry) =>
+      (entry.signalVersions || []).some((item) =>
+        item.subjectKey === identity.subjectKey && item.businessVersion === identity.businessVersion && item.episode === identity.episode));
+    return covered(state.pendingBundles) || covered(state.pendingCompositions);
+  }
+
   #prepareSignals(state, signals, now) {
     return signals.map((signal) => {
       const identity = signalIdentity(signal, state.subjects);
@@ -277,11 +293,8 @@ class ProactiveOrchestrator {
         identity,
         action: signal.action || (signal.kind === "event" ? "请确认下一步处理" : signal.kind === "inspiration" ? "并入本次摘要，明日单独出卡" : "查看今日安排"),
       };
-    }).filter((signal) => {
-      const subject = state.subjects[signal.identity.subjectKey];
-      return !(subject.lastDeliveredVersion === signal.identity.businessVersion && Number(subject.lastDeliveredEpisode || subject.episode || 1) === signal.identity.episode)
-        && !Object.values(state.pendingBundles || {}).some((pending) => (pending.signalVersions || []).some((identity) => identity.subjectKey === signal.identity.subjectKey && identity.businessVersion === signal.identity.businessVersion && identity.episode === signal.identity.episode));
-    });
+    }).filter((signal) => !this.#subjectSettled(state.subjects[signal.identity.subjectKey], signal.identity)
+      && !this.#signalInFlight(state, signal.identity));
   }
 
   async #runAgent(prompt, bundleId) {
@@ -298,40 +311,28 @@ class ProactiveOrchestrator {
     }
   }
 
-  // D12：灵感卡片生成。失败语义（终态三件套）：
-  // - 素材不足（<2 篇）：当日终态跳过，lastRuns 标记后 SignalEngine 当日不再发出，不投递空卡；
-  // - 生成失败/空文本：attempts 先计数再调用（cap 在 send 之前），lastRuns 不标记，下一 tick 重试；
-  // - 当日 attempts 达 8：终态 failed_terminal，当日不再重试，次日随新 date 重新 eligible。
-  async #composeInspiration(state, bundle, now) {
-    const date = localDateKey(now);
-    if (state.inspiration?.date !== date) state.inspiration = { date, attempts: 0 };
-    let notes = [];
-    try {
-      notes = (await this.inspirationSampler.sample({ now }))?.notes || [];
-    } catch (error) {
-      await this.recordEvent?.("inspiration.sample.failed", { date, error: { code: error?.code || "INSPIRATION_SAMPLE_FAILED", message: String(error?.message || error).slice(0, 300) } }, { level: "error" });
+  // L0b：decide 每拍清扫过期组合租约（compose 崩溃/host 重启遗留）——删租约 + 事件，信号重新 eligible。
+  // 租约期内不抢：活着的 compose 最长 compositionLeaseMs 内要么 commit 要么被视为崩溃。
+  async #sweepCompositionLeases(state, now) {
+    const nowMs = now.getTime();
+    for (const [bundleId, lease] of Object.entries(state.pendingCompositions || {})) {
+      if (Date.parse(lease.expiresAt || "") > nowMs) continue;
+      delete state.pendingCompositions[bundleId];
+      await this.recordEvent?.("proactive.tick.composition_lease_expired", {
+        bundleId,
+        slot: lease.slot || null,
+        leaseAgeMs: Math.max(0, nowMs - Date.parse(lease.createdAt || now.toISOString())),
+      }, { level: "warning" });
     }
-    if (notes.length < 2) {
-      state.lastRuns[`inspiration:${date}`] = date;
-      await this.recordEvent?.("inspiration.sample.insufficient", { date, sampled: notes.length });
-      return null;
-    }
-    if (state.inspiration.attempts >= 8) {
-      state.lastRuns[`inspiration:${date}`] = date;
-      await this.recordEvent?.("inspiration.generate.failed_terminal", { date, attempts: state.inspiration.attempts }, { level: "error" });
-      return null;
-    }
-    state.inspiration.attempts += 1;
-    const result = await this.#runAgent(inspirationPrompt(notes), bundle.bundleId);
-    const text = result.job?.status === "completed" ? String(result.job.result?.text || "").trim() : "";
-    if (!text) {
-      await this.recordEvent?.("inspiration.generate.failed", { date, attempts: state.inspiration.attempts, code: result.error?.code || "INSPIRATION_EMPTY_GENERATION" }, { level: "error" });
-      return null;
-    }
-    const record = await this.inspirationStore.create({ date, sampledRefs: notes.map((note) => note.path), text, attempts: state.inspiration.attempts });
-    const message = inspirationCardMessage(record, notes, bundle.bundleId);
-    if (this.cognitiveRuntime?.appendSystemEvent) await this.cognitiveRuntime.appendSystemEvent({ ownerKey: "local-user", threadKey: "main", text: message.text }).catch(() => {});
-    return { message, providerStatus: "completed" };
+  }
+
+  // 显式 acquire/release 以计量锁等待（L0a 观测发现空转 tick 秒级耗时，需要拆开看等待与持有）。
+  async #withStateLock(timing, operation) {
+    const waitStartedAt = Date.now();
+    const lease = await this.stateLock.acquire();
+    timing.lockWaitMs += Date.now() - waitStartedAt;
+    try { return await operation(); }
+    finally { await lease.release(); }
   }
 
   // 灵感记录随 outbox 真实投递落定（覆盖直接投递、drain 回调与重启后 reconcile 三条路径）
@@ -342,6 +343,57 @@ class ProactiveOrchestrator {
       await this.inspirationStore.markDelivered(inspirationId, eventId);
     } catch (error) {
       await this.recordEvent?.("inspiration.delivered_mark_failed", { inspirationId, eventId, error: { code: error?.code || "INSPIRATION_MARK_FAILED", message: String(error?.message || error).slice(0, 300) } }, { level: "error" });
+    }
+  }
+
+  // L2（2026-09-04，#17）：投递成功后的主会话回写——取 outbox 真实 payload（主人所见即所得，
+  // 天然覆盖本地 fallback 与 S1 脱敏降级）。claim 门（锁内）：writebackAt 完成门 + claimedAt 2min 在飞门 + cap 50；
+  // 直投（commit）/ drain（markBundleDelivered）/ 对账（reconcile）三路径共用，at-least-once 不双写。
+  // signal==="test" 不回写（triggerTest 卡不进主会话，只落台账终态）。
+  // 失败吞错不重试：writeback_failed warning + lastErrorCode 抓手——回写是上下文质量，不耦合投递健康信号。
+  async #writebackDeliveredBundle(bundleId, eventId) {
+    if (!this.cognitiveRuntime?.appendSystemEvent || !this.channelDeliveryOutbox?.get || !bundleId || !eventId) return;
+    const claimed = await this.stateLock.run(async () => {
+      const state = await this.load();
+      const entry = state.deliveredWritebacks[bundleId];
+      if (entry?.writebackAt) return false;
+      if (entry?.claimedAt && Date.now() - Date.parse(entry.claimedAt) < 120_000) return false;
+      state.deliveredWritebacks[bundleId] = { eventId, claimedAt: new Date().toISOString(), ...(entry?.lastErrorCode ? { lastErrorCode: entry.lastErrorCode } : {}) };
+      const entries = Object.entries(state.deliveredWritebacks);
+      if (entries.length > 50) {
+        entries.sort((a, b) => String(a[1].writebackAt || a[1].claimedAt || "").localeCompare(String(b[1].writebackAt || b[1].claimedAt || "")));
+        for (const [key] of entries.slice(0, entries.length - 50)) delete state.deliveredWritebacks[key];
+      }
+      await this.save(state);
+      return true;
+    });
+    if (!claimed) return;
+    try {
+      const record = await this.channelDeliveryOutbox.get(eventId, { includePayload: true });
+      const payload = record?.payload;
+      if (payload?.data?.signal !== "test") {
+        const text = String(payload?.text || "");
+        if (text) await this.cognitiveRuntime.appendSystemEvent({ ownerKey: "local-user", threadKey: "main", text });
+      }
+      await this.stateLock.run(async () => {
+        const state = await this.load();
+        const entry = state.deliveredWritebacks[bundleId];
+        if (!entry || entry.writebackAt) return;
+        delete entry.claimedAt;
+        entry.writebackAt = new Date().toISOString();
+        await this.save(state);
+      });
+    } catch (error) {
+      const code = error?.code || "WRITEBACK_FAILED";
+      await this.recordEvent?.("proactive.bundle.writeback_failed", { bundleId, outboxEventId: eventId, error: { code, message: String(error?.message || error).slice(0, 300) } }, { level: "warning" });
+      await this.stateLock.run(async () => {
+        const state = await this.load();
+        const entry = state.deliveredWritebacks[bundleId];
+        if (!entry || entry.writebackAt) return;
+        delete entry.claimedAt;
+        entry.lastErrorCode = code;
+        await this.save(state);
+      }).catch(() => {});
     }
   }
 
@@ -462,7 +514,7 @@ class ProactiveOrchestrator {
     }
   }
 
-  async #reconcileOutbox(state, now) {
+  async #reconcileOutbox(state, now, writebackQueue = null) {
     if (!this.channelDeliveryOutbox?.list || !this.channelDeliveryOutbox?.get) return;
     const records = (await this.channelDeliveryOutbox.list({ limit: 1000 }))
       .filter((item) => item.sourceType === "proactive_bundle" && item.status !== "superseded" && item.status !== "failed_terminal");
@@ -505,33 +557,40 @@ class ProactiveOrchestrator {
       if (record.status === "delivered") {
         this.#applyBundleDelivered(state, record.sourceId, record.eventId, now);
         await this.#markInspirationDelivered(state.pendingBundles[record.sourceId], record.eventId);
+        // L2：对账回补的投递也要回写主会话——锁内只记队，tick 在锁外执行（claim 门防双写）。
+        writebackQueue?.push({ bundleId: record.sourceId, eventId: record.eventId });
       }
     }
   }
 
+  // L0b：锁内只 load→apply→save；灵感落账/web 审计镜像/journal 事件移锁外——
+  // 投递落定（drain 1s 一拍调这里）不再被 compose 的长生成阻塞。apply 会删 pendingBundles 条目，先捕获再落定。
   async markBundleDelivered(bundleId, eventId) {
-    return this.stateLock.run(async () => {
+    const pending = await this.stateLock.run(async () => {
       const state = await this.load();
-      const pending = state.pendingBundles?.[bundleId];
-      const updated = this.#applyBundleDelivered(state, bundleId, eventId);
-      if (!updated) return false;
-      await this.#markInspirationDelivered(pending, eventId);
+      const entry = state.pendingBundles?.[bundleId];
+      if (!this.#applyBundleDelivered(state, bundleId, eventId)) return null;
       await this.save(state);
-      if (pending?.targetChannel && this.notifications?.updateDeliveryStatus) {
-        await this.notifications.updateDeliveryStatus(`${bundleId}:${pending.targetChannel}:v1`, {
-          status: "delivered",
-          outboxEventId: eventId,
-        });
-      }
-      await this.recordEvent?.("proactive.bundle.delivered", {
-        bundleId,
-        signalCount: pending?.signalVersions?.length || 0,
-        channel: pending?.targetChannel || null,
-        outboxEventId: eventId,
-        status: "delivered",
-      });
-      return true;
+      return entry || null;
     });
+    if (!pending) return false;
+    await this.#markInspirationDelivered(pending, eventId);
+    if (pending?.targetChannel && this.notifications?.updateDeliveryStatus) {
+      await this.notifications.updateDeliveryStatus(`${bundleId}:${pending.targetChannel}:v1`, {
+        status: "delivered",
+        outboxEventId: eventId,
+      });
+    }
+    await this.recordEvent?.("proactive.bundle.delivered", {
+      bundleId,
+      signalCount: pending?.signalVersions?.length || 0,
+      channel: pending?.targetChannel || null,
+      outboxEventId: eventId,
+      status: "delivered",
+    });
+    // L2：投递落定后回写主会话（锁外；claim 门幂等）
+    await this.#writebackDeliveredBundle(bundleId, eventId);
+    return true;
   }
 
   async getDiagnostics() {
@@ -548,27 +607,38 @@ class ProactiveOrchestrator {
     };
   }
 
-  async #tickLocked({ now = this.clock(), highValueEvents, shouldContinue = () => true } = {}) {
-    if (!shouldContinue()) return { delivered: [], shouldWake: false };
+  // L0b（2026-09-04，#17）：tick 临界区三段拆分。
+  // decide（锁内，百 ms 级）：load → 迁移门 → outbox 对账 → 日期翻滚 → 安静时段 → 信号收集/准备 →
+  //   灵感终态预检 → 建包 + 写组合租约 → save。模型生成不在这段。
+  // compose（锁外，秒~分钟级）：采样/快照/模型生成——不再抱锁，投递落定（markBundleDelivered）与触发口不再被阻塞。
+  // commit（锁内）：租约校验 → 双守卫 → 灵感记账 → enqueue（嵌套序 stateLock→outbox.lock 与现状一致）→ 落定 → save。
+  // 组合租约 state.pendingCompositions[bundleId] = { slot, signalVersions, signalKinds, leaseId, createdAt, expiresAt }：
+  //   bundleId 由信号身份确定性导出（buildProactiveBundle），天然幂等；leaseId 每轮随机，commit 只认本轮回的 leaseId；
+  //   崩溃/中止遗留的租约由下一拍 decide 清扫（#sweepCompositionLeases），信号随后重新 eligible。
+  async #decideTick({ now = this.clock(), highValueEvents, shouldContinue = () => true } = {}) {
+    if (!shouldContinue()) return { bundle: null };
     const state = await this.load();
     if (state.migration?.status === "pending"
       || (state.migration?.status === "complete" && !await this.#hasValidMigrationMarker(state))) {
       if (state.migration?.status === "pending") await this.save(state);
-      return { delivered: [], shouldWake: false };
+      return { bundle: null };
     }
-    await this.#reconcileOutbox(state, now);
-    if (!shouldContinue()) return { delivered: [], shouldWake: false };
+    // L2：对账发现「崩溃前已投递」的包时，把回写任务带出锁外执行
+    const pendingWritebacks = [];
+    await this.#reconcileOutbox(state, now, pendingWritebacks);
+    if (!shouldContinue()) return { bundle: null, pendingWritebacks };
     const date = localDateKey(now);
     if (state.date !== date) Object.assign(state, { date, notificationsToday: 0 });
     const quietHours = await this.settingsRegistry?.get("notifications.quietHours") || this.quietHours;
-    if (isQuietTime(now, quietHours)) return { delivered: [], shouldWake: false };
+    if (isQuietTime(now, quietHours)) return { bundle: null, pendingWritebacks };
     const events = highValueEvents || await this.signalSources?.collect({ now }) || [];
-    if (!shouldContinue()) return { delivered: [], shouldWake: false };
+    if (!shouldContinue()) return { bundle: null, pendingWritebacks };
     await this.#loadLegacyAudit(state);
     const cadence = await this.settingsRegistry?.get("notifications.cadence") || "balanced";
     const cadenceBudget = { minimal: 1, balanced: 2, active: 3 }[cadence] || 2;
     this.#markInactive(state, events, now);
     this.#pruneResolvedSubjects(state, now);
+    await this.#sweepCompositionLeases(state, now);
     const signals = this.signalEngine.collect({
       now,
       lastRuns: state.lastRuns,
@@ -585,85 +655,221 @@ class ProactiveOrchestrator {
     });
     const prepared = this.#prepareSignals(state, signals, now);
     state.lastEligibleSignals = prepared.length;
-    const delivered = [];
-    if (prepared.length) {
-      const slot = prepared.find((signal) => ["morning", "evening", "weekly", "inspiration"].includes(signal.kind))?.kind || "event";
-      const bundle = buildProactiveBundle(prepared, { now, slot });
-      await this.recordEvent?.("proactive.bundle.created", {
-        bundleId: bundle.bundleId,
-        signalCount: bundle.signalVersions.length,
-        channel: this.channels.homeChannel || "web",
-        outboxEventId: null,
-        status: "created",
-      });
-      if (!shouldContinue()) return { delivered: [], shouldWake: false };
-      let message = null;
-      let providerStatus = null;
-      let localFallback = false;
-      if (slot === "inspiration" && this.inspirationSampler && this.inspirationStore) {
-        // D12：灵感卡片自成分支——采样→模型生成→成卡；素材不足/生成失败不投递空卡（详见 #composeInspiration）
-        const composed = await this.#composeInspiration(state, bundle, now);
-        if (!shouldContinue()) return { delivered: [], shouldWake: false };
-        if (composed) ({ message, providerStatus } = composed);
-      } else {
-        const snapshot = await this.today.snapshot();
-        const weeklySummary = prepared.some((signal) => signal.kind === "weekly") && this.maintenance ? await this.maintenance.weeklySummary() : undefined;
-        const fallback = bundleMessage(bundle, snapshot, weeklySummary);
-        if (!shouldContinue()) return { delivered: [], shouldWake: false };
-        const result = await this.#runAgent(bundlePrompt(bundle), bundle.bundleId);
-        if (!shouldContinue()) return { delivered: [], shouldWake: false };
-        const completedText = result.job?.status === "completed" ? result.job.result?.text : "";
-        const body = completedText ? `${fallback.body}\n\n建议：${completedText}` : fallback.body;
-        message = completedText ? { ...fallback, body, text: `${fallback.title}\n${body}` } : fallback;
-        providerStatus = result.job?.status;
-        localFallback = !completedText;
-        if (completedText && this.cognitiveRuntime?.appendSystemEvent) await this.cognitiveRuntime.appendSystemEvent({ ownerKey: "local-user", threadKey: "main", text: message.text }).catch(() => {});
-      }
-      if (message) {
-        if (!shouldContinue()) return { delivered: [], shouldWake: false };
-        const delivery = await this.#deliverBundle(state, bundle, message, now, { shouldContinue });
-        if (delivery.status === "canceled") return { delivered: [], shouldWake: false };
-        if (delivery.status === "delivered") {
-          this.#applyBundleDelivered(state, bundle.bundleId, delivery.eventId, now);
-          await this.#markInspirationDelivered({ inspirationId: message.data?.inspirationId }, delivery.eventId);
-        }
-        // B1：只有事件型推送消耗防打扰预算；预约投递（morning/evening/weekly/inspiration）不计数。
-        if (slot === "event") state.notificationsToday += 1;
-        state.pending[bundle.bundleId] = { signalKey: bundle.bundleId, status: delivery.status };
-        delivered.push({ signal: "bundle", bundleId: bundle.bundleId, providerStatus, localFallback, deliveryStatus: delivery.status, targetChannel: delivery.targetChannel });
-      }
-    }
-    if (this.conversations && state.lastPruned !== date) {
-      await this.conversations.prune();
-      await this.cognitiveRuntime?.cleanupExpired?.();
-      state.lastPruned = date;
-    }
     state.pending = Object.fromEntries(Object.entries(state.pending).slice(-200));
+    const pruneDue = Boolean(this.conversations) && state.lastPruned !== date;
+    if (!prepared.length) {
+      await this.save(state);
+      return { bundle: null, pruneDue, date, pendingWritebacks };
+    }
+    const slot = prepared.find((signal) => ["morning", "evening", "weekly", "inspiration"].includes(signal.kind))?.kind || "event";
+    const bundle = buildProactiveBundle(prepared, { now, slot });
+    await this.recordEvent?.("proactive.bundle.created", {
+      bundleId: bundle.bundleId,
+      signalCount: bundle.signalVersions.length,
+      channel: this.channels.homeChannel || "web",
+      outboxEventId: null,
+      status: "created",
+    });
+    // 灵感终态预检（自原 #composeInspiration 搬位，保持在 bundle.created 之后）：当日 attempts 达上限 →
+    // 标记当日终态、整包不投（与现行「终态杀整包」语义一致），不写租约。
+    if (slot === "inspiration" && this.inspirationSampler && this.inspirationStore) {
+      if (state.inspiration?.date !== date) state.inspiration = { date, attempts: 0 };
+      if (state.inspiration.attempts >= 8) {
+        state.lastRuns[`inspiration:${date}`] = date;
+        await this.recordEvent?.("inspiration.generate.failed_terminal", { date, attempts: state.inspiration.attempts }, { level: "error" });
+        await this.save(state);
+        return { bundle: null, pruneDue, date, pendingWritebacks };
+      }
+    }
+    const leaseId = randomUUID();
+    state.pendingCompositions[bundle.bundleId] = {
+      slot,
+      signalVersions: bundle.signalVersions,
+      signalKinds: bundle.signalKinds,
+      leaseId,
+      createdAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + this.compositionLeaseMs).toISOString(),
+    };
     await this.save(state);
     return {
-      delivered,
-      shouldWake: delivered.some((item) => item.deliveryStatus === "pending"),
+      bundle,
+      leaseId,
+      slot,
+      date,
+      now,
+      inspiration: slot === "inspiration" ? { date, attempts: state.inspiration?.attempts || 0 } : null,
+      pruneDue,
+      pendingWritebacks,
     };
   }
 
-  // L0a（2026-09-03，验收期加法）：tick 全程计时观测。快速空转（idle 且耗时 < tickObservationMinMs）
+  // compose（锁外）：采样/快照/模型生成全在这里。不持有 state、不落盘；产物交 commit 校验租约后落定。
+  // kind：ok / insufficient / generation_failed / aborted（后三者都不投递）。
+  // L2：主会话回写不在 compose 做（生成≠投递）——统一由 #writebackDeliveredBundle 在投递成功后按 outbox
+  // 真实 payload 回写（主人所见即所得，覆盖 fallback 与 S1 脱敏降级）。
+  async #composeTick(decision, { shouldContinue = () => true } = {}) {
+    const { bundle, slot, date, now } = decision;
+    if (!shouldContinue()) return { kind: "aborted" };
+    if (slot === "inspiration" && this.inspirationSampler && this.inspirationStore) {
+      // D12：灵感卡片——采样→模型生成→成卡；素材不足/生成失败不投递空卡（终态记账在 commit）。
+      let notes = [];
+      try {
+        notes = (await this.inspirationSampler.sample({ now }))?.notes || [];
+      } catch (error) {
+        await this.recordEvent?.("inspiration.sample.failed", { date, error: { code: error?.code || "INSPIRATION_SAMPLE_FAILED", message: String(error?.message || error).slice(0, 300) } }, { level: "error" });
+      }
+      if (notes.length < 2) return { kind: "insufficient", sampled: notes.length };
+      if (!shouldContinue()) return { kind: "aborted" };
+      const result = await this.#runAgent(inspirationPrompt(notes), bundle.bundleId);
+      const text = result.job?.status === "completed" ? String(result.job.result?.text || "").trim() : "";
+      if (!text) return { kind: "generation_failed", code: result.error?.code || "INSPIRATION_EMPTY_GENERATION" };
+      const record = await this.inspirationStore.create({ date, sampledRefs: notes.map((note) => note.path), text, attempts: (decision.inspiration?.attempts || 0) + 1 });
+      const message = inspirationCardMessage(record, notes, bundle.bundleId);
+      return { kind: "ok", message, providerStatus: "completed", localFallback: false };
+    }
+    const snapshot = await this.today.snapshot();
+    const weeklySummary = bundle.signalKinds.some((item) => item.kind === "weekly") && this.maintenance ? await this.maintenance.weeklySummary() : undefined;
+    const fallback = bundleMessage(bundle, snapshot, weeklySummary);
+    if (!shouldContinue()) return { kind: "aborted" };
+    const result = await this.#runAgent(bundlePrompt(bundle), bundle.bundleId);
+    if (!shouldContinue()) return { kind: "aborted" };
+    const completedText = result.job?.status === "completed" ? result.job.result?.text : "";
+    const body = completedText ? `${fallback.body}\n\n建议：${completedText}` : fallback.body;
+    const message = completedText ? { ...fallback, body, text: `${fallback.title}\n${body}` } : fallback;
+    return { kind: "ok", message, providerStatus: result.job?.status, localFallback: !completedText };
+  }
+
+  // commit（锁内）：租约校验 → 双守卫 → 灵感记账 → enqueue → 落定 → save。
+  // 双守卫：leaseId 失配（租约被清扫/状态被重置）→ 弃生成物；compose↔commit 间隙全部信号被落定
+  // （如崩溃遗留 bundle 经对账回补投递）→ 整包放弃防重发。两条放弃路径都必须 save——租约已在锁内删除，
+  // 不落盘则租约残留到过期清扫（信号被多锁一个租约期）。
+  async #commitTick(decision, composed, { shouldContinue = () => true } = {}) {
+    const { bundle, leaseId, slot, date, now } = decision;
+    const state = await this.load();
+    const lease = state.pendingCompositions?.[bundle.bundleId];
+    if (!lease || lease.leaseId !== leaseId) {
+      await this.recordEvent?.("proactive.tick.commit_aborted", { bundleId: bundle.bundleId, slot, reason: "lease_lost" }, { level: "warning" });
+      return { delivered: [], shouldWake: false };
+    }
+    delete state.pendingCompositions[bundle.bundleId];
+    if (composed.kind === "aborted" || !shouldContinue()) {
+      // 干净中止（stop 竞态/关停）：释放租约落定，信号下一拍重新 eligible。
+      await this.save(state);
+      return { delivered: [], shouldWake: false };
+    }
+    if (bundle.signalVersions.length && bundle.signalVersions.every((identity) => this.#subjectSettled(state.subjects[identity.subjectKey], identity))) {
+      await this.recordEvent?.("proactive.tick.commit_aborted", { bundleId: bundle.bundleId, slot, reason: "signals_settled" }, { level: "warning" });
+      await this.save(state);
+      return { delivered: [], shouldWake: false };
+    }
+    if (slot === "inspiration" && this.inspirationSampler && this.inspirationStore) {
+      if (state.inspiration?.date !== date) state.inspiration = { date, attempts: 0 };
+      if (composed.kind === "insufficient") {
+        // 素材不足：当日终态跳过（lastRuns 标记），不耗 attempts，不投递空卡。
+        state.lastRuns[`inspiration:${date}`] = date;
+        await this.recordEvent?.("inspiration.sample.insufficient", { date, sampled: composed.sampled });
+        await this.save(state);
+        return { delivered: [], shouldWake: false };
+      }
+      // attempts 在 commit 计数——生成真实发起（compose 走完模型调用）才计；崩溃于生成中不耗次，租约过期后重试。
+      state.inspiration.attempts += 1;
+      if (composed.kind === "generation_failed") {
+        await this.recordEvent?.("inspiration.generate.failed", { date, attempts: state.inspiration.attempts, code: composed.code }, { level: "error" });
+        await this.save(state);
+        return { delivered: [], shouldWake: false };
+      }
+    }
+    const delivery = await this.#deliverBundle(state, bundle, composed.message, now, { shouldContinue });
+    if (delivery.status === "canceled") {
+      await this.save(state);
+      return { delivered: [], shouldWake: false };
+    }
+    if (delivery.status === "delivered") {
+      this.#applyBundleDelivered(state, bundle.bundleId, delivery.eventId, now);
+      await this.#markInspirationDelivered({ inspirationId: composed.message.data?.inspirationId }, delivery.eventId);
+    }
+    // B1：只有事件型推送消耗防打扰预算；预约投递（morning/evening/weekly/inspiration）不计数。
+    if (slot === "event") state.notificationsToday += 1;
+    state.pending[bundle.bundleId] = { signalKey: bundle.bundleId, status: delivery.status };
+    state.pending = Object.fromEntries(Object.entries(state.pending).slice(-200));
+    await this.save(state);
+    return {
+      delivered: [{ signal: "bundle", bundleId: bundle.bundleId, providerStatus: composed.providerStatus ?? null, localFallback: composed.localFallback ?? false, deliveryStatus: delivery.status, targetChannel: delivery.targetChannel }],
+      shouldWake: delivery.status === "pending",
+      // L2：同步直投分支（enqueue 即 delivered 的去重路径）也要回写——由 tick 在锁外触发，claim 门防双写。
+      deliveredEventId: delivery.status === "delivered" ? delivery.eventId : null,
+    };
+  }
+
+  // prune（锁外）：会话修剪/过期清理由 60s tick 顺带触发，不值得抱锁。
+  // 语义微调（计划显式声明）：lastPruned 按「当日已尝试」落定——prune 抛错当日不再每拍重试，次日再试；
+  // 失败有 proactive.prune.failed 事件可观测。落定用锁内 load→改→save，不与 decide/commit 竞态。
+  async #pruneOutsideLock(date) {
+    try {
+      await this.conversations?.prune();
+      await this.cognitiveRuntime?.cleanupExpired?.();
+    } catch (error) {
+      await this.recordEvent?.("proactive.prune.failed", { date, error: { code: error?.code || "PROACTIVE_PRUNE_FAILED", message: String(error?.message || error).slice(0, 300) } }, { level: "warning" });
+    }
+    await this.stateLock.run(async () => {
+      const state = await this.load({ prepareMigration: false });
+      if (state.lastPruned === date) return;
+      state.lastPruned = date;
+      await this.save(state);
+    });
+  }
+
+  // L0a+L0b：tick 全程计时观测 + 分段（decide/compose/commit）。快速空转（idle 且耗时 < tickObservationMinMs）
   // 不落事件，避免 60s 一拍刷 journal；慢空转（锁等待/长任务征兆）与有产出的 tick 都有 completed 记录。
-  // 失败路径把耗时挂上 error，由 start() 的 interval catch 一并落 journal（:867 附近）。
+  // 失败路径把耗时与阶段挂上 error，由 start() 的 interval catch 一并落 journal。
   async tick(options = {}) {
     const startedAt = Date.now();
+    const timing = { lockWaitMs: 0 };
+    let phase = "decide";
     try {
-      const result = await this.stateLock.run(() => this.#tickLocked(options));
-      const outcome = result.delivered.length
-        ? (result.delivered.some((item) => item.deliveryStatus === "delivered") ? "delivered" : "enqueued")
+      const decideStartedAt = Date.now();
+      const decision = await this.#withStateLock(timing, () => this.#decideTick(options));
+      const decideMs = Date.now() - decideStartedAt;
+      let composeMs = 0;
+      let commitMs = 0;
+      let committed = { delivered: [], shouldWake: false };
+      // L2：对账回补的回写（锁外）——与 decide 的早退路径无关，带出来就执行
+      for (const item of decision.pendingWritebacks || []) {
+        await this.#writebackDeliveredBundle(item.bundleId, item.eventId);
+      }
+      if (decision.bundle) {
+        phase = "compose";
+        const composeStartedAt = Date.now();
+        const composed = await this.#composeTick(decision, options);
+        composeMs = Date.now() - composeStartedAt;
+        phase = "commit";
+        const commitStartedAt = Date.now();
+        committed = await this.#withStateLock(timing, () => this.#commitTick(decision, composed, options));
+        commitMs = Date.now() - commitStartedAt;
+        // L2：同步直投分支（enqueue 即 delivered）的回写，锁外触发
+        if (committed.deliveredEventId) await this.#writebackDeliveredBundle(decision.bundle.bundleId, committed.deliveredEventId);
+      }
+      if (decision.pruneDue && decision.date) {
+        phase = "prune";
+        await this.#pruneOutsideLock(decision.date);
+      }
+      const outcome = committed.delivered.length
+        ? (committed.delivered.some((item) => item.deliveryStatus === "delivered") ? "delivered" : "enqueued")
         : "idle";
       const durationMs = Date.now() - startedAt;
       if (outcome !== "idle" || durationMs >= this.tickObservationMinMs) {
-        await this.recordEvent?.("proactive.tick.completed", { durationMs, outcome, deliveredCount: result.delivered.length });
+        await this.recordEvent?.("proactive.tick.completed", {
+          durationMs, outcome, deliveredCount: committed.delivered.length,
+          lockWaitMs: timing.lockWaitMs, decideMs, composeMs, commitMs,
+        });
       }
-      if (result.shouldWake) await this.wakeDelivery?.();
-      return result.delivered;
+      if (committed.shouldWake) await this.wakeDelivery?.();
+      return committed.delivered;
     } catch (error) {
-      if (error && typeof error === "object") error.tickDurationMs = Date.now() - startedAt;
+      if (error && typeof error === "object") {
+        error.tickDurationMs = Date.now() - startedAt;
+        error.tickPhase = phase;
+      }
       throw error;
     }
   }
@@ -894,7 +1100,7 @@ class ProactiveOrchestrator {
     if (generation !== this.startGeneration) return;
     this.timer = setInterval(() => tickIfEnabled().catch((error) => {
       // tick 失败此前被完全静默（save IO 错 / enqueue 冲突 / snapshot 错都消失）；落 journal 可观测，不阻断下一 tick。
-      this.recordEvent?.("proactive.tick.failed", { error: { code: error?.code, message: String(error?.message || error).slice(0, 500) }, durationMs: error?.tickDurationMs }, { level: "error" }).catch(() => {});
+      this.recordEvent?.("proactive.tick.failed", { error: { code: error?.code, message: String(error?.message || error).slice(0, 500) }, durationMs: error?.tickDurationMs, phase: error?.tickPhase }, { level: "error" }).catch(() => {});
     }), 60_000);
   }
 

@@ -99,6 +99,10 @@ function normalizeState(value = { version: PROACTIVE_STATE_VERSION }) {
     lastRuns: { ...(value.lastRuns || {}) },
     subjects: { ...(value.subjects || {}) },
     pendingBundles: { ...(value.pendingBundles || {}) },
+    // L0b（#17）：组合租约——decide 写、commit 删；旧版 normalizeState 靠 ...value 透传，回滚安全。
+    pendingCompositions: { ...(value.pendingCompositions || {}) },
+    // L2（#17）：投递回写台账——{ [bundleId]: { eventId, claimedAt?, writebackAt?, lastErrorCode? } }。
+    deliveredWritebacks: { ...(value.deliveredWritebacks || {}) },
     pending: { ...(value.pending || {}) },
     recoveryFailures: { ...(value.recoveryFailures || {}) },
     lastPruned: value.lastPruned || "",

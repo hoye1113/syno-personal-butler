@@ -310,7 +310,7 @@ test("ProactiveOrchestrator drives the single Agent, keeps local fallback, and a
   assert.equal(isQuietTime(new Date("2026-07-20T23:30:00+08:00"), { start: "23:00", end: "07:00" }), true);
 });
 
-test("ProactiveOrchestrator uses a separate OpenCode proactive session and appends the result to main", async (t) => {
+test("ProactiveOrchestrator uses a separate OpenCode proactive session and appends the delivered card to main (L2)", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-proactive-opencode-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const calls = [];
@@ -323,11 +323,25 @@ test("ProactiveOrchestrator uses a separate OpenCode proactive session and appen
       calls.push(["append", event.ownerKey, event.threadKey, event.text]);
     },
   };
-  const proactive = new ProactiveOrchestrator({
+  const channels = { async send() { return { web: { delivered: true } }; } };
+  const outbox = new ChannelDeliveryOutbox({
+    root: path.join(root, "outbox"),
+    payloadRoot: path.join(root, "payloads"),
+    lockFile: path.join(root, "outbox.lock"),
+    protect: async (value) => value,
+    unprotect: async (value) => value,
+  });
+  let proactive;
+  proactive = new ProactiveOrchestrator({
     host: { async receive() { throw new Error("must use CognitiveRuntime directly"); } },
     cognitiveRuntime,
     today: { async snapshot() { return { priorities: [{ title: "复习 Tool Bridge" }] }; } },
-    channels: { async send() { return { web: { delivered: true } }; } },
+    channels,
+    channelDeliveryOutbox: outbox,
+    wakeDelivery: () => outbox.deliverDue(
+      async (payload, event) => (await channels.send(payload, [event.targetChannel]))[event.targetChannel],
+      { onDelivered: (event) => proactive.markBundleDelivered(event.sourceId, event.eventId) },
+    ),
     signalEngine: new SignalEngine({ schedule: { morningHour: 8, eveningHour: 20, weeklyDay: 0, maxDailyNotifications: 1 } }),
     stateFile: path.join(root, "state.json"),
     quietHours: { start: "23:00", end: "07:00" },
@@ -335,8 +349,14 @@ test("ProactiveOrchestrator uses a separate OpenCode proactive session and appen
   const delivered = await proactive.tick({ now: new Date("2026-07-20T08:30:00+08:00") });
   assert.equal(delivered[0].localFallback, false);
   assert.deepEqual(calls[0].slice(0, 4), ["run", "chat", "local-user", "proactive"]);
-  assert.deepEqual(calls[1].slice(0, 3), ["append", "local-user", "main"]);
-  assert.match(calls[1][3], /先复习 Tool Bridge/);
+  // L2：回写发生在投递成功后（markBundleDelivered → writeback），文本=主人所见的 outbox payload
+  const append = calls.find((entry) => entry[0] === "append");
+  assert.ok(append, "投递成功后应回写主会话");
+  assert.deepEqual(append.slice(1, 3), ["local-user", "main"]);
+  assert.match(append[3], /先复习 Tool Bridge/);
+  const [record] = await outbox.list({ limit: 1 });
+  const stored = await outbox.get(record.eventId, { includePayload: true });
+  assert.equal(append[3], stored.payload.text, "回写文本与真实投递 payload 一致");
 });
 
 test("ProactiveOrchestrator weekly signal calls maintenance.weeklySummary and targets only the Home Channel", async (t) => {
