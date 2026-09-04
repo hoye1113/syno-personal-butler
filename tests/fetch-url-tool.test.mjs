@@ -224,3 +224,23 @@ test("fetchUrlForChat honestly degrades when the browser daemon is unavailable",
   assert.equal(result.blocked, "browser_unavailable");
   assert.match(result.content, /daemon 未运行/);
 });
+
+// ---------- 代码审查整改①（2026-09-04）：浏览器路径 maxChars 同口径截断 ----------
+
+test("browser-escalated content honors maxChars and marks truncation honestly", async () => {
+  const adapter = fakeBrowserAdapter({
+    capture: { status: "completed", finalUrl: "https://mp.weixin.qq.com/s/abc", title: "长文", content: "正文".repeat(5000) },
+  });
+  const result = await fetchUrlForChat({
+    url: "https://mp.weixin.qq.com/s/abc",
+    maxChars: 2000,
+    fetcher: async (value) => ({ url: value, contentType: "text/html", text: WX_WALL_TEXT, truncated: false }),
+    browserCapture: adapter,
+    context: chatContext,
+  });
+  assert.equal(result.via, "browser");
+  assert.equal(result.truncated, true);
+  assert.ok(result.content.includes("正文".repeat(20)), "截断后仍含正文主体");
+  assert.ok(result.content.length < 3000, `正文应按 maxChars 截断，实际 ${result.content.length}`);
+});
+

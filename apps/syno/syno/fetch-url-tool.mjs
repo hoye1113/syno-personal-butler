@@ -95,7 +95,7 @@ function chatReadWorkflowId(context, url) {
   return `workflow-chatread-${createHash("sha256").update(basis, "utf8").digest("hex").slice(0, 16)}`;
 }
 
-async function escalateViaBrowser({ url, browserCapture, context, wall }) {
+async function escalateViaBrowser({ url, browserCapture, context, wall, maxText }) {
   const workflowId = chatReadWorkflowId(context, url);
   let observation = null;
   // 已有观察记录 = 同（主人, 会话, URL）的浏览器会话可能还在——原地续抓（「继续」场景）；
@@ -110,11 +110,15 @@ async function escalateViaBrowser({ url, browserCapture, context, wall }) {
     observation = await browserCapture.capture({ workflowId, exactUrl: url });
   }
   if (observation?.status === "completed") {
+    // 与直抓同口径的截断（代码审查整改）：adapter 上限 100k 不等于调用方要的 maxChars，
+    // 超长如实标 truncated，不把 100k 灌进聊天上下文。
+    const full = String(observation.content || "");
+    const clipped = full.length > maxText;
     return wrapUntrusted({
       sourceUrl: observation.finalUrl || url,
       contentType: "browser/a11y-tree",
-      text: `页面标题：${observation.title || "未知"}\n\n${observation.content || ""}`,
-      truncated: false,
+      text: `页面标题：${observation.title || "未知"}\n\n${clipped ? full.slice(0, maxText) : full}`,
+      truncated: clipped,
       via: "browser",
       extra: { title: String(observation.title || "") },
     });
@@ -167,7 +171,7 @@ async function fetchUrlForChat({ url, maxChars = DEFAULT_MAX_CHARS, fetcher = fe
     : detectAntiBotWall({ sourceUrl: snapshot.url, text: snapshot.text });
   if (wall && browserCapture && LIVE_CHAT_CHANNELS.has(String(context?.channel || ""))) {
     try {
-      return await escalateViaBrowser({ url: target, browserCapture, context, wall });
+      return await escalateViaBrowser({ url: target, browserCapture, context, wall, maxText });
     } catch (error) {
       // 升级路径自身故障不得吞掉直抓结果——降级为带 blocked 标记的直抓结果（或原 HTTP 错误）
       if (httpBlocked) throw httpBlocked;
