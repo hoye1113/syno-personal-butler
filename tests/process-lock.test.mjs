@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 
 import {
   ProcessFileLock,
@@ -104,4 +106,70 @@ test("host-style fail-fast locking and doctor fail closed on unknown identity", 
   const doctor = await removeConfirmedStaleProcessLock(file);
   assert.deepEqual(doctor, { status: "identity_unknown", owner: null, removed: false });
   assert.equal((await fs.stat(file)).isFile(), true);
+});
+
+test("ProcessFileLock releases a timed-out local waiter for later callers", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-process-lock-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const file = path.join(root, "queued.lock");
+  const holder = await new ProcessFileLock({ file, timeoutMs: 1_000, pollMs: 1 }).acquire();
+  const timedOut = new ProcessFileLock({ file, timeoutMs: 30, pollMs: 1 }).acquire();
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  const follower = new ProcessFileLock({ file, timeoutMs: 1_000, pollMs: 1 }).acquire();
+
+  await assert.rejects(timedOut, { code: "PROCESS_LOCK_TIMEOUT" });
+  await holder.release();
+  const followerLease = await follower;
+  await followerLease.release();
+  await assert.rejects(fs.stat(file), { code: "ENOENT" });
+});
+
+test("Windows stale lock takeover permits only one concurrent winner", { skip: process.platform !== "win32" }, async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-process-lock-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const file = path.join(root, "stale-race.lock");
+  await fs.writeFile(file, `${JSON.stringify({ pid: 2_147_483_647, instanceId: "stale" })}\n`);
+
+  const moduleUrl = pathToFileURL(path.resolve("apps/syno/syno/process-lock.mjs")).href;
+  const childScript = `
+import { ProcessFileLock } from ${JSON.stringify(moduleUrl)};
+const file = Buffer.from(process.argv[1], "base64").toString("utf8");
+const instanceId = Buffer.from(process.argv[2], "base64").toString("utf8");
+try {
+  const lease = await new ProcessFileLock({ file, failFast: true, metadata: { instanceId } }).acquire();
+  process.stdout.write(JSON.stringify({ status: "acquired", instanceId: lease.owner.instanceId }) + "\\n");
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  await lease.release();
+} catch (error) {
+  process.stdout.write(JSON.stringify({ status: "rejected", code: error.code }) + "\\n");
+}
+`;
+  const runChild = (instanceId) => new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ["--input-type=module", "-e", childScript, Buffer.from(file, "utf8").toString("base64"), Buffer.from(instanceId, "utf8").toString("base64")], {
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      const line = stdout.trim().split(/\r?\n/).filter(Boolean).at(-1);
+      resolve({ code, result: line ? JSON.parse(line) : null, stderr });
+    });
+  });
+
+  const attempts = await Promise.all([
+    runChild("winner-a"),
+    runChild("winner-b"),
+  ]);
+  const winners = attempts.filter((attempt) => attempt.result?.status === "acquired");
+  const rejected = attempts.filter((attempt) => attempt.result?.status === "rejected");
+  assert.equal(winners.length, 1, JSON.stringify(attempts));
+  assert.equal(rejected.length, 1, JSON.stringify(attempts));
+  assert.equal(rejected[0].result.code, "PROCESS_LOCK_HELD", JSON.stringify(attempts));
+  await assert.rejects(fs.stat(file), { code: "ENOENT" });
 });
