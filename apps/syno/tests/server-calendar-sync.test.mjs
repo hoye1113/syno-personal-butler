@@ -189,23 +189,34 @@ async function getFreePort() {
 }
 
 async function waitForHealth(child, port, logs) {
-  const deadline = Date.now() + 7_000;
+  // Windows 全量回归期间可能同时启动多个 Node/PowerShell 子进程；
+  // 给夹具一个有界但足够的启动窗口，避免把调度抖动误报为业务失败。
+  const startedAt = Date.now();
+  const deadline = startedAt + 15_000;
+  let lastError = null;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error(`server exited\n${logs.text()}`);
-    try { const response = await requestJson(port, "/api/health"); if (response.statusCode === 200) return; } catch {}
+    try {
+      const response = await requestJson(port, "/api/health", undefined, { timeoutMs: Math.max(1, deadline - Date.now()) });
+      if (response.statusCode === 200) return;
+      lastError = new Error(`HTTP ${response.statusCode}`);
+    } catch (error) {
+      lastError = error;
+    }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error(`server did not become healthy\n${logs.text()}`);
+  const elapsedMs = Date.now() - startedAt;
+  throw new Error(`server did not become healthy after ${elapsedMs}ms${lastError ? `: ${lastError.message}` : ""}\n${logs.text()}`);
 }
 
-async function requestJson(port, pathname, body) {
+async function requestJson(port, pathname, body, { timeoutMs = 30_000 } = {}) {
   const payload = body ? JSON.stringify(body) : "";
   return new Promise((resolve, reject) => {
     const req = request({ hostname: "127.0.0.1", port, path: pathname, method: body ? "POST" : "GET", headers: body ? { "content-type": "application/json", "content-length": Buffer.byteLength(payload), origin: `http://127.0.0.1:${port}` } : {} }, (res) => {
       let raw = ""; res.setEncoding("utf8"); res.on("data", (chunk) => { raw += chunk; });
       res.on("end", () => { try { resolve({ statusCode: res.statusCode, body: raw ? JSON.parse(raw) : null }); } catch (error) { reject(error); } });
     });
-    req.on("error", reject); req.setTimeout(30_000, () => req.destroy(new Error("request timed out")));
+    req.on("error", reject); req.setTimeout(timeoutMs, () => req.destroy(new Error("request timed out")));
     if (payload) req.write(payload); req.end();
   });
 }
