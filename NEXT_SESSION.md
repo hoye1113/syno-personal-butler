@@ -1,4 +1,24 @@
-# Syno 执行语义与移动可靠交付交接（2026-07-29）
+# 当前执行状态（2026-09-18）
+
+本节是当前交接摘要；下方“历史交接”仅用于追溯，不能覆盖这里的单仓运行事实。
+
+- **唯一活动事实源**：本仓库。`vault/` 与 `ops/` 已回到本仓库，由本仓库 Git 和 `origin/main` 管理；当前基线为 `ccf559b`。
+- **生产配置**：planner `vaultRoot` 指向本仓库；用户级和系统级 `SYNO_KNOWLEDGE_ROOT` 均未配置。外部知识仓及备份目录仅作为冻结回滚材料保留。
+- **运行态**：8888 `/api/syno/health` 为 `ready`，delivery 正常；`/api/settings` 与 `/api/syno/today` 均从本仓库读取，当前 `needsYou=0`、待收录=0。
+- **Host 身份**：当前 Host lock 所在 `.runtime` 属于本仓库，PID 33176、入口为 `apps/syno/server.mjs`、repo fingerprint 为 `a57a9503618a0646`。Windows 任务已安装但当前 `running=false`，8888 由手动启动的 Host 提供；任务安装/重启需主人手动执行，Agent 不绕过系统生命周期权限。
+- **环境风险**：当前 Codex 命令进程仍继承了旧的 `SYNO_KNOWLEDGE_ROOT` 值，但不是用户级或系统级配置。后续从该会话启动 Node 前必须显式清除它；生产 Host 的当前 lock、planner 和 API 读路径已证明使用本仓库。
+- **已完成验证**：`pnpm run verify` 通过（2219 files）；`git diff --check` 通过；Agent 契约检查通过；vault 审计基线为 579 files / 332 unmatched wikilinks / 63 orphan / 25 no frontmatter / 20 incomplete frontmatter；B站专项测试 63/63 通过；真实 frontmatter 识别的 83 篇 B站 v2 笔记全量通过。
+- **完整回归**：`pnpm test` 已通过 758/758，0 failed、0 skipped；此前的等待问题已通过测试替身隔离 fake-agent 进程清理路径修复。
+- **当前待办顺序**：
+  1. 主人手动完成 Windows 任务启动/受控重启，并验证登录冷启动；
+  2. 完成真实 DSH、跨渠道、重启恢复和每日灵感反馈验收；
+  3. 处理 `Generate glossary` 孤立笔记和 5 篇今日重读候选；
+  4. 渐进治理历史 wikilink、orphan 和 frontmatter，不批量改写。
+- **保留项**：`.tmp-webbridge-snapshot-20260917-c.json`、`webbridge-req-20260917-omission-06.json`、`webbridge-req-20260917-omission-13.json` 是未跟踪诊断证据，不修改、不暂存、不删除。
+
+---
+
+# 历史交接：Syno 执行语义与移动可靠交付（2026-07-29）
 
 ## 2026-09-04 当前交接：#11 验收稳定性 Day 1/3（重计 09-04 准点出卡）；#17 全链落码且**全部部署**——L0b+L2（`8d13c30` 12:38）+ P1（`faedbe6` 14:34，Owner 指令豁免封板闸门）
 
