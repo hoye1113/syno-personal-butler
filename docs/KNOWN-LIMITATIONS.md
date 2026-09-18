@@ -60,7 +60,7 @@ Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导�
 - 当前项目没有 TypeScript 源码、`tsconfig` 或 `typecheck` 脚本；`pnpm run typecheck` 会返回 `ERR_PNPM_NO_SCRIPT`，JavaScript 语法与行为由 Node 全量测试覆盖。
 - 知识仓 `vault/` 是唯一可写知识事实源。原始 Obsidian 仓库只读，不双向同步；渠道会话和飞书文档不是知识事实源。
 - 状态归档只包含 `%LOCALAPPDATA%\Syno\state`，不包含 DPAPI credentials，也不代替对 Git 跟踪的知识仓 `vault/`、`ops/` 和代码仓配置文档做备份。
-- Web/系统投递通知是可重建运行状态，只写 `.runtime/notifications`，不会因 Host 启动自动污染 `ops/`；需要长期保留的任务与待决策项仍写入 canonical `ops/`。
+- Web/系统投递通知是可重建运行状态，活动通知写入 `.runtime/notifications`，已结束的主动审计通知默认不在工作台展示，归档副本写入 `.runtime/notifications-archive`，不会因 Host 启动自动污染 `ops/`；需要长期保留的任务与待决策项仍写入 canonical `ops/`。
 - 自动收录先形成 `IngestProposal`；覆盖、移动、合并、新 tag 和新 MOC 在隔离工作区自动执行，整理冲突时暂停澄清，以降低错误整理的不可逆成本。
 - 飞书消息长连接使用 Syno 注册的 Feishu App；日历排期仍使用历史 `lark-cli` 授权。两者共享 Syno Policy 和 Markdown 事实源，但当前需要分别完成消息与日历授权，后续可统一凭据体验。
 - 微信仅支持绑定 Owner 的私聊入口，不读取个人聊天历史，也不支持群聊授权。

@@ -230,7 +230,7 @@ class ProactiveOrchestrator {
     }
     let notices;
     try {
-      notices = await this.notifications.list({ limit: 1000 });
+      notices = await this.notifications.list({ limit: 1000, includeSettled: true });
     } catch {
       state.migration = { ...state.migration, auditStatus: "unavailable", notificationIds: {} };
       return;

@@ -1654,6 +1654,9 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "GET" && url.pathname === "/api/syno/note") return runtime.core.read(url.searchParams.get("path") || "");
   if (method === "GET" && url.pathname === "/api/syno/jobs") return { jobs: await runtime.host.list({ limit: 100, ownerKey: webContext.ownerKey }) };
   if (method === "GET" && url.pathname === "/api/syno/notifications") return { notifications: await runtime.notifications.list({ limit: 100 }) };
+  if (method === "POST" && url.pathname === "/api/syno/notifications/archive") {
+    return runControlMutation(runtime, async () => runtime.notifications.archive(await readBody(req)));
+  }
   if (method === "GET" && url.pathname === "/api/syno/channels") return { channels: runtime.channels.status() };
   if (method === "GET" && url.pathname === "/api/syno/proactive/preview") return runtime.proactive.preview();
   if (method === "POST" && url.pathname === "/api/syno/proactive/migrate") {
