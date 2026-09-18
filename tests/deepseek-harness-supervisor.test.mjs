@@ -18,6 +18,10 @@ import { CORE_CHAT_TOOL_NAMES } from "../config/deepseek-harness/syno-tool-sets.
 import { doctor } from "../scripts/deepseek-harness-runtime.mjs";
 
 const fakeAgent = path.resolve("tests/support/fake-dsh-jsonrpc-agent.mjs");
+const testKillTree = async (pid) => {
+  if (!pid) return;
+  try { process.kill(pid); } catch {}
+};
 
 async function writeRuntimePackage(packageDir, packageName, { runtime = true } = {}) {
   await fs.mkdir(packageDir, { recursive: true });
@@ -262,6 +266,7 @@ test("DeepSeekHarnessSupervisor injects DEEPSEEK_API_KEY into a replaced child e
   let spawnedEnv;
   const supervisor = new DeepSeekHarnessSupervisor({
     fakeAgent,
+    killTree: testKillTree,
     localRoot: root,
     bridgeOrigin: "http://127.0.0.1:9/api/syno/bridge/mcp",
     bridgeToken: "bridge-token",
@@ -289,6 +294,7 @@ test("fake chat surface stays jsonrpc and does not spawn dsh web", async (t) => 
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const supervisor = new DeepSeekHarnessSupervisor({
     fakeAgent,
+    killTree: testKillTree,
     localRoot: root,
   });
   t.after(() => supervisor.stop());
@@ -323,6 +329,7 @@ test("JSON-RPC sidecar shutdown terminates the owned process tree instead of rac
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const supervisor = new DeepSeekHarnessSupervisor({
     fakeAgent,
+    killTree: testKillTree,
     localRoot: root,
   });
   t.after(() => supervisor.stop().catch(() => {}));
@@ -460,6 +467,7 @@ test("Web supervisor pins the Syno agent preset when initializing the client", a
     fakeAgent: "",
     localRoot: path.join(root, "local"),
     webReadyTimeoutMs: 1_000,
+    killTree: async () => {},
     webClientFactory: () => ({
       initialized: false,
       async initialize(options) {
