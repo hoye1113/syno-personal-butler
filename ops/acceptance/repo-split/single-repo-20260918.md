@@ -26,7 +26,14 @@
 - 来源 ID 扫描：83 opus、182 BV、148 cv 字段 ID，重复 0。
 - `git diff --check`：迁移分支工作树与文档变更通过。全量导入历史正文仍保留知识仓既有尾随空白，未为迁移清洗正文。
 
-## 未完成项
+## 合入 main 后冒烟
+
+- 本地 `main` 已 fast-forward 到 `3502bae`；Host 以单仓根目录启动，8888/3088 均监听。
+- `/api/syno/health`：`alive=true`、`state=ready`、`deliveryOk=true`、连续投递失败 0。
+- `/api/syno/search?q=Agent&limit=5` 返回 5 条；`/api/syno/jobs` 返回 100 条；`/api/syno/today` 可读，`needsYou=0`。
+- 未创建合成收录或测试灵感写入，避免污染事实源；收录、Job、今日灵感写入路径由本次 758 个 Node 测试覆盖。
+- 重启时发现并清理了一把 PID 已不存在的 stale Host lock；之后直接 Node Host 启动正常。其它 Node/Codex 进程未处理。
+
+## 保留限制
 
 - `bilibili-v3-gap-check.py` 仍依赖外部 `D:\workSpace\Recastory\workspace\bilibili\manifest.json`；该文件当前不存在，因此只记录为环境验证限制，不修改知识内容。
-- Host 尚未在单仓 `main` 上重启；合入主分支后需完成 8888 健康、知识搜索、Job 状态和今日灵感读写冒烟，再提交真实运行记录。
