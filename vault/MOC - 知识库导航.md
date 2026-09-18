@@ -35,6 +35,8 @@ Step 4  沿类型化关系加载一跳     ← 支持/补充/反驳/限制，优
 | agent 架构 / 记忆 / multi-agent / 企业生产 / RAG / 可观测 / delegation / 长上下文致笨 / ReAct | [[MOC - Agent 架构与工程]] | domain |
 | Claude Code / Codex / OpenClaw / Cursor / Vibe Code / AI 编程 / 视频制作 / 动画 / Remotion / FFmpeg / 纸片分层 | [[MOC - AI Coding 与工具]] | domain |
 | eval / benchmark / LLM-as-judge / RL 小模型 / 论文 | [[MOC - AI 评估与研究]] | domain |
+| AI 安全 / 红队 / 监控 / 政策 / 治理 | [[MOC - AI 评估与研究]] | domain |
+| 机器人 / BCI / 物理 AI / 生物科技 / 世界模型 | [[MOC - 具身智能与脑机接口]] | domain |
 | 找不准子主题 / Agent 理论总览 / 想扫一遍全貌 | [[MOC - Agent Theory and Design]]（总览） | 总览 |
 | FDE / 职业 / 蜂群组织 / 哲学 / AGI 时间线 / 面试 / 裁员 / PM 转型 | [[MOC - AI 时代个人发展与组织]] | 横切 |
 | 全栈实现 / LangGraph / Next.js / Coding Agent / Chat Bot / 前端面试 | [[MOC - Loock AI 全栈课程]] | 课程 |
@@ -42,6 +44,10 @@ Step 4  沿类型化关系加载一跳     ← 支持/补充/反驳/限制，优
 | Super Agent 实战 | [[MOC - Super Agent 实战课]] | 课程 |
 | 可复用 prompt 模板（tweet / 摘要 / 翻译 / web clip） | [[MOC - Prompt 库]] | 模板库 |
 | 都不命中 | tag grep + vskill-vault-relate | 兜底 |
+
+## 主归属规则
+
+每篇来源笔记只有一个物理主位置；MOC 允许多重入口。平台、作者、文章/对谈等信息放在 frontmatter，不再作为长期目录。判断冲突时，以笔记回答的主要问题为准：架构组件进 Agent 架构，可靠性控制进 Harness，测量与治理进评估/安全，具体工具使用进 AI Coding，组织与个人工作进组织/产品/职业，模型与实体世界进前沿/具身智能。`B站视频知识库/` 保留为历史导入桶，迁移时只移动文件并维护链接，不复制内容。
 
 ## PARA 检索语义（决定去 Areas 还是 Resources）
 

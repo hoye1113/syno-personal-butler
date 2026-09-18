@@ -1,6 +1,6 @@
 # Spot check 工作表：Codex实战：构建全能AI营销团队
 
-- **Vault**: `02-Resources/AI and Agents/B站视频知识库/Agent架构与平台/Codex实战-构建全能AI营销团队.md`
+- **Vault**: `02-Resources/AI and Agents/AI Coding & Tools/Codex实战-构建全能AI营销团队.md`
 - **时长**: 49:22
 - **spot_check**: （未登记）
 - **transcript_source**: `Recastory/workspace/bilibili-retranscribe/BV1BLGH6REyX/article.md`

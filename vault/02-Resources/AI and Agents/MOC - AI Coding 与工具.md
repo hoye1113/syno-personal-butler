@@ -10,7 +10,7 @@ link_status: connected
 source_path: "02-Resources/AI and Agents/MOC - AI Coding 与工具.md"
 source_sha256: "4da8406d47ff985594d3ef641f7efbd2f2ff2af794e5cf34bc359de1b447bd6b"
 migration_id: "migration-20260720-64e79771"
-updated: 2026-07-15
+updated: 2026-09-17
 ---
 # MOC - AI Coding 与工具
 
@@ -24,6 +24,7 @@ updated: 2026-07-15
 |------|---------|
 | [[Claude Code负责人-AI原生团队如何使用AI]] | Boris 20% side project→千人流传；Todo/Plan 从痛点长出；Eval 分 E2E 与 triggering |
 | [[Claude Code负责人-创造内幕]] | Pragmatic Engineer × Boris：100% AI 写码、瑞士奶酪安全、agentic search、印刷机类比（**A-dialogue v3.2-asr** ✓） |
+| [[Claude Code负责人-创造内幕与印刷术时刻]] | Boris Cherny：100% AI 写码、核心查询循环、审查/权限、上下文与组织转型（**B站 v2 专栏**） |
 | [[Claude Code负责人 Boris Cherny-Tokenmaxxing与AI智能体前沿]] | 指数增长、Tokenmaxxing、Auto 模式路由、rate limit 与 switching cost 变薄 |
 | [[Claude Code之父-亲自讲解Cowork]] | Greg × Boris：Cowork=同一 agent UI；文件夹 opt-in、反向征求、CLAUDE.md（**A-dialogue v3.2-asr** ✓） |
 | [[Claude Cowork-另一种Claude Code]] | Every vibe check：异步任务队列、agent-native 原则、执行黄理念绿（**A-dialogue v3.2-asr** ✓） |
@@ -62,12 +63,12 @@ updated: 2026-07-15
 | [[Codex实战-演示开发一个手机App]] | Riley：Codex + Xcode 搭 Jerry；Claude Agent SDK + Vibe Code CLI |
 | [[Codex实战-用AI颠覆视频剪辑流程]] | Riley：Remotion 动态图、竞品拆解、帧级转场、八 prompt 成片 |
 | [[Codex实战-Notion第二大脑与技能封装]] | Riley 八步：Notion 插件、内嵌浏览器、自定义技能、每晚自动化（**A-lecture v3** ✓） |
+| [[ClawdBot创始人-一个人顶一个团队]] | 代理优先编程、闭环验证、多代理并行与超级个体 |
 | [[OpenClaw创始人-我是如何使用OpenClaw的]] | WhatsApp→Claude Code；CLI Army；Just talk to it，别沉迷 24h loop |
 | [[OpenClaw创始人-Claw现状与安全治理]] | Peter S.：基金会、安全三重奏、做梦记忆、AI CVE 噪音（**canonical v3.2** ✓） |
 | [[30分钟精通OpenClaw]] | 安全五步、五用例 demo、SOUL/USER/MEMORY 本地 MD 人格 |
 | [[Taven创始人-将OpenClaw嵌入产品的实战经验]] | Pi 内核企业嵌入：Excel Skill 小 CLI、一客户一 Agent + AGENTS.md |
 | [[OpenClaw实战-从本地到K8S部署]] | Podman/K8s 四好处、Secret ref 双层、baseline 镜像愿景 |
-| [[给每位员工配备AI智能体]] | Every × OpenClaw/Plus One：一人一 Agent、Slack 公开协作、信任传递（**canonical v3.2** ✓） |
 
 ---
 
@@ -90,19 +91,31 @@ updated: 2026-07-15
 
 | 文章 | 核心主题 |
 |------|---------|
-| Codex实战-用Codex处理日常工作（待收录） | OpenAI 播客：用 Codex 处理日常工作 |
-| [[Codex实战-Notion第二大脑与技能封装]] | Codex + Notion：AI 第二大脑落地实战 |
-| AI编程工具-2026年趋势与Vibe Code（待收录） | AI 编程工具：2026 年趋势与 Vibe Code |
-| AI编程工具-2026年趋势与Vibe Code（待收录） | AI 编程工具：2026 年趋势与 Vibe Code |
-| Claude Code实战-40分钟浏览器自动化（待收录） | Claude Code 实战：40 分钟用 AI 实战浏览器自动化 |
-| [[Claude Code实战-鲜为人知的Claude Code工作流]] | Claude Code 实战：鲜为人知的 Claude Code 工作流 |
-| AI App实战-6个AI工具共同开发App（待收录） | AI App 实战：现场演示 6 个 AI 工具共同开发一个 App |
-| OpenAI总裁-AI要让每个人都受益（待收录） | OpenAI 总裁：AI 要让每个人都受益，是 AGI 之路 |
-| Codex实战-用AI高效完成视频脚本（待收录） | Codex 实战：用 AI 高效完成视频脚本 |
+| [[OpenAI播客-用Codex处理日常工作]] | OpenAI 播客：用 Codex 处理日常工作 |
 | [[AI编程工具-2026年如何Code]] | AI 编程工具：2026 年如何 Code |
 | [[TypeScript专家-AI编程生产级代码]] | TypeScript 专家：AI 编程如何写出生产级代码 |
 | [[Codex实战-AI编程2026新手教程]] | Codex 实战：AI 编程 2026 新手教程 |
 | [[DHH-编写代码的新方式]] | DHH：编写代码的新方式 |
+
+## 按问题空间补充：分类治理批次（2026-09-17）
+
+### 设计、规范与构建反馈
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[AI设计实战-6个AI共同设计App]] | 多 Agent 并行设计、画布协作与设计/代码单一事实源 |
+| [[claude-design-25分钟教程-47b9df82]] | Design.md、原型探索、规格生成与构建反馈 |
+| [[Claude Design实战-从创意到高保真]] | 问卷式需求澄清、线框探索与高保真交付边界 |
+| [[openai产品负责人-codex如何-被开发出来的-哔哩哔哩-c8546496]] | Codex 边界、工具框架、代码审查与产品集成 |
+
+### 工具工作流与内容生产
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[every-ceo-现场演示-chatgpt写作-e5822871]] | 来源保留、语音回放、事实分层与写作工作流 |
+| [[openclaw之父-乐趣就是速度-be250b8c]] | OpenClaw 迭代速度、配置安全与真实用户反馈 |
+| [[riley-brown-codex-150万粉丝-afde4b36]] | Codex、Skills、内容生产、实验与团队协作 |
+| [[Seedance实战-AI视频可控编辑]] | 多输入生成、视频扩展、唇形同步与商业落地 |
 
 ---
 
@@ -113,6 +126,43 @@ updated: 2026-07-15
 | [[ACP集成问题与踩坑经验]] | ACP（Hermes × FlowyClaw/AI_Router）协议集成踩坑：通信、责任边界、Agent Server 问题、连接排障 |
 | [[季白羽-Codex 与 Remotion 纸片分层动画流水线]] | Codex 当指挥家串 Imagegen/F5-TTS/Remotion/FFmpeg 的纸片分层动画流水线：先定镜头、拆四层、独立 PNG、错峰入场、遮挡造纵深 |
 | [[拾语隅-给Hermes装个状态灯]] | 用 Hermes Agent 当个人助手时，通过 macOS 菜单栏状态灯实时显示 Agent 工作状态（工作中/待机/掉线）；迭代方案：CPU 监测→标记文件→日志监控 |
+
+### P1-A-03（2026-09-18）
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[Karpathy-从Vibe Code到Agentic Code]] | 软件 3.0、代理工程、可验证性与人类理解边界 |
+| [[Mitchell Hashimoto-AI时代开源与Git未来]] | 代理 PR、Git 工作流、非思考任务委托与开源协作 |
+
+### P1-A-04（2026-09-18）
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[OpenCode创始人-研发内幕]] | 开源编码代理、产品交付、技术债与工程判断 |
+
+
+### P1-B-01（2026-09-18）
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[a16z创始人-浏览器末日与OpenClaw]] | Agent、Unix Shell 与 OpenClaw 工作流 |
+
+
+### P1-B-02（2026-09-18）
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[Cursor实战-零代码构建语音助手Jarvis]] | Cursor Agent、实时语音与工具调用工作流 |
+| [[Every咨询主管-每天用Codex 重塑工作流]] | 共享上下文、Codex 工具化与确定性软件边界 |
+| [[Hyperframes-HeyGen 用 HTML 代码做 AI 视频]] | HTML/CSS/JS、技能链、渲染与视觉反馈闭环 |
+| [[Matthew Berman-最佳 Vibe Coding 工作流]] | 规则文件、Skills、测试日志与并行 Agent 合并 |
+| [[OpenAI PM-Rohan Varma 用Codex 研发产品]] | Codex、MVP、倒置开发生命周期与 Goal 模式 |
+
+### P1-B-03（2026-09-18）
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[Riley Brown-Fable 5与Paper的智能体原生设计流]] | Claude Code、MCP 画布、设计迭代与部署 |
 
 ## 跨 MOC
 

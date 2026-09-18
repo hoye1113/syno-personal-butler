@@ -2,13 +2,13 @@
 title: "Spot check - 姚顺雨预测性Agent设计"
 tags: [notes, bilibili, ai_agent]
 created: 2026-07-13
-source: "Agent架构与平台/姚顺雨-预测性Agent设计.md"
+source: "02-Resources/AI and Agents/Agent Architecture & Runtime/姚顺雨-预测性Agent设计.md"
 description: "姚顺雨长访谈与无时间戳ASR的四锚点事实抽样。"
 ---
 
 # Spot check 工作表：姚顺雨：预测性 Agent 设计
 
-- **Vault**: `02-Resources/AI and Agents/B站视频知识库/Agent架构与平台/姚顺雨-预测性Agent设计.md`
+- **Vault**: `02-Resources/AI and Agents/Agent Architecture & Runtime/姚顺雨-预测性Agent设计.md`
 - **时长**: 86:33
 - **spot_check**: （未登记）
 - **transcript_source**: `Recastory/workspace/bilibili-retranscribe/BV1tZw4zLEX8/article.md`

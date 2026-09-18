@@ -4,22 +4,22 @@ tags: ["ai_agent", "ai_career", "ai_philosophy", "moc"]
 legacy_tags: ["ai_agent", "ai_career", "ai_philosophy", "moc"]
 created: "2026-06-11"
 source: "vault_initiative - moc - ai_agent - ai_career - ai_philosophy"
-description: "AI 时代个人发展与组织转型主题横切 MOC——FDE/蜂群组织/工程师面试/产品观/智能通缩/个人焦虑，7 篇核心"
+description: "AI 时代个人、职业、组织与产品横切 MOC；新增条目按组织系统、产品体验、个人能力与人的边界组织。"
 knowledge_state: captured
 link_status: connected
 source_path: "02-Resources/哲学与自我认知/MOC - AI 时代个人发展与组织.md"
 source_sha256: "6772b35b7aacb54474f617f756fcc209b430ad3248c28c25e6a2d15098dbd32f"
 migration_id: "migration-20260720-64e79771"
-updated: 2026-08-13
+updated: 2026-09-17
 ---
 
 # MOC - AI 时代个人发展与组织
 
 > **横切 MOC**：跨 `02-Resources/AI and Agents/Agent Design & Patterns/` + `02-Resources/哲学与自我认知/` 的"AI 时代个人/职业/组织"主题笔记。
 >
-> **核心视角**（来自 [[所谓的agent开发到底是个啥岗位]]）：未来 Agent 开发岗（蜂群内最小节点）要的是"业务+技术+AI 协作"——本 MOC 围绕这个判断展开 7 篇笔记。
+> **核心视角**（来自 [[所谓的agent开发到底是个啥岗位]]）：未来 Agent 开发岗（蜂群内最小节点）要的是"业务+技术+AI 协作"——本 MOC 围绕组织、产品、职业与人的边界展开。
 >
-> 7 篇核心 + 1 篇哲学 = 完整的"AI 时代个人地图"。
+> 本 MOC 是横切视角，不按平台、作者或公司建立长期目录；具体来源笔记保留在各自的主题主目录。
 
 ---
 
@@ -30,13 +30,6 @@ updated: 2026-08-13
 | 笔记 | 来源 | 核心判断 |
 |------|------|---------|
 | [[所谓的agent开发到底是个啥岗位]] | 公众号（魔术师卡颂）| 生产力→生产关系→蜂群组织；蜂群内最小节点要"业务+技术+AI 协作" |
-| [[微软CEO-AI竞争终局与企业私有评估]] | B站视频（纳德拉 × No Priors × Latent Space）| 生态>单模型；私有评估=IP；线束/Work IQ；元工作与全栈构建者 |
-| [[Anthropic联创-AI影响比工业革命大10倍快10倍]] | B站视频（Jack Clark × Channel 4）| 10×/÷10 变局；经济指数与计算税；奉承与拟人化；航空式监管；科技银弹 |
-| [[DeepMind CEO-为什么AGI比工业革命大10倍]] | B站视频（Demis Hassabis × 20VC）| AGI=人类全认知、五年概率；算力工作台；持续学习；算法发明；Isomorphic；10×工业革命 |
-| [[DeepMind CEO-AGI倒计时2030年见分晓]] | B站视频（Garry Tan × Demis）| 预训练+RLHF 不够；持续学习缺拼图；MCTS 回归；2030 见分晓 |
-| [[DeepMind CEO-AI未来10年科学与技术发展]] | B站视频（Demis × Hannah Fry）| 科学元年、AlphaFold、世界模型、合成数据 |
-| [[OpenAI Yann Dubois-AI进步为何突然如此真实]] | B站视频（Yann Dubois）| 可靠性窗口；RL 从可验证到真实；SFT/RL 分工 |
-| [[OpenAI前副总裁-AI走出比特世界重构物理世界]] | B站视频（Liam Fedus）| 科学接口 AI；数据闭环；半导体/农业式耐心 |
 | [[万人大厂宣布裁员 40% 利润在涨人却多余了]] | 公众号（极客公园）| 智能替代螺旋、AI 替代需求创造者、2025-2028 危机时间轴、UBI |
 
 ### 岗位层（个人 / 实践）
@@ -44,7 +37,6 @@ updated: 2026-08-13
 | 笔记 | 来源 | 核心判断 |
 |------|------|---------|
 | [[硅谷今年最火的岗位 FDE，我们闷头干了三年]] | 公众号（佳芮）| FDE = 蜂群最小节点在中国 AI to B 的活样本；按结果收费；7 个产品基建 |
-| [[OpenAI团队-FDE工程师的未来]] | B站视频（Finn × OpenAI/Ramp/Nominal/Dataland）| 剑与盾护路线图；模型越强越要进现场；post-training 飞轮；激进所有权 |
 | [[AI 时代如何面试工程师]] | 公众号（柯芃丞）| 从 Coder 到 Engineer；6 项核心能力 + 1 项元能力（好奇心）|
 | [[Agent 越用越翻车，怎么破局？答案藏在经典管理学里]] | 公众号（三元同学）| TRM + 锚定效应 + 苏格拉底提问 + 过度设计 + 瓶颈思维 5 大心法 |
 
@@ -61,7 +53,6 @@ updated: 2026-08-13
 |------|------|---------|
 | [[用AI的这三年，想跟你分享这9条心得]] | 公众号（卡兹克）| 花钱用最好的模型 / 每周自动化 / 实习生思维 / 品味护城河 / 把时间还给现实的人 |
 | [[The Founders Playbook - 打造 AI 原生创业公司]] | Anthropic 英文指南（中文翻译）| 创始人四阶段方法论：Idea/MVP/Launch/Scale；三能力（研究/编程/工作流）；AI 原生 vs 传统 |
-| [[LCA-60分钟变成AI-Native]] | B站视频（LCA）| People + Agents + Context；Skill Chain；Brain 闭环；60 分钟 org 改造 playbook |
 
 ### 哲学 / 自我认知层
 
@@ -106,6 +97,82 @@ updated: 2026-08-13
 
 ---
 
+### P1-A-02（2026-09-18）
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[Anthropic CPO-Claude团队为什么迭代这么快]] | AI 原生产品、快速反馈、发布节奏与团队角色 |
+
+### P1-A-03（2026-09-18）
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[ElevenLabs联创-语音AI现状与未来]] | 语音模型商品化、产品形态、生态与企业增长 |
+| [[Every增长主管-Codex成为知识工作的OS]] | Codex 管理界面、复合知识、审阅流与知识工作组织 |
+
+### P1-A-04（2026-09-18）
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[Notius创始人-AI研究工具与检索]] | 垂直 AI 的组织角色、领域专家、评估者与架构师 |
+| [[Peter Yang-Agent未来与职场内耗]] | 代理界面、任务型 App、超级个体与组织对齐 |
+| [[Taven创始人-将OpenClaw嵌入产品的实战经验]] | Agent=Goals+Context+Tools、产品嵌入与客户专属 Agent |
+
+
+### P1-B-01（2026-09-18）
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[给每位员工配备AI智能体]] | 一人一 Agent、信任传递与公开协作 |
+| [[黄仁勋-成就英伟达的心态]] | 技术路线、系统思维与组织能力 |
+| [[李飞飞-10年后只有两种工作]] | 空间智能、教育分化与个人能动性 |
+| [[前Paypal高管-PM正在消失]] | 枪管型人才、客户反馈与组织并行能力 |
+| [[圆桌讨论-打造世界级AI原生团队]] | AI 原生 SDLC、角色融合与远程协作 |
+| [[a16z-AI并非泡沫]] | AI 供给、渗透率与价值捕获 |
+| [[a16z合伙人-智能体时代的无头软件与企业粘性]] | API、业务规则、例外处理与企业软件护城河 |
+| [[a16z前合伙人-关于AI最理性简介]] | 基础模型商品化、分发与个人策略 |
+| [[Agent实战-Greg Isenberg 智能体即新SaaS]] | 结果定价、最小可用 Agent 与评估集 |
+| [[AI创业思路-9个最大的AI创业点子]] | Agent-first 产品与线下真实连接 |
+| [[Alexandr Wang-智能普及之后愿景成为瓶颈]] | 人才密度、反馈循环、创业愿景与系统思维 |
+| [[Anthropic Labs负责人Mike Krieger-构建AI原生产品的两个思想实验]] | 产品全局观、模型增长、环境与效果定价 |
+| [[Block业务主管-裁员40%后与Goose代理运转]] | 小团队、代理编排、合规与认知深度 |
+| [[Brex CEO-打造首位全职AI CEO]] | CEO 工作流、Agent 授权与公司精神 |
+| [[Brex CEO-最痴迷AI的CEO]] | 首席 AI 官、流程重构与 Agent 自进化 |
+
+
+### P1-B-02（2026-09-18）
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[Chatbase CEO-117天实现百万ARR]] | GPT 包装器到 Agent 平台、自力更生与增长 |
+| [[Claude增长主管-Claude增长19倍]] | 指数增长、产品价值与增长策略 |
+| [[Dan Koe-多重兴趣变成一人公司]] | 研究、包装、系统化输出与个人杠杆 |
+| [[Dan Koe-理解人性是抗AI淘汰的终极元技能]] | 人性、叙事、说服力与个人长期能力 |
+| [[ElevenLabs与Lovable CEO-坐上AI火箭]] | 创始人模式、授权、人才与创业节奏 |
+| [[Every CEO-全员AI后员工数翻3倍]] | 自动化悖论、专家价值与组织扩张 |
+| [[Every CEO-AI越强大工作也越多]] | 公司级 Agent、监督工作与产品角色 |
+| [[Gamma CEO-21亿AI创业 靠团队与PLG]] | PMF、PLG、留存付费与克制招聘 |
+| [[Giga联创-为什么拒绝高薪去创业]] | 创业选择、小团队、信任与 Agent 迭代 |
+| [[Harvey CEO-31岁运营百亿法律AI公司]] | 优先级、双向门决策、韧性与 AI 行业创业 |
+| [[Intercom首席-全员AI转型实践]] | Claude Code、内部技能、PR 自动批准与组织转型 |
+| [[Linear CEO-把AI Agent当一级员工]] | 组织上下文、共享沙盒、质量门槛与 Agent 产品 |
+| [[Meta前高管-一半产品经理为何陷入困境]] | PM 回归建造者、AI 优先招聘与判断力 |
+| [[Notion CEO-AI原生组织像爵士乐队]] | 招聘、品味、能动性与非军乐队组织 |
+
+### P1-B-03（2026-09-18）
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[OpenAI官方-AI各行业落地]] | 多智能体、医疗、企业效率与 AI 经济 |
+| [[OpenAI团队-FDE工程师的未来]] | 客户现场、后期训练飞轮、软件与咨询经济 |
+| [[Replit CEO-建设者与布道者两种人]] | 活代码、领域专家、Agent 并行与企业自建 |
+| [[SaaS投资人-开源AI崛起 闭源巨头承压]] | 开源模型、人才、资本开支与企业 ROI |
+| [[Snap CEO-软件无护城河分发才是]] | 分发、生态、扁平组织与 AI 设计交付 |
+| [[Speechify CEO-从100位CEO学到经验]] | 增长套利、CEO 学习、代币成本与异步文化 |
+| [[USV合伙人Mike Mignano-应用层时代与智能体利益对齐]] | 应用层、商业模式、Harness 与 Agent 利益 |
+| [[Vercel COO-2026世界级GTM与推广工程师]] | GTM 产品化、DealBot 与销售工作流 |
+| [[Whatnot CPO-产品经理不该成为团队的默认配置]] | 问题导向 PM、判断力、招聘与 IC 管理 |
+
 ## 跨 MOC 链接
 
 | 横切主题 | MOC |
@@ -124,109 +191,76 @@ updated: 2026-08-13
 
 | 文章 | 核心主题 |
 |------|---------|
-| [[Linear CEO-把AI Agent当一级员工]] | Karri：零 Bug 政策、慢思考快执行、共享 Agent 沙盒（**canonical v3.2** ✓） |
 | [[Claude Code负责人-AI原生团队如何使用AI]] | Dogfooding 实践、AI 优先的工作流 |
 | [[WorkOS-创建和使用Skills方法论]] | Skills at scale：DRY 进 agentic era、MCP 安全、可移植工作单元 |
 | [[5次创业者-AI智能体独自经营初创公司]] | R2/ClawChief 幕僚长 + Devin playbook；先建 SDLC 再放量 |
-| [[圆桌讨论-打造世界级AI原生团队]] | 圆桌：AI 原生团队组织（**canonical v3.2** ✓） |
-| [[Intercom首席-全员AI转型实践]] | Intercom 全员 AI 转型（**canonical v3.2** ✓） |
 | [[YC合伙人-YC内部AI代理基础设施]] | Pete Koomen：组织超级智能、350+ 工具注册表、Dream cycle（**canonical v3.2** ✓） |
-| [[Notion CEO-AI原生组织像爵士乐队]] | Ivan Zhao：爵士 vs 军乐队、杠铃招聘、CEO 亲手构建（**canonical v3.2** ✓） |
-| [[Block业务主管-裁员40%后与Goose代理运转]] | Block：Goose 框架、Builder Bot、裁员后 AI 运转（**canonical v3.2** ✓） |
 | [[AI 主导的项目和人主导的区别 - 魔术师卡颂]] | monorepo + 统一 CLI 流程；各端差异收敛到工具层 |
 | [[Codex 负责人-所有人都是 builder 是个很糟糕的主意 - Founder Park]] | 实现廉价后 taste/策展最贵；反对取消 PM；zone defense 协作 |
-| [[a16z-AI并非泡沫]] | 供给约束非泡沫、token path、native vs skeuomorphic 产品 |
-| [[OpenAI健康团队-AI在医疗领域的进展]] | Healthbench、临床对话、HIPAA、幻觉上限 |
-| [[OpenAI总裁-GPT5.5与下一阶段AI发展]] | Greg Brockman：Spud/GPT-5.5、监督代理团队、计算驱动经济（**canonical v3.2** ✓） |
-| [[Harvey CEO-31岁运营百亿法律AI公司]] | Winston Weinberg：优先级文档、双向门、法律 AI 幂律（**canonical v3.2** ✓） |
-| [[黄仁勋-英伟达护城河与计算驱动经济]] | Jensen：电子→代币、CUDA 飞轮、能源瓶颈（**canonical v3.2** ✓） |
-| [[Vercel COO-2026世界级GTM与推广工程师]] | Jeanne Grosser：GTM 即产品、推广工程师 10×（**canonical v3.2** ✓） |
-| [[Replit CEO-建设者与布道者两种人]] | Amjad Masad：活代码、领域专家 > 程序员（**canonical v3.2** ✓） |
-| [[Meta前高管-一半产品经理为何陷入困境]] | Nikhyl Singhal：PM 从传话筒到建造者（**canonical v3.2** ✓） |
-| [[ElevenLabs与Lovable CEO-坐上AI火箭]] | Mati × Anton：欧洲 AI 创业、授权与拒绝（**canonical v3.2** ✓） |
-| [[Claude增长主管-Claude增长19倍]] | Amol：线性增长过时、有益摩擦、Cash 自动化增长、迷你 PM、笔记本频道（**canonical v3.2** ✓） |
-| [[前Paypal高管-PM正在消失]] | Keith Rabois：枪管与弹药、未被发现的人才、PM 过时、公开批评、速度至上（**canonical v3.2** ✓） |
-| [[Brex CEO-打造首位全职AI CEO]] | Pedro：虚拟员工吉姆、Crabtrap 安全架构、信号摄取、精神高于技术（**canonical v3.2** ✓） |
-| [[OpenAI总裁-AI自我改进与AGI路线]] | Greg Brockman：战略收缩、超级应用、算力是收入、自动化研究员、起飞（**canonical v3.2** ✓） |
-| [[Lex Fridman-2026年AI现状与展望]] | Lex Fridman 播客：2026 年 AI 现状与展望 |
 | [[杨植麟-Kimi K2.5研发内幕]] | 杨植麟 GTC 演讲：Kimi K2.5 的研发内幕 |
 | [[杨立昆-世界模型才是未来]] | 杨立昆：继续对 LLM 开炮，世界模型才是未来 |
-| [[马斯克-2026最新访谈-奇点临近]] | 马斯克 2026 最新访谈：信息量极大，奇点临近，AGI 2026 到来 |
-| [[黄仁勋-从生成到代理计算]] | 黄仁勋最新访谈：从生成到代理计算，需求再翻千倍 |
-| [[马斯克-xAI内部复盘与规划]] | 马斯克：xAI 内部复盘与规划 |
-| [[Sam Altman-AI海啸已来]] | Sam Altman：AI 海啸已来，社会如何准备 |
 | [[OpenAI首席科学家-超越代码的强化学习]] | OpenAI 首席科学家：超越代码的强化学习 |
-| [[Nebius联创-AI基建无泡沫]] | Nebius 联创：AI 基建无泡沫，全栈交付是关键 |
-| [[Mistral首席科学家-微调比闭源更优]] | Mistral 首席科学家：微调比闭源模型更具竞争优势 |
 | [[Eric Jang-从零构建AlphaGo]] | 从零开始构建 AlphaGo – Eric Jang |
-| [[C++之父-AI代码的局限性]] | C++ 之父：贝尔实验室往事，AI 代码的局限性 |
-| [[Every CEO-全员AI后员工数翻3倍]] | Every CEO：全员 AI 后，员工数翻了 3 倍 |
-| [[Postgres之父-LLM不会取代关系数据库]] | Postgres 之父：LLM 不会取代关系数据库 |
 | [[杨立昆-LLM到不了AGI世界模型才能]] | 杨立昆：LLM 到不了 AGI，世界模型才能 |
 | [[DeepMind播客-AlphaGo10周年AI转折点]] | DeepMind 播客：AlphaGo 10 周年，AI 的转折点 |
 | [[Abridge-监听1亿次医生诊疗的AI]] | Abridge：正在监听 1 亿次医生诊疗的 AI |
 | [[Ulta副总裁-AI Agent落地零售行业实践]] | Ulta 副总裁：AI Agent 落地零售行业实践 |
 | [[xAI研究员-从零构建视频模型的内幕]] | xAI 研究员：xAI 从零构建视频模型的内幕 |
-| [[a16z创始人-浏览器末日与OpenClaw]] | a16z 创始人：程序员末日，Pi 与 OpenClaw |
-| [[Every CEO-AI越强大工作也越多]] | Every CEO：AI 越强大，工作也越多 |
-| Giga创始人-为什么拒绝孙正义创业（待收录） | Giga 创始人：为什么拒绝孙正义，去做创业 |
-| GPT Image2深度体验-新突破（待收录） | GPT Image2 深度体验：AI 生图领域新突破 |
+| [[GPT Image2深度测评-AI生图进化]] | GPT Image2 深度体验：AI 生图领域新突破 |
 | [[Stripe设计主管-用AI设计新网站]] | Stripe 设计主管：如何用 AI 设计我们的新网站 |
-| [[Chatbase CEO-117天实现百万ARR]] | Chatbase CEO：如何 117 天实现百万 ARR |
-| OpenAI总裁-AI要让每个人都受益（待收录） | OpenAI 总裁：AI 要让每个人都受益，是 AGI 之路 |
-| Snap CEO-面对增长还是失败的选择（待收录） | Snap CEO：面对增长还是失败的选择 |
-| [[arc创始人-只靠Scaling Law到不了AGI]] | arc 创始人：只有 Scaling Law 能到达 AGI |
-| [[OpenAI总裁-AI即将迎来爆发式增长]] | OpenAI 总裁：AI 即将迎来爆发式增长 |
-| [[李飞飞-10年后只有两种工作]] | 李飞飞：10 年后只有两种工作 |
 | [[Seedance实战-AI视频可控编辑]] | Seedance 实战：AI 视频转向可控编辑 |
 | [[OpenAI官方-GPT Image2.0演示]] | OpenAI 官方：重磅！GPT Image2.0 现场演示 |
 | [[Granola联创-AI笔记软件应该这样]] | Granola 联创：AI 时代的笔记软件应该这样 |
-| Claude深度功能-19种测试统计准确性（待收录） | Claude 深度功能：Claude 代码的 19 种测试统计准确性 |
-| [[Google IO-两场关于AGI的对赌]] | Google I/O：两场关于 AGI 的对赌 |
-| [[Alex Wang-加入Meta10个月幕后故事]] | Alex Wang：加入 Meta 10 个月幕后故事 |
-| [[陶哲轩-当最强大脑遇上宇宙终极难题]] | 陶哲轩：当最强大脑遇上宇宙终极难题 |
-| [[AI创业思路-9个最大的AI创业点子]] | AI 创业思路：9 个最大的 AI 创业点子 |
 | [[一人公司案例-开发5个APP的AI技能]] | 一人公司案例：开发 5 个 APP 的 AI 技能 |
-| [[OpenAI官方-AI各行业落地]] | OpenAI 官方：AI 各行业落地 |
-| [[Snap CEO-软件无护城河分发才是]] | Snap CEO：软件无护城河，分发才是 |
-| [[SaaS投资人-开源AI崛起 闭源巨头承压]] | SaaS 投资人：开源 AI 崛起，闭源巨头承压 |
-| [[Gamma CEO-21亿AI创业 靠团队与PLG]] | Gamma CEO：21 亿 AI 创业，靠团队与 PLG 跑通 PMF |
-| [[Astral创始人-智能体让PR成本归零 人类审查成瓶颈]] | Astral 创始人 Charlie Marsh：智能体让 PR 成本归零，人类审查成瓶颈；前置自动化校验+Codex Review 成 harness 不变量 |
-| [[Cursor实战-零代码构建语音助手Jarvis]] | Cursor 实战：零代码用 Cursor + GPT Realtime 2 构建语音助手 Jarvis，企业智能体原生路径 |
-| [[Every咨询主管-每天用Codex 重塑工作流]] | Every 咨询主管 Natalia：知识工作即园艺，Codex 让非技术者零摩擦建工具，但确定性软件该买别用 AI 重写 |
-| [[OpenAI总裁-聊天与Agent的融合计划]] | OpenAI 总裁 Greg Brockman：聊天→Agent 融合成超级应用，信任是核心壁垒，算力最稀缺、扩展定律未见顶 |
-| [[Agent实战-Greg Isenberg 智能体即新SaaS]] | Agent 实战：Greg Isenberg 拆解智能体即新 SaaS，卖工作结果不卖工具，MUA+外壳+评估集建信任 |
-| [[Rely AI 创始人-智能体可验证持续学习 不用微调]] | Rely AI 创始人 Soheil Feizi：可验证持续学习（VCL），日志升格为可重现环境，回归感知优化不遗忘 |
-| [[OpenAI PM-Rohan Varma 用Codex 研发产品]] | OpenAI PM Rohan Varma：Codex 倒置开发流程、自配置自动化、Goal 模式自主合并 PR，PM 退到战略护栏 |
-| [[Cerebras CEO-Andrew Feldman AI不是泡沫而是缺货]] | Cerebras CEO Andrew Feldman：AI 非泡沫而是缺货，HBM 瓶颈、SRAM 路径、慢速推理市场为零、能源定胜负 |
-| [[Vercel 团队-Nico Albanese 给智能体一台电脑]] | Vercel Nico Albanese：代理运行时三支柱(指令/工具/沙盒)、持久化沙盒、子代理压缩、文件系统记忆优于 RAG |
-| [[Matthew Berman-最佳 Vibe Coding 工作流]] | Matthew Berman：agents.md 规则+技能封装+自动化循环+修复飞轮，云端并行智能体的合并瓶颈与 work tree 策略 |
-| [[Peter Yang-Hermes 打造 24 小时数字员工]] | Peter Yang：Hermes 部署为 24h 幕僚长——Mac Mini 常开、Telegram、soul.md 个性、Google Workspace、Cron 主动例行 |
-| [[Hyperframes-HeyGen 用 HTML 代码做 AI 视频]] | Hyperframes(HeyGen)：用 HTML 生成 AI 视频，website-to-video 技能、frame.md 视觉规范、Studio 代码diff协同、与 Hermes 整合 |
+
+## 按问题空间补充：分类治理批次（2026-09-17）
+
+### 组织系统与经营机制
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[Cursor人才负责人-高人才密度团队招聘方法论-20260916]] | 招聘最小单位是人；定义前 1% 标准、双向验证与人才密度 |
+| [[OpenClaw实战-Every团队使用Case]] | 一人一 Agent、代理社交、信任阶梯与团队涌现 |
+| [[Polsia-一人AI Agent月入百万]] | 一人公司、结果抽成、代理原生基础设施与自证式开发 |
+| [[a16z-ai时代-投资和资产配置-e65c7283]] | 资本配置、AI 市场规模、软件转型与组织飞轮 |
+| [[cloudflare-ceo-ai的访问流量要超过人了-怎么办-a46c1787]] | 代理访问、互联网商业模式、基础设施与信任 |
+| [[max-hodak-深科技组织操作系统-e4063a4b]] | 采购、成本归因、招聘、绩效与组织反馈系统 |
+| [[stripe-token-新的美元-adcb8ce1]] | 代理商务、金融基础设施、机器身份与预算治理 |
+| [[wispr增长负责人-用ai打造一台1亿美元增长引擎-a4b9750d]] | PLG、归因、增长 Agent 与系统型团队 |
+
+### 产品体验与设计判断
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[anthropic设计负责人-agi至上的-产品设计-83503ae9]] | AI 原生产品设计、原型文化、组织共识与人的判断 |
+| [[openai设计负责人-最佳设计师时代-b53692ba]] | AI 设计反馈、产品判断、角色责任与界面演化 |
+| [[portola-ceo-ai伴侣-01fb89c3]] | AI 产品关系、记忆、延迟、角色体验与增长 |
+| [[代理时代的设计方法-6b140cee]] | 设计到代码、视觉资产、共同事实与人的取舍 |
+
+### 个人能力与职业反馈
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[Every-Kieran-复利工程与单人杠杆]] | 单人工程的复利循环；把判断、品味与反馈沉淀到工作流 |
+| [[TypeScript创始人-AI与软件工程师的责任边界-20260916]] | 工程师责任、代码审查、AI 监督与培养链不能断 |
+| [[GitHub COO-为什么程序员还没被替代]] | 开发者身份、代理 PR、模型路由与个人 Agent 反馈 |
+| [[garry-tan-个人agi-a9b8ffba]] | 个人上下文、Skills、认知所有权与行动闭环 |
+| [[skills-ai-agents-管理生活-13ff1907]] | 个人技能资产、分发、技能链与持续改进 |
+| [[superhuman-ceo-ai时代晋升-取决于提出关键问题的能力-c36aece2]] | 晋升、管理、判断、作品与 AI 工作流 |
+
+### 人的边界与哲学视角
+
+| 笔记 | 关联机制 |
+|---|---|
+| [[e45-人何以自处-复习整理版-3c22f102]] | AI 时代的自我、品味、判断与人的不可外包部分 |
 
 ### Easonlee B 站专栏精华（canonical v2，2026-08-13 批量收录）
 
 | 文章 | 核心主题 |
 |------|---------|
-| [[黄仁勋-成就英伟达的心态]] | Jensen：英伟达核心心态——韧性、长期主义、第一性原理 |
-| [[Arize创始人Jason-如何开发自我改进的Agent]] | Arize Jason：在线评估叠加追踪，驱动 Agent 自我改进闭环 |
-| [[Claude Code成员Tariq-40分钟讲清楚Loop Engineering]] | Tariq：Claude Code 的 Loop Engineering 与 Compound 任务管理 |
-| [[Whatnot CPO-产品经理不该成为团队的默认配置]] | Tom Verrilli：PM 跟着问题流动而非按人头配置，资深 PM 做 IC |
-| [[Alexandr Wang-智能普及之后愿景成为瓶颈]] | Alexandr Wang：智能普及之后，愿景与抱负成为瓶颈 |
-| [[Anthropic Labs负责人Mike Krieger-构建AI原生产品的两个思想实验]] | Mike Krieger：构建 AI 原生产品的两个思想实验 |
-| [[OpenAI研究主管Mark Chen-研究品味是人类的终极壁垒]] | Mark Chen：研究品味是人类的终极壁垒，评测团队隔离防刷榜 |
-| [[OpenAI研究员Noam Brown-测试时算力让评估与安全失效]] | Noam Brown：测试时算力让评估与安全框架失效，时间是瓶颈 |
-| [[Dan Koe-理解人性是抗AI淘汰的终极元技能]] | Dan Koe：理解人性是抗 AI 淘汰的元技能（三大张力+五大杠杆）|
-| [[生物医学家Derya-AI模拟生命与科学3.0]] | Derya：AI 建模生物复杂性，数字孪生与科学 3.0 智能体闭环 |
-| [[USV合伙人Mike Mignano-应用层时代与智能体利益对齐]] | Mike Mignano：应用层黄金时代，初创拉满 token，智能体利益对齐 |
-| [[Riley Brown-Fable 5与Paper的智能体原生设计流]] | Riley Brown：Claude Code+Paper 智能体原生设计流，MCP 控制画布一键部署 |
-| [[SpaceX早期投资人Steve Jurvetson-AI未来三年与指数变革]] | Steve Jurvetson：130 年算力指数是颠覆根基，自主强化学习是突破口 |
-| [[a16z合伙人-智能体时代的无头软件与企业粘性]] | a16z：智能体时代无头软件，企业粘性在固化业务逻辑与合规 |
-| [[Cognition的Jared-智能体构建原则与云端异步协同]] | Cognition Jared：智能体构建原则，云端异步主从协同多智能体 |
-| [[Together AI Rishabh-实时语音智能体的架构与工程权衡]] | Together AI Rishabh：实时语音智能体流水线架构与延迟工程权衡 |
 
 ## 维护
 
-- **总笔记数**：9 核心 + 86 行业观点/访谈（2026-08-13 复核目录实数；Easonlee B 站专栏精华批量收录 +16，原 79 为 2026-07-15 迁入基数）
-- **最后更新**：2026-08-13（批量收录 Easonlee B 站专栏精华 16 篇并补登 S-tier 索引）
+- **笔记范围**：核心/行业来源与按问题空间补充批次；具体数量以链接审计为准
+- **最后更新**：2026-09-17（分类治理批次接入）
 - **入选标准**：笔记主题直接讨论"AI 时代下的人/职业/组织/自我认知"（不是 Agent 本身的实现细节）

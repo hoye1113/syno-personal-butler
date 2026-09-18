@@ -8,7 +8,7 @@ description: "Ralph Loops长视频与无时间戳ASR的四锚点事实抽样。"
 
 # Spot check 工作表：Geoff：Ralph Loops 的基础设施
 
-- **Vault**: `02-Resources/AI and Agents/B站视频知识库/Agent架构与平台/Geoff-Ralph Loops的基础设施.md`
+- **Vault**: `02-Resources/AI and Agents/Harness Context & Reliability/Geoff-Ralph Loops的基础设施.md`
 - **时长**: 77:14
 - **spot_check**: （未登记）
 - **transcript_source**: `bilibili-retranscribe/BV1H59yBFECR/article.md`

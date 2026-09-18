@@ -1,6 +1,6 @@
 # Spot check 工作表：Claude Code实战：构建一个AI数据分析师
 
-- **Vault**: `02-Resources/AI and Agents/B站视频知识库/Agent架构与平台/Claude Code实战-构建一个AI数据分析师.md`
+- **Vault**: `02-Resources/AI and Agents/AI Coding & Tools/Claude Code实战-构建一个AI数据分析师.md`
 - **时长**: 51:46
 - **spot_check**: （未登记）
 - **transcript_source**: `Recastory/workspace/bilibili-retranscribe/BV1Mpf9B5Egk/article.md`

@@ -8,7 +8,7 @@ description: "Karpathy长访谈与无时间戳ASR的四锚点事实抽样。"
 
 # Spot check 工作表：Karpathy：Code Agent 与 Auto Research
 
-- **Vault**: `02-Resources/AI and Agents/B站视频知识库/Agent架构与平台/Karpathy-Code Agent与Auto Research.md`
+- **Vault**: `02-Resources/AI and Agents/Agent Architecture & Runtime/Karpathy-Code Agent与Auto Research.md`
 - **时长**: 66:32
 - **spot_check**: （未登记）
 - **transcript_source**: `Recastory/workspace/bilibili-retranscribe/BV1dwAczDEXY/article.md`

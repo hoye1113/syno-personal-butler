@@ -8,7 +8,7 @@ description: "Neo4J长视频与无时间戳ASR的四锚点事实抽样。"
 
 # Spot check 工作表：Neo4J CEO：如何将文档转化为知识
 
-- **Vault**: `02-Resources/AI and Agents/B站视频知识库/Agent架构与平台/Neo4J CEO-文档转化为知识.md`
+- **Vault**: `02-Resources/AI and Agents/Agent Architecture & Runtime/Neo4J CEO-文档转化为知识.md`
 - **时长**: 48:53
 - **spot_check**: （未登记）
 - **transcript_source**: `bilibili-retranscribe/BV1Dd9CBGEmK/article.md`
