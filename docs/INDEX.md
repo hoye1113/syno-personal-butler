@@ -2,7 +2,7 @@
 
 本文只负责说明文档分类、唯一权威性和当前状态；具体产品规则以对应 Normative 文档为准。
 
-2026-09-01 Owner 决策产品范围收敛为搜索、收录、深度探索分析、知识库查找与今日灵感；学习子系统与项目子系统已物理移除（`f23954d`、`ec068b9`），用户入口只允许更改知识库（`e49a66c`、`b634efd`）。同日完成知识仓库拆分（D13）：`vault/` 与 `ops/` 已迁入独立知识仓库，代码仓库由 `SYNO_KNOWLEDGE_ROOT` 指向它，未设置时回退单库形态。当前唯一执行事实源是 `docs/product-slimming-and-inspiration-plan.md`。Project-aware Knowledge MVP 已关闭为 SUPERSEDED，其计划文档与知识仓 `ops/acceptance/project-aware-knowledge-mvp/` 证据仅作历史追溯。
+2026-09-01 Owner 决策产品范围收敛为搜索、收录、深度探索分析、知识库查找与今日灵感；学习子系统与项目子系统已物理移除（`f23954d`、`ec068b9`），用户入口只允许更改知识库（`e49a66c`、`b634efd`）。2026-09-18 完成单仓迁移：`vault/` 与 `ops/` 已回到本仓库并由同一个 Git 事实源管理；生产环境不设置 `SYNO_KNOWLEDGE_ROOT`，该变量仅保留为回滚兼容入口，D13 拆库记录作为历史追溯。当前唯一执行事实源是 `docs/product-slimming-and-inspiration-plan.md`。Project-aware Knowledge MVP 已关闭为 SUPERSEDED，其计划文档与知识仓 `ops/acceptance/project-aware-knowledge-mvp/` 证据仅作历史追溯。
 
 ## Normative
 

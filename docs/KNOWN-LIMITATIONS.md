@@ -1,13 +1,13 @@
 # Syno 已知限制
 
-更新日期：2026-09-01
+更新日期：2026-09-18
 
 ## 2026-09-01 产品精简与拆墙（当前状态）
 
 - 学习子系统与项目子系统已整体物理移除（`f23954d`、`ec068b9`）：`learning.*`/`projects.*` 工具、`/project` 指令、Job/Workflow/Note 的 projectRef 传播与检索加权均不再存在。历史 ops 记录（含 `ops/projects/*.md` 与学习相关记录）保留只读；新记录不再写入 projectRef/project_refs，旧记录中这些字段被读取方忽略。
 - Project-aware Knowledge MVP 已关闭为 SUPERSEDED（Owner 2026-09-01 产品方向决策），Owner 主观召回观察不再回填；live 证据保留在 `ops/acceptance/project-aware-knowledge-mvp/` 仅作追溯。下文 2026-08-26 起关于 Project 边界的描述均为历史记录。
 - 用户入口边界已结构性加固（`e49a66c`、`b634efd`）：`code_change` 意图、`allowSelfModify`/`allowSystemControl` 开关与 Windows 服务安装/卸载操作已物理删除——不是开关关闭，而是代码不存在，没有任何配置能让聊天入口改代码或控制系统。模型可声明的写入路径只有 `vault/**`；`ops/` 仅系统内部固定记录器写入；自动提交只准暂存 `vault/**`、`ops/**`，永不自动 Push。
-- 知识仓库已拆出（2026-09-01 D13，`24e97af`+`97e557a`、删除提交 `60a8c43`）：`vault/` 与 `ops/` 现居独立知识仓库（本机 `D:\workSpace\syno-knowledge`），代码仓库经用户级 `SYNO_KNOWLEDGE_ROOT` 指向它，未设置时回退单库形态（新机器 fresh clone 零配置可跑）。**旧分支地雷**：不得从拆库前（<`60a8c43`）的分支/提交启动 Host——旧代码会在代码仓库根就地重建 `vault/`/`ops/` 并写入，与知识仓双轨漂移。回滚预案见 `docs/OPERATIONS.md`「知识仓库拆分」。
+- 知识仓库已在 2026-09-18 完成单仓迁回：`vault/` 与 `ops/` 现由本代码仓 Git 和远端统一管理，生产环境不设置 `SYNO_KNOWLEDGE_ROOT`，planner 的 `vaultRoot` 指向本仓根目录。外部 `D:\workSpace\syno-knowledge` 与 `D:\workSpace\syno-knowledge-backup-20260918` 仅作为冻结回滚副本保留，不应继续产生生产写入；旧 D13 拆库提交只作历史追溯。回滚预案见 `docs/OPERATIONS.md`「知识库单仓运行与回滚」。
 - 当前唯一执行事实源为 `docs/product-slimming-and-inspiration-plan.md`；当轮回归基线快照见 `NEXT_SESSION.md`。
 
 ## 发布门槛状态

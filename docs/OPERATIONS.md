@@ -2,20 +2,18 @@
 
 ## 状态分层
 
-- 知识仓库（`SYNO_KNOWLEDGE_ROOT`，本机 `D:\workSpace\syno-knowledge`）：Git 跟踪 `vault/`、`ops/`——长期知识与全部运行记录的事实源。
-- 代码仓库（本仓）：Git 跟踪 `contracts/`、`config/`、应用源码、脚本与文档；拆库后不含 vault/ops（`.gitignore` 防御性排除）。
+- 单仓（本仓）：Git 同时跟踪 `contracts/`、`config/`、应用源码、脚本、文档、`vault/` 和 `ops/`——长期知识与全部运行记录共用一个事实源和远端。
 - 本地可重建：`.runtime/` 的索引、锁、队列快照、投递通知和临时状态。
 - 本地敏感：`%LOCALAPPDATA%\Syno\credentials` 的 DPAPI 凭据；严禁复制到仓库、日志或工单。
 - 本地持久：对话、等待重试的 Job、未完成摄取状态。清理前先停 Syno Host 并备份。
 
-## 知识仓库拆分（2026-09-01，D13）
+## 知识库单仓运行与回滚（2026-09-18）
 
-- 布局：知识仓根 = `vault/` + `ops/` 原样平移，全部逻辑路径（`vault/...`、`ops/...`）不变；代码仓经 `SYNO_KNOWLEDGE_ROOT`（用户级环境变量）找到知识仓，未设置时回退单库模式（行为与拆库前一致，fresh clone 与测试用此形态）。
-- 管家的全部读写与产品提交只落在知识仓 `main`：GitGuard 默认根即知识仓，且主检出非 `main` 时拒绝产品提交（`productBranch` 断言）；Job 隔离 worktree 仍在代码仓 `.worktrees/`（知识仓零杂物）；git 锁恒在代码仓 `.runtime/locks/`。
-- 运行态依赖：Host 进程环境须含 `SYNO_KNOWLEDGE_ROOT`（用户级变量，计划任务登录启动自动继承）；planner 的 `topic-planner.config.json`（`%LOCALAPPDATA%\Syno\state\`）的 `vaultRoot` 指向知识仓根。改代码后按 runbook 重拉 Host（kill + 自监督重启或 `Start-ScheduledTask Syno`）。
-- 地雷：不要从拆库前（`< 60a8c43`）的历史分支/提交启动 Host——旧代码不含知识根解析，会把代码仓当单库写；也不要在代码仓 checkout 旧分支后启动（旧分支会把 vault/ops 跟踪内容还原到代码仓工作树）。
-- 回滚预案：停止 Host → 清除 `SYNO_KNOWLEDGE_ROOT` 用户变量 → 代码仓 `git revert 60a8c43`（vault/ops 从删除前快照还原）→ planner vaultRoot 改回代码仓根 → 重启 Host。知识仓在拆库后的新提交需先 cherry-pick 或手工并回。
-- 旧历史：代码仓 `60a8c43` 之前的历史完整保留拆库前 vault/ops 内容，即旧知识档案；cutover 前全量备份 bundle 在 `C:\tmp\syno-pre-split-24e97af.bundle`（36MB）。filter-repo 提取知识历史为备选，未执行。
+- 布局：本仓根目录 = `vault/` + `ops/` + 产品代码，全部逻辑路径（`vault/...`、`ops/...`）保持不变；当前生产事实源只有本仓一个 Git 工作区和一个远端。
+- 运行态：生产环境必须不设置 `SYNO_KNOWLEDGE_ROOT`，`apps/syno/syno/paths.mjs` 会回退到 `REPO_ROOT`；planner 的 `%LOCALAPPDATA%\Syno\state\topic-planner.config.json` 中 `vaultRoot` 指向本仓根目录。代码仍保留该环境变量解析，仅用于故障回滚到外部副本。
+- 写入与提交：管家的知识读写、Job/Proposal/事件记录和产品提交都落在本仓；产品分支保护仍由 GitGuard 执行，Job 隔离 worktree 仍位于本仓 `.worktrees/`，锁仍位于本仓 `.runtime/locks/`。
+- 回滚预案：停止 Host → 恢复 `SYNO_KNOWLEDGE_ROOT=D:\workSpace\syno-knowledge` 与 planner 的外部 `vaultRoot` → 必要时从 `D:\workSpace\syno-knowledge-backup-20260918` 恢复未提交工作树 → 重启 Host。迁移分支保留，不使用 `git reset --hard` 或强制推送。
+- 旧拆库记录：D13（2026-09-01）及外部 `D:\workSpace\syno-knowledge` 仍作为冻结回滚副本保留，不再作为生产写入目标；迁移前 Git bundle 位于 `D:\workSpace\syno-knowledge-backup-20260918\syno-knowledge-1a6892f.bundle`。
 
 ## 备份
 
