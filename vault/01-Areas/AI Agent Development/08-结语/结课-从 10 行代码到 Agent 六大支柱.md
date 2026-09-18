@@ -7,7 +7,7 @@ source: "https://sitor.cc/courses/agent-fundamentals/33-end"
 description: "本文是 Sitor AI Agent 入门课程的结课篇，用一段 10 行 while 循环回看整门课，指出 Agent 的本质就是'模型在何时被调用、该喂给它什么信息'这一核心问题，并串起 Loop、Context、Tool、Memory、Multi-Agent、Harness 六大支柱。"
 knowledge_state: captured
 link_status: connected
-source_path: "01-Areas/AI Agent Development/08-结语/结课：从 10 行代码到 Agent 六大支柱.md"
+source_path: "01-Areas/AI Agent Development/08-结语/结课-从 10 行代码到 Agent 六大支柱.md"
 source_sha256: "b0d8d46298b8a56f10d00b6ce6bedebe4d968162690d39ed97c399829f6be2b1"
 migration_id: "migration-20260720-64e79771"
 author:

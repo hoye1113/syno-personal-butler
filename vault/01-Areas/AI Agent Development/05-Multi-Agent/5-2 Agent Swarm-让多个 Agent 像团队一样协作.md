@@ -7,7 +7,7 @@ source: "https://sitor.cc/courses/agent-fundamentals/26-agent-swarm"
 description: "Swarm 模式让多个 Agent 组成有 Leader 协调的团队，通过 Mailbox 消息、共享任务列表与 Permission Sync 解决双向通信、共享状态与权限转发三大难题，对比 hub-and-spoke、handoff、groupchat 等编排范式。"
 knowledge_state: captured
 link_status: connected
-source_path: "01-Areas/AI Agent Development/05-Multi-Agent/5-2 Agent Swarm：让多个 Agent 像团队一样协作.md"
+source_path: "01-Areas/AI Agent Development/05-Multi-Agent/5-2 Agent Swarm-让多个 Agent 像团队一样协作.md"
 source_sha256: "df1920561cf3efed2ba2a1e8a558aaccdf6eb11d8ca72d2a4cf12b5e25cc953b"
 migration_id: "migration-20260720-64e79771"
 author:

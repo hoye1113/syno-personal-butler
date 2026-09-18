@@ -7,7 +7,7 @@ source: "https://sitor.cc/courses/agent-fundamentals/27-harness"
 description: "Harness 是包裹在模型之外的控制层（最大步数、工具系统、上下文工程、记忆与多智能体分工），决定 Agent 真实表现；模型越强，部分失效的 Harness 被删减，但系统级约束仍需保留。"
 knowledge_state: captured
 link_status: connected
-source_path: "01-Areas/AI Agent Development/06-Harness Engineering/6-1 Harness：模型外面的这层壳.md"
+source_path: "01-Areas/AI Agent Development/06-Harness Engineering/6-1 Harness-模型外面的这层壳.md"
 source_sha256: "bdd49205555012b76681f1923c8fd7475e20a438ff5f1f1cd5bb21d439c8674c"
 migration_id: "migration-20260720-64e79771"
 author:

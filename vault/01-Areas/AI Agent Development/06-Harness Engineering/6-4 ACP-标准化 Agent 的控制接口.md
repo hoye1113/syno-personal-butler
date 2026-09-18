@@ -7,7 +7,7 @@ source: "https://sitor.cc/courses/agent-fundamentals/30-acp"
 description: "ACP（Agent Client Protocol）为客户端与编码 Agent 之间提供统一的控制接口，避免每新增一个宿主应用就要重写一遍 Agent 适配的 N×M 困境，类比 LSP 之于编辑器与语言。"
 knowledge_state: captured
 link_status: connected
-source_path: "01-Areas/AI Agent Development/06-Harness Engineering/6-4 ACP：标准化 Agent 的控制接口.md"
+source_path: "01-Areas/AI Agent Development/06-Harness Engineering/6-4 ACP-标准化 Agent 的控制接口.md"
 source_sha256: "e3b78585148bcb5af38bfdcd0cd99fe42718a63ec58b15c9b2c269dca1720887"
 migration_id: "migration-20260720-64e79771"
 author:

@@ -7,7 +7,7 @@ source: "https://sitor.cc/courses/super-agent/sa-04c-mini-apps"
 description: "用既有工具系统组装三个可直接运行的应用：代码分析 Agent、基于 fetch_url 的 Research Agent，以及用 write_file 加浏览器内 TSX 加载器实现的 Vibe Coding 多文件 React 应用生成。"
 knowledge_state: captured
 link_status: connected
-source_path: "01-Areas/AI Agent Development/Super Agent 实战课/02-Tool System/2-3 小试牛刀——把工具组装成应用：代码分析、Research Agent、Vibe Coding.md"
+source_path: "01-Areas/AI Agent Development/Super Agent 实战课/02-Tool System/2-3 小试牛刀——把工具组装成应用-代码分析、Research Agent、Vibe Coding.md"
 source_sha256: "70c1ba2ad011162f1a93ae38d5e56fd5cf258606d05f593f5639379f697a836c"
 migration_id: "migration-20260720-64e79771"
 author:

@@ -7,7 +7,7 @@ source: "https://sitor.cc/courses/super-agent/sa-04d-search-tool"
 description: "对比 Tavily（自动挡）与 Serper（手动挡）两类搜索 API 的选型差异，并给出 web_search 双引擎实现与配套 web_fetch（HTML 转 Markdown）的实现思路。"
 knowledge_state: captured
 link_status: connected
-source_path: "01-Areas/AI Agent Development/Super Agent 实战课/02-Tool System/2-4 加餐：Agent 的 Search 工具究竟是如何来实现的？.md"
+source_path: "01-Areas/AI Agent Development/Super Agent 实战课/02-Tool System/2-4 加餐-Agent 的 Search 工具究竟是如何来实现的？.md"
 source_sha256: "0c3736e28b85295ed9e34eb65ad6a037475edde27593dd58495359221595d20f"
 migration_id: "migration-20260720-64e79771"
 author:
