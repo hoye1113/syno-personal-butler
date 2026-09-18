@@ -1,0 +1,347 @@
+---
+id: ingest-fca4f839
+candidateId: candidate-be23fdc9
+status: applied
+suggestedPath: "vault/00-Inbox/langchain-ceo-何时构建自己的agent框架-哔哩哔哩-1e149996.md"
+risk: high
+created: 2026-09-16T15:22:09.899Z
+---
+
+# Ingest proposal: LangChain CEO：何时构建自己的Agent框架？ - 哔哩哔哩
+
+<!-- syno:json:start -->
+```json
+{
+  "id": "ingest-fca4f839",
+  "candidateId": "candidate-be23fdc9",
+  "status": "applied",
+  "suggestedPath": "vault/00-Inbox/langchain-ceo-何时构建自己的agent框架-哔哩哔哩-1e149996.md",
+  "suggestedTags": [
+    "ai_agent",
+    "article",
+    "bilibili",
+    "harness_engineering",
+    "context_engineering",
+    "ai_evaluation"
+  ],
+  "suggestedLinks": [
+    "vault/00-Inbox/linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d.md",
+    "vault/02-Resources/AI and Agents/Agent Design & Patterns/Codex 自我改进 Prompt.md",
+    "vault/01-Areas/AI Agent Development/01-Cognitive Calibration/1-4 Agent 架构演进.md"
+  ],
+  "risk": "high",
+  "created": "2026-09-16T15:22:09.899Z",
+  "sourceDescriptor": {
+    "kind": "url",
+    "originalUrl": "https://www.bilibili.com/opus/1243797626719043607",
+    "canonicalUrl": "https://www.bilibili.com/opus/1243797626719043607",
+    "publisher": "www.bilibili.com",
+    "observedAt": "2026-09-16T15:22:09.820Z",
+    "capturedAt": "2026-09-16T15:22:09.820Z",
+    "captureChannel": "web",
+    "sourceTier": "secondary",
+    "reliability": "unverified",
+    "userSuppliedSource": true,
+    "verificationStatus": "unverified"
+  },
+  "sourceType": "bilibili-opus",
+  "sourceProfile": {
+    "ingestWorkflow": "bilibili_opus_ingest_v2",
+    "primarySource": "column",
+    "opusId": "1243797626719043607",
+    "sourceTier": "C2",
+    "sourceForm": "dialogue",
+    "contentForm": "dialogue",
+    "dialogueFidelity": "source",
+    "questionSource": "column",
+    "voiceBasis": "direct_speech",
+    "factualStatus": "partial",
+    "factualReviewed": "2026-09-16",
+    "verificationScope": "column_only",
+    "verificationBasis": [
+      "column"
+    ]
+  },
+  "quality": {
+    "status": "accepted",
+    "reasons": [
+      "单篇 opus/cv 专栏，含主持人提问与讲者署名回答，人物与声音归属完整，可判定为 source dialogue",
+      "内容为 LangChain CEO Harrison Chase 关于 Agent 框架定制与评估的一手论述，含核心判断、机制、案例与限制，知识密度高，符合收录门槛",
+      "主题落在 AI Agent 框架与评估，与 vault 主题一致，非纯新闻或低价值教程",
+      "无图片依赖，正文为文字专栏，图片、ASR、transcript 按 v2 契约跳过"
+    ]
+  },
+  "materialTier": "A",
+  "canonicalTags": [
+    "ai_agent",
+    "article",
+    "bilibili",
+    "harness_engineering",
+    "context_engineering",
+    "ai_evaluation"
+  ],
+  "duplicateAssessment": {
+    "matches": [
+      "vault/00-Inbox/linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d.md",
+      "vault/02-Resources/AI and Agents/Agent Design & Patterns/Codex 自我改进 Prompt.md",
+      "vault/01-Areas/AI Agent Development/01-Cognitive Calibration/1-4 Agent 架构演进.md",
+      "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/5-前端 Agent 面试题/5-8 八、LangChain 专项.md",
+      "vault/01-Areas/AI Agent Development/07-Framework/7-2 社区各大框架全景.md"
+    ],
+    "sameSource": false,
+    "updateStatus": "new"
+  },
+  "relations": [
+    {
+      "type": "extends",
+      "target": "vault/01-Areas/AI Agent Development/07-Framework/7-2 社区各大框架全景.md",
+      "reason": "六大支柱给出的框架评估尺子只解决“怎么透视框架”，本篇补上“何时该自建”的判断依据——任务是否偏离模型训练分布，以及可预测性/可控性诉求，把静态结构视角推进到决策尺度视角。"
+    },
+    {
+      "type": "extends",
+      "target": "vault/02-Resources/AI and Agents/Agent Design & Patterns/Codex 自我改进 Prompt.md",
+      "reason": "Codex 自我改进 Prompt 讲的是让 agent 复盘自身使用方式并沉淀技能；本篇把它推进到组织级数据飞轮：轨迹收集、私有评估、Engine 自动化修复框架与提示词，是同一机制的更完整工程化版本。"
+    },
+    {
+      "type": "contradicts",
+      "target": "vault/01-Areas/AI Agent Development/01-Cognitive Calibration/1-4 Agent 架构演进.md",
+      "reason": "该笔记主张 2026 年继续停留在 LangChain 式线性编排是过时的；本篇恰好指出通用框架的核心循环并未被绕开，文件系统、记忆、摘要、子代理都只是循环前后的中间件，对“必须另起一套架构”的叙事构成直接反驳。"
+    },
+    {
+      "type": "applies_to",
+      "target": "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/5-前端 Agent 面试题/5-8 八、LangChain 专项.md",
+      "reason": "该笔记解释 LangChain.js 与 LangGraph.js 的分工；本篇由 LangChain CEO 给出的‘核心循环 + 中间件’定位，为‘为什么引入图式编排’提供了来自源头方的解释，可用于回答该类面试题的动机层。"
+    }
+  ],
+  "mocChanges": [],
+  "claimCandidates": [
+    {
+      "statement": "Agent 框架的本职是在正确时机把固定与动态上下文送进模型，并处理工具返回的新信息，而不只是工具调用器。",
+      "stability": "model",
+      "sourceLocation": "章节 01/02；时间轴 01:35"
+    },
+    {
+      "statement": "再复杂的 agent 都跑在同一条核心循环上：模型生成、调用工具、回传观察结果；文件系统、子代理、记忆、摘要、上下文卸载都应作为循环前后或工具调用前后的中间件，而非另起系统。",
+      "stability": "principle",
+      "sourceLocation": "章节 02；时间轴 04:10"
+    },
+    {
+      "statement": "应先用通用 agent 框架获取价值，等明确要极致优化的场景后再加入检查、路由和专用步骤。",
+      "stability": "practice",
+      "sourceLocation": "章节 03；时间轴 07:12"
+    },
+    {
+      "statement": "定制程度取决于任务是否偏离模型训练分布：越接近分布，现成框架越有效；越偏离，越需要定制整体流程。",
+      "stability": "model",
+      "sourceLocation": "章节 03/07；时间轴 09:40"
+    },
+    {
+      "statement": "局部能力仍应贴近模型习惯：法律 agent 虽需专用框架，文件编辑仍应采用各模型擅长的实现方式，DeepAgents 用‘模型配置档案’做切换。",
+      "stability": "practice",
+      "sourceLocation": "章节 03；时间轴 09:40"
+    },
+    {
+      "statement": "构建关键任务 agent 的组织应建立私有基准，用来定义标准、捕捉性能回退，并同时比较准确率、延迟与 token 成本。",
+      "stability": "practice",
+      "sourceLocation": "章节 04；时间轴 14:05"
+    },
+    {
+      "statement": "agent 出错通常来自某次模型调用，而更常见的原因是送入的上下文不对，而不是模型能力不足。",
+      "stability": "model",
+      "sourceLocation": "章节 05；时间轴 18:32"
+    },
+    {
+      "statement": "只有消息轨迹不足以调试，需要完整追踪每一步工具调用与上下文累积过程。",
+      "stability": "practice",
+      "sourceLocation": "章节 05；时间轴 18:32"
+    },
+    {
+      "statement": "持续改进的通用闭环是：运行 agent、收集轨迹、整理数据、做实验、修复问题；反馈可来自用户体验设计或小模型/提示词/代码规则的在线评估器。",
+      "stability": "principle",
+      "sourceLocation": "章节 05；时间轴 22:10"
+    },
+    {
+      "statement": "对每条轨迹都跑大模型评审成本过高，可微调小模型或使用定制提示词、代码规则做在线评估。",
+      "stability": "practice",
+      "sourceLocation": "章节 05；时间轴 22:10"
+    },
+    {
+      "statement": "基准不只用于排名，还可用来发现有效机制并回灌产品：LangChain 用 IssueBench 发现 Codex 主动写小脚本处理轨迹，随后把 Engine 做‘Codex 化’。",
+      "stability": "practice",
+      "sourceLocation": "章节 06；时间轴 28:30"
+    },
+    {
+      "statement": "agent 框架未来是否趋同尚无定论，可能取决于模型；若某实验室深耕垂直领域（如生物），框架将开始分化。",
+      "stability": "volatile",
+      "sourceLocation": "章节 07"
+    },
+    {
+      "statement": "金融服务等需要可预测性的客户会认为通用 agent 框架不可控，倾向定制认知架构以掌控全过程。",
+      "stability": "fact",
+      "sourceLocation": "章节 07"
+    }
+  ],
+  "evidenceCandidates": [
+    {
+      "claimRef": "Agent 框架的本职是编排上下文",
+      "sourceRef": "https://www.bilibili.com/opus/1243797626719043607",
+      "sourceTier": "primary",
+      "stance": "supports",
+      "excerpt": "代理框架的主要职责，是在正确的时间把上下文提供给模型。它会围绕固定上下文和动态上下文完成编排。",
+      "observedAt": "2026-09-16"
+    },
+    {
+      "claimRef": "定制尺度取决于任务是否分布外",
+      "sourceRef": "https://www.bilibili.com/opus/1243797626719043607",
+      "sourceTier": "primary",
+      "stance": "supports",
+      "excerpt": "任务越接近模型训练数据的分布，现成代理框架的效果就越好。一旦任务越来越偏离训练数据分布，你可能就需要以某种方式调整代理框架。",
+      "observedAt": "2026-09-16"
+    },
+    {
+      "claimRef": "私有评估与数据飞轮",
+      "sourceRef": "https://www.bilibili.com/opus/1243797626719043607",
+      "sourceTier": "primary",
+      "stance": "supports",
+      "excerpt": "创建自己的私有评估，因为评估定义了组织内部什么才算好……建立自己的持续学习循环。",
+      "observedAt": "2026-09-16"
+    },
+    {
+      "claimRef": "基准驱动回灌（IssueBench / Codex 化 / Harbor）",
+      "sourceRef": "https://www.bilibili.com/opus/1243797626719043607",
+      "sourceTier": "primary",
+      "stance": "supports",
+      "excerpt": "我们发现 Codex 做了一件很有意思的事：它会自行编写许多小脚本，对这些轨迹进行处理……于是我们进行了一次冲刺开发，把 Engine 进行所谓的‘Codex 化’。",
+      "observedAt": "2026-09-16"
+    },
+    {
+      "claimRef": "调试先查上下文而非模型",
+      "sourceRef": "https://www.bilibili.com/opus/1243797626719043607",
+      "sourceTier": "primary",
+      "stance": "supports",
+      "excerpt": "代理出错时，通常是因为某次大语言模型调用出了问题……我认为，更多时候导致问题的其实是第二种情况（上下文不够好）。",
+      "observedAt": "2026-09-16"
+    },
+    {
+      "claimRef": "通用循环 + 中间件而非另起系统",
+      "sourceRef": "https://www.bilibili.com/opus/1243797626719043607",
+      "sourceTier": "primary",
+      "stance": "supports",
+      "excerpt": "让基础循环持续运行，并在不同位置加入小型钩子或插件，从而实现定制。",
+      "observedAt": "2026-09-16"
+    },
+    {
+      "claimRef": "框架趋同或分化未有定论",
+      "sourceRef": "https://www.bilibili.com/opus/1243797626719043607",
+      "sourceTier": "primary",
+      "stance": "limits",
+      "excerpt": "坦白说，我也不知道答案，我觉得可能取决于模型。",
+      "observedAt": "2026-09-16"
+    }
+  ],
+  "unresolved": [
+    "主持人 A 的真实姓名未在专栏中出现，正文按契约写“主持人A”；讲者 Harrison Chase 身份明确。",
+    "Harrison 引用的 Satya 推特三句话（私有评估、记忆轨迹所有权、持续学习循环）仅由讲者转述，未读取原推，措辞为讲者复述。",
+    "Harbor 为‘行业标准’、Terminal-Bench 2 为‘代码代理领域行业标准基准’属讲者断言，专栏内无第三方数据支撑，未独立核验。",
+    "与 Harvey 合作降低 LLM-as-judge 成本的实验仅有定性描述，无具体数字、口径与时间。",
+    "‘某基准测试显示一种文件编辑方式优于另一种’未给出基准名与出处，无法归属，正文按讲者原话保守保留。",
+    "IssueBench 上 Deep Agents、Codex、Claude Code 的对比只给出 Codex 表现更好的定性结论，无分数、样本量与任务分布。",
+    "专栏为文字稿，开头段落存在明显转写/编辑痕迹（如‘代理/智能体’混用），未做逐句语音核验。",
+    "LangSmith Engine 的演示细节（问题看板、子智能体、Slack 报告）属产品自述，未独立验证。"
+  ],
+  "validators": [
+    "source_traceability",
+    "duplicate",
+    "retention",
+    "frontmatter",
+    "relation_quality",
+    "factual_status",
+    "unresolved",
+    "voice_integrity",
+    "question_independence",
+    "numeric_context",
+    "constraints_preserved",
+    "discussion_readiness"
+  ],
+  "sourceDigest": "d82607a80e3514a486c1e2eca227f6350cb66575b5a6a9417541e83efa0866c5",
+  "existingNoteRef": "vault/00-Inbox/linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d.md",
+  "canonicalBody": "# LangChain CEO：何时构建自己的 Agent 框架\n\n> 讲者：Harrison Chase，LangChain 联合创始人兼 CEO。主题：Agent 框架的定制尺度与评估体系。核心问题：什么时候该用现成框架，什么时候必须自建，以及如何用评估把这条路持续走对。\n>\n> **核心主张：** 先复用成熟的核心循环，只有当任务偏离模型训练分布或业务必须强控制时，才逐步定制；而判断定制是否有效的唯一尺子，是组织自己的私有评估。\n\n> 我先用通用框架拿到价值，等找到真正要做到极致的场景，再加入安全门。\n> ——Harrison Chase\n\n## 开场\n\nHarrison 从“拥有自己的智能”切入：在 LangChain 的划分里，agent 由三部分构成——框架、模型、上下文。想要整体掌握智能，就要能切换模型避免锁定、掌握包括记忆与历史对话在内的全部上下文，并在框架这一层做到可定制。这场分享的重心是第三部分，以及衡量它的评估与可观测性。\n\n## 01 框架的本职是编排上下文\n\n**核心判断：** Agent 框架不是工具调用器，它在正确时机把固定上下文和动态上下文送进模型，再处理工具返回的新信息。\n\n**主持人A：** 你在 GPT-3 时代就开始想这件事：有了模型之后怎样围绕它构建框架，让它不只是自动补全，而是成为虚拟协作者。今天的框架和评估怎么理解？\n\n**Harrison Chase：** 代理框架的主要职责，是在正确的时间把上下文提供给模型。它围绕固定上下文和动态上下文完成编排，把这些内容放进上下文窗口，获取响应，再对响应做处理。\n\n- 固定上下文：系统提示、领域知识等相对稳定的部分。\n- 动态上下文：逐步累积的对话、工具返回结果。\n- 与外部系统交互时，系统会产生更多上下文，再反馈进整个循环。\n\n模型、上下文、框架三者都可替换，才谈得上真正拥有自己的智能。模型这部分他不多讲，只强调一点：要能切换，避免被锁死在单一供应商。\n\n## 02 再复杂的 Agent 也绕不开核心循环\n\n**核心判断：** 所有高级 agent 都跑在同一条核心循环上，更复杂的能力应作为中间件挂在循环前后，而不是另起一套系统。\n\n**主持人A：** 那“构建自己的框架”到底是在构建什么？\n\n**Harrison Chase：** 大家谈 agent，通常指让大语言模型循环运行并调用工具：收到请求 → 模型生成内容（可能含工具调用）→ 执行工具 → 把观察结果传回模型。今天几乎所有 agent 背后都是这个架构，只是细节不同。\n\n- LangChain 是非常基础、精简的框架。\n- DeepAgents 可以看作 Claude Code 的模型无关、用途更通用的版本，额外连接文件系统、支持技能与子代理。\n- 定制位置：调用 agent 之前、每次调用模型之前、封装模型调用或工具调用。\n- 摘要发生在模型调用之前：检查上下文是否过长，做摘要，再通过中间件加回循环。\n- 上下文卸载是对工具调用的封装，把大型工具调用结果导出。\n\n**Harrison Chase：** 现在很多代码代理里的钩子与插件，本质上做的就是这件事：让基础循环持续运行，在不同位置加入小型钩子。代理依旧跑在同一个简单架构上，只是能访问沙箱、文件系统、子代理、记忆，并能加入摘要。\n\n## 03 先用通用框架，再补安全门\n\n**核心判断：** 推荐路径是先上通用框架拿到实际价值，等明确了要做到极致的场景，再加入检查、路由和专用步骤。\n\n**主持人A：** 2023、2024 年大家喜欢做很定制的认知架构，现在还需要吗？\n\n**Harrison Chase：** 那时模型不够强，无法在循环中稳定运行，所以要设计非常定制化的认知架构。比如深度研究代理生成子问题、逐一执行；代码审查机器人有固定的定制步骤。现在很多这类功能已经被整合进框架，成为对核心循环的特定修改。\n\n但对于非常具体的流程，认知架构仍然有用。我们的建议是：**先从通用 agent 框架开始**，这是最容易上手、也能最快获得实际价值的方式；当你逐渐明确希望做到极致的使用场景时，再加入更多安全门和检查机制。\n\n需要面对的现实是：很多现成框架只能配特定模型——Claude Code 与 Claude Agent SDK 面向 Anthropic 模型，Codex 面向 OpenAI 模型。\n\n## 04 定制尺度取决于任务是否分布外\n\n**核心判断：** 任务越接近模型训练分布，现成框架越有效；越偏离分布，越需要定制整体流程——但局部能力仍要贴近模型习惯。\n\n**主持人A：** 那判断“该不该自建”有没有可操作的标准？\n\n**Harrison Chase：** 通常来说，任务越接近模型训练数据的分布，现成框架效果越好；一旦偏离越大，就需要调整框架。这里有个容易被混淆的地方：整体任务可能分布外，但局部能力可能分布内。\n\n- 法律 AI 整体偏离主流训练数据。\n- 但“编辑文件”是主流模型都经过强化学习训练的能力，属于分布内。\n- OpenAI 与 Claude 模型的文件编辑方式不同，各自擅长不同的实现。\n\n所以在 DeepAgents 里我们引入“模型配置档案”：对编辑文件这类分布内任务，按所用模型切换不同的文件编辑实现。**在任务层面定制整体框架，同时让分布内的局部尽量贴近模型层。**\n\n## 05 私有评估定义组织认为什么算好\n\n**核心判断：** 关键任务 agent 必须有自己的基准，用来定义标准、捕捉性能回退，并同时比较准确率、延迟和 token 成本。\n\n**主持人A：** 定制之后怎么知道做对了？\n\n**Harrison Chase：** 两周前 Satya 写了一篇推文，其中三句话我印象很深：创建自己的私有评估，因为评估定义了组织内部什么才算好；保留对组织记忆轨迹的所有权，包括反馈、重要决策和组织背景；建立自己的持续学习循环，让 AI 投资持续复合并提升企业价值。\n\n落到工程上：\n\n- 每家公司在构建关键任务 agent 时，都应为它建立基准测试，用来定义标准、捕捉性能回退、持续优化。\n- Harbor 正逐渐成为定义这类基准的行业标准，它由 Terminal-Bench 2 的创建者开发，是开源评估运行器。\n- Harbor 的结构：agent 在数据集上运行，任务在沙箱中并行执行；每个任务有独立运行环境（Dockerfile 定义的沙箱）、标准答案 solution、验证器 test（可跑代码、单元测试，也可让大模型或另一个 agent 充当评审），以及给 agent 的提示词 instruction.md。\n- 评分维度不止准确率，还要跟踪延迟与 token 成本。\n\n## 06 调试 Agent 先查上下文，而非模型\n\n**核心判断：** Agent 出错通常来自某次模型调用，而更常见的原因是送进去的上下文不对，不是模型不够好。\n\n**主持人A：** 可观测性听起来很基础，为什么对它评价这么高？\n\n**Harrison Chase：** 原因通常有两个：模型不够好，或者大模型收到的上下文不够好。我认为更多时候是第二种。所以需要清楚看到哪些内容进入了上下文窗口、上下文如何逐步累积、运行了哪些步骤、调用了哪些工具。\n\n- 轨迹（trace）：类似 Claude Code 里显示的消息列表，用户消息 → 一串工具调用 → agent 回应，底层都是消息。\n- 仅看消息轨迹还不够，还需要完整追踪：点开具体环节，查看模型内部究竟发生了什么。\n- 对呈现要友好：隐藏部分工具调用，让整个过程可浏览。\n\n### 07 轨迹与反馈才是持续改进的燃料\n\n**核心判断：** 运行 agent、收集轨迹、整理数据、实验修复，构成可复用的数据飞轮；难点在反馈，而反馈可以设计出来。\n\n**主持人A：** 这个闭环具体长什么样？\n\n**Harrison Chase：** 整体方法很简单：构建 agent → 让它运行 → 收集大量轨迹 → 整理数据 → 基于数据做实验。底层有大量复杂性，其中最重要的是反馈来源。\n\n- 来自运行环境的反馈：**如何通过用户体验向用户呈现 agent，这件事被严重低估。** 设计得好，即使没人会点“赞/踩”，也能从行为里拿到相当一部分反馈。\n- 来自合成反馈：对轨迹运行在线评估器。与 Harvey 合作做过实验，大幅降低“大模型当评审”这类任务的成本——对每条轨迹都跑 Opus，账单会高得惊人，所以我们微调了小语言模型；也可以用现成模型配定制提示词，内容足够简单时直接写代码规则。\n\n数据拿到后，可以更新系统的任何部分：通过框架工程更新框架，通过微调更新模型，通过记忆机制更新上下文。在 LangChain，我们最关注框架工程这一块。\n\n### 08 基准不只用来排名，也用来偷师\n\n**核心判断：** 私有基准的价值不止评分，还在于发现别的框架做对了什么，再把有效机制回灌进自己的核心框架。\n\n**Harrison Chase：** 我们一直在想怎么把这套流程尽可能自动化。LangSmith Engine 本质上就是运行在轨迹之上的一个 agent：它有 Engine 标签页，在后台跑，创建“问题看板”，寻找需要整理的数据。底层是一个能访问 LangSmith CLI 的编码 agent，配一段很长的提示词和若干子智能体，用来探索数据、识别问题、找出共性，然后创建问题。\n\n- 每个问题带描述和相关轨迹链接，方便查证支持性证据。\n- 它给出的修复包括：修改提示词、更新上下文、更新指令、加入接入框架的代码。\n- 它本身跑在另一个 Engine 之上，并接入 Slack 发送自身运行情况报告——这是我们“吃自己的狗粮”的方式。\n\n我们还为 Engine 建了一个基准 IssueBench，采用 Harbor 格式，用来持续测试不同模型和不同框架。几周前我们在上面测了自家的 Deep Agents、Codex 和 Claude Code：\n\n- 发现 Codex 会非常积极地自行编写大量小脚本来处理轨迹，这实际上让它取得很好的表现。\n- 于是我们做了一次冲刺开发，把 Engine 做“Codex 化”，把这项经验吸收进核心框架。\n\n**核心判断（补）：** 拥有基准的好处，是可以在许多框架上运行测试，看各自擅长什么，再把有效做法带回自己的核心 agent 框架。\n\n### 09 统一还是分化\n\n**核心判断：** 框架最终会趋同还是分化，讲者本人也不确定，可能取决于模型；能确定的是差异目前藏在很细的细节里。\n\n**主持人A：** 框架会统一成一种做法，还是每家公司各有一套？\n\n**Harrison Chase：** 坦白说我不知道答案，我觉得可能取决于模型。我观察到的是，通用型框架已经足够好，至少在初期能应付很多基础任务——所以我建议从现成的 Deep Agents、Codex、Claude Code 起步，因为模型已经足够好，让它们表现出色的要素（访问文件系统、调用子智能体）也足够成熟。\n\n但从通用框架到完全定制的认知架构是一条连续的光谱，越偏离常规分布越需要定制。光谱的另一端是**可预测性与可控性**：我们有很多金融服务客户，看到 Deep Agents 会说“这种 agent 对我们太不可控、太吓人了”，他们更愿意用定制认知架构来掌控全过程。中间地带则是钩子和中间件。\n\n还有一种可能是分化：如果某个实验室深入发展生物领域，它的框架可能会非常擅长生物 agent 任务，框架本身就开始分化。这个领域发展太快，这正是评估和可观测性重要的原因。\n\n## 限制与边界\n\n- **“何时自建”没有确定答案。** 讲者明确说这是行业悬而未决的问题，给出的只是连续尺度而非阈值。\n- **分布内/分布外的判断依赖模型细节。** 文中提到的具体差异（文件编辑方式、某基准测试的结论）未给出基准名称与出处，无法独立归属。\n- **私有评估的收益未被量化。** IssueBench 上 Deep Agents 与 Codex、Claude Code 的对比只有定性结论，没有分数与样本量。\n- **成本优化实验缺数字。** 与 Harvey 合作的评审成本降低只有“大幅”这类描述。\n- **立场相关。** 讲者是框架与评估平台厂商 CEO，推荐路径与自家产品（LangChain、DeepAgents、LangSmith Engine、Harbor 集成）方向一致，需按来源立场阅读。\n- **转写痕迹。** 专栏正文中“代理/智能体”等术语混用，属编辑或转写层面的不一致，未做逐句语音核验。\n\n## 知识连接\n\n- **补充** [[社区各大框架全景：用六大支柱透视任何 Agent 框架]]：六大支柱给的是“怎么看一个框架”的静态尺子；这篇补上“该不该自己造”的判断依据——任务是否偏离模型训练分布，以及可预测性与可控性诉求。两篇合起来，先量结构，再决定定制尺度。\n- **补充** [[Codex 自我改进 Prompt]]：那篇讲单个 coding agent 把自己高频流程沉淀成技能；这篇把同一机制推到组织级——轨迹、私有评估、Engine 自动提出框架与提示词修复，并指出基准还能反向偷师（Codex 化）。\n- **反驳** [[2026 年了，你的 Agent 架构还停留在 LangChain 时代吗？]]：该笔记暗示停留在 LangChain 式编排已经过时；本篇来自 LangChain CEO 的判断相反——核心循环没有被绕开，文件系统、记忆、摘要、子代理都只是循环前后的中间件，“另起一套系统”不是必要路径。\n- **应用于** [[八、LangChain 专项]]：面试题笔记解释 LangChain.js 与 LangGraph.js 的分工；本篇由源头给出的“核心循环 + 中间件”定位，可以补上“为什么需要图式编排”的动机层回答。\n\n## 来源说明\n\n- 来源：B站专栏单篇 opus（https://www.bilibili.com/opus/1243797626719043607），UP 主 Easonlee 的 AI 笔记整理。\n- 读取范围：仅专栏文字与页面元数据；图片、ASR、transcript、Recastory、Spot Check 全部跳过，未扫描 UP 主空间。\n- 声音依据：专栏呈现为主持人提问 + Harrison Chase 署名回答，属真实问答形态，采用 `dialogue_fidelity: source`、`voice_basis: direct_speech`；主持人真实姓名专栏未给出，按契约写“主持人A”。\n- 事实状态：`partial`。`verification_scope: column_only`，只确认笔记忠实于专栏，不代表外部事实已独立核验；未读取 Harbor、Terminal-Bench 2、IssueBench、Satya 原推及 Harvey 合作实验的原始出处。\n- 未决：见收录报告的 `unresolved` 列表，含未归属基准、缺量化数字与转写痕迹。",
+  "rulesDigest": "67591166536f7a62288f7b77759be8155d0543f4871a90a692f340f0e3c61f86",
+  "sourceReport": {
+    "workflow": "bilibili_opus_ingest_v2",
+    "sourceId": {
+      "opus": "1243797626719043607",
+      "column": "",
+      "bv": ""
+    },
+    "route": {
+      "sourceTier": "C2",
+      "materialTier": "A",
+      "sourceForm": "dialogue",
+      "contentForm": "dialogue",
+      "dialogueFidelity": "source",
+      "questionSource": "column",
+      "voiceBasis": "direct_speech"
+    },
+    "targetPath": "vault/00-Inbox/langchain-ceo-何时构建自己的agent框架-哔哩哔哩-1e149996.md",
+    "sourcesRead": [
+      "column"
+    ],
+    "sourcesSkipped": [
+      "images",
+      "transcript",
+      "recastory",
+      "original_page"
+    ],
+    "retention": {
+      "totalUnits": 9573,
+      "retained": 6275,
+      "removed": 3298,
+      "unresolved": 8
+    },
+    "relatedNotes": [
+      "vault/01-Areas/AI Agent Development/07-Framework/7-2 社区各大框架全景.md",
+      "vault/02-Resources/AI and Agents/Agent Design & Patterns/Codex 自我改进 Prompt.md",
+      "vault/01-Areas/AI Agent Development/01-Cognitive Calibration/1-4 Agent 架构演进.md",
+      "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/5-前端 Agent 面试题/5-8 八、LangChain 专项.md"
+    ],
+    "conceptCandidates": [
+      "ai_agent",
+      "article",
+      "bilibili",
+      "harness_engineering",
+      "context_engineering",
+      "ai_evaluation"
+    ],
+    "mocUpdates": [],
+    "checks": {
+      "duplicate": true,
+      "sourceCompleteness": true,
+      "provenance": true,
+      "retentionCoverage": true,
+      "dialoguePlan": true,
+      "voiceIntegrity": true,
+      "numericContext": true,
+      "constraintsPreserved": true,
+      "relationQuality": true,
+      "discussionReadiness": true,
+      "frontmatter": true,
+      "wikilinks": true,
+      "semanticReview": false
+    },
+    "unresolved": [
+      "主持人 A 的真实姓名未在专栏中出现，正文按契约写“主持人A”；讲者 Harrison Chase 身份明确。",
+      "Harrison 引用的 Satya 推特三句话（私有评估、记忆轨迹所有权、持续学习循环）仅由讲者转述，未读取原推，措辞为讲者复述。",
+      "Harbor 为‘行业标准’、Terminal-Bench 2 为‘代码代理领域行业标准基准’属讲者断言，专栏内无第三方数据支撑，未独立核验。",
+      "与 Harvey 合作降低 LLM-as-judge 成本的实验仅有定性描述，无具体数字、口径与时间。",
+      "‘某基准测试显示一种文件编辑方式优于另一种’未给出基准名与出处，无法归属，正文按讲者原话保守保留。",
+      "IssueBench 上 Deep Agents、Codex、Claude Code 的对比只给出 Codex 表现更好的定性结论，无分数、样本量与任务分布。",
+      "专栏为文字稿，开头段落存在明显转写/编辑痕迹（如‘代理/智能体’混用），未做逐句语音核验。",
+      "LangSmith Engine 的演示细节（问题看板、子智能体、Slack 报告）属产品自述，未独立验证。"
+    ],
+    "status": "incomplete"
+  },
+  "proposalDigest": "3d9d6826042a75cde541f6577c6e4851ffaecd0dec157dda65bca609ceddbe17"
+}
+```
+<!-- syno:json:end -->

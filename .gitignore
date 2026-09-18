@@ -28,8 +28,3 @@ Thumbs.db
 
 .pnpm-store/
 apps/syno/public/assets/syno/*-key.png
-
-# Split knowledge repo (D13, 2026-09-01): vault/ and ops/ live in the knowledge repo
-# (SYNO_KNOWLEDGE_ROOT). Defensive: never re-track knowledge content in the code repo.
-vault/
-ops/

@@ -1,0 +1,17 @@
+[build-system]
+# 使用 setuptools 作为最小构建后端，便于后续需要时再扩展打包流程。
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "obsidian-repository-tooling"
+version = "0.1.0"
+description = "Local tooling for the Obsidian vault audit and ingest workflow."
+# 统一声明脚本运行的最低 Python 版本，避免不同机器行为不一致。
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.unittest]
+# 约定默认测试目录，方便后续统一使用 discover 跑回归。
+start-directory = "tests"
+pattern = "test_*.py"

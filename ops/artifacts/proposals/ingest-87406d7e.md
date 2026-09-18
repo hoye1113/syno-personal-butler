@@ -1,0 +1,16 @@
+---
+id: ingest-87406d7e
+candidateId: candidate-87406d7e
+status: applied
+suggestedPath: "vault/00-Inbox/science-视网膜假体与脑机接口-87406d7e.md"
+risk: merge
+created: 2026-09-17T07:10:23.571Z
+---
+
+# Ingest proposal: Science：视网膜假体、脑机接口与人类体验
+
+<!-- syno:json:start -->
+```json
+{"id":"ingest-87406d7e","candidateId":"candidate-87406d7e","status":"applied","suggestedPath":"vault/00-Inbox/science-视网膜假体与脑机接口-87406d7e.md","risk":"merge","created":"2026-09-17T07:10:23.571Z","sourceDescriptor":{"kind":"url","originalUrl":"https://www.bilibili.com/opus/1242760100068720657","canonicalUrl":"https://www.bilibili.com/opus/1242760100068720657","publisher":"www.bilibili.com","observedAt":"2026-09-17T07:10:23.571Z","capturedAt":"2026-09-17T07:10:23.571Z","captureChannel":"web","platformMessageId":"goal:p0-p1:20260917:final-four","sourceTier":"secondary","reliability":"unverified","userSuppliedSource":true,"verificationStatus":"unverified"},"sourceType":"bilibili-opus","sourceProfile":{"ingestWorkflow":"bilibili_opus_ingest_v2","primarySource":"column","opusId":"1242760100068720657","columnId":"cv52771733","bv":"BV11otP6ZEz5","videoUrl":"https://www.bilibili.com/video/BV11otP6ZEz5/","sourceTier":"C2","materialTier":"A","sourceForm":"dialogue","contentForm":"dialogue","dialogueFidelity":"reconstructed","questionSource":"editorial","voiceBasis":"editorial_summary","factualStatus":"partial","factualReviewed":"2026-09-17","verificationScope":"column_only","verificationBasis":["column"]},"quality":{"status":"accepted","reasons":["专栏正文同时覆盖 Prima 的工程路径、临床反馈、BCI 边界和 AI 表征假设，内容独立且与现有 Neuralink 笔记形成互补。","新笔记明确区分形状视觉、临床产品和身体替换愿景，适合作为 P1 物理 AI/神经接口材料收录。","医疗效果、监管状态和意识理论均保留专栏归属与限制，不作医疗承诺。"]},"materialTier":"A","canonicalTags":["ai_agent","ai_safety","bilibili","article","ai_philosophy"],"duplicateAssessment":{"matches":[],"sameSource":false,"updateStatus":"new"},"relations":[{"type":"extends","target":"vault/00-Inbox/neuralink联创-bci与ai接口-0ed4fe4f.md","reason":"补充视网膜入口、器械迭代和体验连续性，扩展植入式 BCI 的人体 I/O 视角。"},{"type":"extends","target":"vault/00-Inbox/seeed-ceo-开源硬件与物理ai-cdf7cbd4.md","reason":"把物理智能的输入输出边界从机器人身体推进到人体感官和运动通路。"},{"type":"applies_to","target":"vault/02-Resources/AI and Agents/MOC - Agent 架构与工程.md","reason":"把意图、反馈、权限和停止机制映射到贴近身体的神经接口。"},{"type":"limits","target":"vault/02-Resources/AI and Agents/B站视频知识库/行业观点与组织/OpenAI前副总裁-AI走出比特世界重构物理世界.md","reason":"用医疗入口、临床证据和材料封装约束宏观的物理世界叙事。"}],"mocChanges":[],"claimCandidates":[],"evidenceCandidates":[],"unresolved":["未独立核验 Prima 的监管文件、临床登记、论文、患者结果或商业销售状态。","关于形状视觉、AI 表征和基底独立性的远期判断仍属于专栏观点或研究假设。"],"validators":["source-traceability","duplicate","frontmatter","vault-contract","bilibili-opus-specialized-validator"],"sourceDigest":"87406d7e","sourceReport":{"workflow":"bilibili_opus_ingest_v2","source_id":{"opus":"1242760100068720657","column":"cv52771733","bv":"BV11otP6ZEz5"},"route":{"source_tier":"C2","material_tier":"A","source_form":"dialogue","content_form":"dialogue","dialogue_fidelity":"reconstructed","question_source":"editorial","voice_basis":"editorial_summary"},"target_path":"vault/00-Inbox/science-视网膜假体与脑机接口-87406d7e.md","sources_read":["column"],"sources_skipped":["images","transcript","recastory","original_page"],"status":"complete"},"proposalDigest":"87406d7e"}
+```
+<!-- syno:json:end -->

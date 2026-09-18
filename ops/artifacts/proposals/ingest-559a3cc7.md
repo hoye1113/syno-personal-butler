@@ -1,0 +1,16 @@
+---
+id: ingest-559a3cc7
+candidateId: candidate-559a3cc7
+status: applied
+suggestedPath: "vault/00-Inbox/axion-非侵入式脑机接口-559a3cc7.md"
+risk: merge
+created: 2026-09-17T07:10:23.571Z
+---
+
+# Ingest proposal: AXION：非侵入式 BCI 如何从预期电位走向可用交互
+
+<!-- syno:json:start -->
+```json
+{"id":"ingest-559a3cc7","candidateId":"candidate-559a3cc7","status":"applied","suggestedPath":"vault/00-Inbox/axion-非侵入式脑机接口-559a3cc7.md","risk":"merge","created":"2026-09-17T07:10:23.571Z","sourceDescriptor":{"kind":"url","originalUrl":"https://www.bilibili.com/opus/1215486911729106949","canonicalUrl":"https://www.bilibili.com/opus/1215486911729106949","publisher":"www.bilibili.com","observedAt":"2026-09-17T07:10:23.571Z","capturedAt":"2026-09-17T07:10:23.571Z","captureChannel":"web","platformMessageId":"goal:p0-p1:20260917:final-four","sourceTier":"secondary","reliability":"unverified","userSuppliedSource":true,"verificationStatus":"unverified"},"sourceType":"bilibili-opus","sourceProfile":{"ingestWorkflow":"bilibili_opus_ingest_v2","primarySource":"column","opusId":"1215486911729106949","columnId":"cv50592841","bv":"BV152jP6LEEA","videoUrl":"https://www.bilibili.com/video/BV152jP6LEEA/","sourceTier":"C2","materialTier":"A","sourceForm":"dialogue","contentForm":"dialogue","dialogueFidelity":"reconstructed","questionSource":"editorial","voiceBasis":"editorial_summary","factualStatus":"partial","factualReviewed":"2026-09-17","verificationScope":"column_only","verificationBasis":["column"]},"quality":{"status":"accepted","reasons":["专栏正文提供 SPN 信号、用户泛化、眼动融合、硬件舒适和辅助技术产品化的完整链路。","与新建的 Science、既有 Neuralink 笔记形成不同技术入口的互补，保持单独 canonical。","指标、用户规模和产品愿景均按专栏口径记录，并明确不能替代独立复现或临床评估。"]},"materialTier":"A","canonicalTags":["ai_agent","ai_safety","bilibili","article","harness_engineering"],"duplicateAssessment":{"matches":[],"sameSource":false,"updateStatus":"new"},"relations":[{"type":"extends","target":"vault/00-Inbox/neuralink联创-bci与ai接口-0ed4fe4f.md","reason":"补充非侵入式信号、跨用户泛化和佩戴权衡，与植入式路线形成对照。"},{"type":"extends","target":"vault/00-Inbox/science-视网膜假体与脑机接口-87406d7e.md","reason":"补充从脑电和眼动捕捉行动意图的入口，与视网膜感官重建构成互补。"},{"type":"applies_to","target":"vault/02-Resources/AI and Agents/MOC - Agent 架构与工程.md","reason":"把意图确认、误触发保护、反馈、撤销和人工接管落实为 Agent 控制面问题。"},{"type":"limits","target":"vault/02-Resources/AI and Agents/MOC - Harness Engineering.md","reason":"说明软件权限和观测设计之外，身体接口还受噪声、姿势、疲劳和个体差异约束。"}],"mocChanges":[],"claimCandidates":[],"evidenceCandidates":[],"unresolved":["未独立核验 AXION 的论文、专利、产品、临床状态、用户数量或准确率。","约 800 万用户、90% 以上准确率和八小时佩戴等指标均为访谈口径。","历史审计曾将该 BV 标记为 offtopic_bci，本次按 Owner 对当前 P0/P1 批次的明确选择收录；历史审计文件保持不变。"],"validators":["source-traceability","duplicate","frontmatter","vault-contract","bilibili-opus-specialized-validator"],"sourceDigest":"559a3cc7","sourceReport":{"workflow":"bilibili_opus_ingest_v2","source_id":{"opus":"1215486911729106949","column":"cv50592841","bv":"BV152jP6LEEA"},"route":{"source_tier":"C2","material_tier":"A","source_form":"dialogue","content_form":"dialogue","dialogue_fidelity":"reconstructed","question_source":"editorial","voice_basis":"editorial_summary"},"target_path":"vault/00-Inbox/axion-非侵入式脑机接口-559a3cc7.md","sources_read":["column"],"sources_skipped":["images","transcript","recastory","original_page"],"status":"complete"},"proposalDigest":"559a3cc7"}
+```
+<!-- syno:json:end -->

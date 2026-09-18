@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "runAt": "2026-07-29T20:23:52+08:00",
+  "scope": "authorized_windows_task_restart_and_stale_lock_recovery",
+  "failureObserved": {
+    "taskStateAfterFirstRestart": "ready",
+    "health": "unreachable",
+    "hostLock": "present",
+    "lockOwnerProcess": "confirmed_not_alive",
+    "taskResult": "3221225794"
+  },
+  "doctor": { "status": "stale_removed", "removedOnlyAfterOwnerProcessConfirmedNotAlive": true },
+  "recovery": {
+    "taskState": "running",
+    "health": { "status": 200, "state": "ready" },
+    "mobileDelivery": { "status": 200, "mode": "legacy", "acceptedRequests": { "total": 5, "byStatus": { "accepted": 5 } }, "outbox": { "total": 0, "byStatus": {} }, "unknownCases": { "total": 0, "byStatus": {} } }
+  },
+  "ownerAcceptance": "not_performed",
+  "notes": "证据不含 PID、凭据、Token、Cookie 或私人正文；该故障注入证明 doctor 可处理已确认陈旧 Host lock，但不替代 Windows 下次登录冷启动验收。"
+}

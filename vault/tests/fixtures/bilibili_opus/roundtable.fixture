@@ -1,0 +1,58 @@
+---
+title: "Cursor CEO：重构AI编程云端智能体上线"
+tags: [ai_agent, video_transcript, bilibili, cursor]
+created: 2026-07-13
+source: "https://www.bilibili.com/opus/1220790337315799046"
+description: "多位参与者独立观点与回应构成价值的 roundtable 样板。"
+ingest_workflow: bilibili_opus_ingest_v2
+source_type: bilibili_opus
+source_url: "https://www.bilibili.com/opus/1220790337315799046"
+opus_id: "1220790337315799046"
+column_id: "cv51067150"
+video_url: "https://www.bilibili.com/video/BV18qTi6uEDX/"
+bv: "BV18qTi6uEDX"
+uploader: "Easonlee的AI笔记"
+source_tier: C1
+primary_source: column
+material_tier: A
+source_form: roundtable
+content_form: roundtable
+dialogue_fidelity: source
+question_source: column
+voice_basis: direct_speech
+factual_status: partial
+factual_reviewed: 2026-07-13
+verification_scope: column_only
+verification_basis: [column]
+unresolved_facts:
+  - "产品数据仅由第三方专栏确认，部分段落省略人物标签。"
+---
+# Cursor CEO：重构AI编程云端智能体上线
+
+> Michael Truell、Kevin Niparko 与 Tomas Reimers 从产品、平台和模型三个位置讨论云端 Agent。
+
+## 开场
+
+**Michael Truell：** 云端 Agent 首先改变的是任务持续时间。
+
+**Kevin Niparko：** 平台还必须处理隔离和资源调度。
+
+**Tomas Reimers：** 模型能力只有进入可靠执行环境才会变成产品能力。
+
+## 01 三个视角在哪里发生冲突？
+
+**Michael Truell：** 产品希望减少等待。
+
+**Kevin Niparko：** 平台不能为速度放弃隔离。
+
+## 限制与边界
+
+三种视角共同描述系统边界，但不代表它们已经解决所有权衡。
+
+## 知识连接
+
+- **补充** [[Cursor CEO-云端智能体上线]]：把产品发布信息补充为产品、平台和模型之间的协作关系。
+
+## 来源说明
+
+人物观点和回应来自专栏文字；图片和转写未读取。

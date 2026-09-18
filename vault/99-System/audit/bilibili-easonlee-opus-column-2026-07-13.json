@@ -1,0 +1,21 @@
+{
+  "batch": "Easonlee-opus-column-2026-07-13",
+  "note": "Easonlee §二 以专栏为源（opus）重新收录 15 篇，bilibili_opus_ingest_v2 工作流；与 pilot10/together-batch 同惯例。external Recastory manifest 只读，未同步。",
+  "entries": [
+    {"bv": "BV1wzTz6vEVm", "opus_id": "1224198831997976579", "cv": "51417410", "vault_path": "行业观点与组织/Gamma CEO-21亿AI创业 靠团队与PLG.md", "tier_hint": "S"},
+    {"bv": "BV19jTz6JELc", "opus_id": "1224198806222929928", "cv": "51417406", "vault_path": "行业观点与组织/SaaS投资人-开源AI崛起 闭源巨头承压.md", "tier_hint": "S"},
+    {"bv": "BV1XaMh6cEa6", "opus_id": "1223016848358899717", "cv": "51256078", "vault_path": "行业观点与组织/3B1B-Grant Sanderson AI与数学的现状与未来.md", "tier_hint": "A"},
+    {"bv": "BV1SWTz6yEBA", "opus_id": "1224198789037817860", "cv": "51417402", "vault_path": "行业观点与组织/Astral创始人-智能体让PR成本归零 人类审查成瓶颈.md", "tier_hint": "S"},
+    {"bv": "BV198Mh6aEtz", "opus_id": "1222908619516805124", "cv": "51255993", "vault_path": "行业观点与组织/Cursor实战-零代码构建语音助手Jarvis.md", "tier_hint": "A"},
+    {"bv": "BV1cVMh65EUK", "opus_id": "1222862229567701014", "cv": "51255924", "vault_path": "行业观点与组织/Every咨询主管-每天用Codex 重塑工作流.md", "tier_hint": "S"},
+    {"bv": "BV1BJMh6uEtH", "opus_id": "1222645767471104034", "cv": "51255754", "vault_path": "行业观点与组织/OpenAI总裁-聊天与Agent的融合计划.md", "tier_hint": "S"},
+    {"bv": "BV1qnMh6BEWW", "opus_id": "1222537534343479317", "cv": "51255595", "vault_path": "行业观点与组织/Agent实战-Greg Isenberg 智能体即新SaaS.md", "tier_hint": "A"},
+    {"bv": "BV1f7Mh66Ejm", "opus_id": "1222491144375500806", "cv": "51255399", "vault_path": "行业观点与组织/Rely AI 创始人-智能体可验证持续学习 不用微调.md", "tier_hint": "S"},
+    {"bv": "BV1HXMh62Eo6", "opus_id": "1222346069005828103", "cv": "51254707", "vault_path": "行业观点与组织/OpenAI PM-Rohan Varma 用Codex 研发产品.md", "tier_hint": "S"},
+    {"bv": "BV1gXTy6cEPx", "opus_id": "1222120059228389384", "cv": "51193028", "vault_path": "行业观点与组织/Cerebras CEO-Andrew Feldman AI不是泡沫而是缺货.md", "tier_hint": "S"},
+    {"bv": "BV189Ty68EFp", "opus_id": "1221903592888205347", "cv": "51192563", "vault_path": "行业观点与组织/Vercel 团队-Nico Albanese 给智能体一台电脑.md", "tier_hint": "A"},
+    {"bv": "BV1MrTi6iEvh", "opus_id": "1221006820893523977", "cv": "51067237", "vault_path": "行业观点与组织/Matthew Berman-最佳 Vibe Coding 工作流.md", "tier_hint": "A"},
+    {"bv": "BV1TyTi6eEni", "opus_id": "1220419260720873510", "cv": "51066580", "vault_path": "行业观点与组织/Peter Yang-Hermes 打造 24 小时数字员工.md", "tier_hint": "A"},
+    {"bv": "BV1vtTi6LEhx", "opus_id": "1220311027565985864", "cv": "51066299", "vault_path": "行业观点与组织/Hyperframes-HeyGen 用 HTML 代码做 AI 视频.md", "tier_hint": "A"}
+  ]
+}

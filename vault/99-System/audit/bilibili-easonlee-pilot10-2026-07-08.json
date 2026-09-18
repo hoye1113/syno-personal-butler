@@ -1,0 +1,56 @@
+{
+  "batch": "Easonlee-pilot10-2026-07-08",
+  "note": "Easonlee §二 优先待收录试跑 10 篇（Recastory ASR+专栏已齐）",
+  "entries": [
+    {
+      "bv": "BV11H526yEiB",
+      "vault_path": "行业观点与组织/OpenAI总裁-GPT5.5与下一阶段AI发展.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV12RVf62Ed2",
+      "vault_path": "行业观点与组织/Harvey CEO-31岁运营百亿法律AI公司.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1467R6LEzm",
+      "vault_path": "Agent架构与平台/YC合伙人-YC内部AI代理基础设施.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV14jrKBcEav",
+      "vault_path": "行业观点与组织/Vercel COO-2026世界级GTM与推广工程师.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV16BQhBEEgH",
+      "vault_path": "Agent架构与平台/Asana CPO-AI时代工作图谱与共享记忆.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV16JdVBGEyU",
+      "vault_path": "行业观点与组织/黄仁勋-英伟达护城河与计算驱动经济.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV16wGS6MEEn",
+      "vault_path": "行业观点与组织/Notion CEO-AI原生组织像爵士乐队.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV17p9yB9Ef3",
+      "vault_path": "行业观点与组织/Replit CEO-建设者与布道者两种人.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV17x9yBXEug",
+      "vault_path": "行业观点与组织/Meta前高管-一半产品经理为何陷入困境.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV18grKBNEJA",
+      "vault_path": "行业观点与组织/ElevenLabs与Lovable CEO-坐上AI火箭.md",
+      "tier_hint": "S"
+    }
+  ]
+}

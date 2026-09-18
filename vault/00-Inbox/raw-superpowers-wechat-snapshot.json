@@ -1,0 +1,2191 @@
+{
+  "ok": true,
+  "data": {
+    "url": "https://mp.weixin.qq.com/s/n07-XVlpA_0FkV11pzd_yw",
+    "title": "AI 编程也需要质检员：Superpowers Evals 在测什么？",
+    "tree": [
+      [
+        {
+          "role": "heading",
+          "name": "AI 编程也需要质检员：Superpowers Evals 在测什么？",
+          "children": [
+            {
+              "role": "StaticText",
+              "name": "AI 编程也需要质检员：Superpowers Evals 在测什么？",
+              "children": [
+                {
+                  "role": "InlineTextBox",
+                  "name": "AI 编程也需要质检员：Superpowers Evals 在测什么？"
+                }
+              ]
+            }
+          ]
+        },
+        [
+          {
+            "role": "StaticText",
+            "name": "Fly",
+            "children": [
+              {
+                "role": "InlineTextBox",
+                "name": "Fly"
+              }
+            ]
+          },
+          {
+            "role": "link",
+            "name": "Fly的AI研习社",
+            "ref": "@e1",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "Fly的AI研习社",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Fly的AI研习社"
+                  }
+                ]
+              }
+            ]
+          },
+          [
+            {
+              "role": "emphasis",
+              "children": [
+                {
+                  "role": "StaticText",
+                  "name": "2026年7月7日 14:01",
+                  "children": [
+                    {
+                      "role": "InlineTextBox",
+                      "name": "2026年7月7日 14:01"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "role": "emphasis",
+              "name": "上海"
+            }
+          ]
+        ],
+        [
+          {
+            "role": "image",
+            "name": "图片"
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "最近读 Jesse Vincent 写 Superpowers 6 的文章时，我注意到一个比“新版更快、更省 token”更重要的东西：",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "最近读 Jesse Vincent 写 Superpowers 6 的文章时，我注意到一个比“新版更快、"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "更省 token”更重要的东西："
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "他们已经开始认真评测 AI 编程工作流本身。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "他们已经开始认真评测 AI 编程工作流本身。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "不是评测模型会不会解一道算法题，也不是评测某个 prompt 是否看起来更顺手，而是评测一个 coding agent 在真实工程流程里，到底有没有按预期工作。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "不是评测模型会不会解一道算法题，也不是评测某个 prompt 是否看起来更顺手，而"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "是评测一个 coding agent 在真实工程流程里，到底有没有按预期工作。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "这个项目叫 Superpowers Evals",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这个项目叫 Superpowers Evals"
+                  }
+                ]
+              },
+              {
+                "role": "superscript",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "[1]",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "[1]"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": "。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "如果说 Superpowers 是一套给 AI coding agent 用的软件开发方法论，那么 Superpowers Evals 就像它背后的质检实验室。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "如果说 Superpowers 是一套给 AI coding agent 用的软件开发方法论，那么 "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Superpowers Evals 就像它背后的质检实验室。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "它问的不是“AI 会不会写代码”，而是：",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "它问的不是“AI 会不会写代码”，而是："
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "当 AI 被放进一套完整的软件工程流程里，它还能不能稳定、守规矩、可验证地完成工作？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "当 AI 被放进一套完整的软件工程流程里，它还能不能稳定、守规矩、可验证地完成"
+                      },
+                      {
+                        "role": "InlineTextBox",
+                        "name": "工作？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "从“会写代码”到“会按流程交付”",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "从“会写代码”到“会按流程交付”",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "从“会写代码”到“会按流程交付”"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "过去一年，大家聊 AI 编程，常常会把重点放在模型能力上。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "过去一年，大家聊 AI 编程，常常会把重点放在模型能力上。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "哪个模型代码更强？",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "哪个模型代码更强？"
+                  }
+                ]
+              },
+              {
+                "role": "LineBreak",
+                "name": "\n",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "\n"
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": "哪个模型上下文更长？",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "哪个模型上下文更长？"
+                  }
+                ]
+              },
+              {
+                "role": "LineBreak",
+                "name": "\n",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "\n"
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": "哪个模型更会修 bug？",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "哪个模型更会修 bug？"
+                  }
+                ]
+              },
+              {
+                "role": "LineBreak",
+                "name": "\n",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "\n"
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": "哪个模型幻觉更少？",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "哪个模型幻觉更少？"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "这些当然重要。但在真实项目里，模型能力只是起点。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这些当然重要。但在真实项目里，模型能力只是起点。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "一个功能不是“写出一段代码”就结束了。它通常还包括需求澄清、方案设计、任务拆分、测试、实现、review、回归验证和交付说明。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "一个功能不是“写出一段代码”就结束了。它通常还包括需求澄清、方案设计、任务拆"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "分、测试、实现、review、回归验证和交付说明。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "人类工程团队需要这些流程，AI 参与软件开发之后也一样需要。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "人类工程团队需要这些流程，AI 参与软件开发之后也一样需要。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "Superpowers 的思路就是：不要让 AI 一上来就冲进代码里，而是给它一套工程纪律。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Superpowers 的思路就是：不要让 AI 一上来就冲进代码里，而是给它一套工程纪"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "律。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "比如先 brainstorm，先写 plan，用 TDD 推进，让 subagent 分工实现，再让 reviewer 检查是否符合需求和代码质量。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "比如先 brainstorm，先写 plan，用 TDD 推进，让 subagent 分工实现，再让 "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "reviewer 检查是否符合需求和代码质量。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "这听起来很重，但它解决的是一个非常现实的问题：",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这听起来很重，但它解决的是一个非常现实的问题："
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "AI 写代码很快，但 AI 把事情做偏也很快。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "AI 写代码很快，但 AI 把事情做偏也很快。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "如果没有流程约束，速度越快，不确定性也可能越快地累积。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "如果没有流程约束，速度越快，不确定性也可能越快地累积。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "Superpowers Evals 测的到底是什么？",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "Superpowers Evals 测的到底是什么？",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Superpowers Evals 测的到底是什么？"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "普通代码 benchmark 通常像考试。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "普通代码 benchmark 通常像考试。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "给一道题，看模型能不能做出来。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "给一道题，看模型能不能做出来。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "Superpowers Evals 更像现场质检。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Superpowers Evals 更像现场质检。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "它关心的是 coding agent 的行为是否符合工程流程，比如：",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "它关心的是 coding agent 的行为是否符合工程流程，比如："
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "list",
+            "children": [
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "• 该触发 skill 的时候有没有触发？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "• 该触发 skill 的时候有没有触发？"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "• 需要写计划的时候有没有写？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "• 需要写计划的时候有没有写？"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "• 该用独立 worktree 的时候有没有隔离工作区？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "• 该用独立 worktree 的时候有没有隔离工作区？"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "• 有没有按 TDD 的方式先写测试？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "• 有没有按 TDD 的方式先写测试？"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "• 实现之后有没有真的运行验证？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "• 实现之后有没有真的运行验证？"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "• reviewer 有没有发现关键问题？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "• reviewer 有没有发现关键问题？"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "• 改完之后 token 成本、耗时和质量有没有变化？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "• 改完之后 token 成本、耗时和质量有没有变化？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "这和“模型聪不聪明”不是一回事。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这和“模型聪不聪明”不是一回事。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "一个模型可能很强，但如果它不按流程做事，在复杂项目里仍然会制造麻烦。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "一个模型可能很强，但如果它不按流程做事，在复杂项目里仍然会制造麻烦。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "反过来，一个流程如果设计得好，也能让 agent 的产出更稳定、更容易检查、更容易迭代。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "反过来，一个流程如果设计得好，也能让 agent 的产出更稳定、更容易检查、更容"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "易迭代。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "这就是 Superpowers Evals 的价值：它把“AI 工作流是否可靠”变成了一个可以观察、可以记录、可以比较的问题。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这就是 Superpowers Evals 的价值：它把“AI 工作流是否可靠”变成了一个可以观"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "察、可以记录、可以比较的问题。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "它像一个自动化 QA",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "它像一个自动化 QA",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "它像一个自动化 QA"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "从项目设计上看，Superpowers Evals 里大概有几个角色。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "从项目设计上看，Superpowers Evals 里大概有几个角色。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "第一个是被测对象，也就是各种 coding agent。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "第一个是被测对象，也就是各种 coding agent。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "比如 Claude Code、Codex、Gemini、OpenCode、Kimi、Copilot 等，都可以成为被测对象。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "比如 Claude Code、Codex、Gemini、OpenCode、Kimi、Copilot 等，都可"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "以成为被测对象。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "第二个是测试官，项目里称为 Gauntlet-Agent。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "第二个是测试官，项目里称为 Gauntlet-Agent。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "它的作用有点像自动化 QA：给 coding agent 一个场景任务，观察它怎么做，并根据验收条件判断结果。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "它的作用有点像自动化 QA：给 coding agent 一个场景任务，观察它怎么做，并根"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "据验收条件判断结果。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "第三个是编排器 Quorum。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "第三个是编排器 Quorum。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "它负责准备隔离环境、启动 agent、收集日志、记录文件变化、统计 token 使用情况，并跑一些确定性的检查。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "它负责准备隔离环境、启动 agent、收集日志、记录文件变化、统计 token 使用情"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "况，并跑一些确定性的检查。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "一次 eval 不是简单问一句“你会不会实现这个功能”，而是跑一个完整场景：",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "一次 eval 不是简单问一句“你会不会实现这个功能”，而是跑一个完整场景："
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "list",
+            "children": [
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "1. 给 agent 一个任务。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "1. 给 agent 一个任务。"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "2. 观察它有没有按 Superpowers 的流程行动。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "2. 观察它有没有按 Superpowers 的流程行动。"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "3. 收集它创建了哪些文件、调用了哪些工具、执行了哪些命令。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "3. 收集它创建了哪些文件、调用了哪些工具、执行了哪些命令。"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "4. 检查最终状态是否符合预期。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "4. 检查最终状态是否符合预期。"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "5. 输出 pass、fail 或 indeterminate。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "5. 输出 pass、fail 或 indeterminate。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "这个设计很关键。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这个设计很关键。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "因为 AI 工作流的失败，常常不是最终答案错得很明显，而是中间少走了一步。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "因为 AI 工作流的失败，常常不是最终答案错得很明显，而是中间少走了一步。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "比如没有写测试，看起来功能也能跑。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "比如没有写测试，看起来功能也能跑。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "比如没有 review，看起来代码也提交了。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "比如没有 review，看起来代码也提交了。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "比如没有隔离 worktree，看起来任务也完成了。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "比如没有隔离 worktree，看起来任务也完成了。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "但这些“看起来没事”的缺口，到了真实工程里就会变成风险。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "但这些“看起来没事”的缺口，到了真实工程里就会变成风险。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "为什么 Superpowers 6 离不开 Evals？",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "为什么 Superpowers 6 离不开 Evals？",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "为什么 Superpowers 6 离不开 Evals？"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "Jesse Vincent 在 Superpowers 6 的文章里提到，新版让构建速度最多提升 50%，token 成本最多降低 60%。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Jesse Vincent 在 Superpowers 6 的文章里提到，新版让构建速度最多提升 "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "50%，token 成本最多降低 60%。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "但这里真正有意思的不是数字，而是这些数字为什么可信。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "但这里真正有意思的不是数字，而是这些数字为什么可信。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "因为他们不是只凭感觉说“好像更快了”。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "因为他们不是只凭感觉说“好像更快了”。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "他们用 evals 去验证流程改动。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "他们用 evals 去验证流程改动。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "比如，原来 reviewer 需要自己跑很多 git 命令来理解 diff，这会消耗时间和 token。后来他们提前生成 review packet，把 reviewer 需要的 diff 和上下文整理好。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "比如，原来 reviewer 需要自己跑很多 git 命令来理解 diff，这会消耗时间和 "
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "token。后来他们提前生成 review packet，把 reviewer 需要的 diff 和上下文整"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "理好。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "这不是取消 review，而是减少 reviewer 找材料的成本。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这不是取消 review，而是减少 reviewer 找材料的成本。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "再比如，原来有两个 reviewer，一个看需求符合性，一个看代码质量。后来发现两者有很多上下文重叠，于是合并成一个 reviewer，减少重复交接。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "再比如，原来有两个 reviewer，一个看需求符合性，一个看代码质量。后来发现两"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "者有很多上下文重叠，于是合并成一个 reviewer，减少重复交接。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "这也不是降低质量，而是减少流程中的摩擦。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这也不是降低质量，而是减少流程中的摩擦。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "如果没有 evals，这种优化很危险。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "如果没有 evals，这种优化很危险。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "因为你很难判断：",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "因为你很难判断："
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "list",
+            "children": [
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "• token 降了，是因为更高效，还是因为少做了关键检查？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "• token 降了，是因为更高效，还是因为少做了关键检查？"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "• 速度快了，是因为流程更顺，还是因为跳过了验证？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "• 速度快了，是因为流程更顺，还是因为跳过了验证？"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "• reviewer 更简洁了，是因为表达更精准，还是因为漏掉了问题？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "• reviewer 更简洁了，是因为表达更精准，还是因为漏掉了问题？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "Evals 的意义就在这里。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Evals 的意义就在这里。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "它不是为了证明“我们很厉害”，而是为了防止优化变成错觉。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "它不是为了证明“我们很厉害”，而是为了防止优化变成错觉。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "这其实是 AI 工程的新方向",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "这其实是 AI 工程的新方向",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这其实是 AI 工程的新方向"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "我觉得 Superpowers Evals 最值得关注的地方，是它代表了一种新的工程方向：",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "我觉得 Superpowers Evals 最值得关注的地方，是它代表了一种新的工程方向："
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "不只是用 AI 写代码，而是用工程方法管理 AI 写代码的过程。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "不只是用 AI 写代码，而是用工程方法管理 AI 写代码的过程。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "早期我们习惯讨论 prompt engineering。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "早期我们习惯讨论 prompt engineering。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "怎么写提示词，让模型给出更好的回答。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "怎么写提示词，让模型给出更好的回答。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "但当 AI 进入真实软件工程，问题会变得更复杂。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "但当 AI 进入真实软件工程，问题会变得更复杂。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "你需要设计角色：谁负责规划，谁负责实现，谁负责 review，谁负责验证。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "你需要设计角色：谁负责规划，谁负责实现，谁负责 review，谁负责验证。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "你需要设计上下文边界：每个 agent 应该看到什么，不应该看到什么。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "你需要设计上下文边界：每个 agent 应该看到什么，不应该看到什么。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "你需要设计交接物：计划怎么写，diff 怎么给，review 怎么记录。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "你需要设计交接物：计划怎么写，diff 怎么给，review 怎么记录。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "你需要设计评测体系：什么算成功，什么算失败，什么算不确定。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "你需要设计评测体系：什么算成功，什么算失败，什么算不确定。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "这已经不是简单的 prompt engineering，而是 workflow engineering。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "这已经不是简单的 prompt engineering，而是 workflow engineering。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "更准确地说，是 agent process engineering。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "更准确地说，是 agent process engineering。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "对普通开发者有什么启发？",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "对普通开发者有什么启发？",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "对普通开发者有什么启发？"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "第一，不要只问“哪个模型最强”。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "第一，不要只问“哪个模型最强”。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "以后更重要的问题可能是：“我有没有一套能让模型稳定工作的流程？”",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "以后更重要的问题可能是：“我有没有一套能让模型稳定工作的流程？”"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "第二，不要把 AI 当成一个万能实习生。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "第二，不要把 AI 当成一个万能实习生。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "更好的方式，是把它当成一个可以分工、可以约束、可以审查的工程团队成员。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "更好的方式，是把它当成一个可以分工、可以约束、可以审查的工程团队成员。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "第三，AI 工作流也要有回归测试。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "第三，AI 工作流也要有回归测试。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "你改了 prompt，改了 agent 角色，改了 review 流程，都应该能回答一个问题：",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "你改了 prompt，改了 agent 角色，改了 review 流程，都应该能回答一个问题："
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "质量有没有下降？",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "质量有没有下降？"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "如果回答不了，就说明你只是在凭感觉调系统。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "如果回答不了，就说明你只是在凭感觉调系统。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "第四，成本优化不能只看 token。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "第四，成本优化不能只看 token。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "真正好的优化，是减少无效上下文、减少重复劳动、减少不必要输出，同时保留关键的判断和验证。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "真正好的优化，是减少无效上下文、减少重复劳动、减少不必要输出，同时保留关键"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "的判断和验证。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "省 token 很容易。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "省 token 很容易。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "难的是省完之后，质量还在。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "难的是省完之后，质量还在。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "最后",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "最后",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "最后"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "Superpowers Evals 表面上是一个测试工具。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Superpowers Evals 表面上是一个测试工具。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "但我觉得它背后真正重要的信号是：",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "但我觉得它背后真正重要的信号是："
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "strong",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "AI 编程正在进入“可评测的流程时代”。",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "AI 编程正在进入“可评测的流程时代”。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "未来的竞争，可能不只是模型之间的竞争，也不是 prompt 模板之间的竞争。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "未来的竞争，可能不只是模型之间的竞争，也不是 prompt 模板之间的竞争。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "而是谁更会设计 AI 工作流，谁更会评测 AI 行为，谁更会把不确定性变成工程系统。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "而是谁更会设计 AI 工作流，谁更会评测 AI 行为，谁更会把不确定性变成工程系"
+                  },
+                  {
+                    "role": "InlineTextBox",
+                    "name": "统。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "模型会越来越强。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "模型会越来越强。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "但软件工程从来不只是聪明。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "但软件工程从来不只是聪明。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "它还需要纪律、反馈、边界和验证。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "它还需要纪律、反馈、边界和验证。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "AI 编程也是一样。",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "AI 编程也是一样。"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "参考：",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "参考："
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "list",
+            "children": [
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "• Superpowers Evals GitHub 仓库",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "• Superpowers Evals GitHub 仓库"
+                      }
+                    ]
+                  },
+                  {
+                    "role": "superscript",
+                    "children": [
+                      {
+                        "role": "StaticText",
+                        "name": "[1]",
+                        "children": [
+                          {
+                            "role": "InlineTextBox",
+                            "name": "[1]"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "• Superpowers 6 原文",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "• Superpowers 6 原文"
+                      }
+                    ]
+                  },
+                  {
+                    "role": "superscript",
+                    "children": [
+                      {
+                        "role": "StaticText",
+                        "name": "[2]",
+                        "children": [
+                          {
+                            "role": "InlineTextBox",
+                            "name": "[2]"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "listitem",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "• Superpowers 主项目",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "• Superpowers 主项目"
+                      }
+                    ]
+                  },
+                  {
+                    "role": "superscript",
+                    "children": [
+                      {
+                        "role": "StaticText",
+                        "name": "[3]",
+                        "children": [
+                          {
+                            "role": "InlineTextBox",
+                            "name": "[3]"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "heading",
+            "name": "引用链接",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "引用链接",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "引用链接"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "role": "paragraph",
+            "children": [
+              {
+                "role": "code",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "[1]",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "[1]"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " Superpowers Evals: ",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " Superpowers Evals: "
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": "https://github.com/prime-radiant-inc/superpowers-evals",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "https://github.com/prime-radiant-inc/superpowers-evals"
+                  }
+                ]
+              },
+              {
+                "role": "LineBreak",
+                "name": "\n",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "\n"
+                  }
+                ]
+              },
+              {
+                "role": "code",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "[2]",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "[2]"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " Superpowers 6 原文: ",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " Superpowers 6 原文: "
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": "https://blog.fsck.com/2026/06/15/Superpowers-6/",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "https://blog.fsck.com/2026/06/15/Superpowers-6/"
+                  }
+                ]
+              },
+              {
+                "role": "LineBreak",
+                "name": "\n",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "\n"
+                  }
+                ]
+              },
+              {
+                "role": "code",
+                "children": [
+                  {
+                    "role": "StaticText",
+                    "name": "[3]",
+                    "children": [
+                      {
+                        "role": "InlineTextBox",
+                        "name": "[3]"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": " Superpowers 主项目: ",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": " Superpowers 主项目: "
+                  }
+                ]
+              },
+              {
+                "role": "StaticText",
+                "name": "https://github.com/obra/superpowers",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "https://github.com/obra/superpowers"
+                  }
+                ]
+              },
+              {
+                "role": "LineBreak",
+                "name": "\n",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "\n"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      ],
+      [
+        [
+          {
+            "role": "image"
+          },
+          {
+            "role": "link",
+            "name": "Fly的AI研习社",
+            "ref": "@e2",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "Fly的AI研习社",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "Fly的AI研习社"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "role": "button",
+            "name": "赞",
+            "ref": "@e3"
+          },
+          {
+            "role": "button",
+            "name": "分享",
+            "ref": "@e4"
+          },
+          {
+            "role": "button",
+            "name": "在看",
+            "ref": "@e5"
+          },
+          {
+            "role": "button",
+            "name": "留言 写留言",
+            "ref": "@e6",
+            "children": [
+              {
+                "role": "StaticText",
+                "name": "写留言",
+                "children": [
+                  {
+                    "role": "InlineTextBox",
+                    "name": "写留言"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    ]
+  }
+}

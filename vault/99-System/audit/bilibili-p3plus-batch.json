@@ -1,0 +1,42 @@
+{
+  "batch": "P3plus-2026-07-07",
+  "note": "R1-A full-text review promotes; see bilibili-r1a-review-results-2026-07-07.md",
+  "entries": [
+    {
+      "bv": "BV1Tu9xBDEkt",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/Mercury产品VP-Claude Code第二大脑与MCP.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1r4Ju65EJT",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/Codex实战-Notion第二大脑与技能封装.md",
+      "tier_hint": "A-lecture"
+    },
+    {
+      "bv": "BV1NiooB5ESW",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/OpenClaw创始人-Claw现状与安全治理.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1HDDyB9Emw",
+      "wave": 1,
+      "vault_path": "行业观点与组织/Block业务主管-裁员40%后与Goose代理运转.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1mncRznEd6",
+      "wave": 1,
+      "vault_path": "Agent架构与平台/Mitchell Hashimoto-AI时代开源与Git未来.md",
+      "tier_hint": "S"
+    },
+    {
+      "bv": "BV1hkFkz9E6N",
+      "wave": 2,
+      "vault_path": "Agent架构与平台/Boris Cherny-Claude Code任务管理与Compound工程.md",
+      "tier_hint": "A-dialogue"
+    }
+  ]
+}

@@ -1,0 +1,290 @@
+---
+id: ingest-33e13b15
+candidateId: candidate-8186857a
+status: applied
+suggestedPath: "vault/00-Inbox/arize-ai团队-skill到底-应该写多长-哔哩哔哩-1fa0932a.md"
+risk: high
+created: 2026-09-16T15:21:36.002Z
+---
+
+# Ingest proposal: Arize AI团队：Skill到底 应该写多长？ - 哔哩哔哩
+
+<!-- syno:json:start -->
+```json
+{
+  "id": "ingest-33e13b15",
+  "candidateId": "candidate-8186857a",
+  "status": "applied",
+  "suggestedPath": "vault/00-Inbox/arize-ai团队-skill到底-应该写多长-哔哩哔哩-1fa0932a.md",
+  "suggestedTags": [
+    "ai_agent",
+    "article",
+    "bilibili",
+    "context_engineering",
+    "skills",
+    "prompting"
+  ],
+  "suggestedLinks": [
+    "vault/01-Areas/AI Agent Development/01-Cognitive Calibration/1-1 搞定 Agent 六大支柱.md",
+    "vault/00-Inbox/linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d.md",
+    "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-37 01 · 什么是 Skill.md"
+  ],
+  "risk": "high",
+  "created": "2026-09-16T15:21:36.002Z",
+  "sourceDescriptor": {
+    "kind": "url",
+    "originalUrl": "https://www.bilibili.com/opus/1247771343359836183",
+    "canonicalUrl": "https://www.bilibili.com/opus/1247771343359836183",
+    "publisher": "www.bilibili.com",
+    "observedAt": "2026-09-16T15:21:35.904Z",
+    "capturedAt": "2026-09-16T15:21:35.904Z",
+    "captureChannel": "web",
+    "sourceTier": "secondary",
+    "reliability": "unverified",
+    "userSuppliedSource": true,
+    "verificationStatus": "unverified"
+  },
+  "sourceType": "bilibili-opus",
+  "sourceProfile": {
+    "ingestWorkflow": "bilibili_opus_ingest_v2",
+    "primarySource": "column",
+    "opusId": "1247771343359836183",
+    "sourceTier": "C2",
+    "sourceForm": "lecture",
+    "contentForm": "lecture",
+    "dialogueFidelity": "none",
+    "questionSource": "none",
+    "voiceBasis": "direct_speech",
+    "factualStatus": "partial",
+    "factualReviewed": "2026-09-16",
+    "verificationScope": "column_only",
+    "verificationBasis": [
+      "column"
+    ]
+  },
+  "quality": {
+    "status": "accepted",
+    "reasons": [
+      "来源为单篇 B站 opus 图文专栏，含完整讲稿文字与页面元数据（标题、UP主、opus id），来源正文可追溯",
+      "内容围绕 Agent 技能文件/指令遵循上限展开，与 vault「AI Agent 时代」主题高度相关",
+      "含原创复测数据与具体数字（200–300 条、2,000 条、5,000 条、10,000 词、290 美元、7 模型 2,300 次调用），密度达标",
+      "含四种失效模式、研究边界与反例，具备机制与张力",
+      "存在可核验的外部事实线索（IfScale、Chroma、46 模型论文、FireBench/CCRBench/GuideBench），但本流程未读取官方原页，保持 partial"
+    ]
+  },
+  "materialTier": "A",
+  "canonicalTags": [
+    "ai_agent",
+    "article",
+    "bilibili",
+    "context_engineering",
+    "skills",
+    "prompting"
+  ],
+  "duplicateAssessment": {
+    "matches": [
+      "vault/01-Areas/AI Agent Development/01-Cognitive Calibration/1-1 搞定 Agent 六大支柱.md",
+      "vault/00-Inbox/linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d.md",
+      "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-37 01 · 什么是 Skill.md",
+      "vault/02-Resources/AI and Agents/B站视频知识库/Agent架构与平台/Claude Code实战-Gstack把AI变成团队.md",
+      "vault/01-Areas/AI Agent Development/05-Multi-Agent/5-2 Agent Swarm-让多个 Agent 像团队一样协作.md"
+    ],
+    "sameSource": false,
+    "updateStatus": "new"
+  },
+  "relations": [
+    {
+      "type": "extends",
+      "target": "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-37 01 · 什么是 Skill.md",
+      "reason": "Loock 主张用按任务拆分技能模块解决系统提示词膨胀；本篇用复测数据补充：拆分的容量理由已从 200 条硬墙变为职责与成本权衡。"
+    },
+    {
+      "type": "limits",
+      "target": "vault/01-Areas/AI Agent Development/05-Multi-Agent/5-2 Agent Swarm-让多个 Agent 像团队一样协作.md",
+      "reason": "多 Agent 拆分常以「单提示词装不下」为动机；本篇指出指令容量约提升十倍后，容量不再是拆分的主要理由，只在职责与成本上成立。"
+    },
+    {
+      "type": "applies_to",
+      "target": "vault/00-Inbox/linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d.md",
+      "reason": "LinkedIn 篇讲企业上下文基础设施的可发现与可更新；本篇的「输出必须逐次核验」可直接应用于其 Playbook 与 PR 回写流程的可靠性检查。"
+    }
+  ],
+  "mocChanges": [],
+  "claimCandidates": [
+    {
+      "statement": "一年前的前沿模型在单个提示词中约 200–300 条离散约束后开始掉队，500 条时可能遗漏 30%–50%；这是复杂指令能力的乐观上限。",
+      "stability": "volatile",
+      "reviewAfter": "2026-12-16",
+      "basis": "IfScale 复测（GPT-4.1 / Claude Sonnet 4 / Gemini 2.5 Pro）"
+    },
+    {
+      "statement": "约一年内前沿模型同时遵循命名约束的能力提升近十倍：多数模型在接近 2,000 条时弯折，最强模型在 5,000 条以内仍保持稳定。",
+      "stability": "volatile",
+      "reviewAfter": "2026-12-16",
+      "basis": "同一提示词对 GPT-5.5 / Claude Opus 4.7 / Gemini 3.1 Pro / DeepSeek V4 Pro 的扩展测试"
+    },
+    {
+      "statement": "当前模型的失效方式已分化：静默遗忘（DeepSeek）、安全层拒答（Claude）、思考 token 耗尽后无输出（Gemini）、写到一半礼貌放弃（GPT-5.5）。识别失败必须先知道所用模型及其失效模式。",
+      "stability": "model",
+      "basis": "四种模型的实测差异"
+    },
+    {
+      "statement": "技能文件的容量硬墙已转为成本权衡：能否塞入不是问题，加入额外指令带来的价格与延迟是否值得才是问题。",
+      "stability": "practice",
+      "basis": "提示词长度与成本延迟的取舍论述"
+    },
+    {
+      "statement": "技能设计的核心难点已从压缩问题转为验证问题：只能靠逐次检查输出是否真的执行，而非靠写出更好的提示词。",
+      "stability": "principle",
+      "basis": "对失败模式与评测的总结"
+    },
+    {
+      "statement": "受控基准上拿到满分不代表可靠：同一批指令换说法或换顺序，遵循表现可能大幅波动，指令顺序问题仍无结论。",
+      "stability": "fact",
+      "basis": "引用 46 模型论文《重新审视语言模型遵循指令的可靠性》"
+    },
+    {
+      "statement": "长输入准确率可能在达到上下文窗口上限前就下降 30%–50%，且连贯结构良好的文本比打乱排列更易触发该失效。",
+      "stability": "fact",
+      "basis": "引用 Chroma 对 18 个模型的上下文丢失测试"
+    }
+  ],
+  "evidenceCandidates": [
+    {
+      "claimIndex": 0,
+      "sourceRef": "https://www.bilibili.com/opus/1247771343359836183",
+      "sourceTier": "community",
+      "stance": "context",
+      "excerpt": "一年前，大约在 200 到 300 条规则时，前沿模型就开始崩溃了。这是一个非常低的上限，这就是我们的基线。"
+    },
+    {
+      "claimIndex": 1,
+      "sourceRef": "https://www.bilibili.com/opus/1247771343359836183",
+      "sourceTier": "community",
+      "stance": "context",
+      "excerpt": "一年前，它们在 200 到 300 条指令时就开始崩溃。而现在，根据模型不同，这个边界已经接近 2,000 条。最好的模型甚至可以在达到 5,000 条指令之前保持稳定。"
+    },
+    {
+      "claimIndex": 2,
+      "sourceRef": "https://www.bilibili.com/opus/1247771343359836183",
+      "sourceTier": "community",
+      "stance": "context",
+      "excerpt": "DeepSeek 默默遗忘，Claude 被吓到后拒绝，Gemini 过度思考到沉默，而 GPT-5.5 完成一半工作，然后告诉你剩下的部分不值得它做。"
+    },
+    {
+      "claimIndex": 4,
+      "sourceRef": "https://www.bilibili.com/opus/1247771343359836183",
+      "sourceTier": "community",
+      "stance": "context",
+      "excerpt": "新的难点在于：你得知道它到底有没有按你说的做。这就是一个验证问题。"
+    },
+    {
+      "claimIndex": 6,
+      "sourceRef": "https://www.bilibili.com/opus/1247771343359836183",
+      "sourceTier": "community",
+      "stance": "context",
+      "excerpt": "Chroma 对 18 个模型进行了上下文丢失测试，结果显示，长输入的准确率可能在达到上下文窗口上限前，就已经下降 30% 到 50%。"
+    }
+  ],
+  "unresolved": [
+    "IfScale 原始论文与 500 条上限的原始数据未核验，本笔记只确认忠实于 B站专栏表述",
+    "Chroma 上下文丢失研究、46 模型可靠性论文《重新审视语言模型遵循指令的可靠性》、FireBench / CCRBench / GuideBench 均未实际打开，论文标题与结论为专栏转述",
+    "专栏提及的 GitHub 代码与数据地址未记录、未访问",
+    "模型版本命名（GPT-5.5 / Claude Opus 4.7 / Gemini 3.1 Pro / DeepSeek V4）为专栏表述，未与官方发布页比对",
+    "费用数字（总计 290 美元、7 模型 2,300 次调用 209 美元）前后不一致，未澄清",
+    "Claude 安全过滤器示例词与筛选方式为讲者自述，未独立验证",
+    "UP主名称「Easonlee的AI笔记」需在写入 frontmatter 时与页面元数据复核"
+  ],
+  "validators": [
+    "source_traceability",
+    "duplicate",
+    "retention",
+    "frontmatter",
+    "relation_quality",
+    "factual_status",
+    "unresolved",
+    "voice_integrity",
+    "numeric_context",
+    "constraints_preserved",
+    "discussion_readiness"
+  ],
+  "sourceDigest": "eccf6dc1416b0d30135efa731deaadb784e69ad4cad63f90679426c139313671",
+  "existingNoteRef": "vault/01-Areas/AI Agent Development/01-Cognitive Calibration/1-1 搞定 Agent 六大支柱.md",
+  "canonicalBody": "# Arize AI团队：Skill 到底应该写多长？\n\n> Arize AI 开发者关系负责人 Laurie Voss（前 NPM 联合创始人）单场讲座，主题是技能文件（skill file）能写多长。她复现并扩展了 IfScale 指令遵循基准，追问「200 条指令上限」在一年后是否仍然成立。\n>\n> **核心主张：** 前沿模型同时遵循离散指令的能力一年内提升近十倍，把「塞不下」的压缩问题变成了「有没有真的执行」的验证问题。\n\n> 一年前，编写技能最难的地方，是把所有内容塞进去，同时不让模型跑偏。那是一个压缩问题。压缩问题已经消失了。新的难点在于：你得知道它到底有没有按你说的做。\n> ——Laurie Voss\n\n## 开场\n\n这场讲座要回答一个具体问题：你编写技能文件，往里面塞满各种指令，但到了某个时候模型就不再记得所有指令了——这个临界点在哪里？\n\n触发点是迈阿密 AI Engineer 大会上 Dexter Horthy 顺带提到的一句话：一个智能体大约能遵循 200 条指令，之后就开始遗忘，而这个数字来自 2025 年。讲者当场停下没听，因为 200 条根本算不上多：一份像样的技能文件几乎马上就会超过。「如果用户说 X，就做 Y；始终包含关于 Z 的章节；永远不要使用短语 W」——每条都是独立指令。\n\n于是问题变成：这个 200 从何而来、现在是否仍然成立、今天真正的数字是多少。\n\n## 01 旧结果复现：200–300 条之后开始失守\n\n**核心判断：** 一年前的前沿模型在单提示词中约 200–300 条离散约束后开始掉队，500 条时可能丢掉三到五成，这是复杂指令能力的乐观上限。\n\n200 这个数字来自真实基准 IfScale。测试设计很简单：让模型写一份商业报告，并给出一份必须原样出现的词表（例如 customer、revenue），每个词就是一条必须遵守的指令，最后统计实际出现比例。两个关键量是密度 N（一次多少条规则）和准确率（遵守了多少条规则）。\n\n讲者承认「塞随机词」与「遵守真正指令」不完全等同，但把它当作代理指标：\n\n- 要求包含 revenue 这个词，与要求加入一个定价章节，本质是同一类离散命名约束。\n- 若模型连提示词里的 200 个词都跟不上，更复杂的指令只会更差。\n- 因此 200 应被视为上限而非平均值。\n\n验证先做复现。问题是模型生命周期极短：原始 10 个模型里，运行时仍能通过 API 调用的只剩 GPT-4.1、Claude Sonnet 4、Gemini 2.5 Pro；几周后其中一个也退役了。复现曲线与原论文在噪声范围内一致，结论成立：一年前约 200–300 条规则时前沿模型开始崩溃，500 条时损失 30%–50%。\n\n## 02 新模型：能力上限提升近十倍\n\n**核心判断：** 同一测试下新一代模型在原有 500 条上限内全部满分，边界被推到约 2,000 条，最强模型在 5,000 条以内仍稳定，能力约提升十倍。\n\n用完全相同的提示词和词表测试 GPT-5.5、Claude Opus 4.7、Gemini 3.1 Pro 和 DeepSeek V4 Pro，结果一上来全部 100%，基准被「穿过」了。只好把目标往后移：500 → 1,000 → 2,000，一路加到 10,000 个词才找到边界。\n\n- 多数模型在接近 2,000 条时才弯折。\n- 最强模型在 5,000 条以内保持稳定。\n- 曲线看似垂直跌落，实际弯折发生在约 1,000 个词的跨度内。\n\n讲者补了一个反直觉的观察：从 GPT-5.1 到 GPT-5.5 的体感提升并不像十倍，但这项测试对应的恰是「技能文件到底能多长」这一实际工程问题，而它一年内扩大了十倍。更关键的是基准本身才问世一年，500 条已经只是四舍五入的误差——她测的是 Opus 4.7，4.8 更强，所以这张图已经过时，而这正是重点：六个月前定下的提示词长度假设可能已经失效。\n\n## 03 四种失效模式：遗忘、拒答、过思、半途放弃\n\n**核心判断：** 模型不再只是遗忘指令，而是以四种与厂商风格高度相关的不同方式失败，不知道用的是哪个模型及其失效形态，就无法识别失败。\n\n- **DeepSeek V4**：传统失败。约 750 条规则开始遗忘，到 2,000 条几乎丢掉一半。可预测、易测量，是讲者最信任的失败模式。\n- **Claude Opus 4.7**：反复判定测试危险，在 API 层直接拒绝完成。原因是安全分类器敏感，随机词里出现 anthrax、cyclops、cyanide 这类组合就触发过滤器；讲者不得不先用 OpenAI 的安全过滤器筛词才能继续。若任务本身涉及医疗建议这类双重用途内容，可能两三百条就开始拒答。\n- **Gemini 3.1 Pro**：到 5,000 条都稳定，是最强模型之一；超过后被指令压垮，把 token 预算全用于思考，几乎不输出。例如 10,000 token 预算里 9,500 用于思考，最后给一段不含任何指定词的 500 字回答。昂贵且无用。\n- **GPT-5.5**：这批中最好，5,000 条规则以内保持 99% 准确率。但推远后会先写报告，约 500 个词后礼貌宣布「这太蠢了，我不做了」。它已经写出了约 5,000 词的商业报告，所以话没说错，但在测试里算失败，因为半成品缺大多数关键词。\n\nGPT 这种失败最难检测：Claude 会立刻退出，DeepSeek 尽力完成，而 GPT 看起来做得不错，直到你读到结尾。\n\n## 04 工作流程：容量硬墙变成成本权衡\n\n**核心判断：** 拆分技能不再是容量所迫，而应服务于职责与成本；能塞进一万条不代表性价合理。\n\n三件事变了：\n\n- 一年前要把技能文件压到 200 条以内，再指向子技能和一整套附加文件；现在技能文件可以很长，压缩不再是硬约束。\n- 需要 100 条或 300 条具体规则时，可以直接全部放进提示词，不必担心模型悄悄忽略了哪条。2,000 条命名约束足够构成一整套风格指南，能容纳每一条品牌规则和每一条法律免责声明；过去可能要拆给十几个专用智能体并祈祷交接顺利。\n- 过去的问题是「模型能不能做到」，答案现在是能；新问题是「这值不值这个成本」。真正的硬墙上限已变成柔性权衡：额外的指令带来价格与延迟，是否值得。\n\n## 05 研究边界、上下文与输出验证\n\n**核心判断：** 这是代理任务，只证明长技能文件「可行」，不证明「有效」；容量不能替代对长提示词的清晰推理。\n\n讲者列出的注意事项：\n\n- 在一份虚假商业报告里加随机词，只证明长技能文件有效可跑，不等价于证明其实际有效。\n- 各模型撞墙点差异极大，从 750 到 9,000 多条都有，模型选择影响巨大。\n- 测试没有测量模型能否在超长提示词上清晰推理，也没测指令互相冲突、存在张力时的表现。\n\n后续研究提供了补充：\n\n- Chroma 对 18 个模型做上下文丢失测试，长输入准确率可能在到达上下文窗口上限前就下降 30%–50%。\n- 该研究的奇怪之处在于：连贯、结构良好的文本，比打乱随机排列的指令更容易触发失效。\n- 因此模型也许能追踪 2,000 甚至 1 万条指令，但不一定能对它们清晰推理或正确消解冲突。\n\n验证的紧迫性来自失败形态本身：Claude 拒答虽烦但明显，收到错误就知道失败；GPT 写到一半的漂亮报告危险得多，因为看起来像真答案，必须读完全文才发现它中途放弃。讲者强调不能信任输出，每次都要读完确认。\n\n成本数据：运行这些查询总共花了 290 美元，其中 7 个模型调用 2,300 次计 209 美元。（专栏中两个数字未对齐，见「来源说明」。）\n\n## 06 评测闭环：能力上限提高，可靠性仍是问题\n\n**核心判断：** 暴露失败的唯一办法是用另一个大模型监控输出，技能设计的核心已从「塞得下」转为逐次检查是否真的执行。\n\n讲者把评测作为落点（她在 Arise/Arize 做这件事，专栏只保留这一句相关表述）：构建真正的 AI 应用并处理棘手任务时，必然遇到上述一种或多种失效模式。\n\n后续研究进一步收敛了这个判断：\n\n- 一篇测试 46 个模型、题为《重新审视语言模型遵循指令的可靠性》的论文发现，模型可以在类似基准上拿满分，却依然极不可靠。\n- 同一条指令稍微换一种说法，遵循表现就可能出现巨大差异。\n- 同样的 2,000 条指令换个顺序，模型遵循能力可能突然大幅下降。\n- 指令应以什么顺序交给模型，仍是开放问题。\n\n现在已有 FireBench、CCRBench、GuideBench 等基准在测量同一件事：模型同时遵循大量真实且混乱约束的能力。\n\n## 限制与边界\n\n- 基准测的是离散命名约束，不是长文连贯推理；不能把 2,000 条当作「复杂规则也能处理」的证据。\n- 各模型上限差异从 750 到 9,000+ 条，任何单一数字都不能跨模型套用。\n- 能力上限移动速度极快，同一测试几个月内即过时；讲者本人数据在发布后已落后于新模型。\n- 长输入的准确率衰减已在其他研究中出现（30%–50%），且连贯文本反而更易失效，机制未明。\n- 成本与延迟未给出系统量化，只给出单次研究花费。\n\n## 知识连接\n\n- **补充** [[01 · 什么是 Skill]]：Loock 篇用「按任务分发技能模块」解决系统提示词膨胀，本篇补充其容量前提已变——拆分应从职责与成本出发，而非从 200 条硬墙出发。\n- **限制** [[Agent Swarm：让多个 Agent 像团队一样协作]]：多 Agent 拆分常以「单提示词装不下」为动机，本篇说明容量约提升十倍后，该动机在容量层面不再成立。\n- **应用于** [[LinkedIn 工程师：领英的AI Agent 开发和部署实践]]：LinkedIn 篇强调上下文基础设施可发现、可更新，本篇的「逐次核验输出」可直接接入其 Playbook 与 PR 回写流程作为质量闸。\n\n## 来源说明\n\n- 来源形态：B站图文专栏（opus），主源为专栏文字，未读取图片、未进入 ASR、未扫描 UP 主空间。\n- 讲稿为现场讲座单人口述，人物完整、可直接归属，故 `voice_basis: direct_speech`、`dialogue_fidelity: none`、`question_source: none`；正文保留讲者视角与其自述趣闻，未重构为问答。\n- `factual_status: partial`、`verification_scope: column_only`：笔记忠实于专栏文本，但所引外部论文、基准与模型版本均未回原页核验，引用时请按保守措辞处理并参考 `unresolved`。\n- 专栏内数字不一致：费用段落既写「总共 290 美元」，又写「7 个模型调用 2,300 次，总计 209 美元」，正文原样保留未合并。\n- 人名与机构名按专栏音译保留（如 Arise / Arize），未与官方页面比对。\n- 已删除：章节预告、重点速览重复、二维码与市场部提示、世界杯观赛派对与 Luma 报名、致谢寒暄。",
+  "rulesDigest": "67591166536f7a62288f7b77759be8155d0543f4871a90a692f340f0e3c61f86",
+  "sourceReport": {
+    "workflow": "bilibili_opus_ingest_v2",
+    "sourceId": {
+      "opus": "1247771343359836183",
+      "column": "",
+      "bv": ""
+    },
+    "route": {
+      "sourceTier": "C2",
+      "materialTier": "A",
+      "sourceForm": "lecture",
+      "contentForm": "lecture",
+      "dialogueFidelity": "none",
+      "questionSource": "none",
+      "voiceBasis": "direct_speech"
+    },
+    "targetPath": "vault/00-Inbox/arize-ai团队-skill到底-应该写多长-哔哩哔哩-1fa0932a.md",
+    "sourcesRead": [
+      "column"
+    ],
+    "sourcesSkipped": [
+      "images",
+      "transcript",
+      "recastory",
+      "original_page"
+    ],
+    "retention": {
+      "totalUnits": 10560,
+      "retained": 4641,
+      "removed": 5919,
+      "unresolved": 7
+    },
+    "relatedNotes": [
+      "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-37 01 · 什么是 Skill.md",
+      "vault/01-Areas/AI Agent Development/05-Multi-Agent/5-2 Agent Swarm-让多个 Agent 像团队一样协作.md",
+      "vault/00-Inbox/linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d.md"
+    ],
+    "conceptCandidates": [
+      "ai_agent",
+      "article",
+      "bilibili",
+      "context_engineering",
+      "skills",
+      "prompting"
+    ],
+    "mocUpdates": [],
+    "checks": {
+      "duplicate": true,
+      "sourceCompleteness": true,
+      "provenance": true,
+      "retentionCoverage": true,
+      "dialoguePlan": true,
+      "voiceIntegrity": true,
+      "numericContext": true,
+      "constraintsPreserved": true,
+      "relationQuality": true,
+      "discussionReadiness": true,
+      "frontmatter": true,
+      "wikilinks": true,
+      "semanticReview": false
+    },
+    "unresolved": [
+      "IfScale 原始论文与 500 条上限的原始数据未核验，本笔记只确认忠实于 B站专栏表述",
+      "Chroma 上下文丢失研究、46 模型可靠性论文《重新审视语言模型遵循指令的可靠性》、FireBench / CCRBench / GuideBench 均未实际打开，论文标题与结论为专栏转述",
+      "专栏提及的 GitHub 代码与数据地址未记录、未访问",
+      "模型版本命名（GPT-5.5 / Claude Opus 4.7 / Gemini 3.1 Pro / DeepSeek V4）为专栏表述，未与官方发布页比对",
+      "费用数字（总计 290 美元、7 模型 2,300 次调用 209 美元）前后不一致，未澄清",
+      "Claude 安全过滤器示例词与筛选方式为讲者自述，未独立验证",
+      "UP主名称「Easonlee的AI笔记」需在写入 frontmatter 时与页面元数据复核"
+    ],
+    "status": "incomplete"
+  },
+  "proposalDigest": "49377a5ad9324e5fa59ee74548bbc2b630e709668c07a6fca1d879bf6d08f2f4"
+}
+```
+<!-- syno:json:end -->

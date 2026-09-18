@@ -1,0 +1,277 @@
+---
+id: ingest-8a5a8804
+candidateId: candidate-d494b762
+status: applied
+suggestedPath: "vault/00-Inbox/nvidiafu-zong-c-构建agent的-正确方式-哔哩哔哩-5adab385.md"
+risk: high
+created: 2026-09-16T15:22:33.619Z
+---
+
+# Ingest proposal: NVIDIAfu'zong'c：构建Agent的 正确方式 - 哔哩哔哩
+
+<!-- syno:json:start -->
+```json
+{
+  "id": "ingest-8a5a8804",
+  "candidateId": "candidate-d494b762",
+  "status": "applied",
+  "suggestedPath": "vault/00-Inbox/nvidiafu-zong-c-构建agent的-正确方式-哔哩哔哩-5adab385.md",
+  "suggestedTags": [
+    "ai_agent",
+    "video_transcript",
+    "bilibili",
+    "harness_engineering",
+    "context_engineering",
+    "skills"
+  ],
+  "suggestedLinks": [
+    "vault/00-Inbox/linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d.md",
+    "vault/01-Areas/AI Agent Development/04-Context Engineering/4-9 Agent 的记忆系统.md",
+    "vault/01-Areas/AI Agent Development/07-Framework/7-1 LangGraph 实战.md"
+  ],
+  "risk": "high",
+  "created": "2026-09-16T15:22:33.619Z",
+  "sourceDescriptor": {
+    "kind": "url",
+    "originalUrl": "https://www.bilibili.com/opus/1210245337936035863",
+    "canonicalUrl": "https://www.bilibili.com/opus/1210245337936035863",
+    "publisher": "www.bilibili.com",
+    "observedAt": "2026-09-16T15:22:33.544Z",
+    "capturedAt": "2026-09-16T15:22:33.544Z",
+    "captureChannel": "web",
+    "sourceTier": "secondary",
+    "reliability": "unverified",
+    "userSuppliedSource": true,
+    "verificationStatus": "unverified"
+  },
+  "sourceType": "bilibili-opus",
+  "sourceProfile": {
+    "ingestWorkflow": "bilibili_opus_ingest_v2",
+    "primarySource": "column",
+    "opusId": "1210245337936035863",
+    "sourceTier": "C2",
+    "sourceForm": "dialogue",
+    "contentForm": "dialogue",
+    "dialogueFidelity": "source",
+    "questionSource": "column",
+    "voiceBasis": "direct_speech",
+    "factualStatus": "partial",
+    "factualReviewed": "2026-09-17",
+    "verificationScope": "column_only",
+    "verificationBasis": [
+      "column"
+    ]
+  },
+  "quality": {
+    "status": "accepted",
+    "reasons": [
+      "单篇 opus 专栏，正文为 Alex Kantrowitz 主持的三方对谈（ServiceNow Joe Davis、NVIDIA Adel El Hallak），人物、角色、问答结构完整，来源可追溯。",
+      "内容围绕企业级 Agent 的编排、运行时治理、Harness 与技能封装，与 vault 的 AI Agent 主题高度一致。",
+      "含机制解释（多模型编排、默认拒绝、Harness 定义）、带上下文的数字（90% L1 工单、99% 解决时间缩减、七个代理组成的深度研究蓝图）和真实案例（Zoom 权限、Vespa 预订、销售薪酬查询），密度达标。",
+      "存在自动速览与正文重复、平台 UI 与串场寒暄等噪声，按契约删除后不损知识增量。"
+    ]
+  },
+  "materialTier": "A",
+  "canonicalTags": [
+    "ai_agent",
+    "video_transcript",
+    "bilibili",
+    "harness_engineering",
+    "context_engineering",
+    "skills"
+  ],
+  "duplicateAssessment": {
+    "matches": [
+      "vault/00-Inbox/linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d.md",
+      "vault/01-Areas/AI Agent Development/04-Context Engineering/4-9 Agent 的记忆系统.md",
+      "vault/01-Areas/AI Agent Development/07-Framework/7-1 LangGraph 实战.md",
+      "vault/02-Resources/AI and Agents/B站视频知识库/行业观点与组织/Cognition的Jared-智能体构建原则与云端异步协同.md",
+      "vault/02-Resources/AI and Agents/B站视频知识库/Agent架构与平台/Cursor副总裁-构建软件开发过程的Agent.md"
+    ],
+    "sameSource": false,
+    "updateStatus": "new"
+  },
+  "relations": [
+    {
+      "type": "supports",
+      "target": "vault/02-Resources/AI and Agents/B站视频知识库/行业观点与组织/Cognition的Jared-智能体构建原则与云端异步协同.md",
+      "reason": "两篇都主张智能体构建应顺应模型演进，但本文补充了企业侧证据：模型能力之外，决定性因素是围绕模型的确定性治理层（身份、权限、运行时策略），而非提示词或固定流程技巧。"
+    },
+    {
+      "type": "limits",
+      "target": "vault/02-Resources/AI and Agents/B站视频知识库/Agent架构与平台/Cursor副总裁-构建软件开发过程的Agent.md",
+      "reason": "Cursor 案例把 Agent 自主性推到软件工程深处，本文给出其边界条件：当 Agent 同时具备互联网访问、私有知识库读写和代码执行时构成致命三重奏，必须先有默认拒绝的沙盒运行时才谈得上规模化自主。"
+    },
+    {
+      "type": "applies_to",
+      "target": "vault/01-Areas/AI Agent Development/04-Context Engineering/4-9 Agent 的记忆系统.md",
+      "reason": "记忆系统解决 Agent 跨会话的知识留存，本文的‘技能封装’解决重复工作流的确定性复用，两者在企业场景中互补：记忆提供上下文，技能减少重复推理开销。"
+    },
+    {
+      "type": "extends",
+      "target": "vault/00-Inbox/linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d.md",
+      "reason": "LinkedIn 案例聚焦企业上下文基础设施（工具发现、Playbook、用后提交 PR），本文把同一问题推进到运行时治理层：Open Shell 沙盒、AI 控制塔与策略下发，使上下文基建具备可执行的安全边界。"
+    }
+  ],
+  "mocChanges": [],
+  "claimCandidates": [
+    {
+      "statement": "Agent 不是一个单一模型，而是由前沿模型担任协调与规划、配以多个经微调的专业子代理共同编排的复杂系统。",
+      "stability": "model",
+      "reviewAfter": "2027-09-16"
+    },
+    {
+      "statement": "当 Agent 同时获得互联网访问、私有知识库读写和代码执行三项能力时，会形成‘致命三重奏’，必须先施加运行时控制才可进入企业环境。",
+      "stability": "principle",
+      "reviewAfter": "2027-03-16"
+    },
+    {
+      "statement": "企业级 Agent 的确定性来自包裹在概率性 LLM 之外的 Harness：身份、权限、工具集与运行时策略，而非来自模型本身。",
+      "stability": "principle",
+      "reviewAfter": "2027-03-16"
+    },
+    {
+      "statement": "把重复性工作流封装为‘技能’，可避免 Agent 每次重新探索流程，从而降低推理开销并提升执行一致性。",
+      "stability": "practice",
+      "reviewAfter": "2027-03-16"
+    },
+    {
+      "statement": "ServiceNow 内部 90% 的一级支持工单已由 AI Agent 自动处理，解决时间最多缩短 99%。",
+      "stability": "volatile",
+      "reviewAfter": "2027-01-16"
+    }
+  ],
+  "evidenceCandidates": [
+    {
+      "claimRef": "claim-1",
+      "sourceRef": "https://www.bilibili.com/opus/1210245337936035863",
+      "sourceTier": "primary",
+      "stance": "supports",
+      "excerpt": "代理不是一个单一的模型。我们坚信代理是由一系列不同的模型组成的……一个负责深入研究的蓝图或代理，实际上是由不少于七个代理组成的。",
+      "observedAt": "2026-09-16"
+    },
+    {
+      "claimRef": "claim-2",
+      "sourceRef": "https://www.bilibili.com/opus/1210245337936035863",
+      "sourceTier": "primary",
+      "stance": "supports",
+      "excerpt": "这个三重奏是指：当你同时拥有对互联网的访问权、对内部知识库的访问权以及编码终端时。这三者中任选其二，没问题；但如果三者兼具，你就得开始担心了。",
+      "observedAt": "2026-09-16"
+    },
+    {
+      "claimRef": "claim-3",
+      "sourceRef": "https://www.bilibili.com/opus/1210245337936035863",
+      "sourceTier": "primary",
+      "stance": "supports",
+      "excerpt": "核是一个进行推理和规划的 LLM，但它周围有一个 Harness，提供了很多确定性……你围绕它构建了大量的确定性，使其变得安全。",
+      "observedAt": "2026-09-16"
+    },
+    {
+      "claimRef": "claim-5",
+      "sourceRef": "https://www.bilibili.com/opus/1210245337936035863",
+      "sourceTier": "primary",
+      "stance": "supports",
+      "excerpt": "我们已经自动化了 90% 的支持请求，所以我们的大多数问题都能立即得到解决，没有人需要等待。",
+      "observedAt": "2026-09-16"
+    }
+  ],
+  "unresolved": [
+    "‘90% 一级工单自动化 / 解决时间缩短 99%’为企业方自述数据，未找到可独立核验的公开来源，只能作为厂商口径引用。",
+    "‘OpenClaw 在几周内成为 GitHub 增长最快项目、超越 Linux 与 React’为节目中的口头说法，未核验。",
+    "‘Project Arc 将提供 20 个自主代理’属于未来计划表述，落地情况未确认。",
+    "专栏未给出录制日期与发布年份，事实核验日期只能记为本次收录日。",
+    "专栏中的‘AI 控制塔’与 MOC 中既有治理类条目的命名对应关系未确认，需回链时人工校对。"
+  ],
+  "validators": [
+    "source_traceability",
+    "duplicate",
+    "retention",
+    "frontmatter",
+    "relation_quality",
+    "factual_status",
+    "unresolved",
+    "voice_integrity",
+    "numeric_context",
+    "constraints_preserved",
+    "question_independence",
+    "discussion_readiness"
+  ],
+  "sourceDigest": "0014d88716a51b543f0324b9790b7b1e0b6db2f2a36fc11eb2ff456745e69c14",
+  "existingNoteRef": "vault/00-Inbox/linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d.md",
+  "canonicalBody": "# ServiceNow 与 NVIDIA：企业级 Agent 的运行时治理与 Harness\n\n> 对谈三方：主持人 Alex Kantrowitz，ServiceNow 人工智能工程与交付执行副总裁 Joe Davis，NVIDIA 产品管理、代理式人工智能副总裁 Adel El Hallak。\n> 主题：Agent 从试点走向企业级生产，靠的不是一个全能模型，而是一套能把概率性模型约束住的东西。\n>\n> **核心主张：** 企业级 Agent 的关键在于用确定性的 Harness——身份、权限、沙盒运行时和预设技能——包裹概率性的 LLM，让自主性在可强制执行的策略边界内运行。\n\n> 缰绳变得更好了，运行时也变得更安全了。\n> ——Adel El Hallak\n\n## 开场\n\n- 为什么 NVIDIA 与一家软件公司坐到一起：双方多年共同微调模型并开源，也在生产环境合作，例如 AI 控制塔。\n- Joe Davis 说合作始于 2018—2019 年；他们与所有模型供应商合作，但坚持自研开源模型并用自己的硬件跑。\n- 双方共同发布基准测试，前沿模型据此训练，最终让企业场景的用例受益。\n\n## 01 Agent 是一堆模型编出来的系统\n\n**核心判断：** Agent 不是单一模型，而是前沿模型负责协调与规划、多个微调专业子代理负责执行的多模型系统。\n\n**主持人：** 人们记住的是 Claude、Cowork 这类品牌名，会说自己喜欢某个模型组合吗？多模型协作是 ServiceNow 的特例，还是这类产品本来就这么造？\n\n**Adel El Hallak：** 用户看不到幕后的编排。以双方共建的深度研究蓝图（IQ）为例，它由不少于七个代理组成：\n\n- 协调器代理（Orchestrator）像团队负责人，用 Anthropic 的 Claude Opus 或 OpenAI 的 GPT 效果最好。\n- 规划器（Planner）坐在负责人旁边，唯一职责是维护任务与待办清单，完成即划掉。\n- 一堆子研究员代理（Sub-researcher）用 Nemotron 做过后训练与微调，各有不同专长。\n- 光子研究就分三类：擅长批判的、擅长收集事实的、擅长预判后续步骤的。\n\n**Joe Davis：** 这不是理论，ServiceNow 就是这么跑的，模型从前沿到微调，跑在基于 NVIDIA 软件构建的 GPU 集群上。选择把任务发给哪个模型，本质是在准确性与效率之间权衡。\n\n## 02 致命三重奏是进入企业的门槛\n\n**核心判断：** 互联网访问、私有知识库读写、代码执行三者同时具备会形成致命三重奏，企业必须先解决运行时控制问题。\n\n**主持人：** 请先讲讲“爪子”和“开放爪子”的兴起。\n\n**Joe Davis：** “爪子”要解决的问题是给员工配 24 小时在线的数字助手，接管收件箱、Slack、研究报告和对外沟通。它能访问员工本人能访问的一切并代为行动。问题在于人们不完全信任它——强大但难以驾驭，缺少边界。\n\n**Adel El Hallak：** “无限制的自主性”正展示了这种潜力：OpenClaw 成为 GitHub 上增长最快的项目，几周内超过 Linux 和 React。但企业安全负责人谈的是致命三重奏——互联网访问、内部知识库访问、编码终端，三者任选其二没问题，三者兼具就要开始担心。\n\n**主持人：** 人们实际怎么用？让它跑在独立机器上，给它一个邮箱，下达“我需要在意大利租一辆 Vespa”，它会联系罗马 50 家供应商，挑最便宜或指定日期可用的那辆。\n\n**Adel El Hallak：** 如果商店无法在线沟通，它会自己下载一个文本转语音模型直接打电话完成预订。你只给目标和条件，它想方设法达成——这是它们最惊人的地方。\n\n## 03 方舟计划：沙盒运行时与默认拒绝\n\n**核心判断：** 企业级 Agent 的安全不靠事后审计，而靠运行时强制执行的策略和默认拒绝的沙盒。\n\n**主持人：** 一个能以机器速度工作、访问权限又超过常人的机器人，推出它真的会吓人。你们的项目叫“方舟计划”，怎么实现？\n\n**Joe Davis：** 它跑在企业环境里，不是个人助手类工具。根本问题是：如何创建安全环境，明确 Agent 能访问哪些数据和文件，并由什么策略强制执行。这正是 NVIDIA 发挥作用的地方。\n\n**Adel El Hallak：** 操作一个 Agent 需要模型、可访问的工具集和运行时。Open Shell 是一个开源安全运行时，位于基础设施与 Agent 之间：\n\n- 定义 Agent 运行时能做什么，包括可读写的范围。\n- 在运行时决定路由到哪些 LLM，也就是在行动中控制，而不是事前或事后。\n- 负责管理并启动沙盒，在沙盒内按你定义的策略运行 Agent。\n\n这套思路和管理员工入职一样：不直接给机器和全部内部系统的访问权，而是按角色和任务限定可见范围与可用 API。\n\n**Joe Davis：** ServiceNow 提供跑在沙盒内、连到云端的桌面应用，由 Open Shell 强制执行行动指令；AI 控制塔负责监控公司里这些 Agent 的运行情况，提供可见性并做云级治理，例如发现某台机器上的异常攻击行为，也能用于推行全公司政策。\n\n## 04 用确定性的 Harness 约束概率性的 LLM\n\n**核心判断：** LLM 是概率性的，企业要的确定性来自包裹模型的 Harness，而不是模型本身。\n\n**主持人：** Mark Cuban 说过，新员工未必懂政策，但知道行为的后果；AI 不懂后果，怎么在它行为不端时约束它？而且 AI 每次答案可能不同，怎么保证它始终守参数？\n\n**Joe Davis：** 模型确实不像人那样有伦理道德，所以治理更重要。查看工资、试图入侵 Workday 在道德上不对，人知道不该做，Agent 不知道且有这个能力。真正依赖的是治理与安全：运行时、权限和信任。\n\n**主持人：** 但你怎么知道它听？\n\n**Joe Davis：** 运行时强制执行。Agent 有一个由我们提供的身份和权限，我们有权允许或阻止它访问系统。这是确定性的过程，100% 在我们掌控之内。\n\n**Adel El Hallak：** 启动 Open Shell 时，沙盒里 Agent 的默认运行时权限就是“否”，必须明确授予特定进程或行动权限。LLM 的防护栏仍然存在，只是与 Open Shell 互补：防护栏管它不能说什么，运行时防护管它能做什么。\n\n**Joe Davis：** 那些 Agent 突破沙盒、在开发者午休时发邮件的案例，说明沙盒执行不足或环境默认放开了权限。“默认拒绝”是很大的安全网，也可以理解为零信任。\n\n## 05 技能封装让重复任务不再重新推理\n\n**核心判断：** 把重复工作流封装成技能，是用确定性换取效率的关键手段，也是 Harness 的一部分。\n\n**Adel El Hallak：** 当你反复做同一件事，就可以把它封装成一项技能。技能是一组用人类语言写成的指令，用于达成预期结果。比如“每周五在纽约帮我约 Alex 和 Joe 吃午饭”，不必每次都让它重新想 Alex 是谁、Joe 是谁、该用哪个日历、去 Exchange 哪里找。它仍用 LLM，没有完美确定性，但技能会转成具体结果，而且不必每次重新探索流程，执行更有效率。\n\n**Adel El Hallak：** 与 ServiceNow 合作中，除了方舟计划，他们还会提供 20 个自主代理，各自擅长特定任务、流程更规范，与方舟计划带来的自主代理互补。\n\n**主持人：** 用大白话解释一下 Harness？\n\n**Adel El Hallak：** 我不喜欢“脚手架”这个词。Harness 就是你允许模型访问的工具集：模型加 Harness 等于一个 Agent 加一个运行时，包括文件系统访问、代码解释器这类预设工具，以及它有权访问的 MCP 工具或技能。曾经一切都围绕模型，模型变强 Agent 就变强；现在流行的是 Harness 工程，很多研究表明 Harness 的改进会转化为 Agent 更好的结果。\n\n**Joe Davis：** 补充一点，Harness 也可以理解成编排器：它是一个循环，试图完成定义的任务并拥有对应工具访问权。给 Harness 配哪些工具，直接决定 Agent 在特定环境中的能力——能写代码就能做非常动态的事，不能写就只能更静态、更预定义。\n\n## 06 L1 AI IT 专家：90% 工单自动化\n\n**核心判断：** 在企业 ITSM 这类规范化流程里，Agent 已能承担一级分流并大幅压缩解决时间。\n\n**Joe Davis：** 典型场景是员工想装 Zoom 却没有权限，以前要提交事件单，另一端的人登录系统开通，中间可能积压几天。现在 AI 像一级分流员，接到请求后深入研究，判断自己能否直接开通，Harness 就是判断“可以”或“不可以”的那个东西。\n\n**Adel El Hallak：** 它会读文档、看截图，确定无法有足够信心解决时，会把上下文整理好交给人工支持工程师，例如提示“不是重置问题，也不是 Zoom 访问问题，可能是某个东西被拦截了”，给人工一个继续深入的起点。\n\n**Joe Davis：** 我们用 ServiceNow 跑自己的服务，已经自动化了 90% 的支持请求，大多数问题立即解决，没人需要等待。解决时间最多缩短 99%。\n\n**Adel El Hallak：** 这个 90% 的说法我在 GTC 上听 Bill McDermott 讲过，指的是 90% 的 L1 工单。\n\n## 限制与边界\n\n- 90% 自动化与 99% 解决时间缩减都是企业方自述，本文未独立核验。\n- 方舟计划与 20 个自主代理是面向未来的计划表述，落地形态待观察。\n- 默认拒绝能防住越权，但前提是运行时本身可信；专栏提到的沙盒被绕过案例说明执行不彻底就会失效。\n- 这套做法建立在 ServiceNow 式大型企业流程上，是否适用于流程尚未规范化的团队，专栏没有回答。\n\n## 知识连接\n\n- **支持** [[Cognition的Jared-智能体构建原则与云端异步协同]]：都在说智能体构建要顺应模型演进；本文补上企业侧证据，决定成败的是模型外面那层确定性治理。\n- **限制** [[Cursor副总裁-构建软件开发过程的Agent]]：Cursor 把自主性推进到软件工程深处，本文给出边界条件——三权兼具前必须先有默认拒绝的沙盒运行时。\n- **应用于** [[4-9 Agent 的记忆系统]]：记忆解决跨会话的知识留存，技能封装解决重复流程的确定性复用，企业场景里两者互补。\n- **补充** [[linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d]]：LinkedIn 讲上下文基建，本文把它推进到运行时治理层：沙盒、控制塔与策略下发。\n\n## 来源说明\n\n- 来源：B站专栏 opus 1210245337936035863（NVIDIA 副总裁：构建 Agent 的正确方式）。\n- 收录范围：只读专栏文字与页面元数据；未扫描 UP 主空间，未读取图片，未进入 ASR，未读取 transcript 或 Recastory。\n- 声音依据：正文问答均来自专栏记录的直接引语，发言人可归属；主持人姓名以专栏正文给出为准。\n- 事实状态：partial。专栏忠实保留来源内容，但文中企业数据、GitHub 增长说法与未来计划均未独立核验，仅作检索线索，关键数字引用前需回到原始来源核对。",
+  "rulesDigest": "67591166536f7a62288f7b77759be8155d0543f4871a90a692f340f0e3c61f86",
+  "sourceReport": {
+    "workflow": "bilibili_opus_ingest_v2",
+    "sourceId": {
+      "opus": "1210245337936035863",
+      "column": "",
+      "bv": ""
+    },
+    "route": {
+      "sourceTier": "C2",
+      "materialTier": "A",
+      "sourceForm": "dialogue",
+      "contentForm": "dialogue",
+      "dialogueFidelity": "source",
+      "questionSource": "column",
+      "voiceBasis": "direct_speech"
+    },
+    "targetPath": "vault/00-Inbox/nvidiafu-zong-c-构建agent的-正确方式-哔哩哔哩-5adab385.md",
+    "sourcesRead": [
+      "column"
+    ],
+    "sourcesSkipped": [
+      "images",
+      "transcript",
+      "recastory",
+      "original_page"
+    ],
+    "retention": {
+      "totalUnits": 13913,
+      "retained": 4874,
+      "removed": 9039,
+      "unresolved": 5
+    },
+    "relatedNotes": [
+      "vault/02-Resources/AI and Agents/B站视频知识库/行业观点与组织/Cognition的Jared-智能体构建原则与云端异步协同.md",
+      "vault/02-Resources/AI and Agents/B站视频知识库/Agent架构与平台/Cursor副总裁-构建软件开发过程的Agent.md",
+      "vault/01-Areas/AI Agent Development/04-Context Engineering/4-9 Agent 的记忆系统.md",
+      "vault/00-Inbox/linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d.md"
+    ],
+    "conceptCandidates": [
+      "ai_agent",
+      "video_transcript",
+      "bilibili",
+      "harness_engineering",
+      "context_engineering",
+      "skills"
+    ],
+    "mocUpdates": [],
+    "checks": {
+      "duplicate": true,
+      "sourceCompleteness": true,
+      "provenance": true,
+      "retentionCoverage": true,
+      "dialoguePlan": true,
+      "voiceIntegrity": true,
+      "numericContext": true,
+      "constraintsPreserved": true,
+      "relationQuality": true,
+      "discussionReadiness": true,
+      "frontmatter": true,
+      "wikilinks": true,
+      "semanticReview": false
+    },
+    "unresolved": [
+      "‘90% 一级工单自动化 / 解决时间缩短 99%’为企业方自述数据，未找到可独立核验的公开来源，只能作为厂商口径引用。",
+      "‘OpenClaw 在几周内成为 GitHub 增长最快项目、超越 Linux 与 React’为节目中的口头说法，未核验。",
+      "‘Project Arc 将提供 20 个自主代理’属于未来计划表述，落地情况未确认。",
+      "专栏未给出录制日期与发布年份，事实核验日期只能记为本次收录日。",
+      "专栏中的‘AI 控制塔’与 MOC 中既有治理类条目的命名对应关系未确认，需回链时人工校对。"
+    ],
+    "status": "incomplete"
+  },
+  "proposalDigest": "9b7a9cff7c7d7adf2f5c733c06b067fb5e2cb5bf493f8c7492d7d75575de781f"
+}
+```
+<!-- syno:json:end -->

@@ -1,0 +1,17 @@
+---
+title: Generate table of contents
+tags: [prompting, content_creation]
+created: 2026-06-11
+source: 02-Resources/Prompts/Content Creation/Generate table of contents.md
+description: Prompt 模板：为输入文本生成分级目录（H1/H2/H3 等合适层级、含页码）
+---
+
+---
+copilot-command-context-menu-enabled: false
+copilot-command-slash-enabled: false
+copilot-command-context-menu-order: 1080
+copilot-command-model-key: ""
+copilot-command-last-used: 0
+---
+
+Generate a hierarchical table of contents for {}. Use appropriate heading levels (H1, H2, H3, etc.). Include page numbers if present. Return only the table of contents.

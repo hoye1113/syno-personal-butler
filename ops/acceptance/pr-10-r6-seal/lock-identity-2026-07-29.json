@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "runAt": "2026-07-29T21:13:22+08:00",
+  "commit": "3d67f112d7e7101192f70d89c3ea5f2e99a186b9",
+  "taskRestart": "authorized_stop_start",
+  "taskState": "running",
+  "hostHealth": "ready",
+  "lockInspection": {
+    "status": "running",
+    "identityVerification": "windows_process_start_time",
+    "ownerMetadataExposed": false
+  },
+  "result": "passed",
+  "notes": "仅记录脱敏状态；未保存 PID、实例 ID、路径或凭据。"
+}

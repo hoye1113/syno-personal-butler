@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "generatedBy": "automation",
+  "generatedAt": "2026-07-29T00:00:00+08:00",
+  "status": "pending_owner",
+  "performedBy": "",
+  "result": "pending",
+  "checks": [
+    { "id": "mobile-cross-channel-30", "category": "mobile", "expected": "微信与飞书共 30 条真实跨渠道消息，原渠道 ACK/Final 正确", "performedBy": "", "result": "pending", "evidenceRef": "" },
+    { "id": "mobile-multiturn-10", "category": "mobile", "expected": "10 组多轮追问连续且不串 Owner/Session", "performedBy": "", "result": "pending", "evidenceRef": "" },
+    { "id": "tool-registry-5", "category": "effects", "expected": "5 次 ToolRegistry 调用均有 Direct Effect/Business Outcome 边界", "performedBy": "", "result": "pending", "evidenceRef": "" },
+    { "id": "writes-3", "category": "policy", "expected": "3 次明确写入按当前 Policy 执行并可恢复", "performedBy": "", "result": "pending", "evidenceRef": "" },
+    { "id": "ambiguity-3", "category": "clarification", "expected": "3 次系统歧义澄清与一次收录多方案澄清", "performedBy": "", "result": "pending", "evidenceRef": "" },
+    { "id": "recovery-windows", "category": "recovery", "expected": "ACK 后、Direct Effect 后、Final 发送后崩溃均可收敛", "performedBy": "", "result": "pending", "evidenceRef": "" },
+    { "id": "provider-queue", "category": "recovery", "expected": "Provider 不可用时移动请求持久排队并恢复", "performedBy": "", "result": "pending", "evidenceRef": "" },
+    { "id": "decision-cross-channel", "category": "decision", "expected": "单/多 Decision、过期与跨渠道处理不重复执行", "performedBy": "", "result": "pending", "evidenceRef": "" },
+    { "id": "unknown-mobile", "category": "reconciliation", "expected": "微信和飞书各处理隔离 Unknown Case，不复用旧 Invocation Key", "performedBy": "", "result": "pending", "evidenceRef": "" },
+    { "id": "capture-formats", "category": "capture", "expected": "Markdown、PDF/DOCX、浏览器抓取、Chunk 部分失败和恢复", "performedBy": "", "result": "pending", "evidenceRef": "" },
+    { "id": "host-restart", "category": "windows", "expected": "第二 Host 拒绝、OpenCode/Workflow/Outbox 恢复", "performedBy": "", "result": "pending", "evidenceRef": "" },
+    { "id": "windows-cold-start", "category": "windows", "expected": "Windows 下次登录冷启动；注销/重登由 Owner 亲自操作", "performedBy": "", "result": "pending", "evidenceRef": "" }
+  ],
+  "notes": "自动化只能生成模板。不得由测试、探针或 Codex 填写 performedBy=owner/result=passed；不保存私人正文、Token、Cookie 或密钥。"
+}

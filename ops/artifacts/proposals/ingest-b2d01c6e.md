@@ -1,0 +1,263 @@
+---
+id: ingest-b2d01c6e
+candidateId: candidate-3528611b
+status: applied
+suggestedPath: "vault/00-Inbox/linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d.md"
+risk: high
+created: 2026-09-16T14:58:39.051Z
+---
+
+# Ingest proposal: LinkedIn 工程师：领英的AI Agent 开发和部署实践 - 哔哩哔哩
+
+<!-- syno:json:start -->
+```json
+{
+  "id": "ingest-b2d01c6e",
+  "candidateId": "candidate-3528611b",
+  "status": "applied",
+  "suggestedPath": "vault/00-Inbox/linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d.md",
+  "suggestedTags": [
+    "ai_agent",
+    "context_engineering",
+    "mcp",
+    "harness_engineering",
+    "bilibili"
+  ],
+  "suggestedLinks": [
+    "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/5-前端 Agent 面试题/5-5 五、持久化、可靠性与生产实践.md",
+    "vault/01-Areas/AI Agent Development/03-Tool System/3-4 MCP 的工程真相.md",
+    "vault/01-Areas/AI Agent Development/04-Context Engineering/4-2 System Prompt 工程化与 Context Rot.md"
+  ],
+  "risk": "high",
+  "created": "2026-09-16T14:58:39.051Z",
+  "sourceDescriptor": {
+    "kind": "url",
+    "originalUrl": "https://www.bilibili.com/opus/1248096025733759001",
+    "canonicalUrl": "https://www.bilibili.com/opus/1248096025733759001",
+    "publisher": "www.bilibili.com",
+    "observedAt": "2026-09-16T14:58:38.929Z",
+    "capturedAt": "2026-09-16T14:58:38.929Z",
+    "captureChannel": "web",
+    "sourceTier": "secondary",
+    "reliability": "unverified",
+    "userSuppliedSource": true,
+    "verificationStatus": "unverified"
+  },
+  "sourceType": "bilibili-opus",
+  "sourceProfile": {
+    "ingestWorkflow": "bilibili_opus_ingest_v2",
+    "primarySource": "column",
+    "opusId": "1248096025733759001",
+    "sourceTier": "C2",
+    "sourceForm": "lecture",
+    "contentForm": "dialogue",
+    "dialogueFidelity": "reconstructed",
+    "questionSource": "editorial",
+    "voiceBasis": "direct_speech",
+    "factualStatus": "partial",
+    "factualReviewed": "2026-09-16",
+    "verificationScope": "column_only",
+    "verificationBasis": [
+      "column"
+    ]
+  },
+  "quality": {
+    "status": "accepted",
+    "reasons": [
+      "Bilibili opus column captured through authenticated browser; source completeness is C2 because no original BV mapping is available.",
+      "核心命题、机制、数字与经验教训齐备：企业智能体失败源于内部上下文缺失，MCP 工具→Playbook 说明→元工具检索→自我改进闭环构成完整因果链",
+      "含可核验的具体数字（1300+ 工具、600+ Playbook、8000+ 日活用户、1000+ 代码仓库、每周训练营、三四十个工具上限、每小时自动更新），均带上下文",
+      "带明确的限制与张力：工具超过三四十个后上下文质量下降、文档过时与矛盾、上下文过载、无持久记忆",
+      "主题命中 vault 主 tag（ai_agent / context_engineering / mcp / harness_engineering），与既有笔记存在真实关系",
+      "正文为讲者第一人称直接陈述，声音可归属，未见第三方总结或编辑代笔痕迹"
+    ]
+  },
+  "materialTier": "A",
+  "canonicalTags": [
+    "ai_agent",
+    "context_engineering",
+    "mcp",
+    "harness_engineering",
+    "bilibili"
+  ],
+  "duplicateAssessment": {
+    "matches": [
+      "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/5-前端 Agent 面试题/5-5 五、持久化、可靠性与生产实践.md",
+      "vault/01-Areas/AI Agent Development/03-Tool System/3-4 MCP 的工程真相.md",
+      "vault/01-Areas/AI Agent Development/04-Context Engineering/4-2 System Prompt 工程化与 Context Rot.md",
+      "vault/01-Areas/AI Agent Development/06-Harness Engineering/6-3 部署与调度.md",
+      "vault/01-Areas/AI Agent Development/04-Context Engineering/4-10 记忆的五种失效模式.md"
+    ],
+    "sameSource": false,
+    "updateStatus": "new"
+  },
+  "relations": [
+    {
+      "type": "extends",
+      "target": "vault/01-Areas/AI Agent Development/03-Tool System/3-4 MCP 的工程真相.md",
+      "reason": "Adds the enterprise MCP discovery, Playbook layering, and meta-tool scaling details missing from the protocol-level note."
+    },
+    {
+      "type": "applies_to",
+      "target": "vault/01-Areas/AI Agent Development/06-Harness Engineering/6-3 部署与调度.md",
+      "reason": "Provides a concrete enterprise deployment pattern: preinstalled local MCP, hourly updates, and repository-local Playbooks."
+    },
+    {
+      "type": "limits",
+      "target": "vault/01-Areas/AI Agent Development/04-Context Engineering/4-2 System Prompt 工程化与 Context Rot.md",
+      "reason": "Supplies an operational boundary for context growth: flat exposure beyond roughly 30-40 tools degrades quality, so progressive discovery is required."
+    }
+  ],
+  "mocChanges": [],
+  "claimCandidates": [
+    {
+      "statement": "在大型企业内部，编码智能体落地的瓶颈不是模型接入，而是让模型获得正确的内部工作语境；公开代码训练出的模型不了解内部框架与定制基础设施，会幻觉、卡死或编造错误内容，工程师的纠正成本可能高于手写代码。",
+      "stability": "practice",
+      "basis": "讲者以 LinkedIn 逾千代码仓库、内部框架与定制基础设施为例，直接陈述该失败模式与成本比较。"
+    },
+    {
+      "statement": "把任务说明与提示词也作为 MCP 可调用资源（Playbook），让智能体先识别任务对应的 Playbook、再按其步骤调用工具，能把散落在 Wiki、文档、Slack 中的内部经验从人手临场转述变为可执行链路的一部分。",
+      "stability": "model",
+      "basis": "讲者描述 CCA 系统中 Playbooks 的定义方式：每个 Playbook 有名称与功能描述，智能体可像调用普通工具一样自主调用，说明与上下文作为工具输出返回。"
+    },
+    {
+      "statement": "Playbook 设计遵循两条原则：自包含（只承担一项具体任务）与拆分+引用（大流程由小模块组装），由此获得可复用性与渐进式上下文发现，避免开局塞入大量无关信息。",
+      "stability": "principle",
+      "basis": "讲者明确提出这两条创建原则，并分别说明其好处。"
+    },
+    {
+      "statement": "知识库长期有效的前提是把维护从一次性文档劳动变成使用驱动的改进闭环：智能体在用完 Playbook 后识别过时、矛盾与缺失内容，更新内容、检出仓库并提交 PR，合并后服务下一批使用者。",
+      "stability": "practice",
+      "basis": "讲者描述自我改进闭环的完整步骤，并称其为自学习飞轮。"
+    },
+    {
+      "statement": "MCP 工具数量超过三四十个后，上下文质量与系统性能会下降；替代做法是用搜索、Get Schema、执行三个元工具统一暴露数千个工具与 Playbook，并配套系统指令说明如何高效搜索。",
+      "stability": "practice",
+      "basis": "讲者陈述该扩展瓶颈与元工具方案，并给出当前规模：1300+ 工具、600+ Playbook、每天 8000+ 用户。"
+    }
+  ],
+  "evidenceCandidates": [
+    {
+      "claimRef": "claim-工具数量阈值与元工具扩展",
+      "sourceRef": "https://www.bilibili.com/opus/1248096025733759001",
+      "sourceTier": "primary",
+      "stance": "supports",
+      "excerpt": "如果工具数量超过三四十个，系统的上下文质量和性能就会下降，难以继续扩展。因此，我们没有通过 MCP 暴露所有 Playbook 和工具，而是用三个元工具来替代它们。第一个是搜索。",
+      "observedAt": "2026-09-16"
+    },
+    {
+      "claimRef": "claim-Playbook 作为可调用说明资源",
+      "sourceRef": "https://www.bilibili.com/opus/1248096025733759001",
+      "sourceTier": "primary",
+      "stance": "supports",
+      "excerpt": "它不仅通过 MCP 向智能体提供工具，还允许智能体通过 MCP 访问说明和提示词。",
+      "observedAt": "2026-09-16"
+    },
+    {
+      "claimRef": "claim-企业智能体瓶颈在内部语境",
+      "sourceRef": "https://www.bilibili.com/opus/1248096025733759001",
+      "sourceTier": "primary",
+      "stance": "supports",
+      "excerpt": "工程师不得不手动提示这些智能体，让它们做正确的事，这反而比直接手写代码花的时间还多。",
+      "observedAt": "2026-09-16"
+    },
+    {
+      "claimRef": "claim-使用驱动的知识维护闭环",
+      "sourceRef": "https://www.bilibili.com/opus/1248096025733759001",
+      "sourceTier": "primary",
+      "stance": "supports",
+      "excerpt": "我们鼓励智能体在使用某个 Playbook 后，于会话结束时总结经验，识别过时信息、矛盾之处或缺失内容。",
+      "observedAt": "2026-09-16"
+    }
+  ],
+  "unresolved": [
+    "来源为专栏文字与摘要，未读取官方原视频页，无法核对讲者现场原话、问答环节与幻灯片内容；verification_scope 只能标 column_only。",
+    "1300+ 工具、600+ Playbook、日活 8000+ 用户、逾 1000 个代码仓库、三四十个工具阈值等数字均为讲者自述，无独立第三方来源核对。",
+    "CCA（Code, Contextual Agent, Playbooks and Tools）系统的具体版本、发布时间与当前是否对外公开，来源未提供可核验指引。",
+    "来源未说明 Playbook 的作者审核流程、权限边界与误改风险，自我改进闭环的失败模式未被讨论。"
+  ],
+  "validators": [
+    "source_traceability",
+    "duplicate",
+    "retention",
+    "frontmatter",
+    "relation_quality",
+    "factual_status",
+    "unresolved"
+  ],
+  "sourceDigest": "1dc1317a49aba35e0dac5798357645f49bf0a3e9e7e7c78b261faea10d923df5",
+  "existingNoteRef": "vault/02-Resources/AI and Agents/Loock AI 全栈应用开发/5-前端 Agent 面试题/5-5 五、持久化、可靠性与生产实践.md",
+  "canonicalBody": "# LinkedIn 工程师：企业编码智能体的上下文基础设施\n\n> 讲者：Ajay Prakash，LinkedIn 软件工程师。主题：LinkedIn 如何通过上下文工程让编码智能体真正理解企业内部系统。\n>\n> 全篇围绕一个判断展开：模型能力之外，决定智能体能否可靠完成工作的，是可发现、可执行、可持续更新的上下文基础设施。\n>\n> **核心主张：** 企业智能体失败常因不懂内部系统；工具让智能体找到内部做法，Playbook 让经验变成可调用的操作说明，用后提交 PR 让知识库保持新鲜。\n\n> 仅仅给所有工程师提供最新、最先进的工具和模型，是远远不够的。如果不构建让智能体能够在企业内部运行的正确基础设施，这些工具和模型就不会真正高效。\n> ——Ajay Prakash\n\n## 开场\n\n讲者用一个值班场景开场。某项服务的错误数激增，工程师把告警链接交给 Claude Code 或 GitHub Copilot 这类编码智能体，智能体在后台取来公司内部关于该问题的调试说明，据此判断告警对应的具体服务，取来处理该服务所需的上下文，抓取日志与指标，定位根因，找出缓解步骤，汇总反馈给工程师。得到确认后它代为执行缓解操作，再把错误指标与监控面板写入事件管理系统，检出代码并创建修复根因的 PR。整个过程几分钟，人工通常要几小时。\n\n这一流程依托 LinkedIn 自建系统 CCA，即 Code, Contextual Agent, Playbooks and Tools。讲者说明今天要讲的是为什么建、怎么建、学到了什么。\n\n## 01 企业智能体为什么在内部环境失效\n\n**核心判断：** 编码智能体在 LinkedIn 这类大型企业里不奏效，根因是训练数据来自公开开源仓库，模型不了解内部框架与定制基础设施。\n\n**编者问：** 大型企业内部用编码智能体，最先卡在哪一步？\n\n**讲者：** 编码智能体或大语言模型都在公开的开源代码仓库上训练，因此不了解 LinkedIn 成熟代码库的情况，也不了解内部框架和内部系统。结果工程师尝试氛围编程时，智能体因为缺乏上下文而出现三类失败：产生幻觉、卡在中途，以及更危险的——编造错误的内容。\n\n工程师不得不手动提示智能体做正确的事，反而比直接手写代码花的时间更多。于是很多人回到了手动编码，智能体既没能有效理解问题，也没能提供更多视角。\n\n规模可以说明这个断层有多大：\n\n- LinkedIn 有超过一千个代码仓库，构成数千个微服务和应用\n- 这些应用和服务大多建立在各种内部框架和库之上\n- 还有大量定制开发的基础设施，例如自研数据库、实验与追踪平台，以及完全内部使用的配置管理系统\n- 新工程师入职时，公司会安排为期一周的训练营，专门用来熟悉这些系统\n\n讲者提出的问题是：怎样才能让 Cursor、Claude Code 或 GitHub Copilot 这样的编码智能体充分理解 LinkedIn 的内部系统，交付工程师可以信赖的代码——不仅是正确，质量也要达到真正工程师编写的水平。\n\n## 02 MCP 工具先让智能体找到内部做法\n\n**核心判断：** 用 MCP 把内部能力暴露给智能体，第一个工具是代码搜索，之后每接入一个内部工具，系统价值呈复利增长。\n\n**编者问：** 让智能体理解内部系统，第一步做了什么？\n\n**讲者：** 2025 年初 Anthropic 发布 MCP，很快成为业界构建智能体工具的标准。LinkedIn 很早就在 MCP 之上构建了自己的内部 MCP，第一个工具是代码搜索。\n\nLinkedIn 的代码搜索系统本身很先进，支持关键词、自定义过滤器等方式在数千个代码仓库中检索。通过 MCP 把它提供给编码智能体后，工程师不再需要手动摸索如何搜索：直接问智能体“我该如何配置某项功能”，智能体就能用代码搜索找到内部正确实现，据此回答或直接完成实现。\n\n随后接入的工具依次是：\n\n- 文档\n- Jira\n- Slack\n- 所有数据平台\n- 功能开关\n\n每增加一个内部 MCP 工具，系统就创造更多价值，形成复利效应。工程师可以把产品需求文档、设计文档和处于不同上下文的 Jira 任务一起交给智能体，自动化或辅助完成编码工作。\n\n## 03 工具齐全仍不足以完成复杂工作流\n\n**核心判断：** 只连工具不够，复杂工作流还缺三样东西——集中可取的内部经验、可控的上下文占用、以及跨会话的持久记忆。\n\n**编者问：** 工具接得足够多，智能体就能端到端完成任务了吗？\n\n**讲者：** 不够。即使只是稍微复杂的工作流，智能体也往往完成不好。它能回答问题、回答一些基础问题、找到代码示例，但无法可靠地端到端完成一项完整工作。\n\n要具体完整地完成任务，它需要大量只有内部人才掌握的经验，例如如何修复某种错误、如何配置系统、如何调试某条错误日志。这些知识可以通过工具访问，但散落在许多地方：\n\n- 文档\n- Wiki\n- Slack 对话\n- 各团队的口头传承\n\n而且很多时候文档和 Wiki 已经过时，或者存在重复文档。即使智能体能访问这些工具，也还是会迷失。\n\n第二个问题是上下文过载。智能体使用的工具越多，上下文越容易过载。每个工具的输出都占用上下文空间，最终迫使智能体在工作中途压缩上下文，导致部分信息丢失，然后又得从头开始。\n\n第三个问题是无法保留经验。即使智能体弄清了所有细节，也没有持久记忆。每次工程师让它执行某项任务，都得从头开始。\n\n## 04 Playbook：把经验变成可调用的操作说明\n\n**核心判断：** 把任务说明与提示词本身也作为 MCP 可调用资源提供给智能体，让组织知识从人手临场转述变成执行链路的一部分。\n\n**编者问：** 这三个问题怎么解？\n\n**讲者：** 答案是立即把说明提供给智能体。LinkedIn 在 2025 年初构建并发明了一套名为 Playbooks 的系统。它不仅通过 MCP 向智能体提供工具，还允许智能体通过 MCP 访问说明和提示词。\n\n每个 Playbook 看起来就像普通工具，有名称和功能描述。智能体可以像调用普通工具一样自主决定调用某个 Playbook。调用后，其中的说明和上下文作为工具输出返回给编码智能体。这样，智能体既拥有工具，也拥有如何使用这些工具来配置或完成任务的说明。\n\n以配置 Airflow DAG 为例，智能体的行为是：\n\n- 判断“我有一个专门用于完成这项任务的 Playbook”\n- 先调用该 Playbook 获取信息\n- 遵循其中说明，调用相关工具完成任务\n\n## 05 Playbook 的设计原则与自我改进闭环\n\n**核心判断：** Playbook 要自包含、要拆小再引用，才能被正确选择和复用；而知识库保鲜靠把维护变成使用驱动的 PR 闭环。\n\n**编者问：** 当公司里每个人都能建 Playbook 时，怎么保证它们好用？\n\n**讲者：** LinkedIn 的任何人都可以创建一个 Playbook，提交到代码仓库，提供给公司其他人使用。随着 Playbook 数量增长，团队提出了两条创建时必须遵循的原则。\n\n第一条，Playbook 应当自包含，只负责一项非常具体的任务。如果它用于配置 Airflow DAG，那么说明和构建内容都应围绕这一项任务。这样能帮助智能体为正确的任务选择正确的 Playbook。\n\n第二条，把大型 Playbook 拆分成多个更小的 Playbook，然后在大型 Playbook 中引用这些小 Playbook。这条原则有两个好处：\n\n- 可复用性：自包含的小 Playbook 可以被多个 Playbook 复用\n- 渐进式发现上下文：智能体只在需要时读取某个小 Playbook，随着任务推进逐步获取信息，而不是一次性读取全部内容\n\n讲者指出这与后来 Skills 的理念一致，但 LinkedIn 在 Skills 出现之前就已经围绕 Playbooks 构建了整套系统。相比之下 Playbooks 更细致，因为它能通过 MCP 无缝纳入组织和服务的全部上下文，几乎不需要额外配置。\n\n**编者问：** 知识库的内容总会过时，怎么保持新鲜？\n\n**讲者：** 这是任何知识库的主要问题之一。LinkedIn 的做法是把智能体也纳入维护——鼓励智能体在使用某个 Playbook 后，于会话结束时总结经验，识别过时信息、矛盾之处或缺失内容，并思考如何改进 Playbook。然后智能体利用这些上下文更新内容、检出代码仓库、创建 PR。PR 合并后 Playbook 就得到更新。\n\n这就形成一个顺畅的自学习飞轮：知识维护从一次性文档劳动，变成使用驱动的改进闭环，合并后的经验会服务下一位使用者。\n\n## 06 MCP 服务器架构\n\n**核心判断：** 用一台预装到所有公司电脑的本地 MCP 服务器统一提供工具与 Playbook，并在中央与仓库本地之间分层，同时集中处理认证与遥测。\n\n**编者问：** 这套系统在工程上怎么部署和分层？\n\n**讲者：** 系统中有一台本地 MCP 服务器，默认自动安装到所有 LinkedIn 笔记本电脑上。员工加入公司拿到电脑时，它已经预装好。MCP 服务器、Playbooks 或工具一旦更新，所有电脑每小时自动更新。\n\nPlaybook 分两层：\n\n- 中央 Playbook：具有跨领域性质，可应用于多个代码仓库，而不只是某一个仓库\n- 本地 Playbook：专门服务某个代码仓库，可以直接和代码一起提交；只有当编码智能体在该仓库中工作时才会被自动加载\n\n这样就能扩展高度专用于某个仓库的本地 Playbook，而不必担心修改中央仓库。此外，所有 Playbook 和工具都由同一台 MCP 服务器提供服务，便于集中处理身份认证、遥测等事务，并利用这些数据持续改进整个生态系统。\n\n### 07 规模化：元工具与当前体量\n\n**核心判断：** 平铺暴露工具不可扩展，超过三四十个就会拖垮上下文质量；改用搜索、Get Schema、执行三个元工具，才能扩到数千个。\n\n**编者问：** 工具和 Playbook 越堆越多，MCP 本身撑得住吗？\n\n**讲者：** 这是 MCP 的常见问题。如果工具数量超过三四十个，系统的上下文质量和性能就会下降，难以继续扩展。\n\n因此 LinkedIn 没有通过 MCP 暴露所有 Playbook 和工具，而是用三个元工具替代：\n\n- 搜索：智能体先用关键词和标签搜索相关的工具与 Playbook\n- Get Schema：找到合适的工具或 Playbook 后，获取其详细信息\n- 执行：调用对应的工具或 Playbook\n\n配套地，团队控制系统指令，每个编码智能体都预先配置系统指令，说明如何使用这些工具以及如何高效搜索。\n\n这套方案让系统扩展到数千个工具和 Playbook。截至讲者分享时：\n\n- 每天有超过 8,000 名用户使用这套系统及其中的工具与 Playbook\n- 拥有超过 1,300 个工具和超过 600 个 Playbook\n- 使用者不只是工程团队，还有产品经理、设计师和 TPM\n- 不同职能的员工都在使用这些工具，并创建自己的 Playbook 来自动化工作流\n\n## 限制与边界\n\n- 讲者自述的三四十个工具阈值是经验判断，来源未给出测量方法与适用边界，不应直接套用到其他规模或组织。\n- 1,300+ 工具、600+ Playbook、8,000+ 日活等数字均为讲者口述的当前状态，未提供第三方核验渠道。\n- 自我改进闭环只讲了收益，未讨论风险：智能体提交的 PR 由谁审核、错误修改如何回滚、多人同时改同一 Playbook 如何冲突，来源均未涉及。\n- 全文语境是 LinkedIn 这家有逾千仓库、自研数据库与配置系统的大型企业；中小团队缺乏对应的内部基础设施，方案不能直接照搬。\n- 本笔记依据专栏文字整理，未读取官方原视频页，现场问答与幻灯片内容不在核验范围内。\n\n## 知识连接\n\n- **补充** [[3-4 MCP 的工程真相]]：既有笔记讲 MCP 协议本身的能力与硬伤，本来源补上企业落地层的工程方案——本地服务器预装、中央与本地 Playbook 分层、以及用元工具绕过工具数量上限。\n- **应用于** [[6-3 部署与调度]]：既有笔记讨论 Agent 跑在哪、何时跑，本来源给出可对照的实践细节，包括每小时自动更新与随仓库提交的本地 Playbook 自动加载。\n- **限制** [[4-2 System Prompt 工程化与 Context Rot]]：本来源为 Context Rot 给出量化边界，工具数超过三四十个上下文质量与性能即下降，因此必须靠元工具和渐进式发现按需加载，而不是把全部说明塞进上下文。\n\n## 来源说明\n\n- 来源形态：B站图文专栏（opus），单一讲者演讲整理，正文含六个带时间标记的要点小节。\n- 声音归属：全篇回答均为 Ajay Prakash 直接陈述，标 `direct_speech`；无真实主持人，问题由编者按内容推进组织，标 `reconstructed/editorial`。\n- 核验范围：`column_only`。只确认笔记忠实于专栏文字，未读取官方原视频页，外部事实未独立核验。\n- 未决事实见报告 `unresolved` 字段；所有数字与阈值在使用时应保留讲者自述的限定。\n- 图片未读取、未识别、未保存；未扫描 UP 主空间，未进入 ASR 或 transcript 流程。",
+  "rulesDigest": "67591166536f7a62288f7b77759be8155d0543f4871a90a692f340f0e3c61f86",
+  "sourceReport": {
+    "workflow": "bilibili_opus_ingest_v2",
+    "sourceId": {
+      "opus": "1248096025733759001",
+      "column": "",
+      "bv": ""
+    },
+    "route": {
+      "sourceTier": "C2",
+      "materialTier": "A",
+      "sourceForm": "lecture",
+      "contentForm": "dialogue",
+      "dialogueFidelity": "reconstructed",
+      "questionSource": "editorial",
+      "voiceBasis": "direct_speech"
+    },
+    "targetPath": "vault/00-Inbox/linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d.md",
+    "sourcesRead": [
+      "column"
+    ],
+    "sourcesSkipped": [
+      "images",
+      "transcript",
+      "recastory",
+      "original_page"
+    ],
+    "retention": {
+      "totalUnits": 7447,
+      "retained": 5620,
+      "removed": 1827,
+      "unresolved": 4
+    },
+    "relatedNotes": [
+      "vault/01-Areas/AI Agent Development/03-Tool System/3-4 MCP 的工程真相.md",
+      "vault/01-Areas/AI Agent Development/06-Harness Engineering/6-3 部署与调度.md",
+      "vault/01-Areas/AI Agent Development/04-Context Engineering/4-2 System Prompt 工程化与 Context Rot.md"
+    ],
+    "conceptCandidates": [
+      "ai_agent",
+      "context_engineering",
+      "mcp",
+      "harness_engineering",
+      "bilibili"
+    ],
+    "mocUpdates": [],
+    "checks": {
+      "duplicate": true,
+      "sourceCompleteness": true,
+      "provenance": true,
+      "retentionCoverage": true,
+      "dialoguePlan": true,
+      "voiceIntegrity": true,
+      "numericContext": true,
+      "constraintsPreserved": true,
+      "relationQuality": true,
+      "discussionReadiness": true,
+      "frontmatter": true,
+      "wikilinks": true,
+      "semanticReview": false
+    },
+    "unresolved": [
+      "来源为专栏文字与摘要，未读取官方原视频页，无法核对讲者现场原话、问答环节与幻灯片内容；verification_scope 只能标 column_only。",
+      "1300+ 工具、600+ Playbook、日活 8000+ 用户、逾 1000 个代码仓库、三四十个工具阈值等数字均为讲者自述，无独立第三方来源核对。",
+      "CCA（Code, Contextual Agent, Playbooks and Tools）系统的具体版本、发布时间与当前是否对外公开，来源未提供可核验指引。",
+      "来源未说明 Playbook 的作者审核流程、权限边界与误改风险，自我改进闭环的失败模式未被讨论。"
+    ],
+    "status": "incomplete"
+  },
+  "proposalDigest": "094c62c805860072bce5801d86707f6d6b600d6e218ab565c50922dbc1447bf2"
+}
+```
+<!-- syno:json:end -->

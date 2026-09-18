@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "runAt": "2026-07-29T20:08:02+08:00",
+  "scope": "read_only_runtime_probe",
+  "host": {
+    "health": { "status": 200, "alive": true, "state": "ready", "protocolVersion": 2 },
+    "readiness": { "status": 200, "state": "ready", "store": "ready", "openCode": "ready", "channels": "ready" },
+    "mobileDeliveryEndpoint": { "status": 404, "interpretation": "当前监听进程尚未加载本轮新增诊断路由；未执行重启" }
+  },
+  "opencode": { "ready": true, "healthy": true, "version": "1.18.2", "provider": "opencode", "providerFallback": false },
+  "channels": {
+    "weixin": { "ok": true, "configured": true, "ownerBound": true, "connected": true, "source": "running_worker" },
+    "feishu": { "ok": true, "configured": true, "ownerBound": true, "connected": true, "source": "running_worker" }
+  },
+  "windowsTask": { "supported": true, "installed": false, "running": false, "startup": "at_logon", "legacyTaskDetected": false },
+  "ownerAcceptance": "not_performed",
+  "notes": "未发送消息、未重启计划任务、未读取或保存凭据、Token、Cookie、PID 或私人正文；该记录不能替代手机端 Owner 验收或 Windows 下次登录冷启动。"
+}
