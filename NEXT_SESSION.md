@@ -14,7 +14,7 @@
   2. 完成真实 DSH、跨渠道、重启恢复和每日灵感反馈验收；
   3. 处理 `Generate glossary` 孤立笔记和 5 篇今日重读候选；
   4. 渐进治理历史 wikilink、orphan 和 frontmatter，不批量改写。
-- **保留项**：`.tmp-webbridge-snapshot-20260917-c.json`、`webbridge-req-20260917-omission-06.json`、`webbridge-req-20260917-omission-13.json` 是未跟踪诊断证据，不修改、不暂存、不删除。
+- **诊断归档**：`.tmp-webbridge-snapshot-20260917-c.json`、`webbridge-req-20260917-omission-06.json`、`webbridge-req-20260917-omission-13.json` 已移入 `.runtime/quarantine/webbridge-20260917/`，不纳入 Git；如需复查可从该目录恢复。
 
 ---
 
