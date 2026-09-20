@@ -10,7 +10,7 @@ link_status: connected
 source_path: "02-Resources/AI and Agents/MOC - AI Coding 与工具.md"
 source_sha256: "4da8406d47ff985594d3ef641f7efbd2f2ff2af794e5cf34bc359de1b447bd6b"
 migration_id: "migration-20260720-64e79771"
-updated: 2026-09-17
+updated: 2026-09-20
 ---
 # MOC - AI Coding 与工具
 
@@ -116,6 +116,7 @@ updated: 2026-09-17
 | [[openclaw之父-乐趣就是速度-be250b8c]] | OpenClaw 迭代速度、配置安全与真实用户反馈 |
 | [[riley-brown-codex-150万粉丝-afde4b36]] | Codex、Skills、内容生产、实验与团队协作 |
 | [[Seedance实战-AI视频可控编辑]] | 多输入生成、视频扩展、唇形同步与商业落地 |
+| [[Google Flow实战-AIGC视频工作流]] | Nano Banana、Veo 3.1、Omni 与 Storyboard Studio 的 AIGC 视频生产工作流 |
 
 ---
 
