@@ -476,7 +476,10 @@ function createSynoRuntime(options = {}) {
             ownerKey: context.ownerId, channel: context.channel, threadKey: context.threadKey,
             type: "link_read", correlationId: context.conversationId || null,
             expiresAt: new Date(Date.now() + 30 * 60 * 1_000), payload: { url: String(url) },
-          }).catch(() => {});
+          }).catch((openError) => recordEvent("channel.continuation.open_failed", {
+            channel: context.channel || null,
+            error: { code: openError?.code || "CONTINUATION_OPEN_FAILED", message: String(openError?.message || openError).slice(0, 300) },
+          }, { level: "warning" }));
           await recordEvent("knowledge.fetch_url.failed", { runId: context.runId || null, messageId: context.conversationId || null, channel: context.channel || null, code: error?.code || "FETCH_URL_FAILED" }, { level: "warning" });
           if (error?.code === "SOURCE_URL_RESERVED_ADDRESS") {
             throw Object.assign(new Error("当前本机网络把该网址解析为受保护地址，已保留本次读取；稍后直接回复“继续”即可重试。"), { code: error.code, retryable: true });

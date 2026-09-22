@@ -112,6 +112,49 @@ test("ChannelConversationHandler leaves generic usefulness talk to the model", a
   assert.equal((await inspirationStore.list()).find((item) => item.id === card.id).feedback, undefined);
 });
 
+// 并发重放（恢复 worker 与实时消息同卡竞争）：recordFeedback 撞终态时复查事实，
+// 回报既有记录而非把冲突误讲成「尚未投递」。
+test("ChannelConversationHandler reports the recorded fact when a concurrent path wins the feedback race", async () => {
+  let targetCalls = 0;
+  const inspirationStore = {
+    async feedbackTarget(id) {
+      targetCalls += 1;
+      if (targetCalls === 1) return { found: true, alreadyRecorded: false, record: { id } };
+      return { found: true, alreadyRecorded: true, record: { id, feedback: "not_useful" } };
+    },
+    async recordFeedback() { throw new Error("灵感卡片尚未投递，不能回填反馈"); },
+  };
+  const handler = new ChannelConversationHandler({
+    runtime: { async run() { return { text: "模型回复" }; } },
+    core: {}, ingest: {}, pendingDecisions: {},
+    channelContinuations: fakeContinuations({ id: "c-fb", payload: { inspirationId: "inspiration-20260922-abcdef12" } }),
+    inspirationStore,
+  });
+  assert.deepEqual(
+    await handler.handle({ id: "wx-fb-race", ownerKey: "owner", channel: "weixin", text: "也没用" }),
+    { text: "这张灵感卡已经标记为没用，没有覆盖原记录。" },
+  );
+});
+
+// settle 是附属动作：反馈已落账时结案失败只记观测，回执仍是成功事实。
+test("ChannelConversationHandler receipts the recorded feedback even when settling the continuation fails", async (t) => {
+  const { inspirationStore, card } = await feedbackFixture(t);
+  const continuations = fakeContinuations({ id: "c-fb", payload: { inspirationId: card.id } });
+  continuations.settle = async () => { throw new Error("state dir read-only"); };
+  const journal = [];
+  const handler = new ChannelConversationHandler({
+    runtime: { async run() { return { text: "模型回复" }; } },
+    core: {}, ingest: {}, pendingDecisions: {},
+    journal: { async record(event, data, settings) { journal.push({ event, data, level: settings?.level }); return true; } },
+    channelContinuations: continuations,
+    inspirationStore,
+  });
+  assert.deepEqual(await handler.handle({ id: "wx-fb-settle", ownerKey: "owner", channel: "weixin", text: "一般" }), { text: "已记下：这张灵感卡标为一般。" });
+  assert.equal((await inspirationStore.list()).find((item) => item.id === card.id).feedback, "neutral");
+  assert.equal(journal.some((entry) => entry.event === "channel.continuation.settle_failed" && entry.level === "warning"), true);
+  assert.equal(journal.some((entry) => entry.event === "inspiration.feedback.recorded"), true);
+});
+
 test("ChannelConversationHandler shadow-persists mobile text before model execution without changing reply flow", async () => {
   const accepted = [];
   const runs = [];

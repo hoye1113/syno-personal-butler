@@ -20,5 +20,5 @@
 
 - ~~增加/维护回归~~（2026-09-22 完成，`pnpm test` 740/740 绿）：续办隔离/过期/settle 结案、重复灵感反馈只读事实、显式 ID 跨 24h 回填、X 链接 DNS 保留地址结构化错误且不触发浏览器、Bridge bind/release/拒绝 journal、V2 ACK 固定文本/final 仅模型文本且无 `request-*` 泄漏、runtime 失败开续办接线。回归过程实证修复两处实施缺陷：反馈正则捕获组索引（`match[1]` 才是反馈词）与续办 ACTIVE 集合误含 `resolved`（结案后仍命中）。
 - ~~`pnpm test`、`pnpm verify`、`git diff --check`~~（2026-09-22 通过：verify 2226 文件 + 8 文档）。隔离 state 的 headless 冒烟通过：health 200、readiness 503（初始化中）、二维码维护页 200、根路径与 topics/settings 等旧路由 404、Bridge 无认证 401。
-- 待主人参与的运行验收：Windows 登录冷启动验证 Host 和 DSH；真实微信验收“读链接→继续”“灵感卡→没用→也没用”“历史卡 ID 明确评价”“微信未绑定”。
+- 待主人参与的运行验收：Windows 登录冷启动验证 Host 和 DSH；**真实浏览器打开 `/maintenance/weixin` 点通「开始扫码→出码」**（冒烟只覆盖了 HTTP 状态码，CSP 与页面脚本是否相容只能浏览器实证）；真实微信验收“读链接→继续”“灵感卡→没用→也没用”“历史卡 ID 明确评价”“微信未绑定”（未绑定场景同时确认只记脱敏告警、不回退 Web）。
 - 用 runtime journal 按 runId/消息关联追溯 `SYNO_BRIDGE_CONTEXT_REQUIRED` 和异常 request 列表的实际生产方；在得到复现证据前不猜测根因。

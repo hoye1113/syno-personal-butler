@@ -315,3 +315,22 @@ test("runtime knowledge.fetch_url opens a scoped link_read continuation on failu
   // 成功路径的 settle 与重读依赖真实公网抓取，超出单测确定性边界；
   // 其两段行为分别由 channel-continuation-store（settle）与 handler 裸「继续」回归覆盖。
 });
+
+// 续办是增强而非硬依赖：open 失败（DPAPI/磁盘）不阻断错误如实上抛，但必须留观测。
+test("runtime knowledge.fetch_url journals a failed continuation open without masking the fetch error", async () => {
+  process.env.NODE_ENV = "test";
+  const recorded = [];
+  const journal = { async record(event, data, settings) { recorded.push({ event, data, level: settings?.level }); return true; } };
+  const channelContinuations = {
+    async open() { throw new Error("dpapi busy"); },
+    async resolve() { return null; },
+    async settle() { return null; },
+  };
+  const runtime = createSynoRuntime({ channelContinuations, journal });
+  await assert.rejects(
+    runtime.tools.execute("knowledge.fetch_url", { url: "http://198.18.0.31/x" }, { ownerId: "owner", channel: "weixin", threadKey: "main" }),
+    (error) => error.code === "SOURCE_URL_RESERVED_ADDRESS",
+  );
+  assert.equal(recorded.some((entry) => entry.event === "channel.continuation.open_failed" && entry.level === "warning"), true);
+  assert.equal(recorded.some((entry) => entry.event === "knowledge.fetch_url.failed"), true);
+});
