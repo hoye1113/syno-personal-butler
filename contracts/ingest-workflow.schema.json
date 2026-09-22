@@ -42,7 +42,7 @@
     "rulesDigest": { "type": "string" },
     "sourceDigest": { "type": "string", "minLength": 1 },
     "proposalDigest": { "type": "string" },
-    "fetchMethod": { "enum": ["direct_http", "kimi_webbridge", "local_only"] },
+    "fetchMethod": { "enum": ["direct_http", "bsk", "kimi_webbridge", "local_only"] },
     "fallbackReason": { "type": "string" },
     "requestedUrl": { "type": "string" },
     "finalUrl": { "type": "string" },

@@ -87,8 +87,12 @@ pnpm audit:ingest --all      # 展开单条样例，含候选/方案/Job 引用
 决策可避免重复消耗整条模型链。若需要为瞬时抖动保留少量重试缓冲，可在此处调整。
 
 当来源正文被 CSS 噪声污染时，`fetchSourceText` 会抛「来源正文疑似 CSS 噪声，低质量」，
-命中 `empty_or_low_quality` 的浏览器兜底（`fetchMethod=kimi_webbridge`），不再把样式表收进笔记。
+命中 `empty_or_low_quality` 的浏览器兜底（`fetchMethod=bsk`），不再把样式表收进笔记。
 浏览器兜底返回的正文同样过噪声门（`applyBrowserSnapshot` 二次检查），双重防护。
+
+BSK 由 Host 环境中的持久守护进程和浏览器扩展提供。Syno 只探测它们，不在单次任务中安装、启动或重启。
+每次读取使用 `bsk session start --no-focus` 创建后台 Agent Window，复用已连接浏览器的既有登录态，但不借用普通用户标签页；任务结束后立即停止 Session。
+生产环境应让 BSK daemon 随登录长期运行，并在扩展 Automation 设置中关闭人工求助。若页面仍要求登录、验证码或人机验证，Syno 仅做一次有界重试，随后记录 `BROWSER_BLOCKED_UNATTENDED` 并关闭窗口，不等待主人回复。
 
 运行日志按天写入 JSONL，默认保留 14 天，覆盖 Syno 初始化、Harness
 配置/进程/健康/退出、渠道启动，以及消息的附件、决策、收录和 Runtime

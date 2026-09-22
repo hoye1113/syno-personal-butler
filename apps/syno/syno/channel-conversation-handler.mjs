@@ -29,7 +29,7 @@ const WORKFLOW_STATUS_LABELS = Object.freeze({
 });
 
 function workflowStatusText(workflow) {
-  if (workflow.browserStatus === "interaction_required") return "等待你完成浏览器验证";
+  if (workflow.browserStatus === "interaction_required") return "旧版浏览器验证任务已阻塞，可重新发送链接由 BSK 无人值守重试";
   if (workflow.browserStatus === "running") return "正在尝试浏览器抓取";
   if (workflow.browserStatus === "completed") return "浏览器内容已读取，正在生成收录方案";
   return WORKFLOW_STATUS_LABELS[workflow.stage] || workflow.stage;
@@ -535,7 +535,7 @@ class ChannelConversationHandler {
       }
       if (intent.kind === "continue_browser_capture" && this.ingestWorkflows) {
         const waiting = (await this.ingestWorkflows.listPending(ownerKey)).filter((item) => item.browserStatus === "interaction_required");
-        if (!waiting.length) return { text: "当前没有等待浏览器验证的收录。" };
+        if (!waiting.length) return { text: "当前没有可由 BSK 重新尝试的旧版浏览器任务。" };
         if (waiting.length > 1) {
           if (Number.isInteger(intent.index) && intent.index >= 1 && intent.index <= waiting.length) {
             const selected = await this.ingestWorkflows.resumeBrowser(waiting[intent.index - 1].id, { ownerKey, channel: message.channel, senderId: message.senderId });
@@ -603,7 +603,7 @@ class ChannelConversationHandler {
         if (residual.length > 0 && residual.length <= 30
           && /(?:访问|读取|获取|看看|看一下|读一读|读一下|读读|帮我读|打开|总结|分析|讲一讲|解读|解释|什么意思|说了啥|说了什么|内容)/u.test(residual)) {
           await this.#record("channel.read_link.requested", { ...trace, sourceKind: "url" });
-          runText = `${text}\n\n（系统提示：主人想让你读取这个链接并回答问题。请调用 knowledge.fetch_url 读取正文后回答；直抓被反爬拦截时它会自动改用主人的浏览器读取，若需人工验证，如实告知主人在浏览器里完成后回复「继续」。内容被安全策略拦截时如实说明原因，不要编造。主人没有要求收录，不要主动调用收录类工具。）`;
+          runText = `${text}\n\n（系统提示：主人想让你读取这个链接并回答问题。请调用 knowledge.fetch_url 读取正文后回答；直抓被反爬拦截时它会自动改用 BSK 后台 Agent Window。不得请求主人借用标签页、授权或人工接管；若登录或人机验证仍阻塞，如实说明并尝试公开搜索、缓存页或官方替代来源，不要编造。主人没有要求收录，不要主动调用收录类工具。）`;
         }
       }
       if (Array.isArray(message.__imageArtifacts) && message.__imageArtifacts.length) {

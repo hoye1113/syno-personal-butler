@@ -2,8 +2,8 @@
 // 结果始终包成不可信素材。供 knowledge.fetch_url 工具使用——主人在对话里说"看看/读读/访问这个链接"时，
 // 模型走这里，而不是自己发明抓取或臆造"安全策略阻止"。
 // 2026-09-03 #20：直抓命中反爬验证码墙（或 HTTP 401/403/429 封锁）时，活聊天上下文自动升级
-// BrowserCaptureAdapter（kimi-webbridge，主人的真实浏览器）；scheduler/capture 等后台上下文绝不升级——
-// 不在主人不知情时开浏览器标签。
+// BrowserCaptureAdapter（BSK 后台 Agent Window，复用已有浏览器登录态）；scheduler 等主动任务绝不升级，
+// 主人发送链接的聊天与显式收录任务才允许创建不抢焦点的临时 Agent Window。
 
 import { createHash } from "node:crypto";
 
@@ -133,31 +133,30 @@ async function escalateViaBrowser({ url, browserCapture, context, wall, maxText,
       extra: { title: String(observation.title || "") },
     });
   }
-  if (observation?.status === "interaction_required") {
-    reportEscalation(recordEvent, { url, wall, outcome: "interaction_required" });
+  if (observation?.status === "interaction_required" || observation?.error?.code === "BROWSER_BLOCKED_UNATTENDED") {
+    reportEscalation(recordEvent, { url, wall, outcome: "blocked_unattended" });
     return {
       sourceUrl: url,
-      contentType: "browser/interaction",
+      contentType: "browser/unattended-blocker",
       content: [
-        `浏览器已在主人的浏览器中打开该页面（${observation.title || "标题未知"}），但页面要求人工完成登录或验证。`,
-        "如实告诉主人：页面已在浏览器里打开，请完成验证后回复「继续」，届时用同一链接再调一次本工具即可重新读取。",
-        String(observation.interactionHint || ""),
+        `BSK 已在后台尝试读取页面（${observation.title || "标题未知"}），但页面要求登录或人机验证。`,
+        "无人值守模式已停止并关闭临时 Agent Window；不得要求主人接管，也不得绕过验证。可继续使用公开搜索结果、缓存页或官方替代来源完成其余工作。",
       ].join("\n\n"),
       truncated: false,
       redacted: false,
       redactionReasons: [],
       via: "browser",
-      blocked: "interaction_required",
+      blocked: "unattended_auth",
     };
   }
-  // unavailable / failed：两条路都没走通，如实告知（主人确认浏览器与 WebBridge 在线后可重试）
+  // unavailable / failed：两条路都没走通，如实记录。守护进程属于 Host 生命周期，不向离线主人索取权限。
   reportEscalation(recordEvent, { url, wall, outcome: "browser_unavailable" });
   return {
     sourceUrl: url,
     contentType: "none",
     content: [
       `直抓被反爬拦截（${wall}），浏览器通道也未走通：${observation?.error?.message || observation?.error?.code || "未知原因"}。`,
-      "如实告诉主人：直抓与浏览器两种读取方式都没成功；若主人确认浏览器与 WebBridge 服务在线，可重发链接再试。",
+      "如实告诉主人：直抓与 BSK 浏览器两种读取方式都没成功；不要请求临时借用标签页或人工接管。",
     ].join("\n\n"),
     truncated: false,
     redacted: false,

@@ -1,14 +1,15 @@
 import { createHash } from "node:crypto";
 import net from "node:net";
 
+import { locateCommand, runProcess } from "./process-runner.mjs";
 import { isPrivateAddress } from "./source-fetcher.mjs";
 
-const DEFAULT_ENDPOINT = "http://127.0.0.1:10086";
-const DEFAULT_TIMEOUT_MS = 20_000;
+const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_SESSION_TTL_MS = 2 * 60 * 60 * 1_000;
 const MAX_CONTENT_CHARS = 100_000;
 const ALLOWED_ACTIONS = Object.freeze(new Set(["navigate", "snapshot", "list_tabs", "close_session"]));
-const INTERACTION_PATTERN = /(?:登录|登入|log\s*in|sign\s*in|验证码|captcha|人机验证|验证后继续|需要授权|同意条款)/iu;
+const INTERACTION_PATTERN = /(?:请.{0,12}(?:登录|登入|验证)|log\s*in|sign\s*in|验证码|captcha|人机验证|verify\s+(?:you|that)|access\s+denied|访问被拒绝)/iu;
+const INTERACTION_URL_PATTERN = /(?:login|signin|captcha|challenge|verify|verification)/iu;
 
 function adapterError(code, message, details = {}) {
   return Object.assign(new Error(message), { code, ...details });
@@ -38,7 +39,7 @@ function assertSafeUrl(value) {
   return url;
 }
 
-function sessionId(workflowId) {
+function logicalSessionId(workflowId) {
   return `syno-capture-${safeWorkflowId(workflowId)}`;
 }
 
@@ -55,66 +56,112 @@ function digest(value) {
   return createHash("sha256").update(String(value || ""), "utf8").digest("hex");
 }
 
+function parseJson(text) {
+  const source = String(text || "").trim();
+  if (!source) return {};
+  try { return JSON.parse(source); } catch {
+    const lines = source.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+      try { return JSON.parse(lines[index]); } catch {}
+    }
+    throw adapterError("BROWSER_RESPONSE_INVALID", "BSK 返回了无法解析的 JSON");
+  }
+}
+
+function firstString(value, keys) {
+  if (!value || typeof value !== "object") return "";
+  for (const key of keys) {
+    if (typeof value[key] === "string" && value[key]) return value[key];
+  }
+  for (const nested of [value.data, value.session, value.page, value.tab, value.observation]) {
+    const found = firstString(nested, keys);
+    if (found) return found;
+  }
+  return "";
+}
+
+function browserList(value) {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== "object") return [];
+  for (const key of ["browsers", "items", "data"]) {
+    if (Array.isArray(value[key])) return value[key];
+  }
+  return [];
+}
+
+function requiresInteraction({ finalUrl, title, content }) {
+  const body = `${title || ""}\n${content || ""}`;
+  return INTERACTION_URL_PATTERN.test(String(finalUrl || ""))
+    || (body.length < 4_000 && INTERACTION_PATTERN.test(body));
+}
+
 class BrowserCaptureAdapter {
-  constructor({ endpoint = DEFAULT_ENDPOINT, fetchImpl = globalThis.fetch, clock = () => new Date(), timeoutMs = DEFAULT_TIMEOUT_MS, maxContentChars = MAX_CONTENT_CHARS, sessionTtlMs = DEFAULT_SESSION_TTL_MS } = {}) {
-    this.endpoint = String(endpoint).replace(/\/+$/u, "");
-    this.fetchImpl = fetchImpl;
+  constructor({ command = locateCommand("bsk", "SYNO_BSK_COMMAND"), runner = runProcess, clock = () => new Date(), timeoutMs = DEFAULT_TIMEOUT_MS, maxContentChars = MAX_CONTENT_CHARS, sessionTtlMs = DEFAULT_SESSION_TTL_MS, browser = process.env.SYNO_BSK_BROWSER || "" } = {}) {
+    this.commandPath = command;
+    this.runner = runner;
     this.clock = clock;
     this.timeoutMs = timeoutMs;
     this.maxContentChars = Math.min(MAX_CONTENT_CHARS, Math.max(1_000, Number(maxContentChars) || MAX_CONTENT_CHARS));
     this.sessionTtlMs = Math.min(24 * 60 * 60 * 1_000, Math.max(5 * 60 * 1_000, Number(sessionTtlMs) || DEFAULT_SESSION_TTL_MS));
+    this.browser = String(browser || "");
     this.sessions = new Map();
     this.observations = new Map();
   }
 
   async health() {
     try {
-      const result = await this.#request("GET", "/status");
-      const daemonVersion = String(result?.version || "").replace(/^v/u, "");
-      const extensionVersion = String(result?.extension_version || "");
+      const status = await this.#run(["status", "--json"]);
+      const browsers = browserList(await this.#run(["browsers", "--json"]));
+      const explicitlyDisconnected = status.extension_connected === false
+        || status.extensionConnected === false
+        || status.browser_connected === false
+        || status.browserConnected === false;
       return {
-        available: result?.running === true && result?.extension_connected === true,
-        ...(daemonVersion ? { daemonVersion } : {}),
-        ...(extensionVersion ? { extensionVersion } : {}),
+        available: !explicitlyDisconnected && browsers.length > 0,
+        provider: "bsk",
+        connectedBrowsers: browsers.length,
+        ...(firstString(status, ["version", "daemon_version", "daemonVersion"]) ? { daemonVersion: firstString(status, ["version", "daemon_version", "daemonVersion"]).replace(/^v/u, "") } : {}),
       };
     } catch (error) {
-      return { available: false, error: { code: error.code || "BROWSER_DAEMON_UNAVAILABLE", message: error.message } };
+      return { available: false, provider: "bsk", error: { code: error.code || "BROWSER_DAEMON_UNAVAILABLE", message: error.message } };
     }
   }
 
   async command({ workflowId, action, args = {} } = {}) {
     const id = safeWorkflowId(workflowId);
     if (!ALLOWED_ACTIONS.has(action)) throw adapterError("BROWSER_ACTION_DENIED", `浏览器动作不允许：${action}`);
-    const task = this.sessions.get(id);
-    if (task && Date.parse(task.expiresAt) <= this.clock().getTime()) {
-      throw adapterError("BROWSER_SESSION_EXPIRED", "浏览器收录会话已过期，请重新发送地址");
-    }
+    const task = this.#task(id);
     if (action === "navigate") {
-      const requested = task?.requestedUrl;
       const target = assertSafeUrl(args.url);
-      if (!requested || target.toString() !== requested) {
-        throw adapterError("BROWSER_URL_NOT_SIGNED", "浏览器只能打开当前 Workflow 已签发的精确地址");
-      }
+      if (target.toString() !== task.requestedUrl) throw adapterError("BROWSER_URL_NOT_SIGNED", "浏览器只能打开当前 Workflow 已签发的精确地址");
+      const session = await this.#ensureSession(id, task);
+      return this.#run(["navigate", target.toString(), "--session", session, "--wait-until", "domcontentloaded", "--timeout", `${this.timeoutMs}ms`, "--json"]);
     }
-    const session = task?.session || sessionId(id);
-    return this.#invoke(action, args, session);
+    if (action === "snapshot") {
+      const session = await this.#ensureSession(id, task);
+      return this.#run(["observe", "--session", session, "--max-tokens", "25000", "--json"]);
+    }
+    if (action === "list_tabs") {
+      const session = await this.#ensureSession(id, task);
+      return this.#run(["tab", "list", "--session", session, "--scope", "agent", "--json"]);
+    }
+    return this.#stopSession(task);
   }
 
-  authorize({ workflowId, exactUrl, browserSessionId } = {}) {
+  authorize({ workflowId, exactUrl } = {}) {
     const id = safeWorkflowId(workflowId);
     const requestedUrl = assertSafeUrl(exactUrl).toString();
-    const expectedSession = sessionId(id);
-    if (browserSessionId && browserSessionId !== expectedSession) throw adapterError("BROWSER_SESSION_INVALID", "浏览器收录会话标识无效");
     const startedAt = this.clock();
     const task = {
-      session: browserSessionId || expectedSession,
+      logicalSession: logicalSessionId(id),
       requestedUrl,
       startedAt: startedAt.toISOString(),
       expiresAt: new Date(startedAt.getTime() + this.sessionTtlMs).toISOString(),
+      bskSession: "",
     };
     this.sessions.set(id, task);
     this.observations.delete(id);
-    return { workflowId: id, browserSessionId: task.session, requestedUrl: task.requestedUrl, expiresAt: task.expiresAt };
+    return { workflowId: id, browserSessionId: task.logicalSession, requestedUrl, expiresAt: task.expiresAt };
   }
 
   async status({ workflowId } = {}) {
@@ -124,16 +171,14 @@ class BrowserCaptureAdapter {
 
   async navigate({ workflowId } = {}) {
     const id = safeWorkflowId(workflowId);
-    const task = this.sessions.get(id);
-    if (!task) throw adapterError("BROWSER_SESSION_MISSING", "浏览器收录会话已不存在");
-    const result = await this.command({ workflowId: id, action: "navigate", args: { url: task.requestedUrl, newTab: true, group_title: `Syno 收录 · ${id.slice(-12)}` } });
-    return { ...result, workflowId: id, browserSessionId: task.session };
+    const task = this.#task(id);
+    const result = await this.command({ workflowId: id, action: "navigate", args: { url: task.requestedUrl } });
+    return { ...result, workflowId: id, browserSessionId: task.logicalSession };
   }
 
   async snapshot({ workflowId, timeoutMs } = {}) {
     const id = safeWorkflowId(workflowId);
-    const task = this.sessions.get(id);
-    if (!task) throw adapterError("BROWSER_SESSION_MISSING", "浏览器收录会话已不存在");
+    const task = this.#task(id);
     return this.#snapshot(id, task.requestedUrl, timeoutMs);
   }
 
@@ -146,59 +191,89 @@ class BrowserCaptureAdapter {
     const requested = assertSafeUrl(exactUrl).toString();
     this.authorize({ workflowId: id, exactUrl: requested });
     const health = await this.health();
-    if (!health.available) return { status: "unavailable", requestedUrl: requested, error: health.error };
+    if (!health.available) {
+      const observation = { status: "unavailable", requestedUrl: requested, error: health.error || { code: "BROWSER_NOT_CONNECTED", message: "BSK 没有已连接的浏览器" } };
+      this.observations.set(id, observation);
+      this.sessions.delete(id);
+      return observation;
+    }
     try {
-      const navigation = await this.#withTimeout(this.navigate({ workflowId: id }), timeoutMs);
-      if (navigation?.success === false) throw adapterError("BROWSER_NAVIGATE_FAILED", "浏览器没有打开收录地址");
-      return await this.#snapshot(id, requested, timeoutMs);
+      await this.#withTimeout(this.navigate({ workflowId: id }), timeoutMs);
+      let observation = await this.#snapshot(id, requested, timeoutMs);
+      if (observation.error?.code === "BROWSER_BLOCKED_UNATTENDED") {
+        await this.#withTimeout(this.navigate({ workflowId: id }), timeoutMs);
+        observation = await this.#snapshot(id, requested, timeoutMs);
+      }
+      return observation;
     } catch (error) {
-      return { status: "failed", requestedUrl: requested, error: { code: error.code || "BROWSER_CAPTURE_FAILED", message: error.message } };
+      const observation = { status: "failed", requestedUrl: requested, error: { code: error.code || "BROWSER_CAPTURE_FAILED", message: error.message } };
+      this.observations.set(id, observation);
+      return observation;
+    } finally {
+      await this.closeSession({ workflowId: id });
     }
   }
 
   async continue({ workflowId, timeoutMs } = {}) {
     const id = safeWorkflowId(workflowId);
-    if (!this.sessions.has(id)) return { status: "unavailable", error: { code: "BROWSER_SESSION_MISSING", message: "浏览器收录会话已不存在" } };
-    const health = await this.health();
-    if (!health.available) return { status: "unavailable", error: health.error };
-    try { return await this.snapshot({ workflowId: id, timeoutMs }); } catch (error) {
-      return { status: "failed", error: { code: error.code || "BROWSER_CAPTURE_FAILED", message: error.message } };
-    }
+    const task = this.sessions.get(id);
+    const prior = this.observations.get(id);
+    const requestedUrl = task?.requestedUrl || prior?.requestedUrl;
+    if (!requestedUrl) return { status: "unavailable", error: { code: "BROWSER_SESSION_MISSING", message: "浏览器收录会话已不存在" } };
+    return this.capture({ workflowId: id, exactUrl: requestedUrl, timeoutMs });
   }
 
   async listTabs({ workflowId } = {}) {
-    const id = safeWorkflowId(workflowId);
-    if (!this.sessions.has(id)) throw adapterError("BROWSER_SESSION_MISSING", "浏览器收录会话已不存在");
-    return this.command({ workflowId: id, action: "list_tabs" });
+    return this.command({ workflowId, action: "list_tabs" });
   }
 
   async closeSession({ workflowId } = {}) {
     const id = safeWorkflowId(workflowId);
-    if (!this.sessions.has(id)) return { closed: 0 };
-    let result;
-    try {
-      result = await this.command({ workflowId: id, action: "close_session" });
-    } catch (error) {
-      if (error.code !== "BROWSER_SESSION_EXPIRED") throw error;
-      result = { closed: 0, expired: true };
-    }
+    const task = this.sessions.get(id);
+    if (!task) return { closed: 0 };
+    const result = await this.#stopSession(task);
     this.sessions.delete(id);
-    this.observations.delete(id);
     return result;
+  }
+
+  #task(id) {
+    const task = this.sessions.get(id);
+    if (!task) throw adapterError("BROWSER_SESSION_MISSING", "浏览器收录会话已不存在");
+    if (Date.parse(task.expiresAt) <= this.clock().getTime()) throw adapterError("BROWSER_SESSION_EXPIRED", "浏览器收录会话已过期，请重新发送地址");
+    return task;
+  }
+
+  async #ensureSession(id, task) {
+    if (task.bskSession) return task.bskSession;
+    const args = ["session", "start", "--json", "--no-focus", "--name", `Syno ${id.slice(-12)}`];
+    if (this.browser) args.push("--browser", this.browser);
+    const result = await this.#run(args);
+    const session = firstString(result, ["session_id", "sessionId", "id"]);
+    if (!session) throw adapterError("BROWSER_SESSION_START_INVALID", "BSK 未返回 Session ID");
+    task.bskSession = session;
+    return session;
+  }
+
+  async #stopSession(task) {
+    if (!task.bskSession) return { closed: 0 };
+    const session = task.bskSession;
+    await this.#run(["session", "stop", session, "--json"]);
+    task.bskSession = "";
+    return { closed: 1 };
   }
 
   async #snapshot(id, requestedUrl, timeoutMs) {
     const result = await this.#withTimeout(this.command({ workflowId: id, action: "snapshot" }), timeoutMs);
-    const finalUrl = String(result?.url || requestedUrl);
+    const finalUrl = firstString(result, ["url", "final_url", "finalUrl"]) || requestedUrl;
     const final = assertSafeUrl(finalUrl);
     const requested = assertSafeUrl(requestedUrl);
     if (final.origin !== requested.origin) throw adapterError("BROWSER_REDIRECT_ORIGIN_DENIED", "浏览器页面跳转到了未签发的站点");
-    const content = flattenSnapshotTree(result?.tree ?? result?.content).replace(/\u0000/gu, " ").trim().slice(0, this.maxContentChars);
-    const base = { requestedUrl, finalUrl: final.toString(), title: String(result?.title || ""), content, contentDigest: digest(content), usedActions: ["navigate", "snapshot"], browserSessionId: this.sessions.get(id)?.session };
-    const requiresInteraction = INTERACTION_PATTERN.test(`${base.title}\n${content}`)
-      || (!content && INTERACTION_PATTERN.test(base.finalUrl));
-    const observation = requiresInteraction
-      ? { ...base, status: "interaction_required", interactionHint: "请在浏览器完成登录或验证后回复“继续刚才的收录”。" }
+    const raw = result?.observation ?? result?.snapshot ?? result?.tree ?? result?.content ?? result?.text ?? result?.data;
+    const content = flattenSnapshotTree(raw).replace(/\u0000/gu, " ").trim().slice(0, this.maxContentChars);
+    const title = firstString(result, ["title", "page_title", "pageTitle"]);
+    const base = { requestedUrl, finalUrl: final.toString(), title, content, contentDigest: digest(content), usedActions: ["navigate", "observe"], browserSessionId: this.sessions.get(id)?.logicalSession };
+    const observation = requiresInteraction(base)
+      ? { ...base, status: "failed", blocked: "unattended_auth", error: { code: "BROWSER_BLOCKED_UNATTENDED", message: "页面要求登录或人机验证；无人值守读取已停止，且不会绕过验证" } }
       : !content
         ? { ...base, status: "failed", error: { code: "BROWSER_EMPTY_CONTENT", message: "浏览器页面没有可读取正文" } }
         : { ...base, status: "completed" };
@@ -206,24 +281,21 @@ class BrowserCaptureAdapter {
     return observation;
   }
 
-  async #request(method, pathname, body) {
-    const response = await this.fetchImpl(`${this.endpoint}${pathname}`, {
-      method,
-      headers: body === undefined ? {} : { "Content-Type": "application/json" },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(this.timeoutMs),
-    });
-    if (!response?.ok) throw adapterError("BROWSER_DAEMON_HTTP_FAILED", `Kimi WebBridge 请求失败：${response?.status || "unknown"}`);
-    return response.json();
-  }
-
-  async #invoke(action, args, session) {
-    const result = await this.#request("POST", "/command", { action, args, session });
-    // Kimi WebBridge's command endpoint wraps the command result in `data`.
-    // Keep accepting the unwrapped shape used by older local daemons and test
-    // doubles, but always expose the command payload to the workflow layer.
-    if (result && typeof result === "object" && result.data && typeof result.data === "object") return result.data;
-    return result;
+  async #run(args) {
+    const options = {
+      timeoutMs: this.timeoutMs,
+      env: { ...process.env, BSK_AUTO_START: "0", PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" },
+    };
+    try {
+      const result = await this.runner(this.commandPath, args, options);
+      return parseJson(result?.stdout);
+    } catch (error) {
+      let payload = {};
+      try { payload = parseJson(error.stdout); } catch {}
+      const code = firstString(payload, ["code"]) || (error.failureCode === "unavailable" ? "BROWSER_BSK_UNAVAILABLE" : "BROWSER_BSK_COMMAND_FAILED");
+      const message = firstString(payload, ["message"]) || error.message || "BSK 命令失败";
+      throw adapterError(code, message, { cause: error });
+    }
   }
 
   async #withTimeout(promise, timeoutMs) {
@@ -235,4 +307,4 @@ class BrowserCaptureAdapter {
   }
 }
 
-export { ALLOWED_ACTIONS, BrowserCaptureAdapter, flattenSnapshotTree, assertSafeUrl };
+export { ALLOWED_ACTIONS, BrowserCaptureAdapter, flattenSnapshotTree, assertSafeUrl, parseJson, requiresInteraction };

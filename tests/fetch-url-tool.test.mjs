@@ -137,7 +137,7 @@ test("fetchUrlForChat escalates an anti-bot wall to the browser in a live chat c
   assert.equal(adapter.calls[0][2], "https://mp.weixin.qq.com/s/abc");
 });
 
-test("fetchUrlForChat reports interaction_required with a continue hint", async () => {
+test("fetchUrlForChat turns legacy interaction_required into an unattended blocker", async () => {
   const adapter = fakeBrowserAdapter({
     capture: { status: "interaction_required", title: "验证页", interactionHint: "请在浏览器完成登录或验证后回复继续" },
   });
@@ -148,8 +148,9 @@ test("fetchUrlForChat reports interaction_required with a continue hint", async 
     context: chatContext,
   });
   assert.equal(result.via, "browser");
-  assert.equal(result.blocked, "interaction_required");
-  assert.match(result.content, /完成验证后回复/);
+  assert.equal(result.blocked, "unattended_auth");
+  assert.match(result.content, /不得要求主人接管/);
+  assert.doesNotMatch(result.content, /回复.{0,4}继续/);
 });
 
 test("fetchUrlForChat never opens the browser outside live chat (scheduler/proactive)", async () => {

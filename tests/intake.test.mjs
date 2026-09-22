@@ -38,7 +38,7 @@ test("URL intake embeds only controlled readable source text", async () => {
   assert.equal(extractReadableText("<main>Hello<script>attack()</script><p>World</p></main>", "text/html"), "Hello\nWorld");
 });
 
-test("URL intake accepts a locally supplied WebBridge snapshot without calling direct HTTP", async () => {
+test("URL intake accepts a locally supplied BSK snapshot without calling direct HTTP", async () => {
   let directCalls = 0;
   const service = new IntakeService({ sourceFetcher: async () => { directCalls += 1; throw new Error("must not fetch"); } });
   const request = await service.prepare({
@@ -47,7 +47,7 @@ test("URL intake accepts a locally supplied WebBridge snapshot without calling d
     browserSnapshot: { url: "https://example.com/article", text: "浏览器读取的正文", contentType: "text/html" },
   });
   assert.equal(directCalls, 0);
-  assert.equal(request.sourceSnapshot.method, "kimi_webbridge");
+  assert.equal(request.sourceSnapshot.method, "bsk");
   assert.equal(request.content, "浏览器读取的正文");
 });
 

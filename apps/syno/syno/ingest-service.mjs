@@ -262,7 +262,7 @@ class IngestService {
       contentType: String(snapshot.contentType || "text/html"),
       text: text.slice(0, 100_000),
       truncated: text.length > 100_000,
-      method: "kimi_webbridge",
+      method: "bsk",
       contentDigest: String(snapshot.contentDigest || ""),
     };
     await atomicJson(stateFile, { ...state, browserSnapshot, browserCapture: {

@@ -94,7 +94,7 @@ class IntakeService {
           contentType: String(payload.browserSnapshot.contentType || "text/html"),
           text: String(payload.browserSnapshot.text || "").slice(0, MAX_TEXT_BYTES),
           truncated: payload.browserSnapshot.truncated === true,
-          method: "kimi_webbridge",
+          method: "bsk",
         }
         : await this.sourceFetcher(sourceUrl);
       if (!snapshot.text.trim()) throw new Error("来源没有可读取正文");

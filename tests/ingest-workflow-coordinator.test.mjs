@@ -229,7 +229,7 @@ test("remote analysis receives compiled context while local-only capture never c
   assert.equal((await coordinator.listPending("owner")).length, 2);
 });
 
-test("URL preparation automatically assigns OpenCode to the WebBridge after direct HTTP is forbidden", async (t) => {
+test("URL preparation automatically uses BSK after direct HTTP is forbidden", async (t) => {
   const { scheduled, store } = await fixture(t);
   let proposes = 0;
   const browserCalls = [];
@@ -246,7 +246,7 @@ test("URL preparation automatically assigns OpenCode to the WebBridge after dire
   };
   const browserCapture = {
     authorize(input) { browserCalls.push({ authorize: input }); return { browserSessionId: "syno-capture-workflow-browser" }; },
-    observation() { return { status: "completed", finalUrl: "https://example.com/blocked", content: "browser content", contentDigest: "c".repeat(64), browserSessionId: "syno-capture-workflow-browser" }; },
+    async capture() { return { status: "completed", finalUrl: "https://example.com/blocked", content: "browser content", contentDigest: "c".repeat(64), browserSessionId: "syno-capture-workflow-browser" }; },
   };
   const runtimeCalls = [];
   const coordinator = new IngestWorkflowCoordinator({
@@ -261,12 +261,9 @@ test("URL preparation automatically assigns OpenCode to the WebBridge after dire
   await scheduled.shift()();
   const workflow = await coordinator.status(receipt.workflow.id);
   assert.equal(workflow.stage, "proposed");
-  assert.equal(workflow.fetchMethod, "kimi_webbridge");
+  assert.equal(workflow.fetchMethod, "bsk");
   assert.equal(workflow.fallbackReason, "http_forbidden");
-  assert.equal(runtimeCalls[0].context.browserWorkflowId, workflow.id);
-  assert.deepEqual(runtimeCalls[0].context.allowedTools, [
-    "syno_browser_status", "syno_browser_navigate", "syno_browser_snapshot", "syno_browser_list_tabs",
-  ]);
+  assert.equal(runtimeCalls.length, 0, "BSK capture is deterministic and does not spend a model turn");
   assert.equal(browserCalls[0].authorize.exactUrl, "https://example.com/blocked");
   assert.equal(browserCalls[1].id, "artifact-browser");
   assert.ok(events.includes("capture.direct.started"));
@@ -276,7 +273,7 @@ test("URL preparation automatically assigns OpenCode to the WebBridge after dire
   assert.ok(events.includes("capture.browser.completed"));
 });
 
-test("URL sources whose正文 is CSS noise fall back to WebBridge with empty_or_low_quality", async (t) => {
+test("URL sources whose正文 is CSS noise fall back to BSK with empty_or_low_quality", async (t) => {
   const { scheduled, store } = await fixture(t);
   let proposes = 0;
   const ingest = {
@@ -291,7 +288,7 @@ test("URL sources whose正文 is CSS noise fall back to WebBridge with empty_or_
   };
   const browserCapture = {
     authorize() { return { browserSessionId: "syno-capture-workflow-noise" }; },
-    observation() { return { status: "completed", finalUrl: "https://example.com/css-leak", content: "browser content", contentDigest: "c".repeat(64), browserSessionId: "syno-capture-workflow-noise" }; },
+    async capture() { return { status: "completed", finalUrl: "https://example.com/css-leak", content: "browser content", contentDigest: "c".repeat(64), browserSessionId: "syno-capture-workflow-noise" }; },
   };
   const coordinator = new IngestWorkflowCoordinator({
     ingest,
@@ -304,8 +301,41 @@ test("URL sources whose正文 is CSS noise fall back to WebBridge with empty_or_
   await scheduled.shift()();
   const workflow = await coordinator.status(receipt.workflow.id);
   assert.equal(workflow.stage, "proposed");
-  assert.equal(workflow.fetchMethod, "kimi_webbridge");
+  assert.equal(workflow.fetchMethod, "bsk");
   assert.equal(workflow.fallbackReason, "empty_or_low_quality");
+});
+
+test("an unattended BSK auth wall becomes terminal without waiting for owner interaction", async (t) => {
+  const { scheduled, store } = await fixture(t);
+  const ingest = {
+    async receive(payload) { return { artifact: { id: "artifact-auth-wall", kind: payload.kind, dedupeKey: "auth-wall" }, proposalPending: true }; },
+    async readArtifact() { return { id: "artifact-auth-wall", source: "https://example.com/private" }; },
+    async propose() { throw new Error("来源返回 HTTP 403"); },
+  };
+  const browserCapture = {
+    authorize() { return { browserSessionId: "syno-capture-workflow-auth-wall" }; },
+    async capture() {
+      return {
+        status: "failed",
+        requestedUrl: "https://example.com/private",
+        error: { code: "BROWSER_BLOCKED_UNATTENDED", message: "页面要求登录或人机验证" },
+      };
+    },
+  };
+  const coordinator = new IngestWorkflowCoordinator({
+    ingest,
+    store,
+    schedule: (work) => scheduled.push(work),
+    browserCapture,
+  });
+  const receipt = await coordinator.receive({ kind: "url", value: "https://example.com/private" }, { ownerKey: "owner", channel: "weixin", messageId: "auth-wall-1" });
+  await scheduled.shift()();
+  const workflow = await coordinator.status(receipt.workflow.id);
+  assert.equal(workflow.stage, "failed_terminal");
+  assert.equal(workflow.browserStatus, "failed");
+  assert.equal(workflow.lastError.code, "BROWSER_BLOCKED_UNATTENDED");
+  assert.equal(workflow.lastError.retryable, false);
+  assert.equal((await coordinator.listPending("owner")).some((item) => item.browserStatus === "interaction_required"), false);
 });
 
 test("URL safety failures never escalate to the browser fallback", async (t) => {
