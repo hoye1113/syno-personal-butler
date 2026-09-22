@@ -169,7 +169,15 @@ function waitForWebReady(child, { timeoutMs, expectedOrigin }) {
         finish(runtimeError("HARNESS_ORIGIN_INVALID", `dsh web 广告了非预期地址：${advertised}`));
         return;
       }
-      finish(null, expectedOrigin || advertised);
+      // DSH 0.1.7 起横幅 URL 携带一次性浏览器令牌（?token=...），客户端用它
+      // 换取会话 cookie；旧版无 query 时 token 为 null，客户端跳过交换。
+      let token = null;
+      try {
+        token = new URL(advertised).searchParams.get("token");
+      } catch {
+        token = null;
+      }
+      finish(null, { origin: expectedOrigin || advertised, token });
     };
     const onExit = (code, signalName) => {
       finish(runtimeError("HARNESS_EXITED", `dsh web 已退出（code=${code}, signal=${signalName || "none"}）${out ? `：${out.slice(-400)}` : ""}`));
@@ -746,12 +754,13 @@ class DeepSeekHarnessSupervisor {
       void this.#record("harness.child.exit", { profile, pid: child.pid, code, signal: signalName }, { level: code === 0 ? "info" : "error" });
     });
     try {
-      await waitForWebReady(child, {
+      const ready = await waitForWebReady(child, {
         timeoutMs: this.webReadyTimeoutMs ?? Math.max(this.initializeTimeoutMs, 90_000),
         expectedOrigin: origin,
       });
       const client = this.webClientFactory({
-        origin,
+        origin: ready.origin,
+        token: ready.token,
         cwd: workspaceRoot,
         pid: child.pid,
         kill: () => this.killTree(child.pid),

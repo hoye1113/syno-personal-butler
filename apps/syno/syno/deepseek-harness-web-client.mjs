@@ -4,10 +4,6 @@ function runtimeError(code, message, { retryable = false } = {}) {
   return Object.assign(new Error(message), { code, retryable });
 }
 
-function isRecord(value) {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
 function assistantText(events) {
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index];
@@ -39,12 +35,6 @@ function toPromptContent(contentBlocks) {
   return content;
 }
 
-function unwrapEventFrame(raw) {
-  const parsed = JSON.parse(raw);
-  if (isRecord(parsed) && parsed.type === "server-request" && isRecord(parsed.payload)) return parsed.payload;
-  return parsed;
-}
-
 function wsUrl(origin, pathname) {
   const url = new URL(pathname, `${String(origin).replace(/\/+$/, "")}/`);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
@@ -56,6 +46,7 @@ class DeepSeekHarnessWebClient {
     origin,
     cwd,
     pid = null,
+    token = null,
     kill,
     fetchImpl = fetch,
     webSocketImpl = globalThis.WebSocket,
@@ -69,6 +60,8 @@ class DeepSeekHarnessWebClient {
     this.origin = String(origin).replace(/\/+$/, "");
     this.cwd = cwd || "";
     this.pid = pid;
+    this.token = token || null;
+    this.cookie = null;
     this.kill = typeof kill === "function" ? kill : () => {};
     this.fetchImpl = fetchImpl;
     this.webSocketImpl = webSocketImpl;
@@ -81,9 +74,9 @@ class DeepSeekHarnessWebClient {
     this.closed = false;
     this.route = null;
     this.createdSessions = new Set();
+    this.followedSessions = new Set();
     this.listeners = new Set();
-    this.streamAbort = null;
-    this.sockets = new Set();
+    this.mux = null;
   }
 
   subscribe(listener) {
@@ -99,10 +92,35 @@ class DeepSeekHarnessWebClient {
       model,
       ...(agentPreset ? { agentPreset: String(agentPreset) } : {}),
     };
+    if (this.token && !this.cookie) await this.#exchangeToken();
     await this.#waitReady();
-    await this.#ensureStreams();
+    await this.#ensureMux();
     this.initialized = true;
     return { serverInfo: { name: "deepseek-harness-web" }, origin: this.origin };
+  }
+
+  // DSH 0.1.7 起 dsh web 强制浏览器令牌认证：启动横幅 URL 携带一次性进程令牌，
+  // GET /?token=... 换回 HttpOnly 会话 cookie（303 + set-cookie）。Node 的
+  // undici fetch 在 redirect:"manual" 下以 type:"basic" 暴露 set-cookie
+  //（已实证），无需 node:http 兜底。
+  async #exchangeToken() {
+    const url = `${this.origin}/?token=${encodeURIComponent(this.token)}`;
+    let response;
+    try {
+      response = await this.fetchImpl(url, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(Math.max(this.initializeTimeoutMs, 5_000)),
+      });
+    } catch (error) {
+      throw runtimeError("HARNESS_AUTH_FAILED", `dsh web 令牌换取会话 cookie 失败：${error.message || error}`, { retryable: true });
+    }
+    const setCookies = typeof response.headers?.getSetCookie === "function" ? response.headers.getSetCookie() : [];
+    const header = setCookies[0] ?? response.headers?.get?.("set-cookie") ?? "";
+    const pair = String(header).split(";", 1)[0];
+    if (!pair.includes("=")) {
+      throw runtimeError("HARNESS_AUTH_FAILED", `dsh web 令牌换取会话 cookie 被拒（HTTP ${response.status}）`, { retryable: true });
+    }
+    this.cookie = pair;
   }
 
   async runTurn(sessionId, contentBlocks, { signal, onNotification } = {}) {
@@ -196,10 +214,13 @@ class DeepSeekHarnessWebClient {
         return;
       }
       if (signal) signal.addEventListener("abort", onAbort, { once: true });
-      this.rpc("session.prompt", {
-        sessionId,
-        mode: "queue",
-        content: toPromptContent(contentBlocks),
+      this.rpc("session/prompt", {
+        request: {
+          requestId: randomUUID(),
+          sessionId,
+          mode: "queue",
+          content: toPromptContent(contentBlocks),
+        },
       }, signal).then(() => {
         promptAccepted = true;
         maybeSettle();
@@ -208,7 +229,7 @@ class DeepSeekHarnessWebClient {
   }
 
   async abortTurn(sessionId) {
-    await this.rpc("session.cancel", { sessionId });
+    await this.rpc("session/cancel", { request: { sessionId } });
     return { accepted: true };
   }
 
@@ -225,7 +246,7 @@ class DeepSeekHarnessWebClient {
     this.initialized = false;
   }
 
-  async rpc(method, payload = {}, signal) {
+  async rpc(method, args = {}, signal) {
     const rpcId = randomUUID();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.requestTimeoutMs);
@@ -238,8 +259,11 @@ class DeepSeekHarnessWebClient {
     try {
       response = await this.fetchImpl(`${this.origin}/api/${method}`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ type: "client-request", rpcId, method, payload }),
+        headers: {
+          "content-type": "application/json",
+          ...(this.cookie ? { cookie: this.cookie } : {}),
+        },
+        body: JSON.stringify({ type: "client-request", rpcId, method, payload: { args } }),
         signal: controller.signal,
       });
     } catch (error) {
@@ -266,33 +290,39 @@ class DeepSeekHarnessWebClient {
   }
 
   async #ensureSession(sessionId) {
-    if (this.createdSessions.has(sessionId)) return;
-    try {
-      await this.rpc("session.create", {
-        sessionId,
-        ...(this.cwd ? { cwd: this.cwd } : {}),
-        ...(this.route?.agentPreset ? { agentPreset: this.route.agentPreset } : {}),
-      });
-    } catch (error) {
-      if (!/already|exists|conflict/i.test(error.message)) throw error;
-    }
-    if (this.route?.provider && this.route?.model) {
+    if (!this.createdSessions.has(sessionId)) {
       try {
-        await this.rpc("session.selectModel", {
-          sessionId,
-          provider: this.route.provider,
-          model: this.route.model,
+        await this.rpc("session/create", {
+          request: {
+            sessionId,
+            ...(this.cwd ? { cwd: this.cwd } : {}),
+            ...(this.route?.agentPreset ? { agentPreset: this.route.agentPreset } : {}),
+          },
         });
       } catch (error) {
-        this.onNotice?.({
-          event: "harness.web.select_model.failed",
-          data: { sessionId, provider: this.route.provider, model: this.route.model, error: { code: error.code, message: error.message } },
-          options: { level: "error" },
-        });
-        throw runtimeError("HARNESS_MODEL_SELECT_FAILED", `无法为会话选择 ${this.route.provider}/${this.route.model}：${error.message}`, { retryable: true });
+        if (!/already|exists|conflict/i.test(error.message)) throw error;
       }
+      if (this.route?.provider && this.route?.model) {
+        try {
+          await this.rpc("session/selectModel", {
+            request: {
+              sessionId,
+              provider: this.route.provider,
+              model: this.route.model,
+            },
+          });
+        } catch (error) {
+          this.onNotice?.({
+            event: "harness.web.select_model.failed",
+            data: { sessionId, provider: this.route.provider, model: this.route.model, error: { code: error.code, message: error.message } },
+            options: { level: "error" },
+          });
+          throw runtimeError("HARNESS_MODEL_SELECT_FAILED", `无法为会话选择 ${this.route.provider}/${this.route.model}：${error.message}`, { retryable: true });
+        }
+      }
+      this.createdSessions.add(sessionId);
     }
-    this.createdSessions.add(sessionId);
+    await this.#ensureFollow(sessionId);
   }
 
   async #waitReady() {
@@ -300,7 +330,7 @@ class DeepSeekHarnessWebClient {
     let lastError;
     while (Date.now() < deadline) {
       try {
-        await this.rpc("session.list", {});
+        await this.rpc("session/list", { _request: {} });
         return;
       } catch (error) {
         lastError = error;
@@ -311,114 +341,143 @@ class DeepSeekHarnessWebClient {
   }
 
   #closeSockets() {
-    this.streamAbort?.abort();
-    this.streamAbort = null;
-    for (const socket of this.sockets) {
-      try { socket.close(); } catch {}
+    const mux = this.mux;
+    this.mux = null;
+    if (mux) {
+      for (const stream of mux.streams.values()) {
+        stream.onOpenError?.(runtimeError("HARNESS_TRANSPORT_CLOSED", "remote.mux WebSocket 已关闭", { retryable: true }));
+      }
+      mux.streams.clear();
+      try { mux.socket.close(); } catch {}
     }
-    this.sockets.clear();
   }
 
-  async #ensureStreams() {
-    if (this.streamAbort) return;
-    this.streamAbort = new AbortController();
-    try {
-      await Promise.all([
-        this.#openEventStream("/api/events.host", this.streamAbort.signal, (frame) => {
-          if (frame?.type === "host/session-status") {
-            this.#emit({
-              method: "session.status",
-              params: { sessionId: frame.sessionId, status: frame.running === true ? "running" : "idle" },
-            });
+  // DSH 0.1.7 事件面：单条 /api/remote.mux WebSocket 承载多条逻辑流；会话事件
+  // 走每会话一条的 session/follow 逻辑流（snapshot 之后按 seq 追加 durable
+  // 事件帧）。旧版 events.host/events.mux 双流与 server-request 信封已不存在。
+  async #ensureMux() {
+    if (this.mux) return;
+    if (typeof this.webSocketImpl !== "function") {
+      throw runtimeError("HARNESS_TRANSPORT_ERROR", "当前运行时没有 WebSocket，无法连接 dsh web 事件流");
+    }
+    // Node 全局 WebSocket（undici）支持 ws 风格的第二参 options.headers——
+    // 已在本机 Node 24 实证 cookie 头随 upgrade 送达；DSH 自身测试同用法。
+    const options = this.cookie ? { headers: { cookie: this.cookie } } : undefined;
+    const ws = options ? new this.webSocketImpl(wsUrl(this.origin, "/api/remote.mux"), options)
+      : new this.webSocketImpl(wsUrl(this.origin, "/api/remote.mux"));
+    const mux = { socket: ws, streams: new Map() };
+    ws.addEventListener("message", (event) => {
+      let frame;
+      try {
+        frame = JSON.parse(String(event.data ?? ""));
+      } catch {
+        return; // One corrupt frame must not kill the mux.
+      }
+      const stream = mux.streams.get(frame?.streamId);
+      if (!stream) return;
+      try {
+        if (frame.type === "item") {
+          stream.onValue?.(frame.value);
+        } else if (frame.type === "error") {
+          const failure = runtimeError("HARNESS_RPC_ERROR", String(frame.error?.message || "remote stream error"), { retryable: true });
+          stream.onOpenError?.(failure);
+          stream.onStreamError?.(failure);
+        } else if (frame.type === "end") {
+          stream.onEnd?.();
+        }
+      } catch {
+        // A consumer fault must not kill the mux.
+      }
+    });
+    ws.addEventListener("close", () => {
+      if (this.mux === mux) this.mux = null;
+      this.followedSessions.clear();
+      for (const stream of mux.streams.values()) {
+        stream.onOpenError?.(runtimeError("HARNESS_TRANSPORT_CLOSED", "remote.mux WebSocket 已关闭", { retryable: true }));
+      }
+      mux.streams.clear();
+      if (!this.closed) {
+        this.#emit({
+          method: "session.status",
+          params: { sessionId: "", status: "idle", error: "remote.mux WebSocket closed" },
+        });
+      }
+    });
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(runtimeError("HARNESS_NOT_RUNNING", "remote.mux WebSocket 连接超时", { retryable: true }));
+      }, this.initializeTimeoutMs);
+      timer.unref?.();
+      ws.addEventListener("open", () => {
+        clearTimeout(timer);
+        resolve();
+      }, { once: true });
+      ws.addEventListener("error", () => {
+        clearTimeout(timer);
+        reject(runtimeError("HARNESS_TRANSPORT_ERROR", "remote.mux WebSocket 失败", { retryable: true }));
+      }, { once: true });
+    });
+    this.mux = mux;
+  }
+
+  // 每个会话首条 turn 前开一条 follow 逻辑流。snapshot 帧只确认流已建立——
+  // 不回放其中历史事件，否则领养会话的旧 turn/start/turn/end 会污染 runTurn
+  // 的配对结算。follow 先于 prompt 打开，本轮事件必然以 live item 到达。
+  async #ensureFollow(sessionId) {
+    await this.#ensureMux();
+    if (this.followedSessions.has(sessionId)) return;
+    const streamId = `follow:${sessionId}`;
+    const mux = this.mux;
+    const opened = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        mux.streams.delete(streamId);
+        reject(runtimeError("HARNESS_NOT_RUNNING", `session/follow 等待快照超时（${sessionId}）`, { retryable: true }));
+      }, this.initializeTimeoutMs);
+      timer.unref?.();
+      mux.streams.set(streamId, {
+        onValue: (value) => {
+          if (value?.type === "snapshot") {
+            clearTimeout(timer);
+            resolve();
+            return;
           }
-        }),
-        this.#openEventStream("/api/events.mux", this.streamAbort.signal, (frame) => {
-          if (frame?.type === "session/event") {
+          if (value?.type === "event" && value.event) {
             this.#emit({
               method: "session.event",
-              params: { sessionId: frame.sessionId, event: frame.event },
+              params: { sessionId, event: value.event },
             });
           }
-        }),
-      ]);
+        },
+        onOpenError: (error) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+        onStreamError: (error) => {
+          this.onNotice?.({
+            event: "harness.web.follow.failed",
+            data: { sessionId, error: { code: error.code, message: error.message } },
+            options: { level: "error" },
+          });
+        },
+      });
+    });
+    mux.socket.send(JSON.stringify({
+      type: "open",
+      streamId,
+      endpoint: "session/follow",
+      payload: { args: { request: { address: { kind: "session", sessionId } } } },
+    }));
+    try {
+      await opened;
     } catch (error) {
-      this.#closeSockets();
+      mux.streams.delete(streamId);
       throw error;
     }
+    this.followedSessions.add(sessionId);
   }
 
   #emit(notification) {
     for (const listener of this.listeners) listener(notification);
-  }
-
-  async #openEventStream(pathname, signal, onFrame) {
-    if (typeof this.webSocketImpl !== "function") {
-      throw runtimeError("HARNESS_TRANSPORT_ERROR", "当前运行时没有 WebSocket，无法连接 dsh web 事件流");
-    }
-    const connectAbort = new AbortController();
-    const timer = setTimeout(() => connectAbort.abort(), this.initializeTimeoutMs);
-    timer.unref?.();
-    if (signal.aborted) connectAbort.abort();
-    else signal.addEventListener("abort", () => connectAbort.abort(), { once: true });
-    const ws = new this.webSocketImpl(wsUrl(this.origin, pathname));
-    this.sockets.add(ws);
-    ws.addEventListener("message", (event) => {
-      try {
-        onFrame(unwrapEventFrame(String(event.data ?? "")));
-      } catch {
-        // One corrupt frame must not kill the stream.
-      }
-    });
-    try {
-      await new Promise((resolve, reject) => {
-        const fail = (error) => {
-          clearTimeout(timer);
-          ws.removeEventListener("open", onOpen);
-          ws.removeEventListener("error", onError);
-          connectAbort.signal.removeEventListener("abort", onAbort);
-          reject(error);
-        };
-        const onOpen = () => {
-          clearTimeout(timer);
-          ws.removeEventListener("error", onError);
-          connectAbort.signal.removeEventListener("abort", onAbort);
-          resolve();
-        };
-        const onError = () => fail(runtimeError("HARNESS_TRANSPORT_ERROR", `${pathname} WebSocket 失败`, { retryable: true }));
-        const onAbort = () => {
-          fail(runtimeError(
-            signal.aborted ? "HARNESS_TRANSPORT_ERROR" : "HARNESS_NOT_RUNNING",
-            signal.aborted ? `${pathname} WebSocket 已中止` : `${pathname} WebSocket 连接超时`,
-            { retryable: true },
-          ));
-        };
-        if (connectAbort.signal.aborted) {
-          onAbort();
-          return;
-        }
-        ws.addEventListener("open", onOpen, { once: true });
-        ws.addEventListener("error", onError, { once: true });
-        connectAbort.signal.addEventListener("abort", onAbort, { once: true });
-      });
-    } catch (error) {
-      this.sockets.delete(ws);
-      try { ws.close(); } catch {}
-      throw error;
-    }
-    const closeSocket = () => {
-      try { ws.close(); } catch {}
-      this.sockets.delete(ws);
-    };
-    signal.addEventListener("abort", closeSocket, { once: true });
-    ws.addEventListener("close", () => {
-      this.sockets.delete(ws);
-      if (!signal.aborted && !this.closed) {
-        this.#emit({
-          method: "session.status",
-          params: { sessionId: "", status: "idle", error: `${pathname} WebSocket closed` },
-        });
-      }
-    }, { once: true });
   }
 }
 

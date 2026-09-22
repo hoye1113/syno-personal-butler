@@ -157,9 +157,11 @@ pnpm run build
 
 Windows 计划任务 `start-syno.ps1` **不会**写入 `SYNO_DSH_ROOT`。用户/机器环境变量里没有它时，`pnpm windows:restart` 起的 Host 会 `waiting_provider`。`pnpm start` 必须在该进程环境里设置。
 
-**事件通道是 WebSocket，不是 SSE**
+**事件通道是 WebSocket mux，不是 SSE（0.1.7 起需先换 cookie）**
 
-现网 `client-connection` 对 `GET /api/events.host` 与 `/api/events.mux` 返回 **426 Upgrade Required**。Host 客户端（`apps/syno/syno/deepseek-harness-web-client.mjs`）必须用 `ws://127.0.0.1:3088/api/events.*`。不要把 SSE GET 加回去；假服务器应对 GET 回 426、对 upgrade 推 `server-request` JSON 文本帧。
+0.1.7 起 `dsh web` 强制浏览器令牌认证：启动横幅打印 `dsh web: http://127.0.0.1:<port>/?token=<一次性进程令牌>`，Supervisor 解析令牌后由客户端 `GET /?token=...`（303 + `set-cookie`）换回会话 cookie，所有 `POST /api/*` 与 mux upgrade 都必须携带。无 cookie 一律 401（生产实证 `session.list HTTP 401` 即缺 cookie）。
+
+现网事件面是单条 `ws://127.0.0.1:3088/api/remote.mux`：客户端发 `{type:"open", streamId, endpoint, payload:{args}}` 开逻辑流，服务端回 `{type:"item"|"end"|"error", streamId, value?}`。会话事件走每会话一条的 `session/follow` 逻辑流（首帧 `snapshot` 之后按 seq 追加 `{type:"event", event}` 项）；`snapshot.records` 是历史回放，不得当 live 事件消费。一元 RPC 端点从 `session.prompt` 点号式改为 `session/prompt` 两段式，payload 包一层 `{args:{request:{...}}}`（`session/list` 的形参名是 `_request`）。GET 升级路径仍回 426；不要把 SSE GET 加回去。旧版 `/api/events.host`、`/api/events.mux` 与 `server-request` 信封在 0.1.7 已删除。
 
 **permission 表只准一档**
 

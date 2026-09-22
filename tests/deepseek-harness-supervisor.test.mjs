@@ -405,7 +405,15 @@ test("waitForWebReady only accepts the expected loopback origin", async () => {
   ready.stderr = new EventEmitter();
   const accepted = waitForWebReady(ready, { timeoutMs: 1_000, expectedOrigin: "http://127.0.0.1:3088" });
   ready.stdout.emit("data", "dsh web: http://127.0.0.1:3088\n");
-  assert.equal(await accepted, "http://127.0.0.1:3088");
+  assert.deepEqual(await accepted, { origin: "http://127.0.0.1:3088", token: null });
+
+  // DSH 0.1.7 横幅 URL 携带一次性令牌，必须随就绪结果传递给客户端
+  const authed = new EventEmitter();
+  authed.stdout = new EventEmitter();
+  authed.stderr = new EventEmitter();
+  const acceptedAuthed = waitForWebReady(authed, { timeoutMs: 1_000, expectedOrigin: "http://127.0.0.1:3088" });
+  authed.stdout.emit("data", "dsh web: http://127.0.0.1:3088/?token=abc123_-XYZ\n");
+  assert.deepEqual(await acceptedAuthed, { origin: "http://127.0.0.1:3088", token: "abc123_-XYZ" });
 });
 
 test("web start failure kills the process tree", async (t) => {
