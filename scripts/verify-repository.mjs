@@ -21,6 +21,10 @@ const files = gitFileList()
   .map((relative) => path.join(ROOT, relative));
 for (const file of files) {
   const relative = path.relative(ROOT, file).replace(/\\/g, "/");
+  // A deliberate removal remains in `git ls-files` until it is staged.  Verification must
+  // evaluate the working tree that will be committed, rather than treating that deletion as
+  // a failed read of an obsolete asset.
+  try { await fs.access(file); } catch (error) { if (error.code === "ENOENT") continue; throw error; }
   if (path.extname(file) === ".json") {
     try { JSON.parse(await fs.readFile(file, "utf8")); } catch (error) { errors.push(`${relative}: invalid JSON (${error.message})`); }
   }

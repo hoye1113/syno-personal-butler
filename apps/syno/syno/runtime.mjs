@@ -6,7 +6,7 @@ import { AgentHost } from "./agent-host.mjs";
 import { ApprovalAdvisor, minimalAdvice } from "./approval-advisor.mjs";
 import { BrowserCaptureAdapter } from "./browser-capture-adapter.mjs";
 import { createBrowserCaptureTools } from "./browser-capture-tools.mjs";
-import { ChannelHub, WebChannelAdapter, WindowsNotificationAdapter } from "./channels.mjs";
+import { ChannelHub } from "./channels.mjs";
 import { ChannelContinuationStore } from "./channel-continuation-store.mjs";
 import { ChannelConversationHandler } from "./channel-conversation-handler.mjs";
 import { ClaimEvidenceService } from "./claim-evidence-service.mjs";
@@ -240,8 +240,6 @@ function createSynoRuntime(options = {}) {
   const journal = options.journal || new RuntimeJournal();
   const recordEvent = (event, data, settings) => journal.record(event, data, settings).catch(() => null);
   const notifications = options.notifications || new NotificationStore();
-  const web = new WebChannelAdapter({ notifications });
-  const windows = options.windowsChannel || new WindowsNotificationAdapter();
   const jobStore = options.jobStore || new JobStore();
   const pendingDecisions = options.pendingDecisions || new PendingDecisionStore();
   const knowledge = options.knowledge || new KnowledgeStore();
@@ -1114,7 +1112,7 @@ function createSynoRuntime(options = {}) {
   const feishu = options.feishu || new FeishuChannelAdapter({
     onMessage: (message) => channelConversationHandler.handle({ ...message, ownerKey: "local-user", threadKey: "main", channel: "feishu" }),
   });
-  const channels = options.channels || new ChannelHub({ web, windows, weixin, feishu });
+  const channels = options.channels || new ChannelHub({ weixin, feishu });
   // proactive 主动通道连续投递失败计数（drain 回调增/重投成功清零）；health 探活 O(1) 读，避免每探活扫 outbox。
   let proactiveDeliveryConsecutiveFailures = 0;
   const systemAlertLastSentAt = new Map();
@@ -1126,8 +1124,7 @@ function createSynoRuntime(options = {}) {
     systemAlertLastSentAt.set(key, now);
     const alertTitle = String(title || "Syno 系统告警").slice(0, 120);
     const alertBody = String(body || "").slice(0, 500);
-    return channels.send({ title: alertTitle, body: alertBody, source: "system-health", level: key }, ["windows", "web"])
-      .catch((error) => { recordEvent("system.alert.failed", { title: alertTitle, error: { code: error?.code, message: error?.message } }, { level: "error" }); return { delivered: false }; });
+    return recordEvent("system.alert", { title: alertTitle, body: alertBody, level: key });
   };
   reports = new ReportService({ host, knowledge, notifications, channels, gitGuard });
   const today = options.today || new TodayService({ goals, host, settingsRegistry, signalSources, planner });

@@ -1315,8 +1315,10 @@ test("a persistently rejected proactive bundle exhausts attempts to terminal and
   assert.equal(terminalEvents[0].level, "error");
   assert.equal((await outbox.get(enqueued.event.eventId)).status, "failed_terminal");
 
-  const alerts = sent.filter((s) => s.source === "system-health");
-  assert.ok(alerts.some((s) => s.level === "error"), "达上限应跨渠道弹 error 级告警");
+  // Claw-only（2026-09-22）：系统告警只写脱敏运行日志，不再向 Web/Toast 等 GUI 面兜底投递。
+  const alerts = recorded.filter((r) => r.event === "system.alert");
+  assert.ok(alerts.some((r) => r.data?.level === "error"), "达上限应记 error 级系统告警日志");
+  assert.equal(sent.filter((s) => s.source === "system-health").length, 0, "告警不跨渠道投递");
 
   const health = await routeSynoApi(runtime, { method: "GET" }, new URL("http://localhost/api/syno/health"), async () => ({}));
   assert.equal(health.deliveryConsecutiveFailures, 8);
