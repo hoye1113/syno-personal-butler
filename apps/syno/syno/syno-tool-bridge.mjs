@@ -63,7 +63,7 @@ const BRIDGE_TOOL_NAMES = new Set([
 ]);
 
 class SynoToolBridge {
-  constructor({ tools, token, exposedToolNames = null, ownerKey = "local-user", onResult = async () => {}, isRuntimeReady = () => true, effectReceipts = null, reconciliationCases = null, charLimit = null } = {}) {
+  constructor({ tools, token, exposedToolNames = null, ownerKey = "local-user", onResult = async () => {}, isRuntimeReady = () => true, effectReceipts = null, reconciliationCases = null, charLimit = null, recordEvent = null } = {}) {
     if (!tools || !token) throw new Error("SynoToolBridge 缺少 ToolRegistry 或进程级 Token");
     this.tools = tools;
     this.charLimit = charLimit;
@@ -73,6 +73,7 @@ class SynoToolBridge {
     this.isRuntimeReady = isRuntimeReady;
     this.effectReceipts = effectReceipts;
     this.reconciliationCases = reconciliationCases;
+    this.recordEvent = recordEvent;
     this.effectCounter = 0;
     this.activeContext = null;
     this.idempotentResults = new Map();
@@ -97,11 +98,16 @@ class SynoToolBridge {
       threadKey: String(context.threadKey || "main"),
       channel: String(context.channel || "harness"),
       messageId: String(context.messageId || context.runId || ""),
+      runId: String(context.runId || ""),
       allowedTools: new Set((context.allowedTools || []).map(normalizeAllowedToolName)),
       ...(context.browserWorkflowId ? { browserWorkflowId: String(context.browserWorkflowId) } : {}),
       ...(context.browserCloseAuthorized === true ? { browserCloseAuthorized: true } : {}),
     });
-    return () => { this.activeContext = null; };
+    this.recordEvent?.("bridge.context.bound", { runId: this.activeContext.runId || null, messageId: this.activeContext.messageId || null, channel: this.activeContext.channel }).catch(() => {});
+    return () => {
+      this.recordEvent?.("bridge.context.released", { runId: this.activeContext?.runId || null, messageId: this.activeContext?.messageId || null }).catch(() => {});
+      this.activeContext = null;
+    };
   }
 
   definitions() {
@@ -153,6 +159,7 @@ class SynoToolBridge {
     const definition = this.exposed.get(name);
     if (!definition) return { ...response, error: { code: -32601, message: "Tool not found" } };
     if (!this.activeContext) {
+      this.recordEvent?.("bridge.context.rejected", { reason: "context_required", method: request.method }).catch(() => {});
       return {
         ...response,
         error: { code: -32001, message: "SYNO_BRIDGE_CONTEXT_REQUIRED: 工具调用没有绑定 Syno 会话" },
@@ -160,6 +167,7 @@ class SynoToolBridge {
     }
     const active = this.activeContext;
     if (!active.allowedTools.has(name)) {
+      this.recordEvent?.("bridge.context.rejected", { runId: active.runId || null, messageId: active.messageId || null, reason: "tool_not_allowed", tool: name }).catch(() => {});
       return {
         ...response,
         error: { code: -32003, message: "SYNO_BRIDGE_TOOL_NOT_ALLOWED: 本次运行未授权该工具" },

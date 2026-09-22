@@ -75,6 +75,39 @@ test("InspirationStore feedback lifecycle: deliver first, feedback once, TTL gat
   await assert.rejects(store.recordFeedback(second.id, "meh"), /取值无效/);
 });
 
+test("InspirationStore feedbackTarget gates exact writes by delivery owner and prior feedback", async (t) => {
+  const root = await tempRoot(t, "syno-inspiration-target-");
+  const store = new InspirationStore({ opsRoot: root, clock: () => new Date("2026-09-22T08:00:00.000Z") });
+
+  // 历史卡（无 deliveredOwnerKey）：宁可拒绝精确回填，也不猜测归属。
+  const historical = await store.create({ date: "2026-09-20", sampledRefs: ["vault/a.md", "vault/b.md"], text: "历史卡" });
+  await store.markDelivered(historical.id, "event-old");
+  assert.deepEqual(await store.feedbackTarget(historical.id, { ownerKey: "owner" }), { found: false, reason: "not_delivered_to_owner" });
+
+  const card = await store.create({ date: "2026-09-22", sampledRefs: ["vault/c.md", "vault/d.md"], text: "今日卡" });
+  // 未投递的卡不允许回填。
+  assert.deepEqual(await store.feedbackTarget(card.id, { ownerKey: "owner" }), { found: false, reason: "not_delivered_to_owner" });
+
+  await store.markDelivered(card.id, "event-new", { ownerKey: "owner", channel: "weixin", threadKey: "main" });
+  const persisted = (await store.list()).find((item) => item.id === card.id);
+  assert.equal(persisted.deliveredOwnerKey, "owner");
+  assert.equal(persisted.deliveredChannel, "weixin");
+
+  // 跨 owner 拒绝；同 owner 且待反馈 → 命中。
+  assert.deepEqual(await store.feedbackTarget(card.id, { ownerKey: "someone-else" }), { found: false, reason: "not_delivered_to_owner" });
+  const eligible = await store.feedbackTarget(card.id, { ownerKey: "owner" });
+  assert.equal(eligible.found, true);
+  assert.equal(eligible.alreadyRecorded, false);
+
+  // 已反馈卡返回既有事实，不覆盖历史记录。
+  await store.recordFeedback(card.id, "not_useful");
+  const recorded = await store.feedbackTarget(card.id, { ownerKey: "owner" });
+  assert.equal(recorded.found, true);
+  assert.equal(recorded.alreadyRecorded, true);
+  assert.equal(recorded.record.feedback, "not_useful");
+  await assert.rejects(store.recordFeedback(card.id, "useful"), /已反馈|尚未投递|状态/);
+});
+
 test("InspirationStore recentSampledRefs only covers the 30-day sampling memory window", async (t) => {
   const root = await tempRoot(t, "syno-inspiration-memory-");
   let now = new Date("2026-09-01T08:00:00.000Z");

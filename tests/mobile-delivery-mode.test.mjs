@@ -103,6 +103,13 @@ test("v2 mobile handler persists before returning and sends final through the sa
   assert.equal(events[1].responseKind, "final");
   assert.equal(events[1].targetChannel, "weixin");
   assert.equal(updates.some((item) => item.patch.status === "final_pending"), true);
+  // ACK 只有固定文本；final 仅投递当前请求的模型回复。
+  // requestId/eventId 等内部关联 ID 永不进入微信正文（去重靠 deliveryKey，而非正文夹带）。
+  assert.equal(events[0].payload.text, "已接收，正在处理。");
+  assert.equal(events[0].deliveryKey, "request-v2-1:ack:v1");
+  assert.equal(events[1].deliveryKey, "request-v2-1:final:v1");
+  assert.equal(events[1].payload.text, "最终结果");
+  for (const { payload } of events) assert.doesNotMatch(payload.text, /request-[0-9a-z-]*|accepted|event-\d+/i);
 });
 
 test("mobile delivery diagnostics expose only aggregate AcceptedRequest, Outbox and Unknown status", async () => {

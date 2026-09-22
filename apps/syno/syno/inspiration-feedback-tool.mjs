@@ -24,7 +24,7 @@ function createInspirationFeedbackTool({ inspirationStore, recordEvent } = {}) {
     inputSchema: {
       type: "object",
       required: ["feedback"],
-      properties: { feedback: { enum: ["useful", "neutral", "not_useful"] } },
+      properties: { feedback: { enum: ["useful", "neutral", "not_useful"] }, inspirationId: { type: "string", minLength: 1 } },
       additionalProperties: false,
     },
     outputSchema: {
@@ -38,7 +38,15 @@ function createInspirationFeedbackTool({ inspirationStore, recordEvent } = {}) {
       },
       additionalProperties: false,
     },
-    execute: async ({ feedback }, context = {}) => {
+    execute: async ({ feedback, inspirationId }, context = {}) => {
+      if (inspirationId) {
+        const exact = await inspirationStore.feedbackTarget(inspirationId, { ownerKey: context.ownerId });
+        if (!exact.found) return { recorded: false, reason: exact.reason, inspirationId: String(inspirationId) };
+        if (exact.alreadyRecorded) return { recorded: false, reason: "already_recorded", inspirationId: exact.record.id, feedback: exact.record.feedback };
+        const updated = await inspirationStore.recordFeedback(exact.record.id, feedback);
+        await recordEvent?.("inspiration.feedback.recorded", { inspirationId: updated.id, feedback: updated.feedback, channel: context.channel || null })?.catch(() => {});
+        return { recorded: true, inspirationId: updated.id, feedback: updated.feedback };
+      }
       const card = await inspirationStore.latestAwaitingFeedback();
       if (!card) return { recorded: false, reason: "no_card_awaiting" };
       const updated = await inspirationStore.recordFeedback(card.id, feedback);

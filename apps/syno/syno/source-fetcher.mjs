@@ -37,7 +37,11 @@ async function resolvePublicAddress(url, lookup = dnsLookup) {
     ? [{ address: hostname, family: literalFamily }]
     : await lookup(hostname, { all: true, verbatim: true });
   if (!records.length || records.some((record) => isPrivateAddress(record.address))) {
-    throw new Error("URL 解析到本机、内网或保留地址");
+    throw Object.assign(new Error("URL 解析到本机、内网或保留地址"), {
+      code: "SOURCE_URL_RESERVED_ADDRESS",
+      retryable: true,
+      diagnostic: "dns_reserved_address",
+    });
   }
   return records[0];
 }

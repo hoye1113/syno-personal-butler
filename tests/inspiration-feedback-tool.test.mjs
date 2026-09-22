@@ -92,3 +92,33 @@ test("context without boundary flags is refused (TOOL_APPROVAL_REQUIRED); bridge
   assert.equal(output.recorded, true);
   assert.equal(output.inspirationId, card.id);
 });
+
+// 精确 ID 路径（2026-09-22）：有 ID 时只允许同一 Owner 已投递且未反馈的卡；
+// 已反馈卡返回既有事实不覆盖；无 ID 时维持 24h 最近卡安全行为。
+test("explicit inspirationId only writes the exact owner-delivered card and reports prior feedback as fact", async (t) => {
+  const { store, eventsLog, registry } = await makeFixture(t);
+  const card = await store.create({ date: "2026-09-22", sampledRefs: ["vault/a.md", "vault/b.md"], text: "精确卡" });
+  await store.markDelivered(card.id, "event-1", { ownerKey: "owner" });
+  const context = { allowAgentSettings: true, ownerId: "owner", channel: "weixin" };
+
+  const output = await registry.execute("inspiration.record_feedback", { feedback: "useful", inspirationId: card.id }, context);
+  assert.deepEqual(output, { recorded: true, inspirationId: card.id, feedback: "useful" });
+  assert.equal(eventsLog.at(-1).name, "inspiration.feedback.recorded");
+
+  // 已反馈卡：返回事实状态，不覆盖历史记录。
+  const again = await registry.execute("inspiration.record_feedback", { feedback: "not_useful", inspirationId: card.id }, context);
+  assert.deepEqual(again, { recorded: false, reason: "already_recorded", inspirationId: card.id, feedback: "useful" });
+  assert.equal((await store.list()).find((record) => record.id === card.id).feedback, "useful");
+
+  // 跨 Owner 拒绝精确回填。
+  const other = await registry.execute("inspiration.record_feedback", { feedback: "useful", inspirationId: card.id }, { ...context, ownerId: "intruder" });
+  assert.deepEqual(other, { recorded: false, reason: "not_delivered_to_owner", inspirationId: card.id });
+});
+
+test("explicit inspirationId refuses a historical card without a persisted delivery owner", async (t) => {
+  const { store, registry } = await makeFixture(t);
+  const card = await deliveredCard(store); // 历史形态：无 deliveredOwnerKey
+  const output = await registry.execute("inspiration.record_feedback", { feedback: "useful", inspirationId: card.id }, { allowAgentSettings: true, ownerId: "owner" });
+  assert.deepEqual(output, { recorded: false, reason: "not_delivered_to_owner", inspirationId: card.id });
+  assert.equal((await store.list())[0].feedback || null, null);
+});

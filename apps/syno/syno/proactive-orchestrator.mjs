@@ -126,10 +126,10 @@ function prioritiesBody(snapshot) {
 }
 
 class ProactiveOrchestrator {
-  constructor({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery, recordEvent, inspirationStore = null, inspirationSampler = null, signalEngine = new SignalEngine(), stateFile = path.join(PATHS.stateRoot, "proactive.json"), stateLock, clock = () => new Date(), quietHours = DEFAULT_QUIET_HOURS, tickObservationMinMs = 5_000, compositionLeaseMs = 300_000 } = {}) {
+  constructor({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, wakeDelivery, recordEvent, inspirationStore = null, inspirationSampler = null, channelContinuations = null, signalEngine = new SignalEngine(), stateFile = path.join(PATHS.stateRoot, "proactive.json"), stateLock, clock = () => new Date(), quietHours = DEFAULT_QUIET_HOURS, tickObservationMinMs = 5_000, compositionLeaseMs = 300_000 } = {}) {
     if (!host || !today || !channels) throw new Error("ProactiveOrchestrator 缺少 host、today 或 channels");
     this.host = host; this.today = today; this.channels = channels; this.conversations = conversations; this.cognitiveRuntime = cognitiveRuntime;
-    this.settingsRegistry = settingsRegistry; this.signalSources = signalSources; this.maintenance = maintenance; this.channelDeliveryOutbox = channelDeliveryOutbox; this.notifications = notifications; this.ownerChannelTargets = ownerChannelTargets; this.wakeDelivery = wakeDelivery; this.recordEvent = recordEvent; this.inspirationStore = inspirationStore; this.inspirationSampler = inspirationSampler; this.signalEngine = signalEngine; this.stateFile = stateFile; this.stateLock = stateLock || new ProcessFileLock({ file: `${stateFile}.lock`, timeoutMs: 30_000 }); this.clock = clock; this.quietHours = quietHours; this.tickObservationMinMs = tickObservationMinMs; this.compositionLeaseMs = compositionLeaseMs; this.timer = null; this.startGeneration = 0;
+    this.settingsRegistry = settingsRegistry; this.signalSources = signalSources; this.maintenance = maintenance; this.channelDeliveryOutbox = channelDeliveryOutbox; this.notifications = notifications; this.ownerChannelTargets = ownerChannelTargets; this.wakeDelivery = wakeDelivery; this.recordEvent = recordEvent; this.inspirationStore = inspirationStore; this.inspirationSampler = inspirationSampler; this.channelContinuations = channelContinuations; this.signalEngine = signalEngine; this.stateFile = stateFile; this.stateLock = stateLock || new ProcessFileLock({ file: `${stateFile}.lock`, timeoutMs: 30_000 }); this.clock = clock; this.quietHours = quietHours; this.tickObservationMinMs = tickObservationMinMs; this.compositionLeaseMs = compositionLeaseMs; this.timer = null; this.startGeneration = 0;
   }
 
   async load({ prepareMigration = true } = {}) {
@@ -340,7 +340,15 @@ class ProactiveOrchestrator {
     const inspirationId = info?.inspirationId;
     if (!inspirationId || !this.inspirationStore) return;
     try {
-      await this.inspirationStore.markDelivered(inspirationId, eventId);
+      const targetChannel = String(info?.targetChannel || "weixin");
+      await this.inspirationStore.markDelivered(inspirationId, eventId, { ownerKey: "local-user", channel: targetChannel, threadKey: "main" });
+      if (targetChannel === "weixin") {
+        await this.channelContinuations?.open?.({
+          ownerKey: "local-user", channel: targetChannel, threadKey: "main", type: "inspiration_feedback",
+          correlationId: inspirationId, expiresAt: new Date(this.clock().getTime() + 24 * 60 * 60 * 1_000),
+          payload: { inspirationId },
+        });
+      }
     } catch (error) {
       await this.recordEvent?.("inspiration.delivered_mark_failed", { inspirationId, eventId, error: { code: error?.code || "INSPIRATION_MARK_FAILED", message: String(error?.message || error).slice(0, 300) } }, { level: "error" });
     }

@@ -81,6 +81,9 @@ class InspirationStore {
       status: "delivered",
       deliveryEventId: String(eventId || ""),
       deliveredAt: this.clock().toISOString(),
+      ...(options.ownerKey ? { deliveredOwnerKey: String(options.ownerKey) } : {}),
+      ...(options.channel ? { deliveredChannel: String(options.channel) } : {}),
+      ...(options.threadKey ? { deliveredThreadKey: String(options.threadKey) } : {}),
     }), options);
   }
 
@@ -98,6 +101,19 @@ class InspirationStore {
       && !record.feedback
       && Number.isFinite(new Date(record.deliveredAt).getTime())
       && new Date(record.deliveredAt).getTime() >= cutoff) || null;
+  }
+
+  async feedbackTarget(id, { ownerKey, requireAwaiting = true } = {}) {
+    const record = (await this.list()).find((item) => item.id === String(id));
+    if (!record) return { found: false, reason: "not_found" };
+    // New cards persist the delivery owner.  Older historical cards have no owner field and
+    // are intentionally not eligible for exact writes rather than guessing ownership.
+    if (!record.deliveredOwnerKey || record.deliveredOwnerKey !== String(ownerKey || "")) {
+      return { found: false, reason: "not_delivered_to_owner" };
+    }
+    if (record.feedback || record.status === "feedback") return { found: true, alreadyRecorded: true, record };
+    if (requireAwaiting && record.status !== "delivered") return { found: false, reason: "not_awaiting" };
+    return { found: true, alreadyRecorded: false, record };
   }
 
   async recentSampledRefs({ now = this.clock(), windowMs = SAMPLED_WINDOW_MS } = {}) {

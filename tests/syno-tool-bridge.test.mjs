@@ -261,6 +261,42 @@ test("SynoToolBridge rejects tool calls without an active Syno conversation", as
   assert.match(response.error.message, /SYNO_BRIDGE_CONTEXT_REQUIRED/);
 });
 
+// 脱敏 journal（2026-09-22）：bind/release/拒绝必须留痕 runId 与消息关联，
+// 供 SYNO_BRIDGE_CONTEXT_REQUIRED 与异常 request 列表的实证追溯（先复现再修，不猜根因）。
+test("SynoToolBridge journals context bind, release and rejections with correlation ids", async () => {
+  const events = [];
+  const recordEvent = async (event, data) => { events.push({ event, data }); };
+  const bridge = new SynoToolBridge({ tools: registry(), token: "bridge-secret", recordEvent });
+
+  const unbound = await bridge.handle({
+    authorization: "Bearer bridge-secret",
+    body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "knowledge_search", arguments: { query: "agent" } } },
+  });
+  assert.equal(unbound.error.code, -32001);
+
+  const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", channel: "weixin", messageId: "msg-7", runId: "run-7", allowedTools: ["workflow_context"] });
+  const denied = await bridge.handle({
+    authorization: "Bearer bridge-secret",
+    body: { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "knowledge_search", arguments: { query: "agent" } } },
+  });
+  assert.equal(denied.error.code, -32003);
+  release();
+
+  const byName = Object.fromEntries(events.map(({ event, data }) => [event, data]));
+  const rejected = events.filter(({ event }) => event === "bridge.context.rejected").map(({ data }) => data);
+  assert.equal(rejected.some((data) => data.reason === "context_required" && !data.runId), true);
+  assert.equal(byName["bridge.context.bound"].runId, "run-7");
+  assert.equal(byName["bridge.context.bound"].messageId, "msg-7");
+  assert.equal(byName["bridge.context.bound"].channel, "weixin");
+  assert.equal(byName["bridge.context.released"].runId, "run-7");
+  assert.equal(byName["bridge.context.released"].messageId, "msg-7");
+  const notAllowed = rejected.find((data) => data.reason === "tool_not_allowed");
+  assert.equal(notAllowed.tool, "knowledge_search");
+  assert.equal(notAllowed.runId, "run-7");
+  // journal 不携带 token、查询正文等敏感载荷。
+  assert.doesNotMatch(JSON.stringify(events), /bridge-secret|agent/);
+});
+
 test("SynoToolBridge supports the MCP initialize handshake without exposing runtime controls", async () => {
   const bridge = new SynoToolBridge({ tools: registry(), token: "bridge-secret" });
   const initialized = await bridge.handle({

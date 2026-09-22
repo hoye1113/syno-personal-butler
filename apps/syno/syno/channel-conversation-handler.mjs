@@ -10,6 +10,8 @@ import { visionResultToIntakePayload } from "./vision-intake.mjs";
 const URL_IN_TEXT_PATTERN = /https?:\/\/[^\s⺀-鿿豈-﫿＀-￯　-〿]+/gi;
 const EXPLICIT_INGEST_PATTERN = /(?:收录|保存到知识库|记下来|存进知识库)/u;
 const BARE_URL_PATTERN = /^https?:\/\/[^\s⺀-鿿豈-﫿＀-￯　-〿]+$/i;
+const FEEDBACK_REPLY = /^(?:(?:这张|上一张|刚才(?:那张)?|也)\s*|(?:inspiration-\d{8}-[a-f0-9]{8})\s*)?(有用|没用|一般)(?:[。！!～~]?|\s*)$/u;
+const FEEDBACK_BY_TEXT = Object.freeze({ 有用: "useful", 没用: "not_useful", 一般: "neutral" });
 const WORKFLOW_STATUS_LABELS = Object.freeze({
   received: "已接收",
   extracting: "正在直接抓取",
@@ -47,7 +49,7 @@ function captureReceiptText(receipt, { attachment = false } = {}) {
 }
 
 class ChannelConversationHandler {
-  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery, imageStore = null, visionClient = null } = {}) {
+  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelContinuations, inspirationStore, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery, imageStore = null, visionClient = null } = {}) {
     if (!runtime || !core || (!ingest && !ingestWorkflows) || !pendingDecisions) throw new Error("ChannelConversationHandler 缺少 Runtime、Core、IngestWorkflow 或 PendingDecision Store");
     this.runtime = runtime;
     this.core = core;
@@ -61,6 +63,8 @@ class ChannelConversationHandler {
     this.browserCapture = browserCapture;
     this.acceptedRequests = acceptedRequests;
     this.recentInteractions = recentInteractions;
+    this.channelContinuations = channelContinuations;
+    this.inspirationStore = inspirationStore;
     this.channelDeliveryOutbox = channelDeliveryOutbox;
     this.mobileDeliveryMode = mobileDeliveryMode;
     this.ownerChannelTargets = ownerChannelTargets;
@@ -349,6 +353,40 @@ class ChannelConversationHandler {
     return { deferredDelivery: true, requestId: request.requestId };
   }
 
+  async #handleFeedback(text, { ownerKey, channel, threadKey }) {
+    const match = FEEDBACK_REPLY.exec(text);
+    if (!match || !this.channelContinuations || !this.inspirationStore) return null;
+    const feedback = FEEDBACK_BY_TEXT[match[1]];
+    const explicitId = /\b(inspiration-\d{8}-[a-f0-9]{8})\b/i.exec(text)?.[1];
+    const continuation = explicitId
+      ? { payload: { inspirationId: explicitId } }
+      : await this.channelContinuations.resolve({ ownerKey, channel, threadKey, type: "inspiration_feedback" });
+    const inspirationId = continuation?.payload?.inspirationId;
+    if (!inspirationId) return null;
+    const target = await this.inspirationStore.feedbackTarget(inspirationId, { ownerKey });
+    if (!target.found) return { text: "这张灵感卡当前不能回填反馈；我没有改动任何历史记录。" };
+    if (target.alreadyRecorded) return { text: `这张灵感卡已经标记为${target.record.feedback === "not_useful" ? "没用" : target.record.feedback === "useful" ? "有用" : "一般"}，没有覆盖原记录。` };
+    const updated = await this.inspirationStore.recordFeedback(inspirationId, feedback);
+    if (continuation?.id) await this.channelContinuations.settle(continuation.id, { status: "resolved" });
+    await this.#record("inspiration.feedback.recorded", { ownerKey, channel, inspirationId: updated.id, feedback });
+    return { text: `已记下：这张灵感卡标为${match[1]}。` };
+  }
+
+  async #continueLinkRead({ ownerKey, channel, threadKey }) {
+    if (!this.channelContinuations) return null;
+    const continuation = await this.channelContinuations.resolve({ ownerKey, channel, threadKey, type: "link_read" });
+    if (!continuation?.payload?.url) return null;
+    const url = String(continuation.payload.url);
+    try {
+      const result = await this.runtime.run({
+        text: `请继续读取这个链接并直接回答主人先前的问题：${url}\n\n（系统：这是同一条受控读取续办。必须调用 knowledge.fetch_url；不得要求主人打开网页、使用客户端或人工接管。若仍失败，说明事实与可在本聊天中执行的下一步。）`,
+      }, { ownerKey, threadKey, channel, messageId: `continuation:${continuation.id}` });
+      return { text: result.text || "已重新尝试读取该链接，但没有生成可显示的结果。" };
+    } catch (error) {
+      return { text: `这次读取仍未完成：${error.message || "未知错误"}。我已保留链接，可稍后继续重试。` };
+    }
+  }
+
   async handle(message) {
     const trace = {
       channel: String(message.channel || "unknown"),
@@ -389,6 +427,14 @@ class ChannelConversationHandler {
         message.__ingestNote = attachmentOutcome.ingestNote;
       }
       const pendingChatImages = Array.isArray(message.__imageArtifacts) && message.__imageArtifacts.length > 0;
+      if (!pendingChatImages && /^(?:继续|恢复)(?:\s*(?:刚才|刚刚)?(?:的)?(?:链接|读取))?[。！!～~]?$/u.test(text)) {
+        const continued = await this.#continueLinkRead({ ownerKey, channel: message.channel, threadKey });
+        if (continued) return continued;
+      }
+      if (!pendingChatImages) {
+        const feedback = await this.#handleFeedback(text, { ownerKey, channel: message.channel, threadKey });
+        if (feedback) return feedback;
+      }
       const recentReference = pendingChatImages ? null : parseRecentReference(text);
       if (recentReference && this.recentInteractions) {
         const resolution = await this.recentInteractions.resolve(recentReference, {
@@ -399,8 +445,8 @@ class ChannelConversationHandler {
         await this.#record("channel.recent_interaction.resolved", { ...trace, action: recentReference.action, kind: resolution.kind, itemId: resolution.item?.id || null });
         return { text: resolution.text };
       }
-      // P1（2026-09-04）：灵感反馈口令拦截已删除——「有用/没用/一般」落进正常对话，由模型经
-      // inspiration.record_feedback 工具落账（工具内约束：无待反馈卡 recorded:false）。
+      // 决策口令（「同意/拒绝」等）走 PendingDecision 私聊闸门。它与上面的灵感反馈口令
+      // 互不重叠：反馈口令是全句式精确匹配且由 #handleFeedback 出固定回执，不落模型。
       if (!pendingChatImages && isDecisionReply(text)) {
         await this.#record("channel.decision.requested", { ...trace });
         if (message.privateConversation !== true) {

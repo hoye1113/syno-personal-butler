@@ -282,3 +282,36 @@ test("escalation outcomes are journaled with host and wall only (no full URL)", 
   });
   assert.equal(events.length, 0);
 });
+
+// runtime 接线（2026-09-22）：受控读取失败必须挂出 30 分钟 link_read 续办，
+// 私网/保留地址错误对主人改讲「本机解析异常，回复继续可重试」；浏览器升级只留给 HTTP 封锁与反爬墙。
+test("runtime knowledge.fetch_url opens a scoped link_read continuation on failure", async () => {
+  process.env.NODE_ENV = "test";
+  const opened = [];
+  const channelContinuations = {
+    async open(input) { opened.push(input); return { id: `c-${opened.length}` }; },
+    async resolve() { return null; },
+    async settle() { return null; },
+  };
+  const runtime = createSynoRuntime({ channelContinuations });
+  const context = { ownerId: "owner", channel: "weixin", threadKey: "main", conversationId: "m-1", runId: "r-1" };
+  await assert.rejects(
+    runtime.tools.execute("knowledge.fetch_url", { url: "http://198.18.0.30/proxied-by-dns" }, context),
+    (error) => {
+      assert.equal(error.code, "SOURCE_URL_RESERVED_ADDRESS");
+      assert.equal(error.retryable, true);
+      assert.match(error.message, /受保护地址/);
+      assert.match(error.message, /继续/);
+      return true;
+    },
+  );
+  assert.equal(opened.length, 1);
+  assert.equal(opened[0].type, "link_read");
+  assert.equal(opened[0].ownerKey, "owner");
+  assert.equal(opened[0].channel, "weixin");
+  assert.equal(opened[0].payload.url, "http://198.18.0.30/proxied-by-dns");
+  const ttlMs = new Date(opened[0].expiresAt).getTime() - Date.now();
+  assert.ok(ttlMs > 25 * 60_000 && ttlMs <= 30 * 60_000, `续办 TTL 应为 30 分钟，实得 ${ttlMs}ms`);
+  // 成功路径的 settle 与重读依赖真实公网抓取，超出单测确定性边界；
+  // 其两段行为分别由 channel-continuation-store（settle）与 handler 裸「继续」回归覆盖。
+});
