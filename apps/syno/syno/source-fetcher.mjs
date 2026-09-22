@@ -2,6 +2,7 @@ import { lookup as dnsLookup } from "node:dns/promises";
 import http from "node:http";
 import https from "node:https";
 import net from "node:net";
+import tls from "node:tls";
 
 const MAX_SOURCE_BYTES = 2 * 1024 * 1024;
 const MAX_SOURCE_TEXT = 100_000;
@@ -30,6 +31,39 @@ function isPrivateAddress(address) {
     : PRIVATE_IPV6.check(value, "ipv6");
 }
 
+// NO_PROXY 主机名匹配（实证于 2026-09-22，13 例全过）：逗号分隔、大小写不敏感、
+// 「*」全绕、裸条目与前导点条目都匹配该域及其子域。仅主机名维度，不解析条目里的端口。
+function hostMatchesNoProxy(hostname, noProxy) {
+  const host = String(hostname || "").toLowerCase().replace(/^\[|\]$/g, "");
+  for (const rawEntry of String(noProxy || "").split(",")) {
+    const entry = rawEntry.trim().toLowerCase();
+    if (!entry) continue;
+    if (entry === "*") return true;
+    const bare = entry.replace(/^\.+/, "").replace(/^\*\./, "");
+    if (!bare) continue;
+    if (host === bare || host.endsWith(`.${bare}`)) return true;
+  }
+  return false;
+}
+
+// 代理路由判定（对齐 deepseek-harness dsh-http-proxy 的策略语义）：
+// 域名 URL 在对应 scheme 配了代理且未被 NO_PROXY 绕行时走代理，由代理远端解析 DNS——
+// 本地不再解析，TUN/Fake-IP 环境（x.com → 198.18.x.x）才不会被 SSRF 校验误杀。
+// 字面 IP 由调用方先行拦截，永不进入本函数；代理 URL 只支持 http:（CONNECT 与 absolute-form
+// 都以明文 HTTP 发往代理），坏值与不支持 scheme 一律按直连处理，不为别的工具导出的变量抛错。
+function proxyRouteForUrl(url, env = process.env) {
+  const names = url.protocol === "https:"
+    ? ["HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy"]
+    : ["HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"];
+  const proxyValue = names.map((name) => env[name]).find((value) => typeof value === "string" && value.trim());
+  if (!proxyValue) return { proxied: false };
+  if (hostMatchesNoProxy(url.hostname, env.NO_PROXY || env.no_proxy || "")) return { proxied: false };
+  let proxyUrl;
+  try { proxyUrl = new URL(proxyValue.trim()); } catch { return { proxied: false }; }
+  if (proxyUrl.protocol !== "http:") return { proxied: false };
+  return { proxied: true, proxyUrl };
+}
+
 async function resolvePublicAddress(url, lookup = dnsLookup) {
   const hostname = url.hostname.replace(/^\[|\]$/g, "");
   const literalFamily = net.isIP(hostname);
@@ -46,16 +80,42 @@ async function resolvePublicAddress(url, lookup = dnsLookup) {
   return records[0];
 }
 
+const FETCH_HEADERS = {
+  accept: "text/html,application/xhtml+xml,text/plain,application/json;q=0.8",
+  "accept-encoding": "identity",
+  "user-agent": "Syno/1.0 (+localhost personal knowledge intake)",
+};
+
+// 响应读取与超时/错误接线，直连与代理两条请求路径共用：
+// 字节上限内收集 body，超限即 destroy；超时统一讲「来源抓取超时」。
+function wireResponse(request, resolve, reject, { timeoutMs, maxBytes }) {
+  request.on("response", (response) => {
+    const chunks = [];
+    let size = 0;
+    response.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > maxBytes) {
+        request.destroy(new Error("来源正文超过 2 MB 限制"));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    response.on("end", () => resolve({
+      statusCode: response.statusCode || 0,
+      headers: response.headers,
+      body: Buffer.concat(chunks),
+    }));
+  });
+  request.setTimeout(timeoutMs, () => request.destroy(new Error("来源抓取超时")));
+  request.on("error", reject);
+}
+
 function requestOnce(url, address, { timeoutMs = 15_000, maxBytes = MAX_SOURCE_BYTES } = {}) {
   return new Promise((resolve, reject) => {
     const transport = url.protocol === "https:" ? https : http;
     const request = transport.request(url, {
       method: "GET",
-      headers: {
-        accept: "text/html,application/xhtml+xml,text/plain,application/json;q=0.8",
-        "accept-encoding": "identity",
-        "user-agent": "Syno/1.0 (+localhost personal knowledge intake)",
-      },
+      headers: { ...FETCH_HEADERS },
       lookup(_hostname, _options, callback) {
         // Node 24 may request an `all` lookup when auto-selecting IPv4/IPv6.
         // Return the pinned record in the shape that the caller requested;
@@ -65,26 +125,62 @@ function requestOnce(url, address, { timeoutMs = 15_000, maxBytes = MAX_SOURCE_B
         if (_options?.all) callback(null, [address]);
         else callback(null, address.address, address.family);
       },
-    }, (response) => {
-      const chunks = [];
-      let size = 0;
-      response.on("data", (chunk) => {
-        size += chunk.length;
-        if (size > maxBytes) {
-          request.destroy(new Error("来源正文超过 2 MB 限制"));
-          return;
-        }
-        chunks.push(chunk);
-      });
-      response.on("end", () => resolve({
-        statusCode: response.statusCode || 0,
-        headers: response.headers,
-        body: Buffer.concat(chunks),
-      }));
     });
-    request.setTimeout(timeoutMs, () => request.destroy(new Error("来源抓取超时")));
-    request.on("error", reject);
+    wireResponse(request, resolve, reject, { timeoutMs, maxBytes });
     request.end();
+  });
+}
+
+// 经代理取回一个 URL，本地不做 DNS（代理解析），因此也不做保留地址校验——
+// 校验责任在调用方：字面非公网 IP 在进入本函数前已被 resolvePublicAddress 拦下。
+// https: 目标走 CONNECT 隧道后在隧道上握手 TLS；http: 目标用 absolute-form。
+// 实证于 2026-09-22（探针打 https://x.com 与 http://example.com 均 HTTP 200）。
+function requestViaProxy(url, proxyUrl, { timeoutMs = 15_000, maxBytes = MAX_SOURCE_BYTES } = {}) {
+  return new Promise((resolve, reject) => {
+    const proxyHeaders = {};
+    if (proxyUrl.username || proxyUrl.password) {
+      const credential = `${decodeURIComponent(proxyUrl.username)}:${decodeURIComponent(proxyUrl.password)}`;
+      proxyHeaders["proxy-authorization"] = `Basic ${Buffer.from(credential).toString("base64")}`;
+    }
+    if (url.protocol === "http:") {
+      const request = http.request({
+        host: proxyUrl.hostname,
+        port: proxyUrl.port || 8080,
+        method: "GET",
+        path: url.toString(),
+        headers: { ...FETCH_HEADERS, ...proxyHeaders, host: url.host },
+      });
+      wireResponse(request, resolve, reject, { timeoutMs, maxBytes });
+      request.end();
+      return;
+    }
+    const connect = http.request({
+      host: proxyUrl.hostname,
+      port: proxyUrl.port || 8080,
+      method: "CONNECT",
+      path: `${url.hostname}:${url.port || 443}`,
+      headers: { ...proxyHeaders },
+    });
+    connect.setTimeout(timeoutMs, () => connect.destroy(new Error("来源抓取超时")));
+    connect.on("connect", (response, socket) => {
+      if (response.statusCode !== 200) {
+        socket.destroy();
+        reject(new Error(`代理 CONNECT 失败：HTTP ${response.statusCode}`));
+        return;
+      }
+      // tlsSocket 的握手/传输错误经 createConnection 冒到 request 的 error 事件。
+      const tlsSocket = tls.connect({ socket, servername: url.hostname });
+      const request = https.request(url, {
+        method: "GET",
+        headers: { ...FETCH_HEADERS },
+        createConnection: () => tlsSocket,
+        agent: false,
+      });
+      wireResponse(request, resolve, reject, { timeoutMs, maxBytes });
+      request.end();
+    });
+    connect.on("error", reject);
+    connect.end();
   });
 }
 
@@ -137,8 +233,18 @@ async function fetchSourceText(value, options = {}) {
   let url = new URL(value);
   for (let redirects = 0; redirects <= (options.maxRedirects ?? MAX_REDIRECTS); redirects += 1) {
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error("来源 URL 不安全");
-    const address = await resolvePublicAddress(url, options.lookup);
-    const response = await requestOnce(url, address, options);
+    // 每次跳转都重新判定路由：跨域重定向可能在直连与代理之间切换。
+    // 注入 lookup 的调用方（测试）同时冻结路由判定，默认不读真实代理环境。
+    const proxyEnv = options.proxyEnv ?? (options.lookup ? {} : process.env);
+    const hostname = url.hostname.replace(/^\[|\]$/g, "");
+    const route = net.isIP(hostname) === 0 ? proxyRouteForUrl(url, proxyEnv) : { proxied: false };
+    let response;
+    if (route.proxied) {
+      response = await requestViaProxy(url, route.proxyUrl, options);
+    } else {
+      const address = await resolvePublicAddress(url, options.lookup);
+      response = await requestOnce(url, address, options);
+    }
     if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
       if (redirects === (options.maxRedirects ?? MAX_REDIRECTS)) throw new Error("来源重定向次数过多");
       url = new URL(response.headers.location, url);
@@ -169,7 +275,10 @@ export {
   extractReadableText,
   fetchSourceText,
   hasSourceNoise,
+  hostMatchesNoProxy,
   isPrivateAddress,
+  proxyRouteForUrl,
   requestOnce,
+  requestViaProxy,
   resolvePublicAddress,
 };

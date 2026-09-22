@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
-import { fetchSourceText, requestOnce, resolvePublicAddress } from "../apps/syno/syno/source-fetcher.mjs";
+import { fetchSourceText, proxyRouteForUrl, requestOnce, resolvePublicAddress } from "../apps/syno/syno/source-fetcher.mjs";
 
 test("requestOnce supports Node all-address lookup callbacks", async (t) => {
   const server = http.createServer((_request, response) => {
@@ -69,5 +69,77 @@ test("fetchSourceText surfaces the reserved-address code before any network requ
   await assert.rejects(
     fetchSourceText("http://198.18.0.20/proxied"),
     (error) => error.code === "SOURCE_URL_RESERVED_ADDRESS" && error.retryable === true,
+  );
+});
+
+// ---------- 代理感知（2026-09-22）：TUN/Fake-IP 环境域名交代理远端解析 ----------
+
+test("proxyRouteForUrl picks the scheme proxy, honors NO_PROXY, and ignores unusable values", () => {
+  const env = { HTTPS_PROXY: "http://127.0.0.1:7892", HTTP_PROXY: "http://127.0.0.1:7893", NO_PROXY: "localhost,127.0.0.1,::1" };
+  assert.equal(proxyRouteForUrl(new URL("https://x.com/a"), env).proxyUrl.port, "7892");
+  assert.equal(proxyRouteForUrl(new URL("http://example.com/"), env).proxyUrl.port, "7893");
+  assert.equal(proxyRouteForUrl(new URL("https://localhost:8888/"), env).proxied, false);
+  assert.equal(proxyRouteForUrl(new URL("https://x.com/"), {}).proxied, false);
+  // 坏值与不支持 scheme 按直连处理，不为别的工具导出的变量抛错
+  assert.equal(proxyRouteForUrl(new URL("https://x.com/"), { HTTPS_PROXY: "not a url" }).proxied, false);
+  assert.equal(proxyRouteForUrl(new URL("https://x.com/"), { HTTPS_PROXY: "socks5://127.0.0.1:1080" }).proxied, false);
+  assert.equal(proxyRouteForUrl(new URL("https://x.com/"), { ALL_PROXY: "http://127.0.0.1:7892" }).proxied, true);
+  assert.equal(proxyRouteForUrl(new URL("https://x.com/"), { HTTPS_PROXY: "http://127.0.0.1:7892", NO_PROXY: "*" }).proxied, false);
+  // 后缀匹配只认点前缀：example.com.evil.com 不得被 .example.com 误杀
+  assert.equal(proxyRouteForUrl(new URL("https://api.internal.example/"), { HTTPS_PROXY: "http://127.0.0.1:7892", NO_PROXY: ".internal.example" }).proxied, false);
+  assert.equal(proxyRouteForUrl(new URL("https://example.com.evil.example/"), { HTTPS_PROXY: "http://127.0.0.1:7892", NO_PROXY: ".evil.example" }).proxied, false);
+  assert.equal(proxyRouteForUrl(new URL("https://evil.example.com/"), { HTTPS_PROXY: "http://127.0.0.1:7892", NO_PROXY: ".example.com" }).proxied, false);
+  assert.equal(proxyRouteForUrl(new URL("https://notexample.com/"), { HTTPS_PROXY: "http://127.0.0.1:7892", NO_PROXY: ".example.com" }).proxied, true);
+});
+
+test("fetchSourceText routes a proxied hostname through the proxy without any local DNS lookup", async (t) => {
+  const target = http.createServer((_request, response) => {
+    response.writeHead(200, { "content-type": "text/plain" });
+    response.end("proxied body");
+  });
+  await new Promise((resolve) => target.listen(0, "127.0.0.1", resolve));
+  t.after(() => target.close());
+
+  // fake proxy：absolute-form 进来后固定转发到本地 target，模拟代理的远端解析。
+  const received = [];
+  const proxy = http.createServer((request, response) => {
+    received.push({ url: request.url, host: request.headers.host });
+    const upstream = http.request({
+      host: "127.0.0.1",
+      port: target.address().port,
+      path: new URL(request.url).pathname,
+      headers: { host: new URL(request.url).host },
+    }, (upstreamResponse) => {
+      response.writeHead(upstreamResponse.statusCode ?? 502, { "content-type": upstreamResponse.headers["content-type"] || "text/plain" });
+      upstreamResponse.pipe(response);
+    });
+    upstream.on("error", () => { response.writeHead(502); response.end(); });
+    upstream.end();
+  });
+  await new Promise((resolve) => proxy.listen(0, "127.0.0.1", resolve));
+  t.after(() => proxy.close());
+
+  let lookups = 0;
+  const result = await fetchSourceText("http://proxied.example/article", {
+    proxyEnv: { HTTP_PROXY: `http://127.0.0.1:${proxy.address().port}` },
+    lookup: async () => { lookups += 1; throw new Error("proxied hop must not resolve locally"); },
+  });
+  assert.equal(result.text, "proxied body");
+  assert.equal(result.truncated, false);
+  assert.equal(lookups, 0, "proxied 分支不得做本地 DNS");
+  assert.equal(received.length, 1);
+  assert.equal(received[0].url, "http://proxied.example/article", "代理应收到 absolute-form");
+  assert.equal(received[0].host, "proxied.example", "host 头保留原站");
+});
+
+test("fetchSourceText never routes a literal private IP to the proxy", async () => {
+  // 127.0.0.1:1 不可达：若字面 IP 误入代理分支，拿到的会是 ECONNREFUSED 而非 RESERVED。
+  await assert.rejects(
+    fetchSourceText("http://192.168.1.10/a", { proxyEnv: { HTTP_PROXY: "http://127.0.0.1:1" } }),
+    (error) => error.code === "SOURCE_URL_RESERVED_ADDRESS" && error.retryable === true,
+  );
+  await assert.rejects(
+    fetchSourceText("http://198.18.0.30/proxied-by-dns", { proxyEnv: { HTTP_PROXY: "http://127.0.0.1:1" } }),
+    (error) => error.code === "SOURCE_URL_RESERVED_ADDRESS",
   );
 });

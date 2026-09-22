@@ -4,7 +4,7 @@
 
 微信 Claw 是日常唯一入口。Syno Host 仍在 loopback 上运行，以承载健康/readiness、受控 DSH、MCP Bridge、微信轮询、Outbox、Job/Policy/GitGuard；DSH 继续以 `--no-open` 启动，不再作为用户入口。唯一网页例外是 `/maintenance/weixin`：仅 loopback、只含二维码开始、轮询、连接确认，成功或超时后没有任何业务入口。
 
-不迁移或篡改历史 Web 通知、历史灵感档案或未跟踪灵感卡。SSRF 对私网、回环和 `198.18.0.0/15` 的拒绝保持不变；DNS 将公开域名重写到这些地址时，先修复本机 DNS/代理，再由聊天中的“继续”重试。
+不迁移或篡改历史 Web 通知、历史灵感档案或未跟踪灵感卡。SSRF 对私网、回环和 `198.18.0.0/15` 的拒绝保持不变；~~DNS 将公开域名重写到这些地址时，先修复本机 DNS/代理，再由聊天中的“继续”重试~~（2026-09-22 实证修正：TUN/Fake-IP 环境下 fetch_url 已具备代理感知，域名交代理远端解析，见已实施第 8 条）。
 
 ## 已实施
 
@@ -15,6 +15,7 @@
 5. 今日灵感投递成功后写入 owner/channel/thread，并创建 24 小时 `inspiration_feedback`。精确的“有用/没用/一般”在 `ChannelConversationHandler` 直接回执；重复评价只返回既有事实，不覆盖历史。工具接口可接收 `inspirationId`，只允许同 owner 已投递、尚未反馈的卡。
 6. DNS 受保护地址错误具有 `SOURCE_URL_RESERVED_ADDRESS` 结构化代码；保留浏览器升级仅用于 401/403/429 或验证码墙，不用浏览器绕过 SSRF。
 7. Tool Bridge 对 context bind/release/拒绝记录脱敏 journal 事件，包含 runId、消息关联与原因；用户可见 ACK 仍固定为“已接收，正在处理。”。
+8. （2026-09-22 补丁）`source-fetcher` 代理感知：域名 URL 在配了 HTTP(S)_PROXY 且未被 NO_PROXY 绕行时经代理请求（CONNECT 隧道 / absolute-form），本地不做 DNS 解析，TUN/Fake-IP 环境（x.com → 198.18.x.x）不再被 SSRF 校验误杀；字面非公网 IP 任何路径都拒，直连路径的解析+pinning 校验不变。实证：同一 X 链接由两次 SOURCE_URL_RESERVED_ADDRESS 转为直抓 200 拿到全文。DSH 侧无需改动——其 `web-fetch-http` 本就有解析校验+pinning+代理分支（此前“DSH 无 SSRF 防护”的判断系误读，已纠正）。
 
 ## 剩余验收与运行操作
 
