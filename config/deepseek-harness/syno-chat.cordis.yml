@@ -33,7 +33,9 @@
 
 - id: approval
   config:
-    policy: ask
+    # The RPC fallback has no human approval UI; the supervisor confines this
+    # writable profile to the isolated DSH_CWD workspace above.
+    policy: never
 
 - id: session-persistence-jsonl
   config:

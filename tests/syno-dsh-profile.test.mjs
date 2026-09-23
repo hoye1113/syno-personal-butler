@@ -20,15 +20,22 @@ test("resolveChatSurface uses jsonrpc for fake agents and web otherwise", () => 
   assert.equal(resolveChatSurface({ fake: false, env: {} }), "web");
 });
 
+test("Syno production bundle declares the agent preset in DSH's active registry", async () => {
+  const repoRoot = path.resolve(".");
+  const bundlePatch = await readFile(path.join(repoRoot, "packages", "syno-dsh-plugin", "cordis.patch.yml"), "utf8");
+  assert.match(bundlePatch, /id: preset-syno[\s\S]*name: '@deepseek-ai\/dsh-agent-preset'[\s\S]*id: syno/);
+  assert.match(bundlePatch, /name: Syno production/);
+  assert.doesNotMatch(bundlePatch, /includeUserRoot/);
+});
+
 test("Host-generated syno profile pins bundles and forbids marketplace add", async (t) => {
   const homeRoot = await mkdtemp(path.join(os.tmpdir(), "syno-dsh-home-"));
   t.after(() => rm(homeRoot, { recursive: true, force: true }));
   const repoRoot = path.resolve(".");
-  const { synoDir, labDir, agentPreset } = await ensureSynoDshProfiles({ homeRoot, repoRoot });
+  const { synoDir, labDir } = await ensureSynoDshProfiles({ homeRoot, repoRoot });
   const syno = JSON.parse(await readFile(path.join(synoDir, "package.json"), "utf8"));
   const lab = JSON.parse(await readFile(path.join(labDir, "package.json"), "utf8"));
   const synoPatch = await readFile(path.join(synoDir, "cordis.patch.yml"), "utf8");
-  const agentPresetText = await readFile(agentPreset.presetPath, "utf8");
   const pluginPatch = await readFile(path.join(repoRoot, "packages", "syno-dsh-plugin", "cordis.patch.yml"), "utf8");
   assert.equal(path.basename(synoDir), SYNO_PROFILE_NAME);
   assert.equal(path.basename(labDir), SYNO_LAB_PROFILE_NAME);
@@ -42,12 +49,13 @@ test("Host-generated syno profile pins bundles and forbids marketplace add", asy
   assert.equal(syno.dsh.profile.allowMarketplaceAdd, false);
   assert.match(synoPatch, /Do not run/);
   assert.match(synoPatch, /id: agent-presets[\s\S]*default: syno/);
-  assert.match(synoPatch, /includeUserRoot: true/);
-  assert.match(agentPresetText, /name: '@deepseek-ai\/dsh-persona'/);
-  assert.match(agentPresetText, /process\.env\.DSH_SYSTEM_PROMPT/);
-  assert.match(agentPresetText, /process\.env\.SYNO_SKILL_ROOT \?\? process\.cwd\(\)/);
-  assert.match(agentPresetText, /name: '@deepseek-ai\/dsh-compaction-basic'/);
-  assert.match(agentPresetText, /name: '@deepseek-ai\/dsh-tool-web'/);
+  assert.doesNotMatch(synoPatch, /includeUserRoot/);
+  assert.match(pluginPatch, /id: preset-syno[\s\S]*name: '@deepseek-ai\/dsh-agent-preset'[\s\S]*id: syno/);
+  assert.match(pluginPatch, /prefix: !!js process\.env\.DSH_SYSTEM_PROMPT/);
+  assert.match(pluginPatch, /process\.env\.SYNO_SKILL_ROOT \?\? process\.cwd\(\)/);
+  assert.match(pluginPatch, /name: '@deepseek-ai\/dsh-compaction-basic'/);
+  assert.match(pluginPatch, /name: '@deepseek-ai\/dsh-tool-web'/);
+  await assert.rejects(() => access(path.join(homeRoot, ".agent-presets", "syno")), { code: "ENOENT" });
   assert.doesNotMatch(synoPatch, /sk-[A-Za-z0-9]/);
   assert.match(pluginPatch, /searchProvider: deepseek-official/);
   assert.match(pluginPatch, /name: '@deepseek-ai\/dsh-schedule'/);
@@ -69,6 +77,8 @@ test("JSON-RPC chat delegates the shared tool and compaction stack to dsh sdk", 
   assert.match(chat, /id: system-prompt/);
   assert.match(chat, /id: session-persistence-jsonl/);
   assert.match(chat, /mode: workspace-write/);
+  assert.match(chat, /id: approval[\s\S]*policy: never/);
+  assert.doesNotMatch(chat, /policy:\s*ask/);
   assert.match(chat, /toolSet: core/);
   assert.doesNotMatch(chat, /name: '@deepseek-ai\/dsh-(token-meter|compaction|command-compact)/);
 });

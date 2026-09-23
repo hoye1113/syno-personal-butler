@@ -534,6 +534,35 @@ test("ChannelConversationHandler never claims a failed chat Job was saved for la
   assert.doesNotMatch(response.text, /已保存为任务/);
 });
 
+test("ChannelConversationHandler reports a canceled chat Job as terminal", async () => {
+  const handler = new ChannelConversationHandler({
+    runtime: {
+      async run() {
+        throw Object.assign(new Error("provider offline"), { code: "HARNESS_ATTEMPTS_EXHAUSTED", retryable: true });
+      },
+    },
+    core: {
+      async execute() {
+        return { job: { id: "job-chat-canceled", status: "canceled" } };
+      },
+    },
+    ingest: {},
+    pendingDecisions: {},
+  });
+
+  const response = await handler.handle({
+    id: "wx-chat-canceled",
+    ownerKey: "owner",
+    senderId: "weixin-owner",
+    channel: "weixin",
+    text: "在吗",
+  });
+
+  assert.match(response.text, /处理失败/);
+  assert.match(response.text, /job-chat-canceled/);
+  assert.doesNotMatch(response.text, /已保存为任务/);
+});
+
 test("ChannelConversationHandler journals workflow stages without persisting message text", async () => {
   const events = [];
   const handler = new ChannelConversationHandler({

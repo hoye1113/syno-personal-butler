@@ -705,7 +705,7 @@ class ChannelConversationHandler {
           conversationId: threadKey,
         });
         const queuedJob = queued.job;
-        if (["failed", "rejected", "cancelled"].includes(queuedJob?.status)) {
+        if (["failed", "rejected", "canceled"].includes(queuedJob?.status)) {
           return { text: `消息处理失败，任务 ${queuedJob.id || "unknown"} 未完成。请稍后重试。` };
         }
         return {
