@@ -67,7 +67,7 @@ function rpcOk(rpcId, value) {
 
 // DSH 0.1.7 协议 fake：令牌换 cookie（303 + set-cookie）、/api/* 一律校验
 // cookie、单条 /api/remote.mux 承载 session/follow 逻辑流。
-function startFakeWeb({ onPrompt, selectModel } = {}) {
+function startFakeWeb({ onPrompt, selectModel, beforePromptResponse, promptResponseDelayMs = 0 } = {}) {
   const state = {
     rejectMux: false,
     sessionCreates: [],
@@ -125,8 +125,13 @@ function startFakeWeb({ onPrompt, selectModel } = {}) {
       }
       if (message.method === "session/prompt") {
         state.sessionPrompts.push(request);
-        res.end(rpcOk(message.rpcId, { accepted: true }));
         const sessionId = request.sessionId;
+        if (typeof beforePromptResponse === "function") {
+          beforePromptResponse({ sessionId, sendEvent: (event) => sendFollowEvent(sessionId, event) });
+        }
+        const respond = () => res.end(rpcOk(message.rpcId, { accepted: true }));
+        if (promptResponseDelayMs > 0) setTimeout(respond, promptResponseDelayMs);
+        else respond();
         setTimeout(() => {
           if (typeof onPrompt === "function") {
             onPrompt({ sessionId, sendEvent: (event) => sendFollowEvent(sessionId, event) });
@@ -346,6 +351,31 @@ test("DeepSeekHarnessWebClient waits for the paired turn/end when a stale one ra
   const result = await pending;
   assert.equal(step2Sent, true);
   assert.equal(result.finalResponse, "最终答案：抓取被反爬拦截");
+});
+
+test("DeepSeekHarnessWebClient keeps turn events that race ahead of the prompt response", async (t) => {
+  // 生产实证（2026-09-23）：DSH 0.1.7 的 turn/start 可能早于 session/prompt
+  // RPC 响应到达（实测 +493ms vs +500ms）。事件门禁必须在 prompt 发出时即刻
+  // 打开，否则早到的 turn/start 被丢弃、turn/end 配不上对，整轮空等到超时。
+  const fake = await startFakeWeb({
+    promptResponseDelayMs: 120,
+    beforePromptResponse({ sessionId, sendEvent }) {
+      sendEvent({ type: "turn/start", data: { turn: 1 } });
+      sendEvent({
+        type: "assistant/message",
+        data: { message: { content: [{ type: "text", text: "early-hello" }] } },
+      });
+      sendEvent({ type: "turn/end", data: { turn: 1, reason: { kind: "completed" } } });
+    },
+  });
+  t.after(() => fake.close());
+  const client = makeClient(fake);
+  t.after(() => client.close());
+  await client.initialize({ cwd: "/tmp/workspace", provider: "deepseek-official", model: "deepseek-v4-flash" });
+  const started = Date.now();
+  const result = await client.runTurn("syno-early-events", [{ type: "text", text: "你好" }]);
+  assert.equal(result.finalResponse, "early-hello");
+  assert.ok(Date.now() - started < 1_000, "早到的 turn/end 应直接结算，而不是等到 turnTimeoutMs");
 });
 
 test("DeepSeekHarnessWebClient keeps event streams after initializeTimeoutMs", async (t) => {

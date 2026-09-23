@@ -131,7 +131,11 @@ class DeepSeekHarnessWebClient {
     const notifications = [];
     let sawRunning = false;
     let idleAfterRunning = false;
-    let promptAccepted = false;
+    // prompt 发出即开启事件门禁：DSH 0.1.7 实测 turn/start 可能早于
+    // session/prompt RPC 响应到达（2026-09-23 生产实证 +493ms vs +500ms），
+    // 等响应落实才记 turn 号会让 turn/end 配不上对、整轮空等超时；旧轮
+    // 迟到帧由 turn 号配对（activeTurn）与 activeTurn!==null 门挡住。
+    let promptSent = false;
     // 本轮 turn 号（取自 turn/start）；true = 见过 turn/start 但未带 turn 号。
     // turn/end 必须与它配对才采信——若上一轮因竞态被提前结算，其迟到的
     // turn/end 会落进本轮事件列表，只有配对能挡住这种自我污染。
@@ -189,7 +193,7 @@ class DeepSeekHarnessWebClient {
         if (notification.method === "session.event" && notification.params.sessionId === sessionId) {
           const event = notification.params.event;
           events.push(event);
-          if (promptAccepted && event?.type === "turn/start") {
+          if (promptSent && event?.type === "turn/start") {
             activeTurn = typeof event?.data?.turn === "number" ? event.data.turn : true;
             // turn 有了权威终态信号，idle 静默期兜底即刻作废（竞态下它可能
             // 已在计时——idle 先于 turn/start 到达的病态帧序）。
@@ -198,7 +202,7 @@ class DeepSeekHarnessWebClient {
               drainTimer = null;
             }
           }
-          if (promptAccepted && activeTurn !== null && event?.type === "turn/end") {
+          if (promptSent && activeTurn !== null && event?.type === "turn/end") {
             const endedTurn = event?.data?.turn;
             if (activeTurn === true || typeof endedTurn !== "number" || endedTurn === activeTurn) turnEnded = true;
           }
@@ -214,6 +218,7 @@ class DeepSeekHarnessWebClient {
         return;
       }
       if (signal) signal.addEventListener("abort", onAbort, { once: true });
+      promptSent = true;
       this.rpc("session/prompt", {
         request: {
           requestId: randomUUID(),
@@ -222,7 +227,6 @@ class DeepSeekHarnessWebClient {
           content: toPromptContent(contentBlocks),
         },
       }, signal).then(() => {
-        promptAccepted = true;
         maybeSettle();
       }).catch((error) => finish(error));
     });
