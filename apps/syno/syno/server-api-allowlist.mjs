@@ -3,6 +3,7 @@ const ALLOWED_SYNO_API_PATHS = new Set([
   "/api/syno/readiness",
   "/api/syno/bridge/mcp",
   "/api/syno/harness",
+  "/api/syno/channels",
   "/api/syno/weixin/login/start",
   "/api/syno/weixin/login/poll",
   "/api/syno/weixin/connect",
