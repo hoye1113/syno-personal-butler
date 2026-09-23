@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 
 import { createSynoRuntime, routeSynoApi } from "./syno/runtime.mjs";
+import { isAllowedSynoApiPath } from "./syno/server-api-allowlist.mjs";
 import { DEFAULT_WEB_PORT, PATHS } from "./syno/paths.mjs";
 import { ProcessFileLock } from "./syno/process-lock.mjs";
 import { readinessHttpStatus } from "./syno/server-readiness.mjs";
@@ -58,7 +59,6 @@ document.querySelector("#start").onclick = async () => {
 `;
 
 const maintenance = Object.freeze({ "/maintenance/weixin/start": "/api/syno/weixin/login/start", "/maintenance/weixin/poll": "/api/syno/weixin/login/poll", "/maintenance/weixin/connect": "/api/syno/weixin/connect" });
-const allowed = new Set(["/api/syno/health", "/api/syno/readiness", "/api/syno/bridge/mcp", ...Object.values(maintenance)]);
 const server = createServer(async (req, res) => {
   try {
     if (!isLoopback(req) || !isLocalHostHeader(req)) return send(res, 403, JSON.stringify({ error: "loopback_only" }));
@@ -67,7 +67,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/maintenance/weixin.css") return send(res, 200, QR_CSS, "text/css; charset=utf-8");
     if (req.method === "GET" && url.pathname === "/maintenance/weixin.js") return send(res, 200, QR_JS, "text/javascript; charset=utf-8");
     const routed = maintenance[url.pathname] || url.pathname;
-    if (!allowed.has(routed)) return send(res, 404, JSON.stringify({ error: "not_found" }));
+    if (!isAllowedSynoApiPath(routed)) return send(res, 404, JSON.stringify({ error: "not_found" }));
     const apiUrl = new URL(routed, url);
     const value = await routeSynoApi(runtime, req, apiUrl, readJson);
     return send(res, routed === "/api/syno/readiness" ? readinessHttpStatus(runtime.lifecycle().state) : 200, JSON.stringify(value));
