@@ -499,6 +499,41 @@ test("ChannelConversationHandler durably queues a chat when OpenCode is unavaila
   assert.equal(calls[0].context.messageId, "wx-offline");
 });
 
+test("ChannelConversationHandler never claims a failed chat Job was saved for later", async () => {
+  const handler = new ChannelConversationHandler({
+    runtime: {
+      async run() {
+        throw Object.assign(new Error("provider offline"), { code: "HARNESS_ATTEMPTS_EXHAUSTED", retryable: true });
+      },
+    },
+    core: {
+      async execute() {
+        return {
+          job: {
+            id: "job-chat-failed",
+            status: "failed",
+            error: { code: "EXECUTION_FAILED", message: "product commit is restricted to main" },
+          },
+        };
+      },
+    },
+    ingest: {},
+    pendingDecisions: {},
+  });
+
+  const response = await handler.handle({
+    id: "wx-chat-failed",
+    ownerKey: "owner",
+    senderId: "weixin-owner",
+    channel: "weixin",
+    text: "在吗",
+  });
+
+  assert.match(response.text, /处理失败/);
+  assert.match(response.text, /job-chat-failed/);
+  assert.doesNotMatch(response.text, /已保存为任务/);
+});
+
 test("ChannelConversationHandler journals workflow stages without persisting message text", async () => {
   const events = [];
   const handler = new ChannelConversationHandler({

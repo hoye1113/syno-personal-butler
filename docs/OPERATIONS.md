@@ -125,7 +125,7 @@ Get-Content -LiteralPath $log.FullName -Tail 80
 
 - `http://127.0.0.1:8888`：Syno Host 控制面（凭据、渠道、Policy、`GET /api/syno/harness`）。
 - `http://127.0.0.1:3088`（`SYNO_DSH_WEB_PORT`）：受控 DSH Web，与微信同一 Harness Session。这是特权壳（`approval: never`），不是 8888 的聊天 UI。能打开该 origin 的本机进程等于该 session 的代理。
-- 收录分析仍是第二进程 jsonrpc（`syno-capture.cordis.yml`，无 bash/fs/web）。禁止 jsonrpc chat 与生产 DSH Web 同时写同一 session。紧急回切：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。
+- 收录分析仍是第二进程 JSON-RPC sidecar（`dsh --profile sdk-minimal --patch syno-capture.cordis.yml`）：Syno overlay 关闭两个持久 shell 工具，不挂载 filesystem/web 工具，只插入 Syno Bridge。JSON-RPC 聊天回退使用官方 `sdk` profile 和 `syno-chat.cordis.yml`。禁止 JSON-RPC chat 与生产 DSH Web 同时写同一 session。紧急回切：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。
 
 **实际 argv（不要抄错）**
 
@@ -151,9 +151,9 @@ pnpm run build
 
 只 `pnpm install` 不够。CLI 可用 tsx 跑源码，但 typert 与 `dsh.client` 包的 `exports` 指向 `lib/*.js`。未 build 时典型失败：`Cannot find module …/typert.host.js`、`MissingClientBundleError`、从 `%LOCALAPPDATA%\Syno\harness\home\profiles\node_modules` 解析到空 `lib/`。
 
-`pnpm harness:doctor` 现在会检查 Capture/Chat 配置所需的完整 DSH runtime closure，并返回 `runtimeClosure.ok/base/required/missing/source`；closure 不完整时返回 `HARNESS_RUNTIME_CLOSURE_UNAVAILABLE`，不会仅凭 `node_modules` 报告 JSON-RPC sidecar 可启动。doctor 仍不能代替真实 DSH Web、模型回合或 `web_search` 验收。
+`pnpm harness:doctor` 检查 DSH CLI、官方 `sdk` / `sdk-minimal` profile bundle 和 JSON-RPC server runtime closure，并返回 `runtimeClosure.ok/cliEntry/required/missing/source`；closure 不完整时返回 `HARNESS_RUNTIME_CLOSURE_UNAVAILABLE`，不会仅凭 `node_modules` 报告 sidecar 可启动。doctor 仍不能代替真实 sidecar 初始化、模型回合或 `web_search` 验收。
 
-2026-08-25 的 packaged-bin 缺失 `@deepseek-ai/dsh-command-compact`、`@deepseek-ai/dsh-compaction-basic` 安装闭包问题已定位为外部运行闭包问题。Syno 现在以本地 launcher + DSH 已有 `runJsonrpcAgent(bareModuleBaseUrl)` 适配完整 closure，不修改外部 clone；如果 closure 仍缺失，确定性返回 `HARNESS_RUNTIME_CLOSURE_UNAVAILABLE`，不得删除官方 compaction 条目或回退到旧 Agent。
+旧版曾通过 `packages/examples/jsonrpc-demo/src/runner.ts` 启动 sidecar；该 demo runner 已从 DSH 0.1.7 移除。当前 Supervisor 直接运行已构建的 `apps/cli/lib/bin.js`，capture 使用官方 `sdk-minimal`，JSON-RPC chat 回退使用官方 `sdk`。不得恢复 demo runner 或退回旧 Agent；缺少 CLI、bundle 或 server runtime entry 时，确定性返回 `HARNESS_RUNTIME_CLOSURE_UNAVAILABLE`。
 
 Windows 计划任务 `start-syno.ps1` **不会**写入 `SYNO_DSH_ROOT`。用户/机器环境变量里没有它时，`pnpm windows:restart` 起的 Host 会 `waiting_provider`。`pnpm start` 必须在该进程环境里设置。
 

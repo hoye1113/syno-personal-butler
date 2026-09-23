@@ -24,12 +24,18 @@ const CONFIG_FILES = Object.freeze({
   chat: "syno-chat.cordis.yml",
   capture: "syno-capture.cordis.yml",
 });
+const JSONRPC_DSH_PROFILES = Object.freeze({
+  chat: { profile: "sdk", bundles: ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-sdk-app"] },
+  capture: { profile: "sdk-minimal", bundles: ["@deepseek-ai/dsh-sdk-minimal"] },
+});
 const JSONRPC_BOOTSTRAP_PACKAGES = Object.freeze([
   "@deepseek-ai/dsh-app-boot",
   "@deepseek-ai/cordis",
   "@deepseek-ai/dsh-invariants",
+  "@deepseek-ai/dsh-sdk-app",
+  "@deepseek-ai/dsh-sdk-jsonrpc-server",
+  "@deepseek-ai/dsh-sdk-minimal",
 ]);
-const JSONRPC_LAUNCHER_PATH = path.join(PATHS.repoRoot, "apps", "syno", "syno", "deepseek-harness-jsonrpc-launcher.mjs");
 const PROCESS_TREE_KILL_TIMEOUT_MS = 30_000;
 
 function runtimeError(code, message, details) {
@@ -318,8 +324,38 @@ async function discoverDshPackageRoots(dshRoot) {
   await Promise.all([
     walk(path.join(dshRoot, "packages")),
     walk(path.join(dshRoot, "apps")),
+    walk(path.join(dshRoot, "vendor")),
+    walk(path.join(dshRoot, "native")),
   ]);
   return roots;
+}
+
+async function addDshPackageDependencies(required, discoveredRoots) {
+  const inspected = new Set();
+  const pending = [...required];
+  while (pending.length) {
+    const packageName = pending.pop();
+    if (!packageName?.startsWith("@deepseek-ai/") || inspected.has(packageName)) continue;
+    inspected.add(packageName);
+    const packageRoot = discoveredRoots.get(packageName);
+    if (!packageRoot) continue;
+    let manifest;
+    try {
+      manifest = JSON.parse(await fs.readFile(path.join(packageRoot, "package.json"), "utf8"));
+    } catch {
+      continue;
+    }
+    const dependencies = {
+      ...(manifest.dependencies || {}),
+      ...(manifest.peerDependencies || {}),
+    };
+    for (const dependencyName of Object.keys(dependencies)) {
+      if (dependencyName.startsWith("@deepseek-ai/") && !required.has(dependencyName)) {
+        required.add(dependencyName);
+        pending.push(dependencyName);
+      }
+    }
+  }
 }
 
 async function resolveDshRuntimeClosure({
@@ -330,9 +366,10 @@ async function resolveDshRuntimeClosure({
   const root = path.resolve(String(dshRoot || ""));
   const baseRoot = path.join(root, "packages", "bundle", "base");
   const base = path.join(baseRoot, "lib", "index.js");
-  const runner = path.join(root, "packages", "examples", "jsonrpc-demo", "src", "runner.ts");
+  const cliPackageRoot = path.join(root, "apps", "cli");
+  const cliEntry = path.join(cliPackageRoot, "lib", "bin.js");
+  const cliSource = path.join(cliPackageRoot, "src", "bin.ts");
   const tsx = path.join(root, "node_modules", "tsx", "dist", "cli.mjs");
-  const demoNodeModules = path.join(root, "packages", "examples", "jsonrpc-demo", "node_modules");
   const missing = [];
   const required = new Set(JSONRPC_BOOTSTRAP_PACKAGES);
   const profileReports = [];
@@ -341,6 +378,7 @@ async function resolveDshRuntimeClosure({
 
   for (const profile of profiles) {
     const config = path.join(configDir, CONFIG_FILES[profile]);
+    const dshProfile = JSONRPC_DSH_PROFILES[profile];
     let packages = [];
     try {
       packages = cordisBarePackageNames(await fs.readFile(config, "utf8"));
@@ -349,24 +387,18 @@ async function resolveDshRuntimeClosure({
       missing.push(config);
       continue;
     }
+    if (dshProfile) for (const packageName of dshProfile.bundles) required.add(packageName);
     for (const packageName of packages) required.add(packageName);
-    profileReports.push({ profile, config, packages, missing: [] });
+    profileReports.push({ profile, config, dshProfile: dshProfile?.profile || null, packages, missing: [] });
   }
 
-  for (const file of [base, runner, tsx]) {
-    if (!existsSync(file)) missing.push(file);
-  }
-  for (const packageName of JSONRPC_BOOTSTRAP_PACKAGES) {
-    const manifest = packageManifestPath(path.join(root, "packages", "examples", "jsonrpc-demo"), packageName);
-    if (!await packageRuntimeEntry(path.dirname(manifest), packageName)) missing.push(`${manifest}#runtime-entry`);
-  }
+  await addDshPackageDependencies(required, discoveredRoots);
+  if (!existsSync(path.join(root, "node_modules"))) missing.push(path.join(root, "node_modules"));
+  if (!existsSync(cliEntry) && !(existsSync(cliSource) && existsSync(tsx))) missing.push(cliEntry);
+  if (!existsSync(base)) missing.push(base);
   for (const packageName of required) {
-    const baseManifest = packageManifestPath(baseRoot, packageName);
-    const demoManifest = path.join(demoNodeModules, ...packageName.split("/"), "package.json");
     const candidates = [
-      existsSync(baseManifest) ? path.dirname(baseManifest) : null,
       discoveredRoots.get(packageName),
-      existsSync(demoManifest) ? path.dirname(demoManifest) : null,
     ].filter(Boolean);
     let packageRoot;
     for (const candidate of [...new Set(candidates)]) {
@@ -376,7 +408,8 @@ async function resolveDshRuntimeClosure({
       }
     }
     if (!packageRoot) {
-      missing.push(`${baseManifest}#runtime-entry`);
+      const packageRoot = discoveredRoots.get(packageName) || path.join(root, "node_modules", ...packageName.split("/"));
+      missing.push(`${packageRoot}#runtime-entry`);
       continue;
     }
     packageRoots[packageName] = packageRoot;
@@ -393,39 +426,12 @@ async function resolveDshRuntimeClosure({
   return {
     ok: uniqueMissing.length === 0,
     base,
-    source: "syno-jsonrpc-launcher",
+    cliEntry: existsSync(cliEntry) ? cliEntry : cliSource,
+    source: "dsh-sdk-profile",
     required: requiredNames,
     missing: uniqueMissing,
     profiles: profilesWithMissing,
-    packageRoots,
   };
-}
-
-async function ensureDirectoryLink(link, target) {
-  await fs.mkdir(path.dirname(link), { recursive: true });
-  try {
-    const existing = await fs.lstat(link);
-    if (existing.isSymbolicLink()) {
-      const current = path.resolve(path.dirname(link), await fs.readlink(link));
-      if (current === path.resolve(target)) return;
-    }
-    await fs.rm(link, { recursive: true, force: true });
-  } catch (error) {
-    if (error?.code !== "ENOENT") throw error;
-  }
-  await fs.symlink(path.resolve(target), link, process.platform === "win32" ? "junction" : "dir");
-}
-
-async function prepareJsonRpcModuleBase({ localRoot, profile, runtimeClosure }) {
-  if (!runtimeClosure?.ok) return null;
-  const root = path.join(localRoot, "jsonrpc-runtime", profile);
-  const anchor = path.join(root, "anchor.mjs");
-  await fs.mkdir(root, { recursive: true });
-  await fs.writeFile(anchor, "export {};\n", "utf8");
-  for (const [packageName, packageRoot] of Object.entries(runtimeClosure.packageRoots || {})) {
-    await ensureDirectoryLink(path.join(root, "node_modules", ...packageName.split("/")), packageRoot);
-  }
-  return { root, anchor };
 }
 
 async function resolveHarnessLaunch({
@@ -447,7 +453,7 @@ async function resolveHarnessLaunch({
         bootable: true,
         fake: true,
         kind: "fake-agent",
-        runtimeClosure: { ok: true, source: "fake-agent", required: [], missing: [], profiles: [], packageRoots: {} },
+        runtimeClosure: { ok: true, source: "fake-agent", required: [], missing: [], profiles: [] },
         rejected,
       };
     } catch {
@@ -461,18 +467,20 @@ async function resolveHarnessLaunch({
   }
   const runtimeClosure = await resolveDshRuntimeClosure({ dshRoot, configDir });
   const tsxCli = path.join(dshRoot, "node_modules", "tsx", "dist", "cli.mjs");
+  const cliEntry = path.join(dshRoot, "apps", "cli", "lib", "bin.js");
+  const cliSource = path.join(dshRoot, "apps", "cli", "src", "bin.ts");
   const nodeModules = path.join(dshRoot, "node_modules");
-  const adapterAvailable = existsSync(JSONRPC_LAUNCHER_PATH) && existsSync(tsxCli);
-  if (!existsSync(JSONRPC_LAUNCHER_PATH)) rejected.push({ path: JSONRPC_LAUNCHER_PATH, reason: "missing" });
-  if (!existsSync(tsxCli)) rejected.push({ path: tsxCli, reason: "missing" });
+  const adapterAvailable = existsSync(cliEntry) || (existsSync(cliSource) && existsSync(tsxCli));
+  const argsPrefix = existsSync(cliEntry) ? [cliEntry] : adapterAvailable ? [tsxCli, cliSource] : [];
+  if (!adapterAvailable) rejected.push({ path: cliEntry, reason: "missing" });
   return {
     command: nodeExecutable,
-    argsPrefix: adapterAvailable ? [tsxCli, JSONRPC_LAUNCHER_PATH] : [],
+    argsPrefix,
     cwd: dshRoot,
     dshRoot,
     bootable: runtimeClosure.ok && adapterAvailable,
     fake: false,
-    kind: "syno-jsonrpc-adapter",
+    kind: "dsh-sdk-profile",
     runtimeClosure,
     rejected,
     ...(existsSync(nodeModules) ? {} : { missingInstall: true }),
@@ -621,7 +629,7 @@ class DeepSeekHarnessSupervisor {
       return this.#startWeb(profile, { provider, model });
     }
     if (this.launch.bootable === false && this.launch.fake !== true) {
-      const closureUnavailable = this.launch.runtimeClosure?.ok === false;
+      const closureUnavailable = this.launch.runtimeClosure?.ok === false && this.launch.missingInstall !== true;
       const error = runtimeError(
         closureUnavailable ? "HARNESS_RUNTIME_CLOSURE_UNAVAILABLE" : "HARNESS_SETUP_REQUIRED",
         closureUnavailable
@@ -639,10 +647,9 @@ class DeepSeekHarnessSupervisor {
     return this.#startJsonRpc(profile, { provider, model });
   }
 
-  async #profileEnv(profile, { includeCordisConfig = true } = {}) {
+  async #profileEnv(profile) {
     const configPath = configPathFor(profile, { configDir: this.configDir });
     await fs.access(configPath);
-    const pluginPath = path.join(this.configDir, "syno-tool-bridge-plugin.mjs");
     const personaFile = personaPath(profile, { configDir: this.configDir });
     const persona = await fs.readFile(personaFile, "utf8").catch(() => (profile === "capture"
       ? "You are Syno's capture analyzer. Output only one JSON object. Do not use tools."
@@ -652,15 +659,11 @@ class DeepSeekHarnessSupervisor {
     const homeRoot = path.join(this.localRoot, "home");
     const workspaceRoot = path.join(this.localRoot, "workspace", profile);
     await Promise.all([sessionRoot, homeRoot, workspaceRoot].map((directory) => fs.mkdir(directory, { recursive: true })));
-    if (profile === "chat") await ensureSynoDshProfiles({ homeRoot, repoRoot: this.repoRoot });
-    const jsonRpcBase = await prepareJsonRpcModuleBase({
-      localRoot: this.localRoot,
-      profile,
-      runtimeClosure: this.launch?.runtimeClosure,
-    });
+    if (profile === "chat" && this.chatSurface === "web") {
+      await ensureSynoDshProfiles({ homeRoot, repoRoot: this.repoRoot });
+    }
     const env = {
       ...harnessChildEnvironment(process.env),
-      ...(includeCordisConfig ? { DSH_CORDIS_CONFIG: configPath } : {}),
       DSH_CWD: workspaceRoot,
       DSH_HOME: homeRoot,
       DSH_SESSION_ROOT: sessionRoot,
@@ -668,18 +671,18 @@ class DeepSeekHarnessSupervisor {
       SYNO_DSH_ROOT: this.dshRoot,
       SYNO_REPO_ROOT: this.repoRoot,
       SYNO_SKILL_ROOT: path.join(this.configDir, "skills"),
-      SYNO_HARNESS_PLUGIN: pluginPath,
-      ...(jsonRpcBase ? { SYNO_DSH_JSONRPC_BASE: jsonRpcBase.anchor } : {}),
       ...(this.bridgeOrigin ? { SYNO_BRIDGE_ORIGIN: this.bridgeOrigin } : {}),
       ...(this.bridgeToken ? { SYNO_BRIDGE_TOKEN: this.bridgeToken } : {}),
       ...(deepseekKey ? { DEEPSEEK_API_KEY: deepseekKey } : {}),
     };
-    return { env, configPath, workspaceRoot, homeRoot, sessionRoot, jsonRpcBase };
+    return { env, configPath, workspaceRoot, homeRoot, sessionRoot };
   }
 
   async #startJsonRpc(profile, { provider, model } = {}) {
     const { env, configPath, workspaceRoot } = await this.#profileEnv(profile);
-    const args = [...this.launch.argsPrefix, configPath];
+    const dshProfile = JSONRPC_DSH_PROFILES[profile]?.profile;
+    if (!dshProfile) throw runtimeError("HARNESS_PROFILE_INVALID", `未知 Harness JSON-RPC profile：${profile}`);
+    const args = [...this.launch.argsPrefix, "--profile", dshProfile, "--patch", configPath];
     await this.#record("harness.start.requested", { profile, model, kind: this.launch.kind, surface: "jsonrpc" });
     let child;
     try {
@@ -724,7 +727,7 @@ class DeepSeekHarnessSupervisor {
   }
 
   async #startWeb(profile, { provider, model } = {}) {
-    const { env, workspaceRoot } = await this.#profileEnv(profile, { includeCordisConfig: false });
+    const { env, workspaceRoot } = await this.#profileEnv(profile);
     const origin = `http://127.0.0.1:${this.webPort}`;
     const args = [
       ...this.webLaunch.argsPrefix,
@@ -818,8 +821,8 @@ class DeepSeekHarnessSupervisor {
       if (child?.pid) await this.killTree(child.pid).catch(() => {});
     };
     if (slot.surface === "jsonrpc") {
-      // On Windows the tsx wrapper can exit before its launcher child. Always
-      // target the owned PID so /T can reap descendants in that case too.
+      // The SDK profile may own runtime descendants; terminate the complete
+      // process tree rooted at the CLI PID instead of racing protocol shutdown.
       await killOwnedTree();
       await waitForExit(child, 3_000);
       return;
@@ -857,7 +860,6 @@ export {
   DeepSeekHarnessSupervisor,
   HARNESS_PROFILES,
   JSONRPC_BOOTSTRAP_PACKAGES,
-  JSONRPC_LAUNCHER_PATH,
   JSONRPC_RUNTIME_PROFILES,
   REPO_CONFIG_DIR,
   configPathFor,

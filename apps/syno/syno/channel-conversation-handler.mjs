@@ -704,10 +704,14 @@ class ChannelConversationHandler {
           messageId: message.id,
           conversationId: threadKey,
         });
+        const queuedJob = queued.job;
+        if (["failed", "rejected", "cancelled"].includes(queuedJob?.status)) {
+          return { text: `消息处理失败，任务 ${queuedJob.id || "unknown"} 未完成。请稍后重试。` };
+        }
         return {
-          text: queued.job?.status === "waiting_provider"
-            ? `AI 服务暂时不可用，消息已保存为任务 ${queued.job.id}，恢复后继续处理。`
-            : queued.job?.result?.text || `消息已保存为任务 ${queued.job?.id || "unknown"}。`,
+          text: queuedJob?.status === "waiting_provider"
+            ? `AI 服务暂时不可用，消息已保存为任务 ${queuedJob.id}，恢复后继续处理。`
+            : queuedJob?.result?.text || `消息已保存为任务 ${queuedJob?.id || "unknown"}。`,
         };
       }
     } catch (error) {

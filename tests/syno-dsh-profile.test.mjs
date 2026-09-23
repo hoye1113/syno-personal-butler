@@ -64,14 +64,13 @@ test("Host-generated syno profile pins bundles and forbids marketplace add", asy
   assert.equal(path.normalize(resolved), path.normalize(path.join(repoRoot, "packages", "syno-dsh-plugin", "plugin.mjs")));
 });
 
-test("JSON-RPC chat keeps the official compaction stack", async () => {
+test("JSON-RPC chat delegates the shared tool and compaction stack to dsh sdk", async () => {
   const chat = await readFile(path.resolve("config/deepseek-harness/syno-chat.cordis.yml"), "utf8");
-  assert.match(chat, /name: '@deepseek-ai\/dsh-token-meter'/);
-  assert.match(chat, /name: '@deepseek-ai\/dsh-compaction-tool-result-pruner'/);
-  assert.match(chat, /name: '@deepseek-ai\/dsh-compaction-basic'/);
-  assert.match(chat, /thresholdRatio: 0\.8/);
-  assert.match(chat, /retainRatio: 0\.16/);
-  assert.match(chat, /name: '@deepseek-ai\/dsh-command-compact'/);
+  assert.match(chat, /id: system-prompt/);
+  assert.match(chat, /id: session-persistence-jsonl/);
+  assert.match(chat, /mode: workspace-write/);
+  assert.match(chat, /toolSet: core/);
+  assert.doesNotMatch(chat, /name: '@deepseek-ai\/dsh-(token-meter|compaction|command-compact)/);
 });
 
 test("syno-lab profile rebuild preserves dsh CLI plugin dependencies without inheriting Syno", async (t) => {
