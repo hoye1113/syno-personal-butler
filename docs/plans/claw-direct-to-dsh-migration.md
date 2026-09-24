@@ -90,6 +90,7 @@
 - C3 出站与可靠性：`session/event`（`{global:true}`）+ `agent/inbox/claimed` + `turn/end`；typing/ACK/final 由插件独占；失败回执与 Outbox 重试保留。
 - C4 维护页：按 D2 决策接线；Host 只做 loopback 转发，无业务入口。
 - C5 切换：`SYNO_CHANNEL_OWNER=dsh` 成为默认；Host 轮询与回复路径标记 deprecated，保留一个版本。
+  - **C5 前置完成（2026-09-24）**：通道 owner 双轨落地——`SYNO_CHANNEL_OWNER=dsh` 时 Host 经 `delegateChannel` 不再抢微信轮询（`running:false/delegated:true`，登录与发送代理保留），scratch Host 探针验证 health ready；单测 2 条。剩余：维护页 C4 委派细节（Host 扫码写入共享凭据后插件需重启拾取）、真实扫码与真实微信验收矩阵、切默认。
 - 门禁：真实微信端到端（普通对话、多轮工具、链接续读、灵感反馈、图片、失败回执、扫码重绑）、进程锁单实例、重启恢复、Web 与微信同会话并发语义；`#19` 与假超时错误面无对应机制。
 
 ## Phase D：主动运营内嵌

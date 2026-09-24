@@ -6,7 +6,7 @@ import { AgentHost } from "../../../packages/syno-core/agent-host.mjs";
 import { ApprovalAdvisor, minimalAdvice } from "./approval-advisor.mjs";
 import { BrowserCaptureAdapter } from "../../../packages/syno-core/browser-capture-adapter.mjs";
 import { createBrowserCaptureTools } from "./browser-capture-tools.mjs";
-import { ChannelHub } from "../../../packages/syno-core/channels.mjs";
+import { ChannelHub, delegateChannel, resolveChannelOwner } from "../../../packages/syno-core/channels.mjs";
 import { ChannelContinuationStore } from "../../../packages/syno-core/channel-continuation-store.mjs";
 import { ChannelConversationHandler } from "../../../packages/syno-core/channel-conversation-handler.mjs";
 import { ClaimEvidenceService } from "../../../packages/syno-core/claim-evidence-service.mjs";
@@ -1077,10 +1077,14 @@ function createSynoRuntime(options = {}) {
     ackOnReceive: envToggle(process.env.SYNO_WEIXIN_ACK, { defaultOn: false }),
     onMessage: (message) => channelConversationHandler.handle({ ...message, ownerKey: "local-user", threadKey: "main", channel: "weixin" }),
   });
+  // C5 前置：通道 owner 双轨。`SYNO_CHANNEL_OWNER=dsh` 时 Host 不再抢微信轮询，
+  // 由 in-process 通道插件持有；Host 侧仅保留登录/发送代理与状态（delegated 标记）。
+  const channelOwner = resolveChannelOwner(process.env);
+  const weixinChannel = channelOwner === "dsh" ? delegateChannel(weixin, channelOwner) : weixin;
   const feishu = options.feishu || new FeishuChannelAdapter({
     onMessage: (message) => channelConversationHandler.handle({ ...message, ownerKey: "local-user", threadKey: "main", channel: "feishu" }),
   });
-  const channels = options.channels || new ChannelHub({ weixin, feishu });
+  const channels = options.channels || new ChannelHub({ weixin: weixinChannel, feishu });
   // proactive 主动通道连续投递失败计数（drain 回调增/重投成功清零）；health 探活 O(1) 读，避免每探活扫 outbox。
   let proactiveDeliveryConsecutiveFailures = 0;
   const systemAlertLastSentAt = new Map();
@@ -1124,7 +1128,7 @@ function createSynoRuntime(options = {}) {
     return harnessRecoveryPromise;
   }
   async function recoverChannels() {
-    const results = await Promise.allSettled([weixin.start(), feishu.start()]);
+    const results = await Promise.allSettled([weixinChannel.start(), feishu.start()]);
     componentState.channels = results.every((result) => result.status === "fulfilled") ? "ready" : "degraded";
     refreshLifecycleState();
   }
@@ -1402,7 +1406,7 @@ function createSynoRuntime(options = {}) {
     proactive,
     signalSources,
     scheduler: proactive,
-    weixin,
+    weixin: weixinChannel,
     feishu,
     credentials,
     provider,

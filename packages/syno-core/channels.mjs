@@ -66,4 +66,21 @@ class ChannelHub {
   get(id) { return this.adapters.get(id); }
 }
 
-export { ChannelHub, FakeChannelAdapter };
+function resolveChannelOwner(env = process.env) {
+  return String(env.SYNO_CHANNEL_OWNER || "").trim() === "dsh" ? "dsh" : "host";
+}
+
+function delegateChannel(adapter, owner = "dsh") {
+  const passthrough = {};
+  for (const method of ["beginLogin", "pollLogin", "send"]) {
+    if (typeof adapter[method] === "function") passthrough[method] = (...args) => adapter[method](...args);
+  }
+  return {
+    ...passthrough,
+    start: async () => ({ delegated: true, owner }),
+    stop: async () => ({ delegated: true, owner }),
+    status: () => ({ ...(adapter.status?.() || {}), running: false, delegated: true, owner }),
+  };
+}
+
+export { ChannelHub, FakeChannelAdapter, delegateChannel, resolveChannelOwner };

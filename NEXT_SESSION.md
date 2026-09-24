@@ -18,7 +18,7 @@
 - **下一步（按序）**：
   1. B5 删除类：桥实现保留一个版本后再删（`syno-tool-bridge.mjs`、`syno-tool-bridge-plugin.mjs`、`/api/syno/bridge/mcp` 与 allowlist、`FALLBACK_TOOLS`、`SYNO_BRIDGE_CONTEXT_*`）；收录 sidecar/JSON-RPC 回退在删除时一并改挂一次评估。
   2. C1b 尾段：typing/ACK/Outbox 投递归位、维护页 C4、真实扫码。
-  3. C5：`SYNO_CHANNEL_OWNER=dsh` 切默认 + 真实微信验收矩阵。
+  3. C5：通道 owner 双轨前置已落（Host 在 `SYNO_CHANNEL_OWNER=dsh` 下不轮询、delegated 状态）；剩余维护页委派、真实扫码、切默认与真实微信验收矩阵。
   4. Phase D/E：主动内嵌、Host 收缩。
 - **权威文档**：`docs/adr/0007-claw-direct-to-dsh.md`、`docs/plans/claw-direct-to-dsh-migration.md`（波次进度）、`docs/plans/claw-direct-to-dsh-execution-and-verification.md`（执行与验收规范、开放决策）。
 - **生产运行态**：Host 任务 `running=true`、8888 ready、3088 DSH ready、微信 connected；工具面自 2026-09-24 起默认由 in-process capabilities 提供（canonical `syno_*`），回滚开关 `SYNO_CHAT_TOOLS=bridge`；通道路径仍由 Host 承担（`SYNO_CHANNEL_OWNER` 未设）。
