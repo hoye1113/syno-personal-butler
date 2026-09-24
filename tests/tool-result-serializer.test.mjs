@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { serializeForMcp, serializeForToolMessage, redactResultObject, isResultSafe, isPlainObject } from "../apps/syno/syno/tool-result-serializer.mjs";
-import { inspectRemoteContent } from "../apps/syno/syno/sensitive-content.mjs";
+import { inspectRemoteContent } from "../packages/syno-core/sensitive-content.mjs";
 
 test("serializeForMcp: 数组结果不产 structuredContent，完整结果走 content text", () => {
   const result = [{ path: "vault/note.md", query: "agent" }];

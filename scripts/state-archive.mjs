@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { PATHS } from "../apps/syno/syno/paths.mjs";
+import { PATHS } from "../packages/syno-core/paths.mjs";
 import { backupState, restoreState, verifyArchive } from "../apps/syno/syno/state-archive.mjs";
 
 const args = process.argv.slice(2);

@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { WorkflowContextCompiler } from "../apps/syno/syno/workflow-context-compiler.mjs";
-import { validateContractRecord } from "../apps/syno/syno/schema-registry.mjs";
+import { validateContractRecord } from "../packages/syno-core/schema-registry.mjs";
 
 async function fixture(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-workflow-context-"));

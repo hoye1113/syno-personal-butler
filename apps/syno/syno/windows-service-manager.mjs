@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { DEFAULT_WEB_PORT } from "./paths.mjs";
+import { DEFAULT_WEB_PORT } from "../../../packages/syno-core/paths.mjs";
 
 const execFileAsync = promisify(execFile);
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { PATHS } from "./paths.mjs";
+import { PATHS } from "../../../packages/syno-core/paths.mjs";
 
 const DEFAULT_DECISION_TTL_MS = 24 * 60 * 60 * 1_000;
 const DECISION_RESERVATION_TTL_MS = 5 * 60 * 1_000;

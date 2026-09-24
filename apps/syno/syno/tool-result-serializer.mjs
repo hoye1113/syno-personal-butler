@@ -10,7 +10,7 @@
 // 关键不变量：本模块只影响「发给 LLM 的内容」。bridge 的 onResult / effect receipt /
 // pending decision 仍接收原始未脱敏 result，保持审计与事实完整性。截断/脱敏绝不回写存储。
 
-import { inspectRemoteContent } from "./sensitive-content.mjs";
+import { inspectRemoteContent } from "../../../packages/syno-core/sensitive-content.mjs";
 
 // 仅字面量对象（{} / new Object()）或无原型字典（Object.create(null)）算 plain。
 // Date/Map/Set/Error/类实例的 prototype 不指向 Object.prototype，不算 plain——

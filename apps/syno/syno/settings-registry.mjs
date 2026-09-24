@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { PATHS } from "./paths.mjs";
+import { PATHS } from "../../../packages/syno-core/paths.mjs";
 
 const GROUPS = Object.freeze({
   agentAdjustable: Object.freeze(["notifications.cadence", "notifications.quietHours", "ui.displayOrder", "ui.preferences"]),

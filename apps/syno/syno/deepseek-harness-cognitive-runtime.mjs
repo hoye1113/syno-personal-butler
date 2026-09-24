@@ -10,9 +10,9 @@ import {
   sessionStateAfterFailure,
 } from "./session-safety.mjs";
 import { BROWSER_TOOL_NAMES } from "./browser-tool-names.mjs";
-import { PATHS } from "./paths.mjs";
+import { PATHS } from "../../../packages/syno-core/paths.mjs";
 import { ProcessFileLock } from "./process-lock.mjs";
-import { inspectRemoteContent } from "./sensitive-content.mjs";
+import { inspectRemoteContent } from "../../../packages/syno-core/sensitive-content.mjs";
 import { isCoreChatToolName } from "../../../config/deepseek-harness/syno-tool-sets.mjs";
 
 const HARNESS_ADAPTER = "deepseek-harness-sdk";

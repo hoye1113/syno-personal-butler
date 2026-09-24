@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { DeepSeekHarnessJsonRpcClient } from "./deepseek-harness-jsonrpc-client.mjs";
 import { DeepSeekHarnessWebClient } from "./deepseek-harness-web-client.mjs";
 import { defaultDeepseekKeyLoader } from "./deepseek-key-loader.mjs";
-import { PATHS } from "./paths.mjs";
+import { PATHS } from "../../../packages/syno-core/paths.mjs";
 import { RuntimeJournal } from "./runtime-journal.mjs";
 import {
   DEFAULT_DSH_WEB_PORT,

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildSourceDescriptor } from "../apps/syno/syno/source-descriptor.mjs";
-import { validateContractRecord } from "../apps/syno/syno/schema-registry.mjs";
+import { validateContractRecord } from "../packages/syno-core/schema-registry.mjs";
 
 test("SourceDescriptor preserves URL provenance and canonicalizes tracking parameters", async () => {
   const descriptor = buildSourceDescriptor({

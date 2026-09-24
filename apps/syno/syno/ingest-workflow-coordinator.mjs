@@ -2,9 +2,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { PATHS } from "./paths.mjs";
-import { validateContractRecord } from "./schema-registry.mjs";
-import { inspectRemoteContent } from "./sensitive-content.mjs";
+import { PATHS } from "../../../packages/syno-core/paths.mjs";
+import { validateContractRecord } from "../../../packages/syno-core/schema-registry.mjs";
+import { inspectRemoteContent } from "../../../packages/syno-core/sensitive-content.mjs";
 import { buildSourceDescriptor } from "./source-descriptor.mjs";
 
 const TERMINAL_STAGES = new Set(["reported", "failed_terminal", "rejected", "superseded"]);

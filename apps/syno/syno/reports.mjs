@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { PATHS, relativeToRoot } from "./paths.mjs";
+import { PATHS, relativeToRoot } from "../../../packages/syno-core/paths.mjs";
 import { writeRecord } from "./markdown-record.mjs";
 
 class ReportService {

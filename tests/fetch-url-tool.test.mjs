@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { DEFAULT_MAX_CHARS, fetchUrlForChat } from "../apps/syno/syno/fetch-url-tool.mjs";
-import { inspectRemoteContent } from "../apps/syno/syno/sensitive-content.mjs";
+import { inspectRemoteContent } from "../packages/syno-core/sensitive-content.mjs";
 import { MAX_SOURCE_TEXT } from "../apps/syno/syno/source-fetcher.mjs";
 import { createSynoRuntime } from "../apps/syno/syno/runtime.mjs";
 

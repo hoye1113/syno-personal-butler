@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { ChannelConversationHandler } from "../apps/syno/syno/channel-conversation-handler.mjs";
 import { JobStore } from "../apps/syno/syno/job-store.mjs";
-import { PATHS } from "../apps/syno/syno/paths.mjs";
+import { PATHS } from "../packages/syno-core/paths.mjs";
 import { evaluate } from "../apps/syno/syno/policy.mjs";
 
 // 移动端（微信 iLink / 飞书）trust-but-clarify 端到端。这里用**真实**的 policy.evaluate

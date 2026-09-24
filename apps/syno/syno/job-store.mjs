@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { readRecord, writeRecord } from "./markdown-record.mjs";
-import { PATHS, relativeToRoot } from "./paths.mjs";
+import { PATHS, relativeToRoot } from "../../../packages/syno-core/paths.mjs";
 
 const TERMINAL = new Set(["completed", "failed", "rejected", "canceled"]);
 const TRANSITIONS = Object.freeze({

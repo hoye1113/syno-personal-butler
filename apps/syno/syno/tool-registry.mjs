@@ -1,4 +1,4 @@
-import { validateValue } from "./schema-registry.mjs";
+import { validateValue } from "../../../packages/syno-core/schema-registry.mjs";
 
 const RISK = new Set(["read", "low", "high"]);
 

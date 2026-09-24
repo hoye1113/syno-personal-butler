@@ -31,7 +31,7 @@ M1 上下文管理 + host 端口修复 + **Phase 1 收尾** + **M2 记忆保真�
 - `apps/syno/syno/runtime.mjs` — `GET /api/syno/context/stats`（L355）；`options.contextThresholds` 注入 seam（L188-192）；`contextManager` 进 runtime（L313）
 - `apps/syno/syno/settings-registry.mjs` — `context.thresholds`（confirmationRequired 组，校验 light/moderate/heavy/overflow ∈ (0,1) 或 null）
 - `apps/syno/syno/tool-loop-executor.mjs` — handoff 正名 `{role:"system",_syno:{kind:"handoff"}}`；M2b `accumulateDigest(prev,digest,cap)`（滚动窗口，上限外置自 `RETENTION.handoffContextCharsMax`）+ `rotateConversation` 前传 `old.summaries[-1]?.summary || handoff` 累积进 `fresh.handoffContext`
-- `apps/syno/syno/paths.mjs` — `DEFAULT_WEB_PORT = 8888`（JS 单一来源）
+- `packages/syno-core/paths.mjs` — `DEFAULT_WEB_PORT = 8888`（JS 单一来源）
 
 **线上运行模型（已验证）：** host = `node apps/syno/server.mjs`，**从源码运行，无 build 步骤**，监听 `127.0.0.1:8888`（`server.mjs` `PORT || DEFAULT_WEB_PORT`）。改了源码必须 kill 8888 上的 host + 重拉才生效（详见 memory `syno-host-deploy-runbook`）。微信路由 = `conversation-ec193dc2-f1bc-48be-9fe5-18903ef50fd6`（持久在 `%LOCALAPPDATA%\Syno\state\conversation-routing.json`）。
 

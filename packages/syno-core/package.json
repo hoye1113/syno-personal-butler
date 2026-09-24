@@ -1,0 +1,17 @@
+{
+  "name": "@syno/syno-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Syno domain and governance core shared by the Host and DSH in-process plugins",
+  "exports": {
+    "./paths.mjs": "./paths.mjs",
+    "./validator.mjs": "./validator.mjs",
+    "./knowledge-store.mjs": "./knowledge-store.mjs",
+    "./knowledge-read.mjs": "./knowledge-read.mjs",
+    "./sensitive-content.mjs": "./sensitive-content.mjs",
+    "./knowledge-path-policy.mjs": "./knowledge-path-policy.mjs",
+    "./schema-registry.mjs": "./schema-registry.mjs",
+    "./package.json": "./package.json"
+  }
+}

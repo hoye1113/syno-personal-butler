@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { PATHS } from "../apps/syno/syno/paths.mjs";
+import { PATHS } from "../packages/syno-core/paths.mjs";
 
 // 只读审计 ingest-workflow 终态记录：按「错误码 × retryable × fetchMethod」聚类，
 // 暴露哪些失败形态在批量重复发生（历史上的 free 档 429 用同一个 OPENCODE_ATTEMPTS_EXHAUSTED

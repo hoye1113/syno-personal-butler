@@ -10,7 +10,7 @@ $commonScript = Join-Path $PSScriptRoot "windows-service-common.ps1"
 . $commonScript
 $logPolicyScript = Join-Path $PSScriptRoot "syno-launcher-log-policy.ps1"
 . $logPolicyScript
-# Canonical web port: mirror apps/syno/syno/paths.mjs DEFAULT_WEB_PORT (PORT env overrides).
+# Canonical web port: mirror packages/syno-core/paths.mjs DEFAULT_WEB_PORT (PORT env overrides).
 $synoPort = if ($env:PORT) { [int]$env:PORT } else { 8888 }
 $server = Join-Path $resolvedRoot "apps\syno\server.mjs"
 if (-not (Test-Path -LiteralPath $server -PathType Leaf)) { throw "Syno Host entrypoint not found: $server" }

@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { ProcessFileLock } from "./process-lock.mjs";
-import { PATHS } from "./paths.mjs";
+import { PATHS } from "../../../packages/syno-core/paths.mjs";
 import { runDpapi } from "./provider-credential-store.mjs";
 
 const ACCEPTED_REQUEST_VERSION = 1;

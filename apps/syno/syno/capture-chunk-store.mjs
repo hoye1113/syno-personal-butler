@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { PATHS } from "./paths.mjs";
+import { PATHS } from "../../../packages/syno-core/paths.mjs";
 import { ProcessFileLock } from "./process-lock.mjs";
 
 const CHUNK_ALGORITHM_VERSION = "paragraph-v1";

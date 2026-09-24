@@ -7,9 +7,9 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { GitGuard, parsePorcelainZ } from "../apps/syno/syno/git-guard.mjs";
-import { KnowledgeStore } from "../apps/syno/syno/knowledge-store.mjs";
-import { PATHS } from "../apps/syno/syno/paths.mjs";
-import { readKnowledgeSnippet } from "../apps/syno/syno/runtime.mjs";
+import { KnowledgeStore } from "../packages/syno-core/knowledge-store.mjs";
+import { PATHS } from "../packages/syno-core/paths.mjs";
+import { readKnowledgeSnippet } from "../packages/syno-core/knowledge-read.mjs";
 
 const exec = promisify(execFile);
 

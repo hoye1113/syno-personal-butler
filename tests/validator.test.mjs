@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { frontmatterData, validateVaultContract } from "../apps/syno/syno/validator.mjs";
+import { frontmatterData, validateVaultContract } from "../packages/syno-core/validator.mjs";
 
 const execFileAsync = promisify(execFile);
 

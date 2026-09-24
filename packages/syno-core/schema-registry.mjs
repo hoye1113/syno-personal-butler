@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const CONTRACT_ROOT = fileURLToPath(new URL("../../../contracts/", import.meta.url));
+const CONTRACT_ROOT = fileURLToPath(new URL("../../contracts/", import.meta.url));
 const cache = new Map();
 
 function typeMatches(value, type) {

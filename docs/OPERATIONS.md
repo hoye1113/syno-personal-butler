@@ -10,7 +10,7 @@
 ## 知识库单仓运行与回滚（2026-09-18）
 
 - 布局：本仓根目录 = `vault/` + `ops/` + 产品代码，全部逻辑路径（`vault/...`、`ops/...`）保持不变；当前生产事实源只有本仓一个 Git 工作区和一个远端。
-- 运行态：生产环境必须不设置 `SYNO_KNOWLEDGE_ROOT`，`apps/syno/syno/paths.mjs` 会回退到 `REPO_ROOT`；planner 的 `%LOCALAPPDATA%\Syno\state\topic-planner.config.json` 中 `vaultRoot` 指向本仓根目录。代码仍保留该环境变量解析，仅用于故障回滚到外部副本。
+- 运行态：生产环境必须不设置 `SYNO_KNOWLEDGE_ROOT`，`packages/syno-core/paths.mjs` 会回退到 `REPO_ROOT`；planner 的 `%LOCALAPPDATA%\Syno\state\topic-planner.config.json` 中 `vaultRoot` 指向本仓根目录。代码仍保留该环境变量解析，仅用于故障回滚到外部副本。
 - 写入与提交：管家的知识读写、Job/Proposal/事件记录和产品提交都落在本仓；产品分支保护仍由 GitGuard 执行，Job 隔离 worktree 仍位于本仓 `.worktrees/`，锁仍位于本仓 `.runtime/locks/`。
 - 回滚预案：停止 Host → 恢复 `SYNO_KNOWLEDGE_ROOT=D:\workSpace\syno-knowledge` 与 planner 的外部 `vaultRoot` → 必要时从 `D:\workSpace\syno-knowledge-backup-20260918` 恢复未提交工作树 → 重启 Host。迁移分支保留，不使用 `git reset --hard` 或强制推送。
 - 旧拆库记录：D13（2026-09-01）及外部 `D:\workSpace\syno-knowledge` 仍作为冻结回滚副本保留，不再作为生产写入目标；迁移前 Git bundle 位于 `D:\workSpace\syno-knowledge-backup-20260918\syno-knowledge-1a6892f.bundle`。

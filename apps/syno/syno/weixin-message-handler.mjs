@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { PATHS, resolveInside } from "./paths.mjs";
+import { PATHS, resolveInside } from "../../../packages/syno-core/paths.mjs";
 import { isImageMime } from "./image-mime.mjs";
 
 function parseWeixinApproval(text) {

@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { PATHS } from "./paths.mjs";
-import { validateContractRecord } from "./schema-registry.mjs";
+import { PATHS } from "../../../packages/syno-core/paths.mjs";
+import { validateContractRecord } from "../../../packages/syno-core/schema-registry.mjs";
 
 const BASE_SOURCES = Object.freeze([
   "vault/99-System/Agent/INGEST-CONTRACT.md",

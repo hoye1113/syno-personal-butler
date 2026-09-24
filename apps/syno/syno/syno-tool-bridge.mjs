@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { inspectRemoteContent } from "./sensitive-content.mjs";
+import { inspectRemoteContent } from "../../../packages/syno-core/sensitive-content.mjs";
 import { serializeForMcp } from "./tool-result-serializer.mjs";
 
 // 持久键兼容（2026-09-01，D6）：Project 子系统已移除，调用身份不再含 projectRef。

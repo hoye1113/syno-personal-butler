@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { validateContractRecord } from "../apps/syno/syno/schema-registry.mjs";
+import { validateContractRecord } from "../packages/syno-core/schema-registry.mjs";
 
 test("all public contracts are JSON Schema objects with stable identifiers", async () => {
   const root = path.resolve("contracts");

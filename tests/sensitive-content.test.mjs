@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { inspectRemoteContent, redactRemoteContent, detectStrictCredential } from "../apps/syno/syno/sensitive-content.mjs";
+import { inspectRemoteContent, redactRemoteContent, detectStrictCredential } from "../packages/syno-core/sensitive-content.mjs";
 
 test("remote-content DLP blocks common credential and privacy formats", () => {
   const samples = [

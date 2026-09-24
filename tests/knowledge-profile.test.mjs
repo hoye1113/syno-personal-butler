@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { KnowledgeStore } from "../apps/syno/syno/knowledge-store.mjs";
+import { KnowledgeStore } from "../packages/syno-core/knowledge-store.mjs";
 import { KnowledgeMaintenanceSource } from "../apps/syno/syno/knowledge-maintenance-source.mjs";
 import { ClaimEvidenceService } from "../apps/syno/syno/claim-evidence-service.mjs";
 import { KnowledgeProfileService } from "../apps/syno/syno/knowledge-profile-service.mjs";
 import { parseRecord } from "../apps/syno/syno/markdown-record.mjs";
-import { validateContractRecord } from "../apps/syno/syno/schema-registry.mjs";
+import { validateContractRecord } from "../packages/syno-core/schema-registry.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const FIXED_NOW = new Date("2026-07-21T00:00:00.000Z");

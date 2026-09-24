@@ -2,10 +2,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
-const APP_ROOT = path.resolve(MODULE_DIR, "..");
 const REPO_ROOT = process.env.NODE_ENV === "test" && process.env.SYNO_REPO_ROOT
   ? path.resolve(process.env.SYNO_REPO_ROOT)
-  : path.resolve(APP_ROOT, "..", "..");
+  : path.resolve(MODULE_DIR, "..", "..");
+const APP_ROOT = path.join(REPO_ROOT, "apps", "syno");
 
 function localDataRoot() {
   if (process.env.SYNO_LOCAL_DATA) return path.resolve(process.env.SYNO_LOCAL_DATA);

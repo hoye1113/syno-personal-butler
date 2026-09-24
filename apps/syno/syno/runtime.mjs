@@ -23,7 +23,8 @@ import { IngestService, proposalAllowsWriteJob } from "./ingest-service.mjs";
 import { IngestWorkflowCoordinator } from "./ingest-workflow-coordinator.mjs";
 import { JobStore } from "./job-store.mjs";
 import { IntakeService } from "./intake.mjs";
-import { KnowledgeStore } from "./knowledge-store.mjs";
+import { KnowledgeStore } from "../../../packages/syno-core/knowledge-store.mjs";
+import { assertKnowledgeNotSensitive, readKnowledgeSnippet } from "../../../packages/syno-core/knowledge-read.mjs";
 import { InspirationSampler } from "./inspiration-sampler.mjs";
 import { InspirationStore } from "./inspiration-store.mjs";
 import { createInspirationFeedbackTool } from "./inspiration-feedback-tool.mjs";
@@ -34,7 +35,7 @@ import { NotificationStore } from "./notification-store.mjs";
 import { OperationExecutor } from "./operation-executor.mjs";
 import { PendingDecisionStore } from "./pending-decision.mjs";
 import { buildOperationRequest } from "./operation-registry.mjs";
-import { DEFAULT_WEB_PORT, PATHS } from "./paths.mjs";
+import { DEFAULT_WEB_PORT, PATHS } from "../../../packages/syno-core/paths.mjs";
 import { PlannerService } from "./planner-service.mjs";
 import { PostIngestCandidateStore } from "./post-ingest-candidates.mjs";
 import { OutputService } from "./output-service.mjs";
@@ -43,10 +44,10 @@ import { ProviderCredentialStore } from "./provider-credential-store.mjs";
 import { ProactiveOrchestrator } from "./proactive-orchestrator.mjs";
 import { ReportService } from "./reports.mjs";
 import { RuntimeJournal } from "./runtime-journal.mjs";
-import { validateValue } from "./schema-registry.mjs";
+import { validateValue } from "../../../packages/syno-core/schema-registry.mjs";
 import { SettingsRegistry } from "./settings-registry.mjs";
 import { SignalSourceRegistry } from "./signal-source-registry.mjs";
-import { inspectRemoteContent } from "./sensitive-content.mjs";
+import { inspectRemoteContent } from "../../../packages/syno-core/sensitive-content.mjs";
 import { SynoCore } from "./syno-core.mjs";
 import { SynoToolBridge } from "./syno-tool-bridge.mjs";
 import { ToolLoopAgent } from "./tool-loop-agent.mjs";
@@ -111,27 +112,6 @@ async function workflowContext(domain) {
     sections.push({ path: relative, content: content.slice(0, 12_000) });
   }
   return { domain, authority: "canonical-vault-skills", sections };
-}
-
-function isSensitiveKnowledgeNote(markdown) {
-  return /^(?:sensitive|private):\s*(?:true|yes)$/imu.test(markdown)
-    || /^privacy:\s*(?:private|sensitive)$/imu.test(markdown)
-    || !inspectRemoteContent(markdown, { maxChars: Number.MAX_SAFE_INTEGER }).safe;
-}
-
-function assertKnowledgeNotSensitive(markdown) {
-  if (isSensitiveKnowledgeNote(markdown)) {
-    const error = new Error("该笔记标记为敏感内容，禁止发送给远程模型");
-    error.code = "KNOWLEDGE_SENSITIVE_DENIED";
-    throw error;
-  }
-}
-
-async function readKnowledgeSnippet(knowledge, notePath, maxChars = 6_000) {
-  const note = await knowledge.read(notePath);
-  assertKnowledgeNotSensitive(note.markdown);
-  const limit = Math.min(8_000, Math.max(200, Number(maxChars) || 6_000));
-  return { path: note.path, title: note.title, snippet: note.markdown.slice(0, limit), truncated: note.markdown.length > limit };
 }
 
 function remoteSafeJobSummary(job = {}) {
@@ -1976,4 +1956,4 @@ async function assertWebJobOwner(runtime, webContext, jobId) {
   }
 }
 
-export { PUBLIC_COMMAND_INTENTS, buildConversationMigrationContext, createControlMutationLock, createSynoRuntime, createWeixinMessageHandler, parseWeixinApproval, readKnowledgeSnippet, redactMigrationText, remoteSafeJobSummary, resolveCognitiveRuntimeMode, routeSynoApi };
+export { PUBLIC_COMMAND_INTENTS, buildConversationMigrationContext, createControlMutationLock, createSynoRuntime, createWeixinMessageHandler, parseWeixinApproval, redactMigrationText, remoteSafeJobSummary, resolveCognitiveRuntimeMode, routeSynoApi };

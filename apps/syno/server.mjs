@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { createSynoRuntime, routeSynoApi } from "./syno/runtime.mjs";
 import { isAllowedSynoApiPath } from "./syno/server-api-allowlist.mjs";
-import { DEFAULT_WEB_PORT, PATHS } from "./syno/paths.mjs";
+import { DEFAULT_WEB_PORT, PATHS } from "../../packages/syno-core/paths.mjs";
 import { ProcessFileLock } from "./syno/process-lock.mjs";
 import { readinessHttpStatus } from "./syno/server-readiness.mjs";
 

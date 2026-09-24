@@ -14,9 +14,9 @@ import { buildConversationMigrationContext, remoteSafeJobSummary, routeSynoApi }
 import { ConversationStore } from "../apps/syno/syno/conversation-store.mjs";
 import { validateValue } from "../apps/syno/syno/settings-registry.mjs";
 import { backupState, restoreState, verifyArchive } from "../apps/syno/syno/state-archive.mjs";
-import { validateContractRecord } from "../apps/syno/syno/schema-registry.mjs";
+import { validateContractRecord } from "../packages/syno-core/schema-registry.mjs";
 import { isPrivateAddress } from "../apps/syno/syno/source-fetcher.mjs";
-import { frontmatterData } from "../apps/syno/syno/validator.mjs";
+import { frontmatterData } from "../packages/syno-core/validator.mjs";
 
 const execFileAsync = promisify(execFile);
 

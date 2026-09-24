@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { KnowledgeStore } from "../apps/syno/syno/knowledge-store.mjs";
+import { KnowledgeStore } from "../packages/syno-core/knowledge-store.mjs";
 import { KnowledgeMaintenanceSource } from "../apps/syno/syno/knowledge-maintenance-source.mjs";
 import { ClaimEvidenceService } from "../apps/syno/syno/claim-evidence-service.mjs";
 import { GoalService } from "../apps/syno/syno/goal-service.mjs";

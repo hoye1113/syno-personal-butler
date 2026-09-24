@@ -12,7 +12,7 @@ import { TodayService } from "../apps/syno/syno/today-service.mjs";
 import { ConversationRouter } from "../apps/syno/syno/conversation-router.mjs";
 import { SignalSourceRegistry } from "../apps/syno/syno/signal-source-registry.mjs";
 import { KnowledgeMaintenanceSource } from "../apps/syno/syno/knowledge-maintenance-source.mjs";
-import { validateVaultContract } from "../apps/syno/syno/validator.mjs";
+import { validateVaultContract } from "../packages/syno-core/validator.mjs";
 
 test("ConversationRouter keeps one owner conversation across channels and explicit threads", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-conversation-router-"));

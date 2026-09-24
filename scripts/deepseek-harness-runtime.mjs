@@ -11,7 +11,7 @@ import {
   resolveHarnessLaunch,
   resolveWebLaunch,
 } from "../apps/syno/syno/deepseek-harness-supervisor.mjs";
-import { DEFAULT_WEB_PORT } from "../apps/syno/syno/paths.mjs";
+import { DEFAULT_WEB_PORT } from "../packages/syno-core/paths.mjs";
 
 async function fileExists(file) {
   try {

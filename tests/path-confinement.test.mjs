@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 
-import { resolveInside } from "../apps/syno/syno/paths.mjs";
+import { resolveInside } from "../packages/syno-core/paths.mjs";
 
 // Guards the R1/R2(server) path-confinement fixes in apps/syno/server.mjs
 // (editVaultNote / promoteMemoryProposal): they strip the literal sub-tree prefix and

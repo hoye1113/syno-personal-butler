@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { DeepSeekHarnessJsonRpcClient } from "../apps/syno/syno/deepseek-harness-jsonrpc-client.mjs";
 import { resolveHarnessLaunch } from "../apps/syno/syno/deepseek-harness-supervisor.mjs";
-import { PATHS } from "../apps/syno/syno/paths.mjs";
+import { PATHS } from "../packages/syno-core/paths.mjs";
 
 const FAKE_AGENT = path.join(PATHS.repoRoot, "tests", "support", "fake-dsh-jsonrpc-agent.mjs");
 

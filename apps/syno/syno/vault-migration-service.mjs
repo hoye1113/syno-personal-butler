@@ -4,9 +4,9 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { isMocPath } from "./knowledge-path-policy.mjs";
+import { isMocPath } from "../../../packages/syno-core/knowledge-path-policy.mjs";
 import { parseRecord, serializeRecord } from "./markdown-record.mjs";
-import { validateContractRecord } from "./schema-registry.mjs";
+import { validateContractRecord } from "../../../packages/syno-core/schema-registry.mjs";
 import { APPROVED_TAGS, TAG_ALIASES } from "./canonical-tags.mjs";
 
 const execFileAsync = promisify(execFile);

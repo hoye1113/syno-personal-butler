@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { VaultMigrationService } from "../apps/syno/syno/vault-migration-service.mjs";
-import { DEFAULT_WEB_PORT, PATHS } from "../apps/syno/syno/paths.mjs";
+import { DEFAULT_WEB_PORT, PATHS } from "../packages/syno-core/paths.mjs";
 
 function parseArgs(argv) {
   const values = argv.filter((item) => item !== "--");

@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { PATHS } from "./paths.mjs";
+import { PATHS } from "../../../packages/syno-core/paths.mjs";
 
 // 收录后候选记录（2026-09-01 精简）：只保留输出机会与证据候选。
 // 学习候选 / 复习机会随学习子系统一并移除（D6）；历史记录文件原样保留，读取方需容忍旧字段。

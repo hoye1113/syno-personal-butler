@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { parseRecord, writeRecord } from "./markdown-record.mjs";
-import { PATHS } from "./paths.mjs";
+import { PATHS } from "../../../packages/syno-core/paths.mjs";
 
 class GoalService {
   constructor({ opsRoot = PATHS.opsRoot, clock = () => new Date() } = {}) {

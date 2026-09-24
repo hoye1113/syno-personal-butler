@@ -2,12 +2,12 @@ import { constants as fsConstants, promises as fs } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 
-import { PATHS } from "./paths.mjs";
+import { PATHS } from "../../../packages/syno-core/paths.mjs";
 import { ProcessFileLock } from "./process-lock.mjs";
 import { SignalEngine, localDateKey } from "./signal-engine.mjs";
 import { aggregateDeliveryFailures } from "./channel-delivery-outbox.mjs";
 import { PROACTIVE_RESPONSE_KIND, buildProactiveBundle, normalizeState, signalIdentity } from "./proactive-reliability.mjs";
-import { detectStrictCredential } from "./sensitive-content.mjs";
+import { detectStrictCredential } from "../../../packages/syno-core/sensitive-content.mjs";
 
 const DEFAULT_QUIET_HOURS = Object.freeze({ start: "22:30", end: "07:30" });
 

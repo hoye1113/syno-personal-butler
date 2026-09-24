@@ -1,4 +1,4 @@
-import { DEFAULT_WEB_PORT } from "../apps/syno/syno/paths.mjs";
+import { DEFAULT_WEB_PORT } from "../packages/syno-core/paths.mjs";
 
 const SUPPORTED_CHANNELS = new Set(["weixin", "feishu"]);
 // 探针优先读运行中 Worker 的脱敏渠道状态（docs/OPERATIONS.md「渠道健康 probe」）。
