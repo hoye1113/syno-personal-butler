@@ -10,7 +10,9 @@ function assertIntegerRange(value, min, max, name) {
 
 function canonicalToolName(name, chatTools = process.env.SYNO_CHAT_TOOLS) {
   const value = String(name || "");
-  return String(chatTools || "").trim() === "plugin" ? value.replace(/^syno_core_/, "syno_") : value;
+  // 默认（含未设置）为插件接管后的 canonical 名；只有显式 `SYNO_CHAT_TOOLS=bridge`
+  // 回滚到旧工具面时才使用开发名 `syno_core_*`。
+  return String(chatTools || "").trim() === "bridge" ? value : value.replace(/^syno_core_/, "syno_");
 }
 
 export { assertIntegerRange, canonicalToolName };

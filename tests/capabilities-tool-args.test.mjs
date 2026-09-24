@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 
 import { assertIntegerRange, canonicalToolName } from "../packages/syno-dsh-plugin/plugins/capabilities/tool-args.mjs";
 
-test("canonical tool names switch only in plugin chat-tools mode", () => {
+test("canonical tool names are the default; bridge mode rolls back to dev names", () => {
   assert.equal(canonicalToolName("syno_core_knowledge_search", "plugin"), "syno_knowledge_search");
-  assert.equal(canonicalToolName("syno_core_jobs_submit", "plugin"), "syno_jobs_submit");
+  assert.equal(canonicalToolName("syno_core_knowledge_search", undefined), "syno_knowledge_search");
+  assert.equal(canonicalToolName("syno_core_knowledge_search", ""), "syno_knowledge_search");
+  assert.equal(canonicalToolName("syno_core_jobs_submit", ""), "syno_jobs_submit");
   assert.equal(canonicalToolName("syno_core_knowledge_search", "bridge"), "syno_core_knowledge_search");
-  assert.equal(canonicalToolName("syno_core_knowledge_search", ""), "syno_core_knowledge_search");
 });
 
 test("assertIntegerRange accepts empty values and rejects out-of-range integers", () => {

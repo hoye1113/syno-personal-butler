@@ -47,3 +47,4 @@
       name: ./syno-tool-bridge-plugin.mjs
       config:
         toolSet: core
+        allowWhenPluginMode: true

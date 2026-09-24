@@ -185,5 +185,9 @@ function registerCoreTools(ctx) {
 }
 
 export function apply(ctx) {
-  if (process.env.SYNO_CAPABILITIES_TOOLS === "1") registerCoreTools(ctx);
+  // 默认（含未设置）= 插件接管：注册 canonical syno_* 工具；`SYNO_CHAT_TOOLS=bridge` 回滚模式下
+  // 只有当开发闸门 `SYNO_CAPABILITIES_TOOLS=1` 打开时才注册开发名（两套并存用于对照）。
+  const chatTools = String(process.env.SYNO_CHAT_TOOLS || "").trim();
+  if (chatTools === "bridge" && process.env.SYNO_CAPABILITIES_TOOLS !== "1") return;
+  registerCoreTools(ctx);
 }

@@ -10,18 +10,18 @@
   - B2：灵感反馈链路 + `process-lock` 原子发布（修并发 flake）。
   - B3：`fetch_url` + `capture.*` 内嵌。
   - B4：19 个治理模块（policy/agent-host/job-store/git-guard/…）+ `jobs.list`/`jobs.submit`/`today.read`。
-  - B5（第一步）：`SYNO_CHAT_TOOLS=plugin` 双轨切换（canonical `syno_*` 名，bridge 静默）；默认 bridge，生产不变。
+  - B5：**默认接管已完成并 Owner 真机验收通过（2026-09-24 微信知识检索）**——canonical `syno_*` 为默认工具面；回滚开关 `SYNO_CHAT_TOOLS=bridge`；bridge 代码保留一个版本；收录 sidecar / JSON-RPC 回退经 `allowWhenPluginMode: true` 继续用桥。
   - C0：19 个通道/渠道模块迁入 syno-core（生产不变）。
-  - C1a：in-process 通道核心（`session-map`/`session-turn`/`channel-core`，`SYNO_CHANNEL_OWNER=dsh` 门控）。
-- **回归基线**：`pnpm test` 779/779；`pnpm run verify` 2271 files；active docs 8；静态相对导入解析 233 文件全通过。
-- **真实验证**：`pnpm spike:capabilities`（已入仓 `scripts/spike-capabilities.mjs`）三场景——默认知识三轮；`SYNO_CHAT_TOOLS=plugin` canonical 名；`SYNO_WEIXIN_SPIKE=1` fake adapter + 真实模型往返 `pong`。
+  - C1a/C1b：in-process 通道核心 + `ChannelConversationHandler` 确定性路由接回（`SYNO_CHANNEL_OWNER=dsh` 门控；spike 验证「新对话」+ 模型 `pong`）。
+- **回归基线**：`pnpm test` 780/780；`pnpm run verify` 2274 files；active docs 8；静态相对导入解析 236 文件全通过。
+- **真实验证**：`pnpm spike:capabilities`（已入仓 `scripts/spike-capabilities.mjs`）——默认（canonical `syno_*`）、`SYNO_CHAT_TOOLS=bridge`（回滚，`syno_core_*`）、`SYNO_WEIXIN_SPIKE=1`（确定性「新对话」+ 模型 `pong`）。**生产真机验收（2026-09-24）**：微信知识检索经 canonical 插件工具返回 3 篇真实笔记标题。
 - **下一步（按序）**：
-  1. Owner 验收 `SYNO_CHAT_TOOLS=plugin` 真机会话 → 之后执行 B5 删除类（bridge 文件/路由/`SYNO_BRIDGE_CONTEXT_*`、`FALLBACK_TOOLS`、capture sidecar 改挂）。
-  2. C1b：`ChannelConversationHandler` 确定性路由接回、typing/ACK/Outbox 归位、维护页 C4、真实扫码。
+  1. B5 删除类：桥实现保留一个版本后再删（`syno-tool-bridge.mjs`、`syno-tool-bridge-plugin.mjs`、`/api/syno/bridge/mcp` 与 allowlist、`FALLBACK_TOOLS`、`SYNO_BRIDGE_CONTEXT_*`）；收录 sidecar/JSON-RPC 回退在删除时一并改挂一次评估。
+  2. C1b 尾段：typing/ACK/Outbox 投递归位、维护页 C4、真实扫码。
   3. C5：`SYNO_CHANNEL_OWNER=dsh` 切默认 + 真实微信验收矩阵。
   4. Phase D/E：主动内嵌、Host 收缩。
 - **权威文档**：`docs/adr/0007-claw-direct-to-dsh.md`、`docs/plans/claw-direct-to-dsh-migration.md`（波次进度）、`docs/plans/claw-direct-to-dsh-execution-and-verification.md`（执行与验收规范、开放决策）。
-- **生产运行态**：仍以「2026-09-18 交接」与 `docs/OPERATIONS.md` 为准；迁移尚未改变生产启动、渠道或工具路径。
+- **生产运行态**：Host 任务 `running=true`、8888 ready、3088 DSH ready、微信 connected；工具面自 2026-09-24 起默认由 in-process capabilities 提供（canonical `syno_*`），回滚开关 `SYNO_CHAT_TOOLS=bridge`；通道路径仍由 Host 承担（`SYNO_CHANNEL_OWNER` 未设）。
 
 ---
 
