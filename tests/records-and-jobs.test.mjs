@@ -6,7 +6,7 @@ import path from "node:path";
 import { AgentHost } from "../apps/syno/syno/agent-host.mjs";
 import { FakeExecutor } from "../apps/syno/syno/executors.mjs";
 import { JobStore } from "../apps/syno/syno/job-store.mjs";
-import { parseRecord, serializeRecord } from "../apps/syno/syno/markdown-record.mjs";
+import { parseRecord, serializeRecord } from "../packages/syno-core/markdown-record.mjs";
 import { PATHS } from "../packages/syno-core/paths.mjs";
 
 test("Markdown records round-trip without a database", () => {

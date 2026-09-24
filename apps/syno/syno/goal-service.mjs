@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { parseRecord, writeRecord } from "./markdown-record.mjs";
+import { parseRecord, writeRecord } from "../../../packages/syno-core/markdown-record.mjs";
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
 
 class GoalService {

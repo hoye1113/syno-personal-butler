@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { ProcessFileLock } from "./process-lock.mjs";
+import { ProcessFileLock } from "../../../packages/syno-core/process-lock.mjs";
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
 
 const EFFECT_CASE_VERSION = 1;

@@ -26,7 +26,7 @@ import { IntakeService } from "./intake.mjs";
 import { KnowledgeStore } from "../../../packages/syno-core/knowledge-store.mjs";
 import { assertKnowledgeNotSensitive, readKnowledgeSnippet } from "../../../packages/syno-core/knowledge-read.mjs";
 import { InspirationSampler } from "./inspiration-sampler.mjs";
-import { InspirationStore } from "./inspiration-store.mjs";
+import { InspirationStore } from "../../../packages/syno-core/inspiration-store.mjs";
 import { createInspirationFeedbackTool } from "./inspiration-feedback-tool.mjs";
 import { KnowledgeMaintenanceSource } from "./knowledge-maintenance-source.mjs";
 import { fetchUrlForChat } from "./fetch-url-tool.mjs";

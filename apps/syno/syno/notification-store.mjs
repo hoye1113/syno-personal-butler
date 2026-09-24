@@ -3,8 +3,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
-import { readRecord, writeRecord } from "./markdown-record.mjs";
-import { ProcessFileLock } from "./process-lock.mjs";
+import { readRecord, writeRecord } from "../../../packages/syno-core/markdown-record.mjs";
+import { ProcessFileLock } from "../../../packages/syno-core/process-lock.mjs";
 import { walkRecords } from "./records.mjs";
 
 const SETTLED_NOTIFICATION_STATUSES = new Set(["delivered", "failed_terminal"]);

@@ -7,7 +7,7 @@ import { KnowledgeStore } from "../packages/syno-core/knowledge-store.mjs";
 import { KnowledgeMaintenanceSource } from "../apps/syno/syno/knowledge-maintenance-source.mjs";
 import { ClaimEvidenceService } from "../apps/syno/syno/claim-evidence-service.mjs";
 import { KnowledgeProfileService } from "../apps/syno/syno/knowledge-profile-service.mjs";
-import { parseRecord } from "../apps/syno/syno/markdown-record.mjs";
+import { parseRecord } from "../packages/syno-core/markdown-record.mjs";
 import { validateContractRecord } from "../packages/syno-core/schema-registry.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");

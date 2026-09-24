@@ -10,7 +10,7 @@ import {
   ProcessFileLock,
   readWindowsProcessStart,
   removeConfirmedStaleProcessLock,
-} from "../apps/syno/syno/process-lock.mjs";
+} from "../packages/syno-core/process-lock.mjs";
 
 test("ProcessFileLock persists instance identity and only its owner can release it", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-process-lock-"));
@@ -128,27 +128,42 @@ test("Windows stale lock takeover permits only one concurrent winner", { skip: p
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-process-lock-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const file = path.join(root, "stale-race.lock");
+  const holdingMarker = path.join(root, "winner-holding");
+  const releaseMarker = path.join(root, "winner-release");
   await fs.writeFile(file, `${JSON.stringify({ pid: 2_147_483_647, instanceId: "stale" })}\n`);
 
-  const moduleUrl = pathToFileURL(path.resolve("apps/syno/syno/process-lock.mjs")).href;
+  const moduleUrl = pathToFileURL(path.resolve("packages/syno-core/process-lock.mjs")).href;
   const childScript = `
+import { promises as fs } from "node:fs";
 import { ProcessFileLock } from ${JSON.stringify(moduleUrl)};
 const file = Buffer.from(process.argv[1], "base64").toString("utf8");
 const instanceId = Buffer.from(process.argv[2], "base64").toString("utf8");
+const holdMarker = process.argv[3] ? Buffer.from(process.argv[3], "base64").toString("utf8") : "";
+const releaseMarker = process.argv[4] ? Buffer.from(process.argv[4], "base64").toString("utf8") : "";
 try {
   const lease = await new ProcessFileLock({ file, failFast: true, metadata: { instanceId } }).acquire();
   process.stdout.write(JSON.stringify({ status: "acquired", instanceId: lease.owner.instanceId }) + "\\n");
-  await new Promise((resolve) => setTimeout(resolve, 250));
+  if (holdMarker) {
+    await fs.writeFile(holdMarker, "holding");
+    const deadline = Date.now() + 20_000;
+    while (Date.now() < deadline) {
+      try { await fs.access(releaseMarker); break; } catch { await new Promise((resolve) => setTimeout(resolve, 25)); }
+    }
+  }
   await lease.release();
 } catch (error) {
   process.stdout.write(JSON.stringify({ status: "rejected", code: error.code }) + "\\n");
 }
 `;
-  const runChild = (instanceId) => new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ["--input-type=module", "-e", childScript, Buffer.from(file, "utf8").toString("base64"), Buffer.from(instanceId, "utf8").toString("base64")], {
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
-    });
+  const runChild = (instanceId, { hold = false } = {}) => new Promise((resolve, reject) => {
+    const args = [
+      "--input-type=module", "-e", childScript,
+      Buffer.from(file, "utf8").toString("base64"),
+      Buffer.from(instanceId, "utf8").toString("base64"),
+      hold ? Buffer.from(holdingMarker, "utf8").toString("base64") : "",
+      hold ? Buffer.from(releaseMarker, "utf8").toString("base64") : "",
+    ];
+    const child = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     let stdout = "";
     let stderr = "";
     child.stdout.setEncoding("utf8");
@@ -162,14 +177,19 @@ try {
     });
   });
 
-  const attempts = await Promise.all([
-    runChild("winner-a"),
-    runChild("winner-b"),
-  ]);
-  const winners = attempts.filter((attempt) => attempt.result?.status === "acquired");
-  const rejected = attempts.filter((attempt) => attempt.result?.status === "rejected");
-  assert.equal(winners.length, 1, JSON.stringify(attempts));
-  assert.equal(rejected.length, 1, JSON.stringify(attempts));
-  assert.equal(rejected[0].result.code, "PROCESS_LOCK_HELD", JSON.stringify(attempts));
+  // 先让 A 拿到锁并停在不释放状态，再启动 B；两者只要都报告 acquired 就说明没有互斥。
+  const winnerRun = runChild("winner-a", { hold: true });
+  const holdDeadline = Date.now() + 20_000;
+  while (Date.now() < holdDeadline) {
+    try { await fs.access(holdingMarker); break; } catch { await new Promise((resolve) => setTimeout(resolve, 25)); }
+  }
+  const loserRun = await runChild("winner-b");
+  await fs.writeFile(releaseMarker, "release");
+  const winnerAttempt = await winnerRun;
+
+  const attempts = [winnerAttempt, loserRun];
+  assert.equal(winnerAttempt.result?.status, "acquired", JSON.stringify(attempts));
+  assert.equal(loserRun.result?.status, "rejected", JSON.stringify(attempts));
+  assert.equal(loserRun.result.code, "PROCESS_LOCK_HELD", JSON.stringify(attempts));
   await assert.rejects(fs.stat(file), { code: "ENOENT" });
 });

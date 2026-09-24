@@ -5,7 +5,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { isMocPath } from "../../../packages/syno-core/knowledge-path-policy.mjs";
-import { parseRecord, serializeRecord } from "./markdown-record.mjs";
+import { parseRecord, serializeRecord } from "../../../packages/syno-core/markdown-record.mjs";
 import { validateContractRecord } from "../../../packages/syno-core/schema-registry.mjs";
 import { APPROVED_TAGS, TAG_ALIASES } from "./canonical-tags.mjs";
 

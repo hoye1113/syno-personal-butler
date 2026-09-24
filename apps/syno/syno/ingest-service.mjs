@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { IntakeService } from "./intake.mjs";
-import { parseRecord, writeRecord } from "./markdown-record.mjs";
+import { parseRecord, writeRecord } from "../../../packages/syno-core/markdown-record.mjs";
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
 import { validateContractRecord } from "../../../packages/syno-core/schema-registry.mjs";
 import { hasSourceNoise } from "./source-fetcher.mjs";

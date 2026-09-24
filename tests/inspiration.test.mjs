@@ -7,7 +7,7 @@ import test from "node:test";
 import { ChannelDeliveryOutbox } from "../apps/syno/syno/channel-delivery-outbox.mjs";
 import { ChannelConversationHandler } from "../apps/syno/syno/channel-conversation-handler.mjs";
 import { InspirationSampler } from "../apps/syno/syno/inspiration-sampler.mjs";
-import { InspirationStore } from "../apps/syno/syno/inspiration-store.mjs";
+import { InspirationStore } from "../packages/syno-core/inspiration-store.mjs";
 import { ProactiveOrchestrator } from "../apps/syno/syno/proactive-orchestrator.mjs";
 import { SignalEngine } from "../apps/syno/syno/signal-engine.mjs";
 

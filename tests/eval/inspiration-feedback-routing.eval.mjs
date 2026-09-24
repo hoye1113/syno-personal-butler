@@ -19,7 +19,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { createInspirationFeedbackTool } from "../../apps/syno/syno/inspiration-feedback-tool.mjs";
-import { InspirationStore } from "../../apps/syno/syno/inspiration-store.mjs";
+import { InspirationStore } from "../../packages/syno-core/inspiration-store.mjs";
 import { ToolRegistry } from "../../apps/syno/syno/tool-registry.mjs";
 
 const LIVE = process.env.SYNO_LIVE_EVAL === "1" && Boolean(process.env.DEEPSEEK_API_KEY);

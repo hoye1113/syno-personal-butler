@@ -3,7 +3,7 @@ import path from "node:path";
 import { isMocPath } from "../../../packages/syno-core/knowledge-path-policy.mjs";
 import { evaluate } from "./policy.mjs";
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
-import { ProcessFileLock } from "./process-lock.mjs";
+import { ProcessFileLock } from "../../../packages/syno-core/process-lock.mjs";
 import { validateRepositoryChange } from "../../../packages/syno-core/validator.mjs";
 
 function isSystemPath(value) {

@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
-import { ProcessFileLock } from "./process-lock.mjs";
+import { ProcessFileLock } from "../../../packages/syno-core/process-lock.mjs";
 import { SignalEngine, localDateKey } from "./signal-engine.mjs";
 import { aggregateDeliveryFailures } from "./channel-delivery-outbox.mjs";
 import { PROACTIVE_RESPONSE_KIND, buildProactiveBundle, normalizeState, signalIdentity } from "./proactive-reliability.mjs";

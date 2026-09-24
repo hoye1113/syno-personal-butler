@@ -8,7 +8,7 @@ import path from "node:path";
 import { FakeCalendarAdapter, MarkdownCalendarAdapter } from "../apps/syno/syno/calendar-adapters.mjs";
 import { ChannelHub, FakeChannelAdapter } from "../apps/syno/syno/channels.mjs";
 import { FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, renderRegistrationQr, SILENT_SDK_LOGGER, validateRegistrationUrl } from "../apps/syno/syno/feishu-channel.mjs";
-import { ProcessFileLock } from "../apps/syno/syno/process-lock.mjs";
+import { ProcessFileLock } from "../packages/syno-core/process-lock.mjs";
 import { createWeixinMessageHandler, parseWeixinApproval } from "../apps/syno/syno/runtime.mjs";
 import { isDirectMessage, isGroupMessage, LocalCredentialStore, LocalProcessLock, normalizeInbound, parseAttachmentKey, readLimitedBody, renderLoginQr, resolveAttachmentUrl, sniffMime, validateIlinkBaseUrl, validateLoginQrUrl, WeixinIlinkAdapter, WeixinIlinkClient } from "../apps/syno/syno/weixin-ilink.mjs";
 

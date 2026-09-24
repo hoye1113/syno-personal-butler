@@ -1,8 +1,8 @@
 import { promises as fs } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
-import { validateContractRecord } from "../../../packages/syno-core/schema-registry.mjs";
-import { PATHS } from "../../../packages/syno-core/paths.mjs";
+import { validateContractRecord } from "./schema-registry.mjs";
+import { PATHS } from "./paths.mjs";
 import { ProcessFileLock } from "./process-lock.mjs";
 
 function yamlScalar(value) {

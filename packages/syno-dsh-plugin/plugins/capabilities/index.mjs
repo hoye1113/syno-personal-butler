@@ -5,6 +5,7 @@ import {
   readKnowledgeSnippetJson,
   searchKnowledgeNotes,
 } from "./knowledge-tools.mjs";
+import { INSPIRATION_FEEDBACK_TOOL_NAME, recordInspirationFeedback } from "./inspiration-tools.mjs";
 
 export const name = "syno-capabilities";
 export const inject = ["tools"];
@@ -35,6 +36,26 @@ function registerCoreTools(ctx) {
       render: (_args, value) => [{ type: "text", text: String(value) }],
     },
     execute: (args) => readKnowledgeSnippetJson({ path: args.path, maxChars: args.maxChars }),
+  }));
+  ctx.tools.register(defineTool({
+    name: INSPIRATION_FEEDBACK_TOOL_NAME,
+    description: [
+      "记录主人对最近一张「今日灵感」卡片的评价（in-process 试用工具）。仅当主人明确评价这张卡时调用一次：",
+      "有用/有启发/不错 → useful；一般/还行/凑合 → neutral；没用/不对味/无感 → not_useful。",
+      "返回 recorded:false 表示当前没有待反馈的卡，如实告诉主人即可，不要编造已记录。",
+    ].join(""),
+    parameters: {
+      feedback: { type: "string", required: true, description: "useful | neutral | not_useful", enum: ["useful", "neutral", "not_useful"] },
+      inspirationId: { type: "string", description: "可选：明确的灵感卡 ID（跨 24h 回填）" },
+    },
+    output: {
+      schema: { type: "string" },
+      render: (_args, value) => [{ type: "text", text: String(value) }],
+    },
+    execute: async (args) => JSON.stringify(await recordInspirationFeedback({
+      feedback: args.feedback,
+      inspirationId: args.inspirationId,
+    })),
   }));
 }
 

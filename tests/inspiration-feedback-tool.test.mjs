@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { createInspirationFeedbackTool } from "../apps/syno/syno/inspiration-feedback-tool.mjs";
-import { InspirationStore } from "../apps/syno/syno/inspiration-store.mjs";
+import { InspirationStore } from "../packages/syno-core/inspiration-store.mjs";
 import { ToolRegistry } from "../apps/syno/syno/tool-registry.mjs";
 
 // P1（#17）inspiration.record_feedback 工具单测：无卡/有卡/TTL 过期/非法取值/无边界上下文拒绝/

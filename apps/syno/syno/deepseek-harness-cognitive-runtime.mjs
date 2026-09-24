@@ -11,7 +11,7 @@ import {
 } from "./session-safety.mjs";
 import { BROWSER_TOOL_NAMES } from "./browser-tool-names.mjs";
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
-import { ProcessFileLock } from "./process-lock.mjs";
+import { ProcessFileLock } from "../../../packages/syno-core/process-lock.mjs";
 import { inspectRemoteContent } from "../../../packages/syno-core/sensitive-content.mjs";
 import { isCoreChatToolName } from "../../../config/deepseek-harness/syno-tool-sets.mjs";
 

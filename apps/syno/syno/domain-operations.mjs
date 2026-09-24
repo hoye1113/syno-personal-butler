@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
-import { writeRecord } from "./markdown-record.mjs";
+import { writeRecord } from "../../../packages/syno-core/markdown-record.mjs";
 
 function dateParts(iso) { return [iso.slice(0, 4), iso.slice(5, 7)]; }
 

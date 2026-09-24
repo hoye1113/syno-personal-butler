@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
-import { ProcessFileLock } from "./process-lock.mjs";
+import { ProcessFileLock } from "../../../packages/syno-core/process-lock.mjs";
 
 const CHUNK_ALGORITHM_VERSION = "paragraph-v1";
 const ANALYSIS_CONTRACT_VERSION = "capture-analysis-v1";

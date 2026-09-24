@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
-import { ProcessFileLock } from "./process-lock.mjs";
+import { ProcessFileLock } from "../../../packages/syno-core/process-lock.mjs";
 import { runDpapi } from "./provider-credential-store.mjs";
 
 // Only "open" records may be picked up by resolve().  Every outcome of a continuation —

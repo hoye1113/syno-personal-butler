@@ -26,17 +26,14 @@
 
 按执行顺序；每项完成即跑对应门禁并更新本节状态。
 
-### B2 波次（下一步立即做）
+### B2 波次（灵感链路完成 2026-09-24，剩余 today/capture 状态类）
 
-1. 迁移链到 `packages/syno-core/`（沿用 A1 codemod 手法，逐文件跑测试）：
-   - `process-lock.mjs`（standalone；注意其存量 flake，见「其他发现」）；
-   - `markdown-record.mjs`（依赖 schema-registry/paths/process-lock）；
-   - `inspiration-store.mjs`（依赖 markdown-record/paths）。
-2. capabilities 注册 `syno_core_inspiration_record_feedback`：语义对齐 `inspiration-feedback-tool.mjs`（无卡 `recorded:false`、`already_recorded` 只读事实、显式 ID 跨 24h），`recordEvent` 在插件内降级为可选。
-3. 单测：无卡返回、重复评价只读既有事实、显式 ID 回填（参考 `tests/inspiration-feedback-tool.test.mjs` 既有断言）。
-4. `today.read` 依赖评估：GoalService / AgentHost / SignalSourceRegistry / PlannerService / PriorityEngine；若依赖树过大，先把 `capture.status`/`list_pending`（IngestWorkflowStore 宿主 state）排入 B2，`today.read` 顺延 B3。
-5. 门禁：`pnpm test` + `pnpm run verify` + 真实 DSH 回合；spike 可先经 store 造一张已投递灵感卡再让模型调用反馈工具。
-6. spike 继续增长时为它加场景参数（如 `SYNO_SPIKE_SCENARIO`），避免单文件膨胀；B5 前把 spike 的进程退出语义彻底移出生产模块（现已拆分）。
+1. ✅ 迁移链到 `packages/syno-core/`：`process-lock.mjs`、`markdown-record.mjs`、`inspiration-store.mjs`（41 处导入改指，import-check 217 文件全解析）。
+2. ✅ capabilities 注册 `syno_core_inspiration_record_feedback`：语义对齐 `inspiration-feedback-tool.mjs`（无卡 `recorded:false`、`already_recorded` 只读事实、显式 ID 跨 24h），`recordEvent` 可选。
+3. ✅ 单测 `tests/capabilities-inspiration-tools.test.mjs`：无卡/单次落账/幂等/TTL/显式 ID 所有权与回填/非法取值。
+4. ⏳ `today.read` 依赖评估：GoalService / AgentHost / SignalSourceRegistry / PlannerService / PriorityEngine；若依赖树过大，先把 `capture.status`/`list_pending`（IngestWorkflowStore 宿主 state）排入下一波，`today.read` 顺延。
+5. ✅ 门禁：`pnpm test` 764/764 + `pnpm run verify` + 真实 DSH spike（知识三轮），灵感反馈以单测覆盖（live 造卡留给生产验收）。
+6. ⏳ spike 场景参数（`SYNO_SPIKE_SCENARIO`）暂未需要；B5 前保持 spike 与生产模块分离（已拆分）。
 
 ### B3 波次
 
@@ -50,9 +47,9 @@
 
 - 按 Phase B 的 B5 条目执行；切换前确认索引双写策略（Host 与 DSH 是否共用 `SYNO_RUNTIME_ROOT`，已原子写但需决定单写者或独立文件）。
 
-### 其他发现（独立于迁移，建议单独修）
+### 其他发现（独立于迁移）
 
-- `tests/process-lock.test.mjs` 并发接管用例竞态：6 并发复现 5 失败（`PROCESS_LOCK_IDENTITY_UNKNOWN` 替代 `PROCESS_LOCK_HELD`）；根因是 `process-lock.mjs` 接管写入非原子，可套用 `knowledge-store` 的 tmp+rename 修法。
+- ~~`tests/process-lock.test.mjs` 并发接管用例竞态~~：**已修（2026-09-24）**。根因两类：`process-lock.mjs` 创建/接管写入非原子（改 `temp + fs.link` 原子发布，failFast 对空文件做有界重试）；PowerShell 身份读取在负载下超时（首个预算失败后带更长预算重试一次）。并发用例改为「赢家先持有并打标、输家再启动」的确定性握手。6 并发复现 6/6 绿。
 - `tests/proactive-reliability.test.mjs:1096` 投递等待超时：全量套件负载下偶发、单跑通过；等待窗口对负载敏感，单独会话评估收紧或放宽。
 
 ## Phase A：共享核心与插件骨架（行为不变）
@@ -69,7 +66,7 @@
 ## Phase B：能力内嵌（替换 Tool Bridge，分波次）
 
 - B1 知识三件套（**完成 2026-09-24**）：`knowledge.search`/`read_snippet` 经 `packages/syno-core/knowledge-read.mjs` + capabilities 插件注册 `syno_core_knowledge_search`、`syno_core_knowledge_read_snippet`（`SYNO_CAPABILITIES_TOOLS=1` 门控，暂不占 canonical 名）。真实 DSH 三轮回合（`pong` → search → read_snippet 链式）通过；`tests/capabilities-knowledge-tools.test.mjs` 覆盖限长、敏感拒读与去敏感字段。审查整改：spike 拆到 `spike.mjs`（生产模块零 `process.exit`、`inject` 收缩为 `tools`）、syno-core `package.json` 收敛到最小字段、`PATHS.appRoot` 死字段删除、知识索引改原子写、补 `truncated:true` 截断测试。
-- B2 状态与反馈类：`today.read`、`capture.status`/`list_pending`、`inspiration.record_feedback`；需迁 `inspiration-store`/`markdown-record`/`process-lock` 与 Today 依赖树到 syno-core。
+- B2 状态与反馈类（**灵感链路完成 2026-09-24**）：`process-lock`/`markdown-record`/`inspiration-store` 迁入 syno-core；capabilities 注册 `syno_core_inspiration_record_feedback`（无卡 `recorded:false`、`already_recorded` 只读事实、显式 ID 跨 24h，语义与 Host 工具一致），由 `tests/capabilities-inspiration-tools.test.mjs` 覆盖；`process-lock` 获取与接管改 `temp + fs.link` 原子发布，并修掉存量并发 flake。剩余：`today.read` 与 `capture.status`/`list_pending` 状态类排期（见「下一步待办」）。
 - B3 抓取与收录：`knowledge.fetch_url`、`capture.start`（SSRF/代理、浏览器升级、Workflow 授权）。
 - B4 写治理与全量面：`jobs.list`/`jobs.submit`、registry 全量、`toolSet: core|all` 语义保持；最大风险项，单独安全评审。
 - B5 切换与删除：capabilities 接管 canonical 名并按 `SYNO_CHAT_TOOLS=plugin` 切换，接管时必须保留原 Bridge 的 owner/allowedTools 语义（通道会话映射）、`agentAdjustableBoundary`、`tool-result-serializer` 脱敏与 `toolSet: core|all` 过滤；删除 `syno-tool-bridge.mjs`、`syno-tool-bridge-plugin.mjs`、`/api/syno/bridge/mcp` 与 allowlist 对应项、`FALLBACK_TOOLS`、`SYNO_BRIDGE_CONTEXT_*` 及相关 journal/测试替身；`syno-tool-sets.mjs` 名单转为插件工具集定义；收录 sidecar 改挂 capabilities（workflow 授权经现有 WorkflowStore 解析），若 shadow 证明不可行则保留 capture 专用最小桥并记录偏差。

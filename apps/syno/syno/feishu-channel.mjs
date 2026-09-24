@@ -4,7 +4,7 @@ import path from "node:path";
 import QRCode from "qrcode";
 
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
-import { ProcessFileLock } from "./process-lock.mjs";
+import { ProcessFileLock } from "../../../packages/syno-core/process-lock.mjs";
 import { runDpapi } from "./provider-credential-store.mjs";
 
 async function atomicWrite(file, value) {

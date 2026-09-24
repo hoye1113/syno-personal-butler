@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
 import { locateCommand, runProcess } from "./process-runner.mjs";
-import { writeRecord } from "./markdown-record.mjs";
+import { writeRecord } from "../../../packages/syno-core/markdown-record.mjs";
 
 class FakeCalendarAdapter {
   constructor() { this.events = []; }

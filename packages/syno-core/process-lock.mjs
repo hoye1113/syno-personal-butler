@@ -152,6 +152,14 @@ async function waitForLocalLock(localLease, deadline, file) {
   }
 }
 
+async function isBlankLockFile(file) {
+  try {
+    return (await fs.readFile(file, "utf8")).trim() === "";
+  } catch {
+    return false;
+  }
+}
+
 async function removeStaleProcessLockIfConfirmed(file, { timeoutMs = 0, failFast = false } = {}) {
   const resolved = path.resolve(file);
   const recoveryLease = await acquireWindowsRecoveryMutex(resolved, { timeoutMs, failFast });
@@ -170,13 +178,17 @@ async function removeStaleProcessLockIfConfirmed(file, { timeoutMs = 0, failFast
 async function readWindowsProcessStart(pid) {
   if (process.platform !== "win32") return null;
   const script = `$p=Get-Process -Id ${Number(pid)} -ErrorAction SilentlyContinue; if($p){$p.StartTime.ToUniversalTime().ToString('o')}`;
-  try {
-    const result = await execFileAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true, timeout: 2_000 });
-    const value = String(result.stdout || "").trim();
-    return value;
-  } catch {
-    return null;
+  // 负载下 PowerShell 启动可能超过首个预算；身份读取失败会把活锁误判为 identity_unknown（failFast 直接拒绝、
+  // 非 failFast 空转等待），因此超时后带更长预算重试一次；两次都失败才按“无法确认身份”返回 null。
+  for (const timeout of [2_000, 10_000]) {
+    try {
+      const result = await execFileAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true, timeout });
+      return String(result.stdout || "").trim();
+    } catch {
+      // 继续用更长预算重试；两次均失败视为身份未知。
+    }
   }
+  return null;
 }
 
 async function inspectProcessLock(file, { verifyIdentity = false } = {}) {
@@ -275,24 +287,36 @@ class ProcessFileLock {
     });
   }
 
+  async #publishLock() {
+    const owner = this.owner;
+    const temporary = `${this.file}.${process.pid}.${randomUUID()}.claim`;
+    await fs.writeFile(temporary, `${JSON.stringify(owner)}\n`, { encoding: "utf8", flag: "wx" });
+    try {
+      await fs.link(temporary, this.file);
+    } catch (error) {
+      await fs.rm(temporary, { force: true }).catch(() => {});
+      throw error;
+    }
+    await fs.rm(temporary, { force: true }).catch(() => {});
+    return owner;
+  }
+
   async acquire() {
     await fs.mkdir(path.dirname(this.file), { recursive: true });
     const localLease = this.failFast ? null : reserveLocalLock(this.file);
     const deadline = Date.now() + this.timeoutMs;
     try {
       if (localLease) await waitForLocalLock(localLease, deadline, this.file);
+      let unknownRetries = 0;
       while (Date.now() <= deadline) {
         try {
-          const handle = await fs.open(this.file, "wx", 0o600);
-          const owner = this.owner;
-          await handle.writeFile(`${JSON.stringify(owner)}\n`, "utf8");
+          const owner = await this.#publishLock();
           let released = false;
           return {
             release: async () => {
               if (released) return;
               released = true;
               try {
-                await handle.close().catch(() => {});
                 let current = null;
                 try { current = JSON.parse(await fs.readFile(this.file, "utf8")); } catch {}
                 if (current?.pid === owner.pid && current?.instanceId === owner.instanceId) {
@@ -319,6 +343,13 @@ class ProcessFileLock {
               continue;
             }
             if (inspection.status === "identity_unknown") {
+              // 版本混跑兜底：旧版写入者是「先独占创建、后写 JSON」，空文件是瞬时态；
+              // 有界重试后仍为空/损坏才按身份未知失败关闭。
+              if (unknownRetries < 5 && await isBlankLockFile(this.file)) {
+                unknownRetries += 1;
+                await delay(this.pollMs);
+                continue;
+              }
               const unknown = new Error(`跨进程锁身份无法确认：${path.basename(this.file)}`);
               unknown.code = "PROCESS_LOCK_IDENTITY_UNKNOWN";
               throw unknown;

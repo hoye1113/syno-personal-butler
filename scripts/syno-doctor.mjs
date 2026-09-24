@@ -2,7 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { PATHS } from "../packages/syno-core/paths.mjs";
-import { removeConfirmedStaleProcessLock } from "../apps/syno/syno/process-lock.mjs";
+import { removeConfirmedStaleProcessLock } from "../packages/syno-core/process-lock.mjs";
 
 async function doctor() {
   const lockFile = path.join(PATHS.stateRoot, "locks", "syno-host.lock");

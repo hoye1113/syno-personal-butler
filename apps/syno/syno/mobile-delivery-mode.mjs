@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { ProcessFileLock } from "./process-lock.mjs";
+import { ProcessFileLock } from "../../../packages/syno-core/process-lock.mjs";
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
 
 const MOBILE_DELIVERY_MODE_VERSION = 1;
