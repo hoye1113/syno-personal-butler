@@ -193,3 +193,64 @@ try {
   assert.equal(loserRun.result.code, "PROCESS_LOCK_HELD", JSON.stringify(attempts));
   await assert.rejects(fs.stat(file), { code: "ENOENT" });
 });
+
+test("fail-fast acquisition waits out a legacy half-written lock instead of reporting unknown identity", { skip: process.platform !== "win32" }, async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-process-lock-"));
+  const file = path.join(root, "slow-writer.lock");
+  const readyMarker = path.join(root, "writer-ready");
+  const writeMarker = path.join(root, "writer-go");
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+  const moduleUrl = pathToFileURL(path.resolve("packages/syno-core/process-lock.mjs")).href;
+  const childScript = `
+import { promises as fs } from "node:fs";
+const file = Buffer.from(process.argv[1], "base64").toString("utf8");
+const readyMarker = Buffer.from(process.argv[2], "base64").toString("utf8");
+const writeMarker = Buffer.from(process.argv[3], "base64").toString("utf8");
+const handle = await fs.open(file, "wx", 0o600);
+await fs.writeFile(readyMarker, "ready");
+const deadline = Date.now() + 10_000;
+while (Date.now() < deadline) {
+  try { await fs.access(writeMarker); break; } catch { await new Promise((resolve) => setTimeout(resolve, 10)); }
+}
+await handle.writeFile(JSON.stringify({
+  pid: process.pid,
+  instanceId: "slow-writer",
+  processStartedAt: new Date(Date.now() - process.uptime() * 1_000).toISOString(),
+}) + "\\n", "utf8");
+await handle.close();
+await new Promise((resolve) => setTimeout(resolve, 1_200));
+process.stdout.write(JSON.stringify({ status: "written" }) + "\\n");
+`;
+  const writer = new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [
+      "--input-type=module", "-e", childScript,
+      Buffer.from(file, "utf8").toString("base64"),
+      Buffer.from(readyMarker, "utf8").toString("base64"),
+      Buffer.from(writeMarker, "utf8").toString("base64"),
+    ], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    let stderr = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", (code) => resolve({ code, stderr }));
+  });
+
+  const waitFor = async (target) => {
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline) {
+      try { await fs.access(target); return; } catch { await new Promise((resolve) => setTimeout(resolve, 20)); }
+    }
+    throw new Error(`等待标记文件超时：${path.basename(target)}`);
+  };
+
+  await waitFor(readyMarker);
+  const pending = new ProcessFileLock({ file, failFast: true, timeoutMs: 8_000, pollMs: 50 }).acquire();
+  const outcome = pending.then(() => null, (error) => error);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  await fs.writeFile(writeMarker, "go");
+  assert.equal((await outcome)?.code, "PROCESS_LOCK_HELD");
+  const writerResult = await writer;
+  assert.equal(writerResult.code, 0, writerResult.stderr);
+  assert.equal(JSON.parse(await fs.readFile(file, "utf8")).instanceId, "slow-writer");
+});

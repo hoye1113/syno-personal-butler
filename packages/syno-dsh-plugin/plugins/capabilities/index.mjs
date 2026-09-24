@@ -15,6 +15,7 @@ import {
   captureStatus,
   startCapture,
 } from "./capture-tools.mjs";
+import { assertIntegerRange } from "./tool-args.mjs";
 
 export const name = "syno-capabilities";
 export const inject = ["tools"];
@@ -44,7 +45,10 @@ function registerCoreTools(ctx) {
       schema: { type: "string" },
       render: (_args, value) => [{ type: "text", text: String(value) }],
     },
-    execute: (args) => readKnowledgeSnippetJson({ path: args.path, maxChars: args.maxChars }),
+    execute: (args) => {
+      assertIntegerRange(args.maxChars, 200, 8000, "maxChars");
+      return readKnowledgeSnippetJson({ path: args.path, maxChars: args.maxChars });
+    },
   }));
   ctx.tools.register(defineTool({
     name: INSPIRATION_FEEDBACK_TOOL_NAME,
@@ -77,7 +81,10 @@ function registerCoreTools(ctx) {
       schema: { type: "string" },
       render: (_args, value) => [{ type: "text", text: String(value) }],
     },
-    execute: (args) => fetchKnowledgeUrl({ url: args.url, maxChars: args.maxChars }),
+    execute: (args) => {
+      assertIntegerRange(args.maxChars, 1000, 100000, "maxChars");
+      return fetchKnowledgeUrl({ url: args.url, maxChars: args.maxChars });
+    },
   }));
   ctx.tools.register(defineTool({
     name: CAPTURE_START_TOOL_NAME,
@@ -86,6 +93,7 @@ function registerCoreTools(ctx) {
       kind: { type: "string", required: true, description: "url | text | markdown | txt | personal", enum: ["url", "text", "markdown", "txt", "personal"] },
       value: { type: "string", required: true, description: "收录内容（URL 或正文）" },
       title: { type: "string", description: "可选标题" },
+      filename: { type: "string", description: "可选文件名（txt/文件类收录）" },
       sourceKind: { type: "string", description: "personal | unknown", enum: ["personal", "unknown"] },
       analysisMode: { type: "string", description: "remote | local-only", enum: ["remote", "local-only"] },
     },
@@ -97,6 +105,7 @@ function registerCoreTools(ctx) {
       kind: args.kind,
       value: args.value,
       ...(args.title ? { title: args.title } : {}),
+      ...(args.filename ? { filename: args.filename } : {}),
       ...(args.sourceKind ? { sourceKind: args.sourceKind } : {}),
       ...(args.analysisMode ? { analysisMode: args.analysisMode } : {}),
     }),

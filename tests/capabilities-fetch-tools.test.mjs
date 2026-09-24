@@ -27,6 +27,8 @@ test("capabilities fetch url surfaces fetch failures instead of inventing conten
       url: "https://example.com/blocked",
       fetcher: async () => { throw Object.assign(new Error("SSRF 拒绝"), { code: "SOURCE_URL_RESERVED_ADDRESS" }); },
     }),
-    { code: "SOURCE_URL_RESERVED_ADDRESS" },
+    (error) => error.code === "SOURCE_URL_RESERVED_ADDRESS"
+      && error.retryable === true
+      && /受保护地址/.test(error.message),
   );
 });

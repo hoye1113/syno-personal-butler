@@ -287,10 +287,13 @@ class ProcessFileLock {
     });
   }
 
+  // 锁发布=「临时文件写全量内容 + link 原子占名」：link 前文件不存在，不存在「已创建但未写入」的窗口。
+  // 不再像旧实现那样持有 O_EXCL 句柄（Windows 上曾以句柄阻止他人 unlink）；删除防护改由
+  // removeStaleProcessLockIfConfirmed 的 recovery mutex + 锁内重检 stale 承担。
   async #publishLock() {
     const owner = this.owner;
     const temporary = `${this.file}.${process.pid}.${randomUUID()}.claim`;
-    await fs.writeFile(temporary, `${JSON.stringify(owner)}\n`, { encoding: "utf8", flag: "wx" });
+    await fs.writeFile(temporary, `${JSON.stringify(owner)}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
     try {
       await fs.link(temporary, this.file);
     } catch (error) {
