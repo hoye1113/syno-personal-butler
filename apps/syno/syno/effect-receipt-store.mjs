@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { ProcessFileLock } from "../../../packages/syno-core/process-lock.mjs";
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
-import { runDpapi } from "./provider-credential-store.mjs";
+import { runDpapi } from "../../../packages/syno-core/provider-credential-store.mjs";
 
 const EFFECT_RECEIPT_VERSION = 1;
 

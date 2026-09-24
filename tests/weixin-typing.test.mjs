@@ -16,7 +16,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { WeixinIlinkClient, WeixinIlinkAdapter, envToggle } from "../apps/syno/syno/weixin-ilink.mjs";
+import { WeixinIlinkClient, WeixinIlinkAdapter, envToggle } from "../packages/syno-core/weixin-ilink.mjs";
 
 function fakeCredentialStore() {
   return { async save() {}, async load() { return null; }, async clear() {}, async saveRuntime() {} };

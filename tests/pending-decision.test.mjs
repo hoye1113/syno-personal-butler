@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { DECISION_RESERVATION_TTL_MS, PendingDecisionStore } from "../apps/syno/syno/pending-decision.mjs";
+import { DECISION_RESERVATION_TTL_MS, PendingDecisionStore } from "../packages/syno-core/pending-decision.mjs";
 
 async function setup(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-pending-decision-"));

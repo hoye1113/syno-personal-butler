@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { AcceptedRequestRecoveryWorker } from "../apps/syno/syno/accepted-request-recovery.mjs";
+import { AcceptedRequestRecoveryWorker } from "../packages/syno-core/accepted-request-recovery.mjs";
 
 // 守护 O7：accepted_request 不能转 terminal（会孤儿回执），故持续重试；
 // 但 retries 命中阈值时触发一次升级告警，让“静默无限重试”变可观测。

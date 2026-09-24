@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
-import { isImageMime } from "./image-mime.mjs";
+import { isImageMime } from "../../../packages/syno-core/image-mime.mjs";
 
 const DEFAULT_MAX_ENTRIES = 32;
 

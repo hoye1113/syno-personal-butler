@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { RuntimeJournal } from "../apps/syno/syno/runtime-journal.mjs";
+import { RuntimeJournal } from "../packages/syno-core/runtime-journal.mjs";
 
 test("RuntimeJournal persists ordered JSONL events and redacts credentials", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-runtime-journal-"));

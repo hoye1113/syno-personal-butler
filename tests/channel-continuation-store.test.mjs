@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { ChannelContinuationStore } from "../apps/syno/syno/channel-continuation-store.mjs";
+import { ChannelContinuationStore } from "../packages/syno-core/channel-continuation-store.mjs";
 
 test("ChannelContinuationStore encrypts payload and isolates owner/channel/thread", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-continuation-"));

@@ -6,11 +6,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { FakeCalendarAdapter, MarkdownCalendarAdapter } from "../apps/syno/syno/calendar-adapters.mjs";
-import { ChannelHub, FakeChannelAdapter } from "../apps/syno/syno/channels.mjs";
-import { FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, renderRegistrationQr, SILENT_SDK_LOGGER, validateRegistrationUrl } from "../apps/syno/syno/feishu-channel.mjs";
+import { ChannelHub, FakeChannelAdapter } from "../packages/syno-core/channels.mjs";
+import { FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, renderRegistrationQr, SILENT_SDK_LOGGER, validateRegistrationUrl } from "../packages/syno-core/feishu-channel.mjs";
 import { ProcessFileLock } from "../packages/syno-core/process-lock.mjs";
 import { createWeixinMessageHandler, parseWeixinApproval } from "../apps/syno/syno/runtime.mjs";
-import { isDirectMessage, isGroupMessage, LocalCredentialStore, LocalProcessLock, normalizeInbound, parseAttachmentKey, readLimitedBody, renderLoginQr, resolveAttachmentUrl, sniffMime, validateIlinkBaseUrl, validateLoginQrUrl, WeixinIlinkAdapter, WeixinIlinkClient } from "../apps/syno/syno/weixin-ilink.mjs";
+import { isDirectMessage, isGroupMessage, LocalCredentialStore, LocalProcessLock, normalizeInbound, parseAttachmentKey, readLimitedBody, renderLoginQr, resolveAttachmentUrl, sniffMime, validateIlinkBaseUrl, validateLoginQrUrl, WeixinIlinkAdapter, WeixinIlinkClient } from "../packages/syno-core/weixin-ilink.mjs";
 
 async function removeTemp(root) {
   await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });

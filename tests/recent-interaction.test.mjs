@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { PendingDecisionStore } from "../apps/syno/syno/pending-decision.mjs";
-import { RecentInteractionView, parseRecentReference } from "../apps/syno/syno/recent-interaction.mjs";
+import { PendingDecisionStore } from "../packages/syno-core/pending-decision.mjs";
+import { RecentInteractionView, parseRecentReference } from "../packages/syno-core/recent-interaction.mjs";
 
 test("recent references parse deterministically without asking the model", () => {
   assert.deepEqual(parseRecentReference("刚才那个"), { kind: "recent_reference", action: "inspect", confidence: 1, text: "刚才那个" });

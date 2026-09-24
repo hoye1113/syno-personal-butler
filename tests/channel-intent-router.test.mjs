@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ChannelIntentRouter } from "../apps/syno/syno/channel-intent-router.mjs";
-import { CapabilityPresenter } from "../apps/syno/syno/capability-presenter.mjs";
+import { ChannelIntentRouter } from "../packages/syno-core/channel-intent-router.mjs";
+import { CapabilityPresenter } from "../packages/syno-core/capability-presenter.mjs";
 
 test("ChannelIntentRouter recognizes natural-language new conversation without catching ordinary text", () => {
   const router = new ChannelIntentRouter();

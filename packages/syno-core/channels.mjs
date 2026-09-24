@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { PATHS } from "../../../packages/syno-core/paths.mjs";
+import { PATHS } from "./paths.mjs";
 
 class FakeChannelAdapter {
   constructor() { this.messages = []; this.running = false; }

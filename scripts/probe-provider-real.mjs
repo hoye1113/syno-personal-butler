@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { NativeCognitiveRuntime } from "../apps/syno/syno/cognitive-runtime.mjs";
 import { ConversationStore } from "../apps/syno/syno/conversation-store.mjs";
 import { ProviderClient } from "../apps/syno/syno/provider-client.mjs";
-import { ProviderCredentialStore } from "../apps/syno/syno/provider-credential-store.mjs";
+import { ProviderCredentialStore } from "../packages/syno-core/provider-credential-store.mjs";
 import { ToolLoopAgent } from "../apps/syno/syno/tool-loop-agent.mjs";
 import { ToolRegistry } from "../apps/syno/syno/tool-registry.mjs";
 

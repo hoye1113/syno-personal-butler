@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { PATHS, resolveInside } from "../../../packages/syno-core/paths.mjs";
-import { isImageMime } from "./image-mime.mjs";
+import { isImageMime } from "../../../packages/syno-core/image-mime.mjs";
 
 function parseWeixinApproval(text) {
   const match = /^批准\s+(job-\d{8}-[a-f0-9]{8})\s+([a-f0-9]{6})$/iu.exec(String(text || "").trim());

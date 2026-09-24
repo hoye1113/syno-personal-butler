@@ -57,7 +57,7 @@
 ### 其他发现（独立于迁移）
 
 - ~~`tests/process-lock.test.mjs` 并发接管用例竞态~~：**已修（2026-09-24）**。根因两类：`process-lock.mjs` 创建/接管写入非原子（改 `temp + fs.link` 原子发布，failFast 对空文件做有界重试）；PowerShell 身份读取在负载下超时（首个预算失败后带更长预算重试一次）。并发用例改为「赢家先持有并打标、输家再启动」的确定性握手。6 并发复现 6/6 绿。
-- `tests/proactive-reliability.test.mjs:1096` 投递等待超时：全量套件负载下偶发、单跑通过；等待窗口对负载敏感，单独会话评估收紧或放宽。
+- ~~`tests/proactive-reliability.test.mjs:1096` 投递等待超时~~：**已修（2026-09-24）**。`waitForWorkflowDuplicate` 由 400×5ms=2s 改为 15s deadline 轮询（快速路径仍首轮命中）。
 
 ## Phase A：共享核心与插件骨架（行为不变）
 
@@ -82,6 +82,7 @@
 
 ## Phase C：微信通道内嵌（Claw 直连）
 
+- **C0 预备（完成 2026-09-24）**：19 个通道/渠道模块迁入 syno-core（`provider-credential-store`/`runtime-journal`/`weixin-text-format`/`weixin-ilink`/`feishu-channel`/`channel-delivery-outbox`/`channel-continuation-store`/`channel-intent-router`/`pending-decision`/`accepted-request-store`/`accepted-request-recovery`/`mobile-delivery-mode`/`proactive-reliability`/`channels`/`channel-conversation-handler`/`capability-presenter`/`recent-interaction`/`image-mime`/`vision-intake`）；全量 775/775 绿，生产行为不变。
 - C1 新插件 `@syno/dsh-channel-weixin`：迁移 `weixin-ilink.mjs`（客户端/适配器/QR/poller/quarantine/typing/`formatWx`）、`channel-delivery-outbox.mjs`、`OwnerChannelTargetStore`、`accepted-request-*`、`channel-continuation-store`、`channel-intent-router`、`pending-decision` 渠道部分与 `channel-conversation-handler` 的确定性路由（模型调用替换为 `followup`）。
 - C2 会话接入：按 owner/thread 建/复 `syno` preset 会话（`agentPresets.resolve/acquireScope` + `agents.create` + `mount`），与 3088 Web 打开同一会话兼容；冷会话按 `agents.resume` + retry-once 处理与 Web controller 的竞争。
 - C3 出站与可靠性：`session/event`（`{global:true}`）+ `agent/inbox/claimed` + `turn/end`；typing/ACK/final 由插件独占；失败回执与 Outbox 重试保留。

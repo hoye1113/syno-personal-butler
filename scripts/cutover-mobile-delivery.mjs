@@ -2,8 +2,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { AcceptedRequestStore } from "../apps/syno/syno/accepted-request-store.mjs";
-import { MobileDeliveryMode } from "../apps/syno/syno/mobile-delivery-mode.mjs";
+import { AcceptedRequestStore } from "../packages/syno-core/accepted-request-store.mjs";
+import { MobileDeliveryMode } from "../packages/syno-core/mobile-delivery-mode.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const acceptanceFile = path.join(root, "ops", "acceptance", "pr-10-r6-seal", "owner-acceptance.json");

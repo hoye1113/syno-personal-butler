@@ -4,8 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { ChannelConversationHandler } from "../apps/syno/syno/channel-conversation-handler.mjs";
-import { MobileDeliveryMode } from "../apps/syno/syno/mobile-delivery-mode.mjs";
+import { ChannelConversationHandler } from "../packages/syno-core/channel-conversation-handler.mjs";
+import { MobileDeliveryMode } from "../packages/syno-core/mobile-delivery-mode.mjs";
 import { createControlMutationLock, routeSynoApi } from "../apps/syno/syno/runtime.mjs";
 import { runCutover } from "../scripts/cutover-mobile-delivery.mjs";
 

@@ -8,7 +8,7 @@ import { DeepSeekHarnessJsonRpcClient } from "./deepseek-harness-jsonrpc-client.
 import { DeepSeekHarnessWebClient } from "./deepseek-harness-web-client.mjs";
 import { defaultDeepseekKeyLoader } from "./deepseek-key-loader.mjs";
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
-import { RuntimeJournal } from "./runtime-journal.mjs";
+import { RuntimeJournal } from "../../../packages/syno-core/runtime-journal.mjs";
 import {
   DEFAULT_DSH_WEB_PORT,
   SYNO_AGENT_PRESET_NAME,

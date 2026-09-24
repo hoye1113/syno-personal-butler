@@ -7,7 +7,7 @@ import test from "node:test";
 import { IsolatedImageStore } from "../apps/syno/syno/isolated-image-store.mjs";
 import { createGlyphPng } from "../apps/syno/syno/image-png.mjs";
 import { OpencodeVisionClient, parseVisionJson } from "../apps/syno/syno/opencode-vision-client.mjs";
-import { visionResultToIntakePayload } from "../apps/syno/syno/vision-intake.mjs";
+import { visionResultToIntakePayload } from "../packages/syno-core/vision-intake.mjs";
 import { artifactToIntakePayload } from "../apps/syno/syno/weixin-message-handler.mjs";
 
 async function isolatedPng(t) {

@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { PATHS } from "../../../packages/syno-core/paths.mjs";
+import { PATHS } from "./paths.mjs";
 
 const SECRET_KEY = /(?:authorization|cookie|password|secret|token|api[-_]?key|bridge[-_]?token)/i;
 const MAX_VALUE_LENGTH = 4_096;

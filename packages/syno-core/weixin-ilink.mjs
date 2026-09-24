@@ -3,8 +3,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import QRCode from "qrcode";
 
-import { PATHS, resolveInside } from "../../../packages/syno-core/paths.mjs";
-import { ProcessFileLock } from "../../../packages/syno-core/process-lock.mjs";
+import { PATHS, resolveInside } from "./paths.mjs";
+import { ProcessFileLock } from "./process-lock.mjs";
 import { runDpapi } from "./provider-credential-store.mjs";
 import { redactString } from "./runtime-journal.mjs";
 import { stripMarkdown, wxBreaks } from "./weixin-text-format.mjs";

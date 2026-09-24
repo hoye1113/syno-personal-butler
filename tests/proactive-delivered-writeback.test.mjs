@@ -4,9 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { ChannelDeliveryOutbox } from "../apps/syno/syno/channel-delivery-outbox.mjs";
+import { ChannelDeliveryOutbox } from "../packages/syno-core/channel-delivery-outbox.mjs";
 import { ProactiveOrchestrator } from "../apps/syno/syno/proactive-orchestrator.mjs";
-import { PROACTIVE_RESPONSE_KIND } from "../apps/syno/syno/proactive-reliability.mjs";
+import { PROACTIVE_RESPONSE_KIND } from "../packages/syno-core/proactive-reliability.mjs";
 import { SignalEngine } from "../apps/syno/syno/signal-engine.mjs";
 
 // L2（#17）投递成功后回写：compose 不再回写主会话，统一由 #writebackDeliveredBundle 在投递落定后

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { clip, formatWx, stripMarkdown, wxBreaks } from "../apps/syno/syno/weixin-text-format.mjs";
+import { clip, formatWx, stripMarkdown, wxBreaks } from "../packages/syno-core/weixin-text-format.mjs";
 
 test("formatWx 用空行分节、emoji 锚点成块", () => {
   const out = formatWx({

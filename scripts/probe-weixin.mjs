@@ -1,7 +1,7 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { WeixinIlinkAdapter } from "../apps/syno/syno/weixin-ilink.mjs";
+import { WeixinIlinkAdapter } from "../packages/syno-core/weixin-ilink.mjs";
 import { getRunningChannelStatus } from "./live-channel-probe-runtime.mjs";
 
 function valueOf(argv, name, fallback = "") {

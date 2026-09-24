@@ -1,4 +1,4 @@
-import { signalIdentity } from "./proactive-reliability.mjs";
+import { signalIdentity } from "../../../packages/syno-core/proactive-reliability.mjs";
 
 // D12：灵感卡出卡时间默认为 12:30（2026-09-02 Owner 自 16:00 调整——午时阅读更自然）。
 const DEFAULT_SCHEDULE = Object.freeze({ morningHour: 8, eveningHour: 21, inspirationHour: 12, inspirationMinute: 30, weeklyDay: 0, maxDailyNotifications: 3 });

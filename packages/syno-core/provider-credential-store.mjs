@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { PATHS } from "../../../packages/syno-core/paths.mjs";
+import { PATHS } from "./paths.mjs";
 
 const DEFAULT_BASE_URL = "https://server.flowyaipc.cn/claw/v1";
 

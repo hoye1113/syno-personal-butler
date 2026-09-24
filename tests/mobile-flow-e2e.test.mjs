@@ -4,7 +4,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 
-import { ChannelConversationHandler } from "../apps/syno/syno/channel-conversation-handler.mjs";
+import { ChannelConversationHandler } from "../packages/syno-core/channel-conversation-handler.mjs";
 import { JobStore } from "../packages/syno-core/job-store.mjs";
 import { PATHS } from "../packages/syno-core/paths.mjs";
 import { evaluate } from "../packages/syno-core/policy.mjs";

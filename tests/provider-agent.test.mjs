@@ -5,12 +5,12 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { ConversationStore } from "../apps/syno/syno/conversation-store.mjs";
-import { ChannelDeliveryOutbox } from "../apps/syno/syno/channel-delivery-outbox.mjs";
+import { ChannelDeliveryOutbox } from "../packages/syno-core/channel-delivery-outbox.mjs";
 import { executeDomainOperation } from "../packages/syno-core/domain-operations.mjs";
 import { PriorityEngine } from "../packages/syno-core/priority-engine.mjs";
 import { ProactiveOrchestrator, isQuietTime, localMessage } from "../apps/syno/syno/proactive-orchestrator.mjs";
 import { ProviderClient, ProviderError, estimateTokens, matchesFixedModel } from "../apps/syno/syno/provider-client.mjs";
-import { ProviderCredentialStore, runDpapi } from "../apps/syno/syno/provider-credential-store.mjs";
+import { ProviderCredentialStore, runDpapi } from "../packages/syno-core/provider-credential-store.mjs";
 import { SettingsRegistry } from "../packages/syno-core/settings-registry.mjs";
 import { SignalEngine, localDateKey } from "../apps/syno/syno/signal-engine.mjs";
 import { routeSynoApi } from "../apps/syno/syno/runtime.mjs";

@@ -1,7 +1,7 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { FeishuChannelAdapter, FeishuCredentialStore } from "../apps/syno/syno/feishu-channel.mjs";
+import { FeishuChannelAdapter, FeishuCredentialStore } from "../packages/syno-core/feishu-channel.mjs";
 import { getRunningChannelStatus } from "./live-channel-probe-runtime.mjs";
 
 function parseOptions(argv) {

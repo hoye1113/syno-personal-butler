@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { ChannelDeliveryOutbox } from "../apps/syno/syno/channel-delivery-outbox.mjs";
+import { ChannelDeliveryOutbox } from "../packages/syno-core/channel-delivery-outbox.mjs";
 
 async function fixture(options = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-channel-outbox-"));

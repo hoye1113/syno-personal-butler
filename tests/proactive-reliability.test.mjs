@@ -7,8 +7,8 @@ import path from "node:path";
 
 import { ProactiveOrchestrator } from "../apps/syno/syno/proactive-orchestrator.mjs";
 import { SignalEngine } from "../apps/syno/syno/signal-engine.mjs";
-import { ChannelDeliveryOutbox } from "../apps/syno/syno/channel-delivery-outbox.mjs";
-import { OwnerChannelTargetStore } from "../apps/syno/syno/proactive-reliability.mjs";
+import { ChannelDeliveryOutbox } from "../packages/syno-core/channel-delivery-outbox.mjs";
+import { OwnerChannelTargetStore } from "../packages/syno-core/proactive-reliability.mjs";
 import { IngestWorkflowCoordinator, IngestWorkflowStore } from "../packages/syno-core/ingest-workflow-coordinator.mjs";
 import { WorkflowOutbox } from "../apps/syno/syno/workflow-outbox.mjs";
 import { createSynoRuntime, routeSynoApi } from "../apps/syno/syno/runtime.mjs";
@@ -1086,7 +1086,9 @@ async function buildWorkflowDuplicateRuntime(t, {
 }
 
 async function waitForWorkflowDuplicate(condition, message) {
-  for (let attempt = 0; attempt < 400; attempt += 1) {
+  // 全量套件负载下投递结算可能超过 2s；给足 15s 预算，快速路径仍在首轮命中。
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
     if (await condition()) return;
     await new Promise((resolve) => setTimeout(resolve, 5));
   }

@@ -4,9 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { AcceptedRequestStore } from "../apps/syno/syno/accepted-request-store.mjs";
-import { AcceptedRequestRecoveryWorker } from "../apps/syno/syno/accepted-request-recovery.mjs";
-import { runDpapi } from "../apps/syno/syno/provider-credential-store.mjs";
+import { AcceptedRequestStore } from "../packages/syno-core/accepted-request-store.mjs";
+import { AcceptedRequestRecoveryWorker } from "../packages/syno-core/accepted-request-recovery.mjs";
+import { runDpapi } from "../packages/syno-core/provider-credential-store.mjs";
 
 async function fixture() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-accepted-request-"));

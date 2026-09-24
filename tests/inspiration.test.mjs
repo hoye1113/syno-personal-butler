@@ -4,8 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { ChannelDeliveryOutbox } from "../apps/syno/syno/channel-delivery-outbox.mjs";
-import { ChannelConversationHandler } from "../apps/syno/syno/channel-conversation-handler.mjs";
+import { ChannelDeliveryOutbox } from "../packages/syno-core/channel-delivery-outbox.mjs";
+import { ChannelConversationHandler } from "../packages/syno-core/channel-conversation-handler.mjs";
 import { InspirationSampler } from "../apps/syno/syno/inspiration-sampler.mjs";
 import { InspirationStore } from "../packages/syno-core/inspiration-store.mjs";
 import { ProactiveOrchestrator } from "../apps/syno/syno/proactive-orchestrator.mjs";
