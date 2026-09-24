@@ -50,7 +50,7 @@ for (const file of files) {
 }
 
 const required = [
-  "apps/syno/server.mjs", "apps/syno/syno/syno-core.mjs",
+  "apps/syno/server.mjs", "packages/syno-core/syno-core.mjs",
   "contracts/job.schema.json", "docs/ARCHITECTURE.md",
 ];
 for (const relative of required) {

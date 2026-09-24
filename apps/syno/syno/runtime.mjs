@@ -49,7 +49,7 @@ import { validateValue } from "../../../packages/syno-core/schema-registry.mjs";
 import { SettingsRegistry } from "../../../packages/syno-core/settings-registry.mjs";
 import { SignalSourceRegistry } from "../../../packages/syno-core/signal-source-registry.mjs";
 import { inspectRemoteContent } from "../../../packages/syno-core/sensitive-content.mjs";
-import { SynoCore } from "./syno-core.mjs";
+import { SynoCore } from "../../../packages/syno-core/syno-core.mjs";
 import { SynoToolBridge } from "./syno-tool-bridge.mjs";
 import { ToolLoopAgent } from "./tool-loop-agent.mjs";
 import { ToolLoopExecutor } from "./tool-loop-executor.mjs";

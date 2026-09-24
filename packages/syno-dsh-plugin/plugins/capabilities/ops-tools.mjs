@@ -18,6 +18,7 @@ import { PlannerService } from "../../../../packages/syno-core/planner-service.m
 import { ReportService } from "../../../../packages/syno-core/reports.mjs";
 import { SettingsRegistry } from "../../../../packages/syno-core/settings-registry.mjs";
 import { SignalSourceRegistry } from "../../../../packages/syno-core/signal-source-registry.mjs";
+import { SynoCore } from "../../../../packages/syno-core/syno-core.mjs";
 import { TodayService } from "../../../../packages/syno-core/today-service.mjs";
 
 const JOBS_LIST_TOOL_NAME = "syno_core_jobs_list";
@@ -76,7 +77,8 @@ function createOpsRuntime(overrides = {}) {
   });
   reports = overrides.reports || new ReportService({ host, knowledge });
   const today = overrides.today || new TodayService({ goals, host, settingsRegistry, signalSources, planner });
-  return { host, today };
+  const core = overrides.core || new SynoCore({ host, knowledge, today });
+  return { core, host, knowledge, today };
 }
 
 function createOpsTools({ host, today } = {}) {

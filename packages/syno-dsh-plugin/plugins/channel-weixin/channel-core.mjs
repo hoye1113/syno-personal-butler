@@ -19,6 +19,8 @@ function createInprocessWeixinChannel({
   threadKey = "main",
   mapping = new WeixinSessionMap(),
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  createHandler = null,
+  handler = null,
 } = {}) {
   if (!ctx) throw new Error("通道核心需要 DSH ctx");
   if (!adapter) throw new Error("通道核心需要 adapter");
@@ -51,25 +53,48 @@ function createInprocessWeixinChannel({
     return sessionId;
   }
 
+  const runtime = {
+    async run({ text: runText } = {}) {
+      const sessionId = await ensureSession();
+      const result = await awaitSessionTurn({
+        ctx,
+        sessionId,
+        sourceKind: "weixin",
+        timeoutMs,
+        dispatch: (id) => {
+          const agent = ctx.agents.get(id);
+          if (!agent) throw Object.assign(new Error("通道会话不在运行"), { code: "CHANNEL_SESSION_MISSING" });
+          agent.followup(createUserMessage({
+            content: [{ type: "text", text: String(runText || "") }],
+            source: { kind: "weixin" },
+          }));
+        },
+      });
+      return { text: result.text };
+    },
+    async newConversation() {
+      await mapping.clear(key);
+      currentSessionId = null;
+    },
+    async health() {
+      return { ready: true };
+    },
+  };
+
+  const resolvedHandler = handler || (createHandler ? createHandler(runtime) : null);
+  if (!resolvedHandler) throw new Error("通道核心需要 handler 或 createHandler");
+
   async function handleInbound(message = {}) {
-    const text = String(message.text || "").trim();
-    if (!text) return "（空消息：当前仅支持文本）";
-    const sessionId = await ensureSession();
-    const result = await awaitSessionTurn({
-      ctx,
-      sessionId,
-      sourceKind: "weixin",
-      timeoutMs,
-      dispatch: (id) => {
-        const agent = ctx.agents.get(id);
-        if (!agent) throw Object.assign(new Error("通道会话不在运行"), { code: "CHANNEL_SESSION_MISSING" });
-        agent.followup(createUserMessage({
-          content: [{ type: "text", text }],
-          source: { kind: "weixin" },
-        }));
-      },
+    const reply = await resolvedHandler.handle({
+      channel: "weixin",
+      ownerKey,
+      threadKey,
+      id: String(message.id || ""),
+      text: String(message.text || ""),
+      ...(Array.isArray(message.artifacts) && message.artifacts.length ? { artifacts: message.artifacts } : {}),
+      privateConversation: true,
     });
-    return result.text || "（模型未返回文本，请稍后再试）";
+    return reply?.text || "（模型未返回文本，请稍后再试）";
   }
 
   function attach() {
@@ -80,6 +105,7 @@ function createInprocessWeixinChannel({
   const channel = {
     attach,
     handleInbound,
+    runtime,
     sessionKey: key,
     currentSessionId: () => currentSessionId,
   };

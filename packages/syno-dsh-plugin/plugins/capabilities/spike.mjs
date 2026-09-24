@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import { createInprocessWeixinChannel } from "../channel-weixin/channel-core.mjs";
+import { createWeixinChannelHandler } from "../channel-weixin/channel-handler.mjs";
+import { createOpsRuntime } from "./ops-tools.mjs";
 import { KNOWLEDGE_READ_SNIPPET_TOOL_NAME, KNOWLEDGE_SEARCH_TOOL_NAME } from "./knowledge-tools.mjs";
 import { canonicalToolName } from "./tool-args.mjs";
 
@@ -38,14 +40,28 @@ async function runWeixinSpike(ctx) {
     async start() {},
     async stop() {},
   };
+  const { core } = createOpsRuntime();
   const channel = createInprocessWeixinChannel({
     ctx,
     adapter,
     workspacePath: process.env.DSH_CWD || process.cwd(),
     timeoutMs: SPIKE_TIMEOUT_MS,
+    createHandler: (runtime) => createWeixinChannelHandler({ runtime, core }),
   });
   channel.attach();
   line("weixin-channel-attached");
+  const reset = await adapter.onMessage({
+    channel: "weixin",
+    text: "新对话",
+    senderId: "spike-owner",
+    contextToken: "spike-token",
+    id: `spike-weixin-reset-${randomUUID()}`,
+  });
+  if (String(reset?.text || "") !== "已开启新对话。") {
+    line(`WEIXIN_SPIKE_FAIL reset=${JSON.stringify(reset?.text || "")}`);
+    setTimeout(() => process.exit(1), 100);
+    return;
+  }
   const reply = await adapter.onMessage({
     channel: "weixin",
     text: "只回复单词：pong",
@@ -59,7 +75,7 @@ async function runWeixinSpike(ctx) {
     setTimeout(() => process.exit(1), 100);
     return;
   }
-  line(`WEIXIN_SPIKE_OK ${JSON.stringify({ sessionId: channel.currentSessionId(), text })}`);
+  line(`WEIXIN_SPIKE_OK ${JSON.stringify({ sessionId: channel.currentSessionId(), reset: reset.text, text })}`);
   setTimeout(() => process.exit(0), 100);
 }
 
