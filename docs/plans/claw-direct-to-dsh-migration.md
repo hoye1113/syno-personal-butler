@@ -35,11 +35,11 @@
 
 ## Phase B：能力内嵌（替换 Tool Bridge，分波次）
 
-- B1 知识三件套（**完成 2026-09-24**）：`knowledge.search`/`read_snippet` 经 `packages/syno-core/knowledge-read.mjs` + capabilities 插件注册 `syno_core_knowledge_search`、`syno_core_knowledge_read_snippet`（`SYNO_CAPABILITIES_TOOLS=1` 门控，暂不占 canonical 名）。真实 DSH 三轮回合（`pong` → search → read_snippet 链式）通过；`tests/capabilities-knowledge-tools.test.mjs` 覆盖限长、敏感拒读与去敏感字段。
+- B1 知识三件套（**完成 2026-09-24**）：`knowledge.search`/`read_snippet` 经 `packages/syno-core/knowledge-read.mjs` + capabilities 插件注册 `syno_core_knowledge_search`、`syno_core_knowledge_read_snippet`（`SYNO_CAPABILITIES_TOOLS=1` 门控，暂不占 canonical 名）。真实 DSH 三轮回合（`pong` → search → read_snippet 链式）通过；`tests/capabilities-knowledge-tools.test.mjs` 覆盖限长、敏感拒读与去敏感字段。审查整改：spike 拆到 `spike.mjs`（生产模块零 `process.exit`、`inject` 收缩为 `tools`）、syno-core `package.json` 收敛到最小字段、`PATHS.appRoot` 死字段删除、知识索引改原子写、补 `truncated:true` 截断测试。
 - B2 状态与反馈类：`today.read`、`capture.status`/`list_pending`、`inspiration.record_feedback`；需迁 `inspiration-store`/`markdown-record`/`process-lock` 与 Today 依赖树到 syno-core。
 - B3 抓取与收录：`knowledge.fetch_url`、`capture.start`（SSRF/代理、浏览器升级、Workflow 授权）。
 - B4 写治理与全量面：`jobs.list`/`jobs.submit`、registry 全量、`toolSet: core|all` 语义保持；最大风险项，单独安全评审。
-- B5 切换与删除：capabilities 接管 canonical 名并按 `SYNO_CHAT_TOOLS=plugin` 切换；删除 `syno-tool-bridge.mjs`、`syno-tool-bridge-plugin.mjs`、`/api/syno/bridge/mcp` 与 allowlist 对应项、`FALLBACK_TOOLS`、`SYNO_BRIDGE_CONTEXT_*` 及相关 journal/测试替身；`syno-tool-sets.mjs` 名单转为插件工具集定义；收录 sidecar 改挂 capabilities（workflow 授权经现有 WorkflowStore 解析），若 shadow 证明不可行则保留 capture 专用最小桥并记录偏差。
+- B5 切换与删除：capabilities 接管 canonical 名并按 `SYNO_CHAT_TOOLS=plugin` 切换，接管时必须保留原 Bridge 的 owner/allowedTools 语义（通道会话映射）、`agentAdjustableBoundary`、`tool-result-serializer` 脱敏与 `toolSet: core|all` 过滤；删除 `syno-tool-bridge.mjs`、`syno-tool-bridge-plugin.mjs`、`/api/syno/bridge/mcp` 与 allowlist 对应项、`FALLBACK_TOOLS`、`SYNO_BRIDGE_CONTEXT_*` 及相关 journal/测试替身；`syno-tool-sets.mjs` 名单转为插件工具集定义；收录 sidecar 改挂 capabilities（workflow 授权经现有 WorkflowStore 解析），若 shadow 证明不可行则保留 capture 专用最小桥并记录偏差。
 - 门禁：每波 `pnpm test` + `pnpm run verify` + 真实 DSH 回合；B5 门禁另加：`tests/syno-tool-bridge.test.mjs` 改写为 in-process 契约测试、全仓 `SYNO_BRIDGE_CONTEXT_REQUIRED` 零引用、真实生产会话工具调用与写审计通过。
 
 ## Phase C：微信通道内嵌（Claw 直连）

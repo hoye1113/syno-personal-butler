@@ -5,7 +5,6 @@ const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = process.env.NODE_ENV === "test" && process.env.SYNO_REPO_ROOT
   ? path.resolve(process.env.SYNO_REPO_ROOT)
   : path.resolve(MODULE_DIR, "..", "..");
-const APP_ROOT = path.join(REPO_ROOT, "apps", "syno");
 
 function localDataRoot() {
   if (process.env.SYNO_LOCAL_DATA) return path.resolve(process.env.SYNO_LOCAL_DATA);
@@ -56,7 +55,6 @@ const DEFAULT_WEB_PORT = 8888;
 
 const PATHS = Object.freeze({
   repoRoot: REPO_ROOT,
-  appRoot: APP_ROOT,
   knowledgeRoot: KNOWLEDGE_ROOT,
   vaultRoot: path.join(KNOWLEDGE_ROOT, "vault"),
   opsRoot: path.join(KNOWLEDGE_ROOT, "ops"),

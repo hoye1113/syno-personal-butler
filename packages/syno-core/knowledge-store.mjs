@@ -87,7 +87,14 @@ class KnowledgeStore {
     }
     this.cache = notes; this.fingerprint = fingerprint;
     await fs.mkdir(path.dirname(this.indexFile), { recursive: true });
-    await fs.writeFile(this.indexFile, `${JSON.stringify({ schema: "knowledge-index", version: 1, fingerprint, rebuiltAt: new Date().toISOString(), notes }, null, 2)}\n`, "utf8");
+    const temporary = `${this.indexFile}.${process.pid}.${crypto.randomUUID()}.tmp`;
+    try {
+      await fs.writeFile(temporary, `${JSON.stringify({ schema: "knowledge-index", version: 1, fingerprint, rebuiltAt: new Date().toISOString(), notes }, null, 2)}\n`, "utf8");
+      await fs.rename(temporary, this.indexFile);
+    } catch (error) {
+      await fs.rm(temporary, { force: true }).catch(() => {});
+      throw error;
+    }
     return { notes: notes.length, rebuiltAt: new Date().toISOString(), fingerprint };
   }
   async #ensureCurrent() {

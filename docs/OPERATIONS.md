@@ -175,6 +175,8 @@ Windows 计划任务 `start-syno.ps1` **不会**写入 `SYNO_DSH_ROOT`。用户/
 
 `ensureSynoDshProfiles` 每次 chat 启动会重写 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\` 的 manifest / `cordis.patch.yml`，并把 `@syno/dsh-plugin` junction 进 profile `node_modules`。`syno` Agent preset 作为 `preset-syno` 声明在 `@syno/dsh-plugin` bundle patch 中；当前 DSH 不再扫描 `$DSH_HOME/.agent-presets`。生产 Web Supervisor 在 `session.create` 显式传 `agentPreset: syno`；不要依赖可被 DSH 用户设置覆盖的默认 preset。按当前 Harness checkout 的 manifest，生产 profile 固定 `@deepseek-ai/dsh-base`、`@deepseek-ai/dsh-web-app` 和 `@syno/dsh-plugin`；base 提供 token meter/session，受控 Web preset 提供官方 compaction、tool-result-pruner 和 compact command，`@deepseek-ai/dsh-schedule` 作为官方 function plugin 由 Syno bundle patch 挂载。JSON-RPC chat 同样显式挂载 token-meter、tool-result-pruner、compaction-basic 和 command-compact。若当前 `SYNO_DSH_ROOT` 缺少这些官方包或 schedule 无法解析，启动应失败并报告安装问题，不回退到 Syno 自研上下文链路。不要对生产 `syno` 跑 `dsh plugin add`。
 
+Syno 插件实现位于 linked root `packages/syno-dsh-plugin/` 内：官方包不安装、不 vendoring，由该包 `peerDependencies` 加 DSH 运行时拦截按 realpath 解析；插件内对 `packages/syno-core/` 的导入也是相对路径。不要给 DSH 子进程加 `--preserve-symlinks` 或把插件改为复制安装——两者都会让插件内的相对导入与 peer 投影失效。
+
 实验只用 `syno-lab`。Host 重建 lab manifest 时会保留 DSH CLI 已安装的 bundle/dependency，并剔除 `@syno/dsh-plugin`，因此不会因生产 Host 重启而丢失实验插件。按 DSH profile 机制安装并锁定 Mnemon：
 
 ```powershell

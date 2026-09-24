@@ -19,6 +19,8 @@ async function fixture(t) {
     "---\ntitle: Agent Memory\ntags: [ai_agent]\n---\n记忆机制\n", "utf8");
   await fs.writeFile(path.join(vaultRoot, "01-Areas", "Agent Secret.md"),
     "---\ntitle: Agent Secret\nsensitive: true\n---\nAgent secret\n", "utf8");
+  await fs.writeFile(path.join(vaultRoot, "01-Areas", "Long Note.md"),
+    `---\ntitle: Long Note\n---\n${"长".repeat(400)}\n`, "utf8");
   return { vaultRoot, indexFile, knowledge: new KnowledgeStore({ vaultRoot, indexFile }) };
 }
 
@@ -53,6 +55,13 @@ test("capabilities knowledge read snippet clamps and refuses sensitive notes", a
   ));
   assert.equal(clamped.snippet, snippet.snippet);
   assert.equal(clamped.truncated, false);
+
+  const long = JSON.parse(await readKnowledgeSnippetJson(
+    { path: "vault/01-Areas/Long Note.md", maxChars: 200 },
+    { knowledge },
+  ));
+  assert.equal(long.snippet.length, 200);
+  assert.equal(long.truncated, true);
 
   await assert.rejects(
     readKnowledgeSnippetJson({ path: "vault/01-Areas/Agent Secret.md" }, { knowledge }),

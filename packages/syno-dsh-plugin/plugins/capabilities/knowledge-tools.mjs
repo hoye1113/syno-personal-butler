@@ -1,6 +1,9 @@
 import { KnowledgeStore } from "../../../../packages/syno-core/knowledge-store.mjs";
 import { readKnowledgeSnippet } from "../../../../packages/syno-core/knowledge-read.mjs";
 
+const KNOWLEDGE_SEARCH_TOOL_NAME = "syno_core_knowledge_search";
+const KNOWLEDGE_READ_SNIPPET_TOOL_NAME = "syno_core_knowledge_read_snippet";
+
 let sharedStore = null;
 
 function storeFor({ vaultRoot, indexFile } = {}) {
@@ -27,4 +30,9 @@ async function readKnowledgeSnippetJson({ path: notePath, maxChars } = {}, { kno
   return JSON.stringify(await readKnowledgeSnippet(store, notePath, maxChars));
 }
 
-export { readKnowledgeSnippetJson, searchKnowledgeNotes };
+export {
+  KNOWLEDGE_READ_SNIPPET_TOOL_NAME,
+  KNOWLEDGE_SEARCH_TOOL_NAME,
+  readKnowledgeSnippetJson,
+  searchKnowledgeNotes,
+};

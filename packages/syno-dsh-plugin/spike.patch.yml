@@ -1,5 +1,7 @@
-# Spike A overlay: mount the in-process capabilities plugin beside itself.
+# Spike A overlay: mount capabilities plus the dev spike beside this patch.
 # Not part of the production bundle; run with `--patch <this file>`.
 - insert:
     - id: syno-capabilities
       name: './plugins/capabilities/index.mjs'
+    - id: syno-capabilities-spike
+      name: './plugins/capabilities/spike.mjs'
