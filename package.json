@@ -24,6 +24,7 @@
     "harness:doctor": "node scripts/deepseek-harness-runtime.mjs doctor",
     "harness:status": "node scripts/deepseek-harness-runtime.mjs status",
     "probe:harness": "node scripts/probe-harness.mjs",
+    "spike:capabilities": "node scripts/spike-capabilities.mjs",
     "syno:doctor": "node scripts/syno-doctor.mjs"
   },
   "engines": {

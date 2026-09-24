@@ -26,6 +26,8 @@ test("Syno production bundle declares the agent preset in DSH's active registry"
   assert.match(bundlePatch, /id: preset-syno[\s\S]*name: '@deepseek-ai\/dsh-agent-preset'[\s\S]*id: syno/);
   assert.match(bundlePatch, /name: Syno production/);
   assert.doesNotMatch(bundlePatch, /includeUserRoot/);
+  assert.match(bundlePatch, /id: syno-capabilities[\s\S]*name: '\.\/plugins\/capabilities\/index\.mjs'/);
+  assert.match(bundlePatch, /id: syno-channel-weixin[\s\S]*name: '\.\/plugins\/channel-weixin\/index\.mjs'/);
 });
 
 test("Host-generated syno profile pins bundles and forbids marketplace add", async (t) => {

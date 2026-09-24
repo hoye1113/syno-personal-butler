@@ -136,7 +136,7 @@
 
 ## 11. 开放决策（请审查时给结论）
 
-1. spike 运行器入仓为 `scripts/spike-capabilities.mjs`（当前在 `%TEMP%`，不入仓则每个会话需重写）。
+1. ~~spike 运行器入仓~~ **已完成（2026-09-24）**：`scripts/spike-capabilities.mjs`（`pnpm spike:capabilities`，默认/plugin/weixin 三模式，scratch 隔离）。
 2. §3.4 索引双写：A（复用 runtime root）vs B（独立索引文件）。
 3. B4 的 hidden 工具（`claims/evidence/settings`）是否纳入插件全量面，还是维持仅 Host 内部可达。
 4. Phase C 前是否先做一次 D1 凭据路径的安全评审（插件内存解密 vs Host 代理）并出具结论。

@@ -14,13 +14,12 @@
   - C0：19 个通道/渠道模块迁入 syno-core（生产不变）。
   - C1a：in-process 通道核心（`session-map`/`session-turn`/`channel-core`，`SYNO_CHANNEL_OWNER=dsh` 门控）。
 - **回归基线**：`pnpm test` 779/779；`pnpm run verify` 2271 files；active docs 8；静态相对导入解析 233 文件全通过。
-- **真实验证（DSH spike，runner 在临时目录，入仓待决）**：默认知识三轮；`SYNO_CHAT_TOOLS=plugin` canonical 名；`SYNO_WEIXIN_SPIKE=1` fake adapter + 真实模型往返 `pong`。
+- **真实验证**：`pnpm spike:capabilities`（已入仓 `scripts/spike-capabilities.mjs`）三场景——默认知识三轮；`SYNO_CHAT_TOOLS=plugin` canonical 名；`SYNO_WEIXIN_SPIKE=1` fake adapter + 真实模型往返 `pong`。
 - **下一步（按序）**：
   1. Owner 验收 `SYNO_CHAT_TOOLS=plugin` 真机会话 → 之后执行 B5 删除类（bridge 文件/路由/`SYNO_BRIDGE_CONTEXT_*`、`FALLBACK_TOOLS`、capture sidecar 改挂）。
   2. C1b：`ChannelConversationHandler` 确定性路由接回、typing/ACK/Outbox 归位、维护页 C4、真实扫码。
   3. C5：`SYNO_CHANNEL_OWNER=dsh` 切默认 + 真实微信验收矩阵。
   4. Phase D/E：主动内嵌、Host 收缩。
-  5. 可选：spike 运行器入仓为 `scripts/spike-capabilities.mjs`。
 - **权威文档**：`docs/adr/0007-claw-direct-to-dsh.md`、`docs/plans/claw-direct-to-dsh-migration.md`（波次进度）、`docs/plans/claw-direct-to-dsh-execution-and-verification.md`（执行与验收规范、开放决策）。
 - **生产运行态**：仍以「2026-09-18 交接」与 `docs/OPERATIONS.md` 为准；迁移尚未改变生产启动、渠道或工具路径。
 

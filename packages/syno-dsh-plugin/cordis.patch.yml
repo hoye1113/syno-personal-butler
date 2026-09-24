@@ -84,6 +84,12 @@
       name: '@syno/dsh-plugin'
       config:
         toolSet: core
+    # B5 双轨：in-process capabilities 与微信通道骨架（全部门控默认关闭，
+    # 不设 env 时既不注册工具也不建通道；`SYNO_CHAT_TOOLS=plugin` 时 bridge 静默）。
+    - id: syno-capabilities
+      name: './plugins/capabilities/index.mjs'
+    - id: syno-channel-weixin
+      name: './plugins/channel-weixin/index.mjs'
     - id: web-fetch-http
       name: '@deepseek-ai/dsh-web-fetch-http'
 
