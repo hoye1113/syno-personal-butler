@@ -49,9 +49,10 @@
 - ⏳ 延后：hidden 工具面（claims/evidence/settings）是否纳入插件（B5 决策）；真实 DSH 写审计（会在真实知识仓产生 Job/提交，留 Owner/生产验收）；effect receipt 随 B5 评估。
 - 门禁：`pnpm test` 773/773 + verify + spike 10 工具激活绿。
 
-### B5 波次（切换与删除）
+### B5 波次（切换开关完成 2026-09-24）
 
-- 按 Phase B 的 B5 条目执行；切换前确认索引双写策略（Host 与 DSH 是否共用 `SYNO_RUNTIME_ROOT`，已原子写但需决定单写者或独立文件）。
+- 切换开关已落地：`SYNO_CHAT_TOOLS=plugin` 双轨（bridge 静默 + canonical 名）；默认 bridge 不变；双模式 spike 绿。
+- ⏳ 待 Owner 验收后执行删除清单（见 Phase B 的 B5 条目）；切换前确认索引双写策略（Host 与 DSH 是否共用 `SYNO_RUNTIME_ROOT`，已原子写但需决定单写者或独立文件）。
 
 ### 其他发现（独立于迁移）
 
@@ -76,7 +77,7 @@
 - B3 抓取与收录（**完成 2026-09-24**）：`source-fetcher`/`source-descriptor`/`process-runner`/`canonical-tags`/`intake`/`ingest-service`/`ingest-workflow-coordinator`/`browser-capture-adapter`/`fetch-url-tool` 迁入 syno-core；capabilities 注册 `syno_core_knowledge_fetch_url`、`syno_core_capture_start`/`status`/`list_pending`（7 个工具全量），由 `tests/capabilities-fetch-tools.test.mjs` 与 `tests/capabilities-capture-tools.test.mjs` 覆盖（直抓包裹、失败如实上抛、workflow 落库/状态/待办/幂等重放）。**延后项**：浏览器升级与「继续」续办依赖通道上下文（Phase C 接入）；收录分析（`analyze`/sidecar）随 B5 的 JSON-RPC sidecar 迁移接入，本波 `capture.start` 只落 `received` 态 workflow。
 - B2/B3 审查整改（2026-09-24）：锁文件恢复 `0o600` 且发布路径补保护模型注释；`fetch_url` 工具移除无调用方的 `browserCapture` 参数并给「受保护地址」错误补 retryable 话术；`read_snippet`/`fetch_url` 补入参区间校验对齐 Host 契约（新增 `tool-args.mjs`）；`capture.start` 补 `filename` 参数；`syno-doctor` 增加过期 `.claim`/`.tmp` 清扫；补「旧版慢写空锁」重试测试。
 - B4 写治理与全量面（**主体完成 2026-09-24**）：19 个治理模块与 `job-summary` 迁入 syno-core；`syno_core_jobs_list`/`jobs_submit`/`today_read` 注册（写仍走 AgentHost/Policy/GitGuard 精确路径，fake-git 单测覆盖）；剩 hidden 工具面决策与真实写审计（留 Owner）。
-- B5 切换与删除：capabilities 接管 canonical 名并按 `SYNO_CHAT_TOOLS=plugin` 切换，接管时必须保留原 Bridge 的 owner/allowedTools 语义（通道会话映射）、`agentAdjustableBoundary`、`tool-result-serializer` 脱敏与 `toolSet: core|all` 过滤；删除 `syno-tool-bridge.mjs`、`syno-tool-bridge-plugin.mjs`、`/api/syno/bridge/mcp` 与 allowlist 对应项、`FALLBACK_TOOLS`、`SYNO_BRIDGE_CONTEXT_*` 及相关 journal/测试替身；`syno-tool-sets.mjs` 名单转为插件工具集定义；收录 sidecar 改挂 capabilities（workflow 授权经现有 WorkflowStore 解析），若 shadow 证明不可行则保留 capture 专用最小桥并记录偏差。
+- B5 切换与删除（**切换开关完成 2026-09-24**）：`SYNO_CHAT_TOOLS=plugin` 时 bridge 插件静默退出、capabilities 注册 canonical `syno_*` 名（`canonicalToolName`）；默认仍为 bridge（生产不变）。双模式真实 DSH spike 均绿。**删除类操作待 Owner 验收后再执行（保留一个版本）**：删除 `syno-tool-bridge.mjs`、`syno-tool-bridge-plugin.mjs`、`/api/syno/bridge/mcp` 与 allowlist 对应项、`FALLBACK_TOOLS`、`SYNO_BRIDGE_CONTEXT_*` 及相关 journal/测试替身；`syno-tool-sets.mjs` 名单转为插件工具集定义；收录 sidecar 改挂 capabilities（workflow 授权经现有 WorkflowStore 解析）；接管时保留 owner/allowedTools 语义（通道会话映射）、`agentAdjustableBoundary`、`tool-result-serializer` 脱敏与 `toolSet: core|all` 过滤。
 - 门禁：每波 `pnpm test` + `pnpm run verify` + 真实 DSH 回合；B5 门禁另加：`tests/syno-tool-bridge.test.mjs` 改写为 in-process 契约测试、全仓 `SYNO_BRIDGE_CONTEXT_REQUIRED` 零引用、真实生产会话工具调用与写审计通过。
 
 ## Phase C：微信通道内嵌（Claw 直连）

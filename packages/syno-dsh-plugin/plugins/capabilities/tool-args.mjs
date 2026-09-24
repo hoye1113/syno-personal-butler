@@ -8,4 +8,9 @@ function assertIntegerRange(value, min, max, name) {
   }
 }
 
-export { assertIntegerRange };
+function canonicalToolName(name, chatTools = process.env.SYNO_CHAT_TOOLS) {
+  const value = String(name || "");
+  return String(chatTools || "").trim() === "plugin" ? value.replace(/^syno_core_/, "syno_") : value;
+}
+
+export { assertIntegerRange, canonicalToolName };

@@ -100,6 +100,9 @@ function registerTool(ctx, origin, token, definition) {
 }
 
 export async function apply(ctx, config = {}) {
+  // B5 双轨开关：plugin 模式下由 in-process capabilities 注册 canonical syno_* 工具，
+  // 桥保持静默以避免重名；默认（bridge/未设置）行为不变。
+  if (String(process.env.SYNO_CHAT_TOOLS || "").trim() === "plugin") return;
   const origin = String(process.env.SYNO_BRIDGE_ORIGIN || "").trim();
   const token = String(process.env.SYNO_BRIDGE_TOKEN || "").trim();
   if (!origin || !token) {

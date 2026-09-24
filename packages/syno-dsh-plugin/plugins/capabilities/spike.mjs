@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import { KNOWLEDGE_READ_SNIPPET_TOOL_NAME, KNOWLEDGE_SEARCH_TOOL_NAME } from "./knowledge-tools.mjs";
+import { canonicalToolName } from "./tool-args.mjs";
 
 export const name = "syno-capabilities-spike";
 export const inject = ["agents", "agentPresets", "workspaceRegistry"];
@@ -8,6 +9,8 @@ export const inject = ["agents", "agentPresets", "workspaceRegistry"];
 const SPIKE_PREFIX = "[syno-spike-a]";
 const SPIKE_TIMEOUT_MS = Number(process.env.SYNO_SPIKE_TIMEOUT_MS || 180_000);
 const SPIKE_MODEL = process.env.SYNO_SPIKE_MODEL || "deepseek-v4-flash";
+const SEARCH_TOOL = canonicalToolName(KNOWLEDGE_SEARCH_TOOL_NAME);
+const READ_SNIPPET_TOOL = canonicalToolName(KNOWLEDGE_READ_SNIPPET_TOOL_NAME);
 
 function line(text) {
   process.stdout.write(`${SPIKE_PREFIX} ${text}\n`);
@@ -90,7 +93,7 @@ async function runSpike(ctx) {
   const second = nextTurn();
   observed.finalText = "";
   handle.agent.followup(createUserMessage({
-    content: [{ type: "text", text: `请调用 ${KNOWLEDGE_SEARCH_TOOL_NAME} 工具（query 参数用「Agent」，limit=2），然后用一句中文告诉我返回了几条。` }],
+    content: [{ type: "text", text: `请调用 ${SEARCH_TOOL} 工具（query 参数用「Agent」，limit=2），然后用一句中文告诉我返回了几条。` }],
     source: { kind: "user" },
   }));
   const secondReason = await timed(second);
@@ -100,15 +103,15 @@ async function runSpike(ctx) {
   const third = nextTurn();
   observed.finalText = "";
   handle.agent.followup(createUserMessage({
-    content: [{ type: "text", text: `用 ${KNOWLEDGE_READ_SNIPPET_TOOL_NAME} 工具读取你刚才搜索结果里第一条笔记的 path（maxChars=300），然后用一句话告诉我它的标题。` }],
+    content: [{ type: "text", text: `用 ${READ_SNIPPET_TOOL} 工具读取你刚才搜索结果里第一条笔记的 path（maxChars=300），然后用一句话告诉我它的标题。` }],
     source: { kind: "user" },
   }));
   const thirdReason = await timed(third);
   const thirdText = observed.finalText;
   line(`turn-3 ${thirdReason} ${thirdText}`);
 
-  const toolCalled = observed.toolCalls.includes(KNOWLEDGE_SEARCH_TOOL_NAME);
-  const readSnippetCalled = observed.toolCalls.includes(KNOWLEDGE_READ_SNIPPET_TOOL_NAME);
+  const toolCalled = observed.toolCalls.includes(SEARCH_TOOL);
+  const readSnippetCalled = observed.toolCalls.includes(READ_SNIPPET_TOOL);
   const payload = {
     sessionId,
     preset: preset.id,

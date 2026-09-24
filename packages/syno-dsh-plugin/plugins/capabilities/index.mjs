@@ -21,14 +21,14 @@ import {
   TODAY_READ_TOOL_NAME,
   defaultOpsTools,
 } from "./ops-tools.mjs";
-import { assertIntegerRange } from "./tool-args.mjs";
+import { assertIntegerRange, canonicalToolName } from "./tool-args.mjs";
 
 export const name = "syno-capabilities";
 export const inject = ["tools"];
 
 function registerCoreTools(ctx) {
   ctx.tools.register(defineTool({
-    name: KNOWLEDGE_SEARCH_TOOL_NAME,
+    name: canonicalToolName(KNOWLEDGE_SEARCH_TOOL_NAME),
     description: "搜索 Syno 知识库（in-process 试用工具，与 Bridge 并存，B5 波次后接管 canonical 名称）",
     parameters: {
       query: { type: "string", required: true, description: "搜索词" },
@@ -41,7 +41,7 @@ function registerCoreTools(ctx) {
     execute: (args) => searchKnowledgeNotes({ query: args.query, limit: args.limit }),
   }));
   ctx.tools.register(defineTool({
-    name: KNOWLEDGE_READ_SNIPPET_TOOL_NAME,
+    name: canonicalToolName(KNOWLEDGE_READ_SNIPPET_TOOL_NAME),
     description: "读取单篇非敏感知识笔记的限长必要片段（in-process 试用工具）",
     parameters: {
       path: { type: "string", required: true, description: "vault/... 逻辑路径" },
@@ -57,7 +57,7 @@ function registerCoreTools(ctx) {
     },
   }));
   ctx.tools.register(defineTool({
-    name: INSPIRATION_FEEDBACK_TOOL_NAME,
+    name: canonicalToolName(INSPIRATION_FEEDBACK_TOOL_NAME),
     description: [
       "记录主人对最近一张「今日灵感」卡片的评价（in-process 试用工具）。仅当主人明确评价这张卡时调用一次：",
       "有用/有启发/不错 → useful；一般/还行/凑合 → neutral；没用/不对味/无感 → not_useful。",
@@ -77,7 +77,7 @@ function registerCoreTools(ctx) {
     })),
   }));
   ctx.tools.register(defineTool({
-    name: FETCH_URL_TOOL_NAME,
+    name: canonicalToolName(FETCH_URL_TOOL_NAME),
     description: "抓取并读取一个公网网页的正文（in-process 试用工具，直抓；浏览器升级与续办在通道迁移后接入）",
     parameters: {
       url: { type: "string", required: true, description: "公网 URL" },
@@ -93,7 +93,7 @@ function registerCoreTools(ctx) {
     },
   }));
   ctx.tools.register(defineTool({
-    name: CAPTURE_START_TOOL_NAME,
+    name: canonicalToolName(CAPTURE_START_TOOL_NAME),
     description: "接收待收录内容并启动可恢复的 IngestWorkflow（in-process 试用工具；分析接入留待 sidecar 迁移）",
     parameters: {
       kind: { type: "string", required: true, description: "url | text | markdown | txt | personal", enum: ["url", "text", "markdown", "txt", "personal"] },
@@ -117,7 +117,7 @@ function registerCoreTools(ctx) {
     }),
   }));
   ctx.tools.register(defineTool({
-    name: CAPTURE_STATUS_TOOL_NAME,
+    name: canonicalToolName(CAPTURE_STATUS_TOOL_NAME),
     description: "读取一个 Artifact 的收录方案状态（in-process 试用工具）",
     parameters: {
       artifactId: { type: "string", required: true, description: "capture.start 返回的 artifact.id" },
@@ -129,7 +129,7 @@ function registerCoreTools(ctx) {
     execute: (args) => captureStatus({ artifactId: args.artifactId }),
   }));
   ctx.tools.register(defineTool({
-    name: CAPTURE_LIST_PENDING_TOOL_NAME,
+    name: canonicalToolName(CAPTURE_LIST_PENDING_TOOL_NAME),
     description: "列出尚未完成的收录工作流（in-process 试用工具）",
     parameters: {},
     output: {
@@ -139,7 +139,7 @@ function registerCoreTools(ctx) {
     execute: () => captureListPending(),
   }));
   ctx.tools.register(defineTool({
-    name: JOBS_LIST_TOOL_NAME,
+    name: canonicalToolName(JOBS_LIST_TOOL_NAME),
     description: "查看任务与执行状态（in-process 试用工具）",
     parameters: {
       limit: { type: "integer", description: "返回条数上限（1-100，默认 20）" },
@@ -154,7 +154,7 @@ function registerCoreTools(ctx) {
     },
   }));
   ctx.tools.register(defineTool({
-    name: JOBS_SUBMIT_TOOL_NAME,
+    name: canonicalToolName(JOBS_SUBMIT_TOOL_NAME),
     description: "提交受 Policy 约束的动作、长期记忆候选、报告或选题 Job（in-process 试用工具，仍走 Job/Validator/GitGuard）",
     parameters: {
       mode: { type: "string", required: true, description: "action | memory | report | output", enum: ["action", "memory", "report", "output"] },
@@ -168,7 +168,7 @@ function registerCoreTools(ctx) {
     execute: (args) => defaultOpsTools().jobsSubmit({ mode: args.mode, text: args.text, reason: args.reason }),
   }));
   ctx.tools.register(defineTool({
-    name: TODAY_READ_TOOL_NAME,
+    name: canonicalToolName(TODAY_READ_TOOL_NAME),
     description: "读取按目标、承诺和到期信号排序的今日工作台（in-process 试用工具）",
     parameters: {
       capacity: { type: "integer", description: "返回条数上限（1-20，默认 10）" },
