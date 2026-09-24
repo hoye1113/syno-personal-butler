@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
+import { createInprocessWeixinChannel } from "../channel-weixin/channel-core.mjs";
 import { KNOWLEDGE_READ_SNIPPET_TOOL_NAME, KNOWLEDGE_SEARCH_TOOL_NAME } from "./knowledge-tools.mjs";
 import { canonicalToolName } from "./tool-args.mjs";
 
@@ -17,11 +18,49 @@ function line(text) {
 }
 
 export function apply(ctx) {
+  if (process.env.SYNO_WEIXIN_SPIKE === "1") {
+    runWeixinSpike(ctx).catch((error) => {
+      line(`WEIXIN_SPIKE_FAIL ${error?.stack || String(error)}`);
+      setTimeout(() => process.exit(1), 100);
+    });
+    return;
+  }
   if (process.env.SYNO_CAPABILITIES_SPIKE !== "1") return;
   runSpike(ctx).catch((error) => {
     line(`SPIKE_A_FAIL ${error?.stack || String(error)}`);
     setTimeout(() => process.exit(1), 100);
   });
+}
+
+async function runWeixinSpike(ctx) {
+  const adapter = {
+    async send() { return { delivered: true }; },
+    async start() {},
+    async stop() {},
+  };
+  const channel = createInprocessWeixinChannel({
+    ctx,
+    adapter,
+    workspacePath: process.env.DSH_CWD || process.cwd(),
+    timeoutMs: SPIKE_TIMEOUT_MS,
+  });
+  channel.attach();
+  line("weixin-channel-attached");
+  const reply = await adapter.onMessage({
+    channel: "weixin",
+    text: "只回复单词：pong",
+    senderId: "spike-owner",
+    contextToken: "spike-token",
+    id: `spike-weixin-${randomUUID()}`,
+  });
+  const text = String(reply?.text || "");
+  if (text.trim() !== "pong") {
+    line(`WEIXIN_SPIKE_FAIL text=${JSON.stringify(text)}`);
+    setTimeout(() => process.exit(1), 100);
+    return;
+  }
+  line(`WEIXIN_SPIKE_OK ${JSON.stringify({ sessionId: channel.currentSessionId(), text })}`);
+  setTimeout(() => process.exit(0), 100);
 }
 
 async function runSpike(ctx) {
