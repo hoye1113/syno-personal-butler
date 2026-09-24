@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 import { promises as fs, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 
-import { walkMarkdown, titleOf } from "../../../packages/syno-core/knowledge-store.mjs";
-import { PATHS } from "../../../packages/syno-core/paths.mjs";
+import { walkMarkdown, titleOf } from "./knowledge-store.mjs";
+import { PATHS } from "./paths.mjs";
 
 const COOLDOWN_DAYS = 7;
 const COOLDOWN_MS = COOLDOWN_DAYS * 86_400_000;

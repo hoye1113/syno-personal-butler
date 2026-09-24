@@ -16,7 +16,7 @@ await fs.mkdir(path.join(contractRoot, "config"), { recursive: true });
 process.env.SYNO_KNOWLEDGE_ROOT = knowledgeRoot;
 
 const { PATHS, relativeToKnowledge, relativeToRepo, relativeToRoot } = await import("../packages/syno-core/paths.mjs");
-const { GitGuard } = await import("../apps/syno/syno/git-guard.mjs");
+const { GitGuard } = await import("../packages/syno-core/git-guard.mjs");
 const { validateVaultContract } = await import("../packages/syno-core/validator.mjs");
 
 function git(cwd, args) {

@@ -4,8 +4,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { PATHS } from "../../../packages/syno-core/paths.mjs";
-import { ProcessFileLock } from "../../../packages/syno-core/process-lock.mjs";
+import { PATHS } from "./paths.mjs";
+import { ProcessFileLock } from "./process-lock.mjs";
 
 const execFileAsync = promisify(execFile);
 

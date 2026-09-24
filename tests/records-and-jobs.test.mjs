@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { AgentHost } from "../apps/syno/syno/agent-host.mjs";
+import { AgentHost } from "../packages/syno-core/agent-host.mjs";
 import { FakeExecutor } from "../apps/syno/syno/executors.mjs";
-import { JobStore } from "../apps/syno/syno/job-store.mjs";
+import { JobStore } from "../packages/syno-core/job-store.mjs";
 import { parseRecord, serializeRecord } from "../packages/syno-core/markdown-record.mjs";
 import { PATHS } from "../packages/syno-core/paths.mjs";
 

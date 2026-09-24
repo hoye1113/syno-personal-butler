@@ -41,9 +41,13 @@
 - ✅ plugin 工具：`syno_core_knowledge_fetch_url`、`syno_core_capture_start`/`status`/`list_pending` + 单测；门禁 `pnpm test` 768/768、verify、spike 7 工具激活。
 - ⏳ 延后：浏览器升级/续办（Phase C 通道上下文）、收录分析 sidecar（B5）。
 
-### B4 波次
+### B4 波次（主体完成 2026-09-24）
 
-- `jobs.list`/`jobs.submit` + registry 全量面 + `toolSet: core|all` 语义；单独安全评审（写治理、effect receipt、审批边界、owner/allowedTools）。
+- ✅ 模块迁移：`policy`/`operation-registry`/`operation-executor`/`git-guard`/`agent-host`/`job-store`/`session-safety`/`claim-evidence-service`/`goal-service`/`output-lifecycle`/`output-service`/`planner-service`/`priority-engine`/`signal-source-registry`/`settings-registry`/`today-service`/`domain-operations`/`reports`/`knowledge-maintenance-source` 迁入 syno-core；`remoteSafeJobSummary` 抽到 `packages/syno-core/job-summary.mjs`。
+- ✅ 工具：`syno_core_jobs_list`/`syno_core_jobs_submit`/`syno_core_today_read`；写路径仍走 AgentHost → Policy → Job → Validator → GitGuard 精确路径（`createOpsRuntime` 装配，`OperationExecutor` 支持 actions/memory/report/output 四类 operation）。
+- ✅ 单测：job 生成/审计路径（fake git）、非法 mode/缺 text 拒绝、today 快照。
+- ⏳ 延后：hidden 工具面（claims/evidence/settings）是否纳入插件（B5 决策）；真实 DSH 写审计（会在真实知识仓产生 Job/提交，留 Owner/生产验收）；effect receipt 随 B5 评估。
+- 门禁：`pnpm test` 773/773 + verify + spike 10 工具激活绿。
 
 ### B5 波次（切换与删除）
 
@@ -71,7 +75,7 @@
 - B2 状态与反馈类（**灵感链路完成 2026-09-24**）：`process-lock`/`markdown-record`/`inspiration-store` 迁入 syno-core；capabilities 注册 `syno_core_inspiration_record_feedback`（无卡 `recorded:false`、`already_recorded` 只读事实、显式 ID 跨 24h，语义与 Host 工具一致），由 `tests/capabilities-inspiration-tools.test.mjs` 覆盖；`process-lock` 获取与接管改 `temp + fs.link` 原子发布，并修掉存量并发 flake。剩余：`today.read` 与 `capture.status`/`list_pending` 状态类排期（见「下一步待办」）。
 - B3 抓取与收录（**完成 2026-09-24**）：`source-fetcher`/`source-descriptor`/`process-runner`/`canonical-tags`/`intake`/`ingest-service`/`ingest-workflow-coordinator`/`browser-capture-adapter`/`fetch-url-tool` 迁入 syno-core；capabilities 注册 `syno_core_knowledge_fetch_url`、`syno_core_capture_start`/`status`/`list_pending`（7 个工具全量），由 `tests/capabilities-fetch-tools.test.mjs` 与 `tests/capabilities-capture-tools.test.mjs` 覆盖（直抓包裹、失败如实上抛、workflow 落库/状态/待办/幂等重放）。**延后项**：浏览器升级与「继续」续办依赖通道上下文（Phase C 接入）；收录分析（`analyze`/sidecar）随 B5 的 JSON-RPC sidecar 迁移接入，本波 `capture.start` 只落 `received` 态 workflow。
 - B2/B3 审查整改（2026-09-24）：锁文件恢复 `0o600` 且发布路径补保护模型注释；`fetch_url` 工具移除无调用方的 `browserCapture` 参数并给「受保护地址」错误补 retryable 话术；`read_snippet`/`fetch_url` 补入参区间校验对齐 Host 契约（新增 `tool-args.mjs`）；`capture.start` 补 `filename` 参数；`syno-doctor` 增加过期 `.claim`/`.tmp` 清扫；补「旧版慢写空锁」重试测试。
-- B4 写治理与全量面：`jobs.list`/`jobs.submit`、registry 全量、`toolSet: core|all` 语义保持；最大风险项，单独安全评审。
+- B4 写治理与全量面（**主体完成 2026-09-24**）：19 个治理模块与 `job-summary` 迁入 syno-core；`syno_core_jobs_list`/`jobs_submit`/`today_read` 注册（写仍走 AgentHost/Policy/GitGuard 精确路径，fake-git 单测覆盖）；剩 hidden 工具面决策与真实写审计（留 Owner）。
 - B5 切换与删除：capabilities 接管 canonical 名并按 `SYNO_CHAT_TOOLS=plugin` 切换，接管时必须保留原 Bridge 的 owner/allowedTools 语义（通道会话映射）、`agentAdjustableBoundary`、`tool-result-serializer` 脱敏与 `toolSet: core|all` 过滤；删除 `syno-tool-bridge.mjs`、`syno-tool-bridge-plugin.mjs`、`/api/syno/bridge/mcp` 与 allowlist 对应项、`FALLBACK_TOOLS`、`SYNO_BRIDGE_CONTEXT_*` 及相关 journal/测试替身；`syno-tool-sets.mjs` 名单转为插件工具集定义；收录 sidecar 改挂 capabilities（workflow 授权经现有 WorkflowStore 解析），若 shadow 证明不可行则保留 capture 专用最小桥并记录偏差。
 - 门禁：每波 `pnpm test` + `pnpm run verify` + 真实 DSH 回合；B5 门禁另加：`tests/syno-tool-bridge.test.mjs` 改写为 in-process 契约测试、全仓 `SYNO_BRIDGE_CONTEXT_REQUIRED` 零引用、真实生产会话工具调用与写审计通过。
 

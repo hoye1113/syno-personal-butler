@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { FakeExecutor } from "../apps/syno/syno/executors.mjs";
-import { OperationExecutor } from "../apps/syno/syno/operation-executor.mjs";
+import { OperationExecutor } from "../packages/syno-core/operation-executor.mjs";
 
 test("Fake Executor implements submit, inspect and cancel", async () => {
   const fake = new FakeExecutor({ responder: async () => ({ text: "ok", changedPaths: ["ops/a.md"] }) });

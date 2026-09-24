@@ -7,8 +7,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { buildOperationRequest } from "../apps/syno/syno/operation-registry.mjs";
-import { evaluate } from "../apps/syno/syno/policy.mjs";
+import { buildOperationRequest } from "../packages/syno-core/operation-registry.mjs";
+import { evaluate } from "../packages/syno-core/policy.mjs";
 import { routeSynoApi } from "../apps/syno/syno/runtime.mjs";
 import { VaultMigrationService } from "../apps/syno/syno/vault-migration-service.mjs";
 

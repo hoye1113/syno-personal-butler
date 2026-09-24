@@ -4,13 +4,13 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { KnowledgeStore } from "../packages/syno-core/knowledge-store.mjs";
-import { KnowledgeMaintenanceSource } from "../apps/syno/syno/knowledge-maintenance-source.mjs";
-import { ClaimEvidenceService } from "../apps/syno/syno/claim-evidence-service.mjs";
-import { GoalService } from "../apps/syno/syno/goal-service.mjs";
+import { KnowledgeMaintenanceSource } from "../packages/syno-core/knowledge-maintenance-source.mjs";
+import { ClaimEvidenceService } from "../packages/syno-core/claim-evidence-service.mjs";
+import { GoalService } from "../packages/syno-core/goal-service.mjs";
 import { KnowledgeProfileService } from "../apps/syno/syno/knowledge-profile-service.mjs";
-import { PlannerService } from "../apps/syno/syno/planner-service.mjs";
-import { TodayService } from "../apps/syno/syno/today-service.mjs";
-import { SignalSourceRegistry } from "../apps/syno/syno/signal-source-registry.mjs";
+import { PlannerService } from "../packages/syno-core/planner-service.mjs";
+import { TodayService } from "../packages/syno-core/today-service.mjs";
+import { SignalSourceRegistry } from "../packages/syno-core/signal-source-registry.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const FIXED_NOW = new Date("2026-07-21T08:00:00.000Z");

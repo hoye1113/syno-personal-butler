@@ -8,11 +8,12 @@ import { promisify } from "node:util";
 
 import { runProcess } from "../packages/syno-core/process-runner.mjs";
 import { assertJsonMutation, assertSameOriginMutation, securityHeaders } from "../apps/syno/syno/http-security.mjs";
-import { assertRegisteredOperation, buildOperationRequest, intentForOperation } from "../apps/syno/syno/operation-registry.mjs";
-import { OutputService } from "../apps/syno/syno/output-service.mjs";
-import { buildConversationMigrationContext, remoteSafeJobSummary, routeSynoApi } from "../apps/syno/syno/runtime.mjs";
+import { assertRegisteredOperation, buildOperationRequest, intentForOperation } from "../packages/syno-core/operation-registry.mjs";
+import { OutputService } from "../packages/syno-core/output-service.mjs";
+import { buildConversationMigrationContext, routeSynoApi } from "../apps/syno/syno/runtime.mjs";
+import { remoteSafeJobSummary } from "../packages/syno-core/job-summary.mjs";
 import { ConversationStore } from "../apps/syno/syno/conversation-store.mjs";
-import { validateValue } from "../apps/syno/syno/settings-registry.mjs";
+import { validateValue } from "../packages/syno-core/settings-registry.mjs";
 import { backupState, restoreState, verifyArchive } from "../apps/syno/syno/state-archive.mjs";
 import { validateContractRecord } from "../packages/syno-core/schema-registry.mjs";
 import { isPrivateAddress } from "../packages/syno-core/source-fetcher.mjs";

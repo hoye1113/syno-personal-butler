@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { evaluate } from "../apps/syno/syno/policy.mjs";
+import { evaluate } from "../packages/syno-core/policy.mjs";
 import { validateChangedPaths } from "../packages/syno-core/validator.mjs";
 
 test("Policy routes read, write and high-risk intents deterministically", () => {

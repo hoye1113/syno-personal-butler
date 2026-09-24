@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { GitGuard, parsePorcelainZ } from "../apps/syno/syno/git-guard.mjs";
+import { GitGuard, parsePorcelainZ } from "../packages/syno-core/git-guard.mjs";
 import { KnowledgeStore } from "../packages/syno-core/knowledge-store.mjs";
 import { PATHS } from "../packages/syno-core/paths.mjs";
 import { readKnowledgeSnippet } from "../packages/syno-core/knowledge-read.mjs";

@@ -5,13 +5,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { IngestService, isAllowedIngestPath, isAllowedExistingVaultPath, noteFilenameBase, proposalAllowsWriteJob } from "../packages/syno-core/ingest-service.mjs";
-import { ClaimEvidenceService } from "../apps/syno/syno/claim-evidence-service.mjs";
-import { GoalService } from "../apps/syno/syno/goal-service.mjs";
-import { OutputService } from "../apps/syno/syno/output-service.mjs";
-import { TodayService } from "../apps/syno/syno/today-service.mjs";
+import { ClaimEvidenceService } from "../packages/syno-core/claim-evidence-service.mjs";
+import { GoalService } from "../packages/syno-core/goal-service.mjs";
+import { OutputService } from "../packages/syno-core/output-service.mjs";
+import { TodayService } from "../packages/syno-core/today-service.mjs";
 import { ConversationRouter } from "../apps/syno/syno/conversation-router.mjs";
-import { SignalSourceRegistry } from "../apps/syno/syno/signal-source-registry.mjs";
-import { KnowledgeMaintenanceSource } from "../apps/syno/syno/knowledge-maintenance-source.mjs";
+import { SignalSourceRegistry } from "../packages/syno-core/signal-source-registry.mjs";
+import { KnowledgeMaintenanceSource } from "../packages/syno-core/knowledge-maintenance-source.mjs";
 import { validateVaultContract } from "../packages/syno-core/validator.mjs";
 
 test("ConversationRouter keeps one owner conversation across channels and explicit threads", async (t) => {

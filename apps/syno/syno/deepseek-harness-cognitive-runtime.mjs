@@ -8,7 +8,7 @@ import {
   SESSION_STATE_KNOWN,
   canFallbackAfterAttempt,
   sessionStateAfterFailure,
-} from "./session-safety.mjs";
+} from "../../../packages/syno-core/session-safety.mjs";
 import { BROWSER_TOOL_NAMES } from "./browser-tool-names.mjs";
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
 import { ProcessFileLock } from "../../../packages/syno-core/process-lock.mjs";

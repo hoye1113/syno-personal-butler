@@ -1,7 +1,7 @@
 import path from "node:path";
 
-import { PATHS, relativeToRoot } from "../../../packages/syno-core/paths.mjs";
-import { writeRecord } from "../../../packages/syno-core/markdown-record.mjs";
+import { PATHS, relativeToRoot } from "./paths.mjs";
+import { writeRecord } from "./markdown-record.mjs";
 
 class ReportService {
   constructor({ host, knowledge, notifications, channels, gitGuard, opsRoot = PATHS.opsRoot, pathResolver, clock = () => new Date() } = {}) {

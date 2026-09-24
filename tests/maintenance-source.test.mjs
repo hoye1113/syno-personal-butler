@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { KnowledgeMaintenanceSource } from "../apps/syno/syno/knowledge-maintenance-source.mjs";
+import { KnowledgeMaintenanceSource } from "../packages/syno-core/knowledge-maintenance-source.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const FIXED_NOW = new Date("2026-07-21T08:00:00.000Z");

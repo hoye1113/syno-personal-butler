@@ -10,7 +10,7 @@ import {
   normalizeSessionState,
   sessionStateAfterFailure,
   selectSessionRecoveryStrategy,
-} from "../apps/syno/syno/session-safety.mjs";
+} from "../packages/syno-core/session-safety.mjs";
 
 test("Session fallback safety is fail-closed and controlled-message copy strips tool data", () => {
   assert.equal(normalizeSessionState("unexpected"), SESSION_STATE_KNOWN.UNKNOWN);

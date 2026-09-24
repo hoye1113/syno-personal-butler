@@ -1,4 +1,4 @@
-import { buildOperationRequest } from "./operation-registry.mjs";
+import { buildOperationRequest } from "../../../packages/syno-core/operation-registry.mjs";
 
 class SynoCore {
   constructor({ host, knowledge, notifications, channels, reports, today } = {}) {

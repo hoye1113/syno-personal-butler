@@ -2,58 +2,59 @@ import { createHash, randomBytes } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { AgentHost } from "./agent-host.mjs";
+import { AgentHost } from "../../../packages/syno-core/agent-host.mjs";
 import { ApprovalAdvisor, minimalAdvice } from "./approval-advisor.mjs";
 import { BrowserCaptureAdapter } from "../../../packages/syno-core/browser-capture-adapter.mjs";
 import { createBrowserCaptureTools } from "./browser-capture-tools.mjs";
 import { ChannelHub } from "./channels.mjs";
 import { ChannelContinuationStore } from "./channel-continuation-store.mjs";
 import { ChannelConversationHandler } from "./channel-conversation-handler.mjs";
-import { ClaimEvidenceService } from "./claim-evidence-service.mjs";
+import { ClaimEvidenceService } from "../../../packages/syno-core/claim-evidence-service.mjs";
 import { DeepSeekHarnessCognitiveRuntime, DeepSeekHarnessSessionBindingStore, HARNESS_MODEL_CHAIN, parseHarnessModel } from "./deepseek-harness-cognitive-runtime.mjs";
 import { DeepSeekHarnessSupervisor } from "./deepseek-harness-supervisor.mjs";
 import { ContextManager } from "./context-manager.mjs";
 import { ConversationStore } from "./conversation-store.mjs";
 import { ConversationRouter } from "./conversation-router.mjs";
-import { executeDomainOperation } from "./domain-operations.mjs";
+import { executeDomainOperation } from "../../../packages/syno-core/domain-operations.mjs";
 import { FeishuChannelAdapter } from "./feishu-channel.mjs";
-import { GitGuard } from "./git-guard.mjs";
-import { GoalService } from "./goal-service.mjs";
+import { GitGuard } from "../../../packages/syno-core/git-guard.mjs";
+import { GoalService } from "../../../packages/syno-core/goal-service.mjs";
 import { IngestService, proposalAllowsWriteJob } from "../../../packages/syno-core/ingest-service.mjs";
 import { IngestWorkflowCoordinator } from "../../../packages/syno-core/ingest-workflow-coordinator.mjs";
-import { JobStore } from "./job-store.mjs";
+import { JobStore } from "../../../packages/syno-core/job-store.mjs";
 import { IntakeService } from "../../../packages/syno-core/intake.mjs";
 import { KnowledgeStore } from "../../../packages/syno-core/knowledge-store.mjs";
+import { remoteSafeJobSummary } from "../../../packages/syno-core/job-summary.mjs";
 import { assertKnowledgeNotSensitive, readKnowledgeSnippet } from "../../../packages/syno-core/knowledge-read.mjs";
 import { InspirationSampler } from "./inspiration-sampler.mjs";
 import { InspirationStore } from "../../../packages/syno-core/inspiration-store.mjs";
 import { createInspirationFeedbackTool } from "./inspiration-feedback-tool.mjs";
-import { KnowledgeMaintenanceSource } from "./knowledge-maintenance-source.mjs";
+import { KnowledgeMaintenanceSource } from "../../../packages/syno-core/knowledge-maintenance-source.mjs";
 import { fetchUrlForChat } from "../../../packages/syno-core/fetch-url-tool.mjs";
 import { KnowledgeProfileService } from "./knowledge-profile-service.mjs";
 import { NotificationStore } from "./notification-store.mjs";
-import { OperationExecutor } from "./operation-executor.mjs";
+import { OperationExecutor } from "../../../packages/syno-core/operation-executor.mjs";
 import { PendingDecisionStore } from "./pending-decision.mjs";
-import { buildOperationRequest } from "./operation-registry.mjs";
+import { buildOperationRequest } from "../../../packages/syno-core/operation-registry.mjs";
 import { DEFAULT_WEB_PORT, PATHS } from "../../../packages/syno-core/paths.mjs";
-import { PlannerService } from "./planner-service.mjs";
+import { PlannerService } from "../../../packages/syno-core/planner-service.mjs";
 import { PostIngestCandidateStore } from "./post-ingest-candidates.mjs";
-import { OutputService } from "./output-service.mjs";
+import { OutputService } from "../../../packages/syno-core/output-service.mjs";
 import { ProviderClient } from "./provider-client.mjs";
 import { ProviderCredentialStore } from "./provider-credential-store.mjs";
 import { ProactiveOrchestrator } from "./proactive-orchestrator.mjs";
-import { ReportService } from "./reports.mjs";
+import { ReportService } from "../../../packages/syno-core/reports.mjs";
 import { RuntimeJournal } from "./runtime-journal.mjs";
 import { validateValue } from "../../../packages/syno-core/schema-registry.mjs";
-import { SettingsRegistry } from "./settings-registry.mjs";
-import { SignalSourceRegistry } from "./signal-source-registry.mjs";
+import { SettingsRegistry } from "../../../packages/syno-core/settings-registry.mjs";
+import { SignalSourceRegistry } from "../../../packages/syno-core/signal-source-registry.mjs";
 import { inspectRemoteContent } from "../../../packages/syno-core/sensitive-content.mjs";
 import { SynoCore } from "./syno-core.mjs";
 import { SynoToolBridge } from "./syno-tool-bridge.mjs";
 import { ToolLoopAgent } from "./tool-loop-agent.mjs";
 import { ToolLoopExecutor } from "./tool-loop-executor.mjs";
 import { ToolRegistry } from "./tool-registry.mjs";
-import { TodayService } from "./today-service.mjs";
+import { TodayService } from "../../../packages/syno-core/today-service.mjs";
 import { WeixinIlinkAdapter, envToggle } from "./weixin-ilink.mjs";
 import { clip, formatWx, stripMarkdown } from "./weixin-text-format.mjs";
 import { VaultMigrationService } from "./vault-migration-service.mjs";
@@ -112,22 +113,6 @@ async function workflowContext(domain) {
     sections.push({ path: relative, content: content.slice(0, 12_000) });
   }
   return { domain, authority: "canonical-vault-skills", sections };
-}
-
-function remoteSafeJobSummary(job = {}) {
-  const candidateSummary = String(job.result?.summary || job.summary || job.request?.summary || "").slice(0, 500);
-  const summary = inspectRemoteContent(candidateSummary, { maxChars: 500 }).safe ? candidateSummary : "";
-  return {
-    id: String(job.id || ""),
-    intent: String(job.intent || job.request?.intent || job.decision?.intent || ""),
-    status: String(job.status || ""),
-    risk: String(job.risk || job.decision?.risk || ""),
-    phase: String(job.phase || ""),
-    changedPaths: Array.isArray(job.changedPaths)
-      ? job.changedPaths.map(String).filter((item) => /^(?:vault|ops)\//u.test(item)).slice(0, 100)
-      : [],
-    ...(summary ? { summary } : {}),
-  };
 }
 
 function redactMigrationText(value) {
@@ -1956,4 +1941,4 @@ async function assertWebJobOwner(runtime, webContext, jobId) {
   }
 }
 
-export { PUBLIC_COMMAND_INTENTS, buildConversationMigrationContext, createControlMutationLock, createSynoRuntime, createWeixinMessageHandler, parseWeixinApproval, redactMigrationText, remoteSafeJobSummary, resolveCognitiveRuntimeMode, routeSynoApi };
+export { PUBLIC_COMMAND_INTENTS, buildConversationMigrationContext, createControlMutationLock, createSynoRuntime, createWeixinMessageHandler, parseWeixinApproval, redactMigrationText, resolveCognitiveRuntimeMode, routeSynoApi };

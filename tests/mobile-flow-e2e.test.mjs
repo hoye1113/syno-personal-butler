@@ -5,9 +5,9 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 
 import { ChannelConversationHandler } from "../apps/syno/syno/channel-conversation-handler.mjs";
-import { JobStore } from "../apps/syno/syno/job-store.mjs";
+import { JobStore } from "../packages/syno-core/job-store.mjs";
 import { PATHS } from "../packages/syno-core/paths.mjs";
-import { evaluate } from "../apps/syno/syno/policy.mjs";
+import { evaluate } from "../packages/syno-core/policy.mjs";
 
 // 移动端（微信 iLink / 飞书）trust-but-clarify 端到端。这里用**真实**的 policy.evaluate
 // 与**真实**的 JobStore 状态机（非桩），证明三条腿都成立，且两通道同权限同行为：

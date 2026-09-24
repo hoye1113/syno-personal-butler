@@ -4,11 +4,11 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { KnowledgeStore } from "../packages/syno-core/knowledge-store.mjs";
-import { KnowledgeMaintenanceSource } from "../apps/syno/syno/knowledge-maintenance-source.mjs";
-import { ClaimEvidenceService } from "../apps/syno/syno/claim-evidence-service.mjs";
-import { GoalService } from "../apps/syno/syno/goal-service.mjs";
+import { KnowledgeMaintenanceSource } from "../packages/syno-core/knowledge-maintenance-source.mjs";
+import { ClaimEvidenceService } from "../packages/syno-core/claim-evidence-service.mjs";
+import { GoalService } from "../packages/syno-core/goal-service.mjs";
 import { KnowledgeProfileService } from "../apps/syno/syno/knowledge-profile-service.mjs";
-import { PlannerService } from "../apps/syno/syno/planner-service.mjs";
+import { PlannerService } from "../packages/syno-core/planner-service.mjs";
 import { parseRecord, writeRecord } from "../packages/syno-core/markdown-record.mjs";
 import { validateContractRecord } from "../packages/syno-core/schema-registry.mjs";
 

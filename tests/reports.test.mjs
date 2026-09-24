@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { ReportService } from "../apps/syno/syno/reports.mjs";
+import { ReportService } from "../packages/syno-core/reports.mjs";
 
 test("reports expose exact changed paths and defer commits inside an approved job", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-reports-"));
