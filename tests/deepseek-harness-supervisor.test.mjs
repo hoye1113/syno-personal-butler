@@ -106,12 +106,18 @@ test("Harness child environment is an explicit whitelist and drops host secrets"
     FEISHU_APP_SECRET: "must-not-leak",
     DEEPSEEK_API_KEY: "must-not-inherit",
     SYNO_OPENCODE_API_KEY: "must-not-inherit",
+    SYNO_CAPABILITIES_TOOLS: "1",
+    SYNO_CHAT_TOOLS: "plugin",
+    SYNO_CHANNEL_OWNER: "dsh",
   });
   assert.deepEqual(env, {
     Path: "C:\\Windows",
     SYSTEMROOT: "C:\\Windows",
     TEMP: "C:\\Temp",
     HTTPS_PROXY: "http://127.0.0.1:7892",
+    SYNO_CAPABILITIES_TOOLS: "1",
+    SYNO_CHAT_TOOLS: "plugin",
+    SYNO_CHANNEL_OWNER: "dsh",
   });
 });
 
