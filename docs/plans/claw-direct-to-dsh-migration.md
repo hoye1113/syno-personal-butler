@@ -22,6 +22,39 @@
 - 不合并主动运营与 `@deepseek-ai/dsh-schedule` 的会话内普通提醒。
 - 本期只迁微信；飞书按同一通道插件模式后续单独评估。
 
+## 下一步待办（2026-09-24 整理）
+
+按执行顺序；每项完成即跑对应门禁并更新本节状态。
+
+### B2 波次（下一步立即做）
+
+1. 迁移链到 `packages/syno-core/`（沿用 A1 codemod 手法，逐文件跑测试）：
+   - `process-lock.mjs`（standalone；注意其存量 flake，见「其他发现」）；
+   - `markdown-record.mjs`（依赖 schema-registry/paths/process-lock）；
+   - `inspiration-store.mjs`（依赖 markdown-record/paths）。
+2. capabilities 注册 `syno_core_inspiration_record_feedback`：语义对齐 `inspiration-feedback-tool.mjs`（无卡 `recorded:false`、`already_recorded` 只读事实、显式 ID 跨 24h），`recordEvent` 在插件内降级为可选。
+3. 单测：无卡返回、重复评价只读既有事实、显式 ID 回填（参考 `tests/inspiration-feedback-tool.test.mjs` 既有断言）。
+4. `today.read` 依赖评估：GoalService / AgentHost / SignalSourceRegistry / PlannerService / PriorityEngine；若依赖树过大，先把 `capture.status`/`list_pending`（IngestWorkflowStore 宿主 state）排入 B2，`today.read` 顺延 B3。
+5. 门禁：`pnpm test` + `pnpm run verify` + 真实 DSH 回合；spike 可先经 store 造一张已投递灵感卡再让模型调用反馈工具。
+6. spike 继续增长时为它加场景参数（如 `SYNO_SPIKE_SCENARIO`），避免单文件膨胀；B5 前把 spike 的进程退出语义彻底移出生产模块（现已拆分）。
+
+### B3 波次
+
+- `knowledge.fetch_url`（`source-fetcher` 的 SSRF/pinning/代理分支 + `BrowserCaptureAdapter` 升级 + `ChannelContinuationStore` 续办）与 `capture.start`/`status`/`list_pending`（`IngestWorkflowCoordinator`/`IngestService`，仍只产生 Workflow/Proposal，不直写 vault）。
+
+### B4 波次
+
+- `jobs.list`/`jobs.submit` + registry 全量面 + `toolSet: core|all` 语义；单独安全评审（写治理、effect receipt、审批边界、owner/allowedTools）。
+
+### B5 波次（切换与删除）
+
+- 按 Phase B 的 B5 条目执行；切换前确认索引双写策略（Host 与 DSH 是否共用 `SYNO_RUNTIME_ROOT`，已原子写但需决定单写者或独立文件）。
+
+### 其他发现（独立于迁移，建议单独修）
+
+- `tests/process-lock.test.mjs` 并发接管用例竞态：6 并发复现 5 失败（`PROCESS_LOCK_IDENTITY_UNKNOWN` 替代 `PROCESS_LOCK_HELD`）；根因是 `process-lock.mjs` 接管写入非原子，可套用 `knowledge-store` 的 tmp+rename 修法。
+- `tests/proactive-reliability.test.mjs:1096` 投递等待超时：全量套件负载下偶发、单跑通过；等待窗口对负载敏感，单独会话评估收紧或放宽。
+
 ## Phase A：共享核心与插件骨架（行为不变）
 
 - A1 抽 `packages/syno-core`：移入无 Host 耦合的领域与治理模块（`knowledge-store`、`fetch-url-tool`/`source-fetcher`、`ingest-service`、`job-store`、`agent-host`、`policy`、`validator`、`git-guard`、`operation-*`、`today-service`、`inspiration-store`、`paths` 的知识根派生等）。`apps/syno` 改为引用；现有测试原样通过。
