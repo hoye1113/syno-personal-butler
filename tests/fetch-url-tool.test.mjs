@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { DEFAULT_MAX_CHARS, fetchUrlForChat } from "../apps/syno/syno/fetch-url-tool.mjs";
+import { DEFAULT_MAX_CHARS, fetchUrlForChat } from "../packages/syno-core/fetch-url-tool.mjs";
 import { inspectRemoteContent } from "../packages/syno-core/sensitive-content.mjs";
-import { MAX_SOURCE_TEXT } from "../apps/syno/syno/source-fetcher.mjs";
+import { MAX_SOURCE_TEXT } from "../packages/syno-core/source-fetcher.mjs";
 import { createSynoRuntime } from "../apps/syno/syno/runtime.mjs";
 
 test("fetchUrlForChat wraps the snapshot as untrusted material and passes fields through", async () => {
@@ -110,7 +110,7 @@ const WX_WALL_TEXT = "当前环境异常，完成验证后即可继续访问。�
 const chatContext = { channel: "weixin", ownerId: "local-user", threadKey: "main", conversationId: "m1" };
 
 test("detectAntiBotWall recognizes the WeChat verification wall and spares normal pages", async () => {
-  const { detectAntiBotWall } = await import("../apps/syno/syno/fetch-url-tool.mjs");
+  const { detectAntiBotWall } = await import("../packages/syno-core/fetch-url-tool.mjs");
   assert.equal(detectAntiBotWall({ sourceUrl: "https://mp.wappoc_appmsgcaptcha.example/x", text: "" }), "verification_redirect");
   assert.equal(detectAntiBotWall({ sourceUrl: "https://mp.weixin.qq.com/s/abc", text: WX_WALL_TEXT }), "verification_page");
   assert.equal(detectAntiBotWall({ sourceUrl: "https://example.com", text: "验证码 " }), "short_verification_page");

@@ -9,7 +9,7 @@ import { ProactiveOrchestrator } from "../apps/syno/syno/proactive-orchestrator.
 import { SignalEngine } from "../apps/syno/syno/signal-engine.mjs";
 import { ChannelDeliveryOutbox } from "../apps/syno/syno/channel-delivery-outbox.mjs";
 import { OwnerChannelTargetStore } from "../apps/syno/syno/proactive-reliability.mjs";
-import { IngestWorkflowCoordinator, IngestWorkflowStore } from "../apps/syno/syno/ingest-workflow-coordinator.mjs";
+import { IngestWorkflowCoordinator, IngestWorkflowStore } from "../packages/syno-core/ingest-workflow-coordinator.mjs";
 import { WorkflowOutbox } from "../apps/syno/syno/workflow-outbox.mjs";
 import { createSynoRuntime, routeSynoApi } from "../apps/syno/syno/runtime.mjs";
 

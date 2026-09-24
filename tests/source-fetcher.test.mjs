@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
-import { fetchSourceText, proxyRouteForUrl, requestOnce, resolvePublicAddress } from "../apps/syno/syno/source-fetcher.mjs";
+import { fetchSourceText, proxyRouteForUrl, requestOnce, resolvePublicAddress } from "../packages/syno-core/source-fetcher.mjs";
 
 test("requestOnce supports Node all-address lookup callbacks", async (t) => {
   const server = http.createServer((_request, response) => {

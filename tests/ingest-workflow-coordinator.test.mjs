@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { IngestWorkflowCoordinator, IngestWorkflowStore } from "../apps/syno/syno/ingest-workflow-coordinator.mjs";
+import { IngestWorkflowCoordinator, IngestWorkflowStore } from "../packages/syno-core/ingest-workflow-coordinator.mjs";
 import { SynoToolBridge } from "../apps/syno/syno/syno-tool-bridge.mjs";
 import { ToolRegistry } from "../apps/syno/syno/tool-registry.mjs";
 

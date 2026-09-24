@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { ApprovalAdvisor, minimalAdvice } from "../apps/syno/syno/approval-advisor.mjs";
-import { IngestService } from "../apps/syno/syno/ingest-service.mjs";
+import { IngestService } from "../packages/syno-core/ingest-service.mjs";
 import { routeSynoApi } from "../apps/syno/syno/runtime.mjs";
 
 const ARTIFACT_ID = "artifact-20260720-ef20760f";

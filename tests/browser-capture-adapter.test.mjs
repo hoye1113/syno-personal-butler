@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { BrowserCaptureAdapter } from "../apps/syno/syno/browser-capture-adapter.mjs";
+import { BrowserCaptureAdapter } from "../packages/syno-core/browser-capture-adapter.mjs";
 
 function fakeRunner({ observations = [{ url: "https://example.com/article", title: "文章", observation: "中文正文" }], statusError = null, stopError = null } = {}) {
   const calls = [];

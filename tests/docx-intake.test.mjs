@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { IntakeService, MAX_ATTACHMENT_BYTES, extractDocxText } from "../apps/syno/syno/intake.mjs";
+import { IntakeService, MAX_ATTACHMENT_BYTES, extractDocxText } from "../packages/syno-core/intake.mjs";
 import { makeMinimalDocx } from "./helpers/minimal-docx.mjs";
 
 test("DOCX intake validates PK magic bytes and size", async (t) => {

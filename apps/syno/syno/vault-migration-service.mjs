@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { isMocPath } from "../../../packages/syno-core/knowledge-path-policy.mjs";
 import { parseRecord, serializeRecord } from "../../../packages/syno-core/markdown-record.mjs";
 import { validateContractRecord } from "../../../packages/syno-core/schema-registry.mjs";
-import { APPROVED_TAGS, TAG_ALIASES } from "./canonical-tags.mjs";
+import { APPROVED_TAGS, TAG_ALIASES } from "../../../packages/syno-core/canonical-tags.mjs";
 
 const execFileAsync = promisify(execFile);
 const CONTENT_ROOTS = ["00-Inbox", "01-Areas", "02-Resources", "03-Archive"];

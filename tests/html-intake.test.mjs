@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { IntakeService } from "../apps/syno/syno/intake.mjs";
+import { IntakeService } from "../packages/syno-core/intake.mjs";
 
 test("HTML intake extracts readable text and wraps in untrusted-source", async () => {
   const service = new IntakeService({

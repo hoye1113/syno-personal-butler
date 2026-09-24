@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
-import { locateCommand, runProcess } from "./process-runner.mjs";
+import { locateCommand, runProcess } from "../../../packages/syno-core/process-runner.mjs";
 import { writeRecord } from "../../../packages/syno-core/markdown-record.mjs";
 
 class FakeCalendarAdapter {

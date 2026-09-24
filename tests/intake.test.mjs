@@ -4,8 +4,8 @@ import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { classifyUrl, IntakeService, validatePublicUrl } from "../apps/syno/syno/intake.mjs";
-import { extractReadableText, isPrivateAddress } from "../apps/syno/syno/source-fetcher.mjs";
+import { classifyUrl, IntakeService, validatePublicUrl } from "../packages/syno-core/intake.mjs";
+import { extractReadableText, isPrivateAddress } from "../packages/syno-core/source-fetcher.mjs";
 
 test("intake accepts public URLs and only a single Bilibili opus/cv", () => {
   assert.equal(classifyUrl(validatePublicUrl("https://www.bilibili.com/opus/123")), "bilibili-opus");

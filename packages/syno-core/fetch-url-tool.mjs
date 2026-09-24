@@ -8,7 +8,7 @@
 import { createHash } from "node:crypto";
 
 import { fetchSourceText, MAX_SOURCE_TEXT } from "./source-fetcher.mjs";
-import { inspectRemoteContent, redactRemoteContent } from "../../../packages/syno-core/sensitive-content.mjs";
+import { inspectRemoteContent, redactRemoteContent } from "./sensitive-content.mjs";
 
 const DEFAULT_MAX_CHARS = 20_000;
 

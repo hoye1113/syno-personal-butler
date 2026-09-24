@@ -4,7 +4,7 @@ import path from "node:path";
 import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 
-import { PATHS } from "../../../packages/syno-core/paths.mjs";
+import { PATHS } from "./paths.mjs";
 import { fetchSourceText, isPrivateAddress, extractReadableText } from "./source-fetcher.mjs";
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;

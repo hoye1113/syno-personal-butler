@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { createGlyphPng } from "../../apps/syno/syno/image-png.mjs";
 import { defaultOpencodeZenKeyLoader } from "../../apps/syno/syno/opencode-key-loader.mjs";
 import { VISION_MODEL, ZEN_CHAT_COMPLETIONS } from "../../apps/syno/syno/opencode-vision-client.mjs";
-import { locateCommand, spawnPortable } from "../../apps/syno/syno/process-runner.mjs";
+import { locateCommand, spawnPortable } from "../../packages/syno-core/process-runner.mjs";
 
 const QUESTION = "What background color is this image, and what exact Latin letters or digits are visible? Reply with JSON {color,text}.";
 

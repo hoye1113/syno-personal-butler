@@ -6,7 +6,7 @@ import { parseRecord, writeRecord } from "../../../packages/syno-core/markdown-r
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
 import { isActionableOutput, outputTransition, presentOutputOpportunity } from "./output-lifecycle.mjs";
 import { validateContractRecord } from "../../../packages/syno-core/schema-registry.mjs";
-import { buildSourceDescriptor } from "./source-descriptor.mjs";
+import { buildSourceDescriptor } from "../../../packages/syno-core/source-descriptor.mjs";
 
 class OutputService {
   constructor({ opsRoot = PATHS.opsRoot, clock = () => new Date() } = {}) { this.opsRoot = opsRoot; this.clock = clock; }

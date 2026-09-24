@@ -6,6 +6,15 @@ import {
   searchKnowledgeNotes,
 } from "./knowledge-tools.mjs";
 import { INSPIRATION_FEEDBACK_TOOL_NAME, recordInspirationFeedback } from "./inspiration-tools.mjs";
+import { FETCH_URL_TOOL_NAME, fetchKnowledgeUrl } from "./fetch-tools.mjs";
+import {
+  CAPTURE_LIST_PENDING_TOOL_NAME,
+  CAPTURE_START_TOOL_NAME,
+  CAPTURE_STATUS_TOOL_NAME,
+  captureListPending,
+  captureStatus,
+  startCapture,
+} from "./capture-tools.mjs";
 
 export const name = "syno-capabilities";
 export const inject = ["tools"];
@@ -56,6 +65,63 @@ function registerCoreTools(ctx) {
       feedback: args.feedback,
       inspirationId: args.inspirationId,
     })),
+  }));
+  ctx.tools.register(defineTool({
+    name: FETCH_URL_TOOL_NAME,
+    description: "抓取并读取一个公网网页的正文（in-process 试用工具，直抓；浏览器升级与续办在通道迁移后接入）",
+    parameters: {
+      url: { type: "string", required: true, description: "公网 URL" },
+      maxChars: { type: "integer", description: "正文上限（1000-100000）" },
+    },
+    output: {
+      schema: { type: "string" },
+      render: (_args, value) => [{ type: "text", text: String(value) }],
+    },
+    execute: (args) => fetchKnowledgeUrl({ url: args.url, maxChars: args.maxChars }),
+  }));
+  ctx.tools.register(defineTool({
+    name: CAPTURE_START_TOOL_NAME,
+    description: "接收待收录内容并启动可恢复的 IngestWorkflow（in-process 试用工具；分析接入留待 sidecar 迁移）",
+    parameters: {
+      kind: { type: "string", required: true, description: "url | text | markdown | txt | personal", enum: ["url", "text", "markdown", "txt", "personal"] },
+      value: { type: "string", required: true, description: "收录内容（URL 或正文）" },
+      title: { type: "string", description: "可选标题" },
+      sourceKind: { type: "string", description: "personal | unknown", enum: ["personal", "unknown"] },
+      analysisMode: { type: "string", description: "remote | local-only", enum: ["remote", "local-only"] },
+    },
+    output: {
+      schema: { type: "string" },
+      render: (_args, value) => [{ type: "text", text: String(value) }],
+    },
+    execute: (args) => startCapture({
+      kind: args.kind,
+      value: args.value,
+      ...(args.title ? { title: args.title } : {}),
+      ...(args.sourceKind ? { sourceKind: args.sourceKind } : {}),
+      ...(args.analysisMode ? { analysisMode: args.analysisMode } : {}),
+    }),
+  }));
+  ctx.tools.register(defineTool({
+    name: CAPTURE_STATUS_TOOL_NAME,
+    description: "读取一个 Artifact 的收录方案状态（in-process 试用工具）",
+    parameters: {
+      artifactId: { type: "string", required: true, description: "capture.start 返回的 artifact.id" },
+    },
+    output: {
+      schema: { type: "string" },
+      render: (_args, value) => [{ type: "text", text: String(value) }],
+    },
+    execute: (args) => captureStatus({ artifactId: args.artifactId }),
+  }));
+  ctx.tools.register(defineTool({
+    name: CAPTURE_LIST_PENDING_TOOL_NAME,
+    description: "列出尚未完成的收录工作流（in-process 试用工具）",
+    parameters: {},
+    output: {
+      schema: { type: "string" },
+      render: (_args, value) => [{ type: "text", text: String(value) }],
+    },
+    execute: () => captureListPending(),
   }));
 }
 

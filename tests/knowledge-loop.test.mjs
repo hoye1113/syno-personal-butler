@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { IngestService, isAllowedIngestPath, isAllowedExistingVaultPath, noteFilenameBase, proposalAllowsWriteJob } from "../apps/syno/syno/ingest-service.mjs";
+import { IngestService, isAllowedIngestPath, isAllowedExistingVaultPath, noteFilenameBase, proposalAllowsWriteJob } from "../packages/syno-core/ingest-service.mjs";
 import { ClaimEvidenceService } from "../apps/syno/syno/claim-evidence-service.mjs";
 import { GoalService } from "../apps/syno/syno/goal-service.mjs";
 import { OutputService } from "../apps/syno/syno/output-service.mjs";

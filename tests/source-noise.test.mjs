@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { hasSourceNoise } from "../apps/syno/syno/source-fetcher.mjs";
-import { IngestService } from "../apps/syno/syno/ingest-service.mjs";
+import { hasSourceNoise } from "../packages/syno-core/source-fetcher.mjs";
+import { IngestService } from "../packages/syno-core/ingest-service.mjs";
 
 const RULE = ".wp-grid{display:grid;grid-template-columns:repeat(4,1fr);column-gap:1.5rem;row-gap:1.5rem;align-items:start;justify-content:center}";
 const LEAK = `Skip to content
