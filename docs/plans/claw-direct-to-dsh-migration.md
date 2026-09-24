@@ -31,7 +31,7 @@
 1. ✅ 迁移链到 `packages/syno-core/`：`process-lock.mjs`、`markdown-record.mjs`、`inspiration-store.mjs`（41 处导入改指，import-check 217 文件全解析）。
 2. ✅ capabilities 注册 `syno_core_inspiration_record_feedback`：语义对齐 `inspiration-feedback-tool.mjs`（无卡 `recorded:false`、`already_recorded` 只读事实、显式 ID 跨 24h），`recordEvent` 可选。
 3. ✅ 单测 `tests/capabilities-inspiration-tools.test.mjs`：无卡/单次落账/幂等/TTL/显式 ID 所有权与回填/非法取值。
-4. ⏳ `today.read` 依赖评估：GoalService / AgentHost / SignalSourceRegistry / PlannerService / PriorityEngine；若依赖树过大，先把 `capture.status`/`list_pending`（IngestWorkflowStore 宿主 state）排入下一波，`today.read` 顺延。
+4. ✅ **`today.read` 评估结论（2026-09-24）**：`TodayService` 本体只依赖 PriorityEngine/output-lifecycle，但构造依赖 `AgentHost`（JobStore/Policy/GitGuard/OperationExecutor）+ GoalService + PlannerService + SignalSourceRegistry + settingsRegistry，属 B4 规模 → `today.read` 顺延到 B4；下一波（B3）按计划做 `knowledge.fetch_url` 与 `capture.*`。
 5. ✅ 门禁：`pnpm test` 764/764 + `pnpm run verify` + 真实 DSH spike（知识三轮），灵感反馈以单测覆盖（live 造卡留给生产验收）。
 6. ⏳ spike 场景参数（`SYNO_SPIKE_SCENARIO`）暂未需要；B5 前保持 spike 与生产模块分离（已拆分）。
 
