@@ -1,6 +1,34 @@
-# 当前执行状态（2026-09-18）
+# 当前执行状态（2026-09-24）
 
-本节是当前交接摘要；下方“历史交接”仅用于追溯，不能覆盖这里的单仓运行事实。
+本节是当前交接摘要；下方「2026-09-18 交接」与「历史交接」仅用于追溯，不能覆盖这里的迁移事实。
+
+## Claw 直通 DSH 迁移（ADR 0007）
+
+- **分支/远端**：`main` 已与 `origin/main` 同步（本轮推送至 `74f2148`）。
+- **已完成波次**：
+  - A 期 + B1：`packages/syno-core` 抽取（knowledge 切片）；capabilities 插件骨架；知识三件套 in-process。
+  - B2：灵感反馈链路 + `process-lock` 原子发布（修并发 flake）。
+  - B3：`fetch_url` + `capture.*` 内嵌。
+  - B4：19 个治理模块（policy/agent-host/job-store/git-guard/…）+ `jobs.list`/`jobs.submit`/`today.read`。
+  - B5（第一步）：`SYNO_CHAT_TOOLS=plugin` 双轨切换（canonical `syno_*` 名，bridge 静默）；默认 bridge，生产不变。
+  - C0：19 个通道/渠道模块迁入 syno-core（生产不变）。
+  - C1a：in-process 通道核心（`session-map`/`session-turn`/`channel-core`，`SYNO_CHANNEL_OWNER=dsh` 门控）。
+- **回归基线**：`pnpm test` 779/779；`pnpm run verify` 2271 files；active docs 8；静态相对导入解析 233 文件全通过。
+- **真实验证（DSH spike，runner 在临时目录，入仓待决）**：默认知识三轮；`SYNO_CHAT_TOOLS=plugin` canonical 名；`SYNO_WEIXIN_SPIKE=1` fake adapter + 真实模型往返 `pong`。
+- **下一步（按序）**：
+  1. Owner 验收 `SYNO_CHAT_TOOLS=plugin` 真机会话 → 之后执行 B5 删除类（bridge 文件/路由/`SYNO_BRIDGE_CONTEXT_*`、`FALLBACK_TOOLS`、capture sidecar 改挂）。
+  2. C1b：`ChannelConversationHandler` 确定性路由接回、typing/ACK/Outbox 归位、维护页 C4、真实扫码。
+  3. C5：`SYNO_CHANNEL_OWNER=dsh` 切默认 + 真实微信验收矩阵。
+  4. Phase D/E：主动内嵌、Host 收缩。
+  5. 可选：spike 运行器入仓为 `scripts/spike-capabilities.mjs`。
+- **权威文档**：`docs/adr/0007-claw-direct-to-dsh.md`、`docs/plans/claw-direct-to-dsh-migration.md`（波次进度）、`docs/plans/claw-direct-to-dsh-execution-and-verification.md`（执行与验收规范、开放决策）。
+- **生产运行态**：仍以「2026-09-18 交接」与 `docs/OPERATIONS.md` 为准；迁移尚未改变生产启动、渠道或工具路径。
+
+---
+
+# 2026-09-18 交接（追溯用）
+
+本节是当时交接摘要；下方“历史交接”仅用于追溯，不能覆盖这里的单仓运行事实。
 
 - **唯一活动事实源**：本仓库。`vault/` 与 `ops/` 已回到本仓库，由本仓库 Git 和 `origin/main` 管理；主分支基线为 `ccf559b`，当前交接分支为 `chore/single-repo-runtime-followup`，有 2 个尚未推送的本地提交。
 - **生产配置**：planner `vaultRoot` 指向本仓库；用户级和系统级 `SYNO_KNOWLEDGE_ROOT` 均未配置。外部知识仓及备份目录仅作为冻结回滚材料保留。
