@@ -1,17 +1,17 @@
 ---
-title: "ACP 接入方案的多样性与局限性 — 实践踩坑备忘"
-tags: ["ai_agent", "ai_coding", "notes"]
-legacy_tags: ["ai_agent", "ai_coding", "notes"]
-created: "2026-05-21"
-source: "manual - ai_coding - acp - notes"
-description: "Hermes Agent Ultra 与 FlowyClaw / AI_Router ACP 协议集成踩坑——ACP"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/Programming and Engineering/ACP集成问题与踩坑经验.md"
-source_sha256: "c3ba7735954fee5ac28c156ad4e46165e86a6f9246290c14ecae44ddbddd2f5f"
-migration_id: "migration-20260720-64e79771"
+title: ACP 接入方案的多样性与局限性 — 实践踩坑备忘
 author:
   - "[[vault 主人]]"
+created: 2026-05-21
+description: Hermes Agent Ultra 与 FlowyClaw / AI_Router ACP 协议集成踩坑——ACP
+  协议通信、责任边界、Agent Server 问题、连接排障；含
+  D:\workSpace\git_clone_test\FlowyClaw\、crates/hermes-acp/、hermes-cli
+  handle_cli_acp 等参考
+tags:
+  - ai_agent
+  - ai_coding
+  - notes
+source: manual - ai_coding - acp - notes
 ---
 
 # ACP 接入方案的多样性与局限性 — 实践踩坑备忘

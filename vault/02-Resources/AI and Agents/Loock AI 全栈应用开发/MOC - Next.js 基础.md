@@ -1,16 +1,14 @@
 ---
-title: "MOC - Next.js 基础"
-tags: ["ai_agent", "ai_coding", "nextjs", "moc"]
-legacy_tags: ["ai_agent", "ai_coding", "nextjs", "moc"]
-created: "2026-06-09"
-source: "vault_initiative - moc - loock_ai - nextjs - ai_agent"
-description: "全栈应用所需的 Next.js 基础知识"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/MOC - Next.js 基础.md"
-source_sha256: "7d97aa66487415d83741cdff7533daa3c36ec408b20010e8a2a0b1ebdea41c14"
-migration_id: "migration-20260720-64e79771"
+title: MOC - Next.js 基础
+description: 全栈应用所需的 Next.js 基础知识
+created: 2026-06-09
 synced: 2026-06-09
+tags:
+  - ai_agent
+  - ai_coding
+  - nextjs
+  - moc
+source: vault_initiative - moc - loock_ai - nextjs - ai_agent
 ---
 
 # Next.js 基础

@@ -1,19 +1,16 @@
 ---
-title: "02 · 搭建第一个 Agent 入口 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "coding_agent", "ai_agent"]
-legacy_tags: ["loock_ai", "coding_agent", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/mini-coding-agent/01-minimal-agent/02-agent-entry"
-description: "从空目录开始，定义消息类型、封装模型调用、设计工具接口，把五层架构落地成可以运行的代码。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-7 02 · 搭建第一个 Agent 入口.md"
-source_sha256: "893cfd90fcc017f7d3ab48ece12d243c9ed57939c767acbc2f86839eedb2e9da"
-migration_id: "migration-20260720-64e79771"
+title: 02 · 搭建第一个 Agent 入口 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/mini-coding-agent/01-minimal-agent/02-agent-entry
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 从空目录开始，定义消息类型、封装模型调用、设计工具接口，把五层架构落地成可以运行的代码。
+tags:
+  - loock_ai
+  - coding_agent
+  - ai_agent
 ---
 
 第 1 章 · 最小可用 Agent

@@ -52,3 +52,12 @@ source: vault_initiative - moc - ai_agent - harness_engineering - claude_code - 
 - **状态**：已拆分（2026-07-15）。本文件只作总览，不再列具体笔记条目。
 - **拆分去向**：架构工程 / AI Coding / 评估研究 为新建 domain MOC；Harness / 职业为已有横切 MOC 扩充。
 - **孤立判定**：被 `[[MOC - Agent Theory and Design]]` 链入 = 破孤（规则不变）。
+
+---
+
+## 迁移收录（2026-10-08 · 知识库合并）
+
+> 以下为 2026-10-08 两库合并时按来源管道成组挂载的笔记，保证 MOC 可达，后续策展融入上方结构。
+
+- [[当编码不再是瓶颈 - Berkeley RDI 软件自主开发三级框架|当编码不再是瓶颈 - Berkeley RDI 软件自主开发三级框架]]
+- [[自进化Agent研究综述-腾讯程序员-20260813|自进化 Agent（Self-Evolving Agent）研究综述]]

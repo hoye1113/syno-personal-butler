@@ -1,19 +1,16 @@
 ---
-title: "05 · 实战：SubAgent 协作 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "coding_agent", "ai_agent"]
-legacy_tags: ["loock_ai", "coding_agent", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/mini-coding-agent/10-multi-agent/05-complex-task"
-description: "把前面所有能力综合起来，让主 agent 通过 delegate_task  工具协调多个  ubagent 完成复杂任务。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-56 05 · 实战 - SubAgent 协作.md"
-source_sha256: "e5cf67c93bc7bf08b9c767caa5cea6fc88c592f5fdf9d7b795b53912381a2a6c"
-migration_id: "migration-20260720-64e79771"
+title: 05 · 实战：SubAgent 协作 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/mini-coding-agent/10-multi-agent/05-complex-task
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 把前面所有能力综合起来，让主 agent 通过 delegate_task  工具协调多个  ubagent 完成复杂任务。
+tags:
+  - loock_ai
+  - coding_agent
+  - ai_agent
 ---
 
 第 10 章 · SubAgent 协作

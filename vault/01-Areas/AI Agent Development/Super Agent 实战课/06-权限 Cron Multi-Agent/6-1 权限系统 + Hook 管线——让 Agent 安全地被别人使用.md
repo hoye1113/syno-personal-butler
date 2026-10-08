@@ -1,18 +1,14 @@
 ---
 title: "权限系统 + Hook 管线——让 Agent 安全地被别人使用 — Super Agent 实战课"
-tags: ["ai_agent", "hooks"]
-legacy_tags: ["ai_agent", "hooks"]
-created: "2026-07-13"
 source: "https://sitor.cc/courses/super-agent/sa-17-permissions"
-description: "讲解 Agent 接入飞书群等多人环境后，如何用权限系统拦截危险操作，并用 Hook 管线在工具执行前后插入审计日志与格式校验等自定义逻辑。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/Super Agent 实战课/06-权限 Cron Multi-Agent/6-1 权限系统 + Hook 管线——让 Agent 安全地被别人使用.md"
-source_sha256: "53e4cc9517180eb5f36f0761f8b693a2af6cff0df725e8afd9f1d7e0660451e3"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-07-13
+description: "讲解 Agent 接入飞书群等多人环境后，如何用权限系统拦截危险操作，并用 Hook 管线在工具执行前后插入审计日志与格式校验等自定义逻辑。"
+tags:
+  - ai_agent
+  - hooks
 ---
 ## 权限系统 + Hook 管线——让 Agent 安全地被别人使用
 

@@ -1,18 +1,17 @@
 ---
 title: "Agent 越用越翻车，怎么破局？答案藏在经典管理学里"
-tags: ["ai_agent", "prompting"]
-legacy_tags: ["ai_agent", "agent_management", "经典管理学", "classical_management", "prompting"]
-created: "2026-06-11"
-source: "https://mp.weixin.qq.com/s/N1WgUN8ddXrw0p0o5IiykA"
-description: "把 Andy Grove 的 TRM、Kahneman 的锚定效应与苏格拉底提问、Brooks 的第二系统效应、Goldratt 的瓶颈理论这 5 大经典管理学心法，迁移到 Agent 管理上；核心结论\"管理 Agent 的最高境界不是让 Agent 做更多的事，而是让 Agent 做正确的事，在正确的时机得到正确的干预"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/Agent 越用越翻车，怎么破局？答案藏在经典管理学里.md"
-source_sha256: "5174bcbe75824ef195d18ba81d5d8fe3b9a393d8f8b2f1ad70cf3388841fc460"
-migration_id: "migration-20260720-64e79771"
+source: https://mp.weixin.qq.com/s/N1WgUN8ddXrw0p0o5IiykA
 author:
   - "[[三元同学]]"
 published: unknown
+created: 2026-06-11
+description: 把 Andy Grove 的 TRM、Kahneman 的锚定效应与苏格拉底提问、Brooks 的第二系统效应、Goldratt 的瓶颈理论这 5 大经典管理学心法，迁移到 Agent 管理上；核心结论"管理 Agent 的最高境界不是让 Agent 做更多的事，而是让 Agent 做正确的事，在正确的时机得到正确的干预"
+tags:
+  - ai_agent
+  - agent_management
+  - 经典管理学
+  - classical_management
+  - prompting
 ---
 
 # Agent 越用越翻车，怎么破局？答案藏在经典管理学里

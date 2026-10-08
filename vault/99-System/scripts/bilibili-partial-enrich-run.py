@@ -13,10 +13,9 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from path_config import RECASTORY_ROOT, RECASTORY_WORKSPACE
 
-MANIFEST = RECASTORY_WORKSPACE / "bilibili/manifest.json"
-RECASTORY = RECASTORY_ROOT
+MANIFEST = Path(r"D:\workSpace\git_clone_test\hoye-git\Recastory\workspace\bilibili\manifest.json")
+RECASTORY = Path(r"D:\workSpace\git_clone_test\hoye-git\Recastory")
 
 
 def partial_entries(manifest: dict) -> list[dict]:

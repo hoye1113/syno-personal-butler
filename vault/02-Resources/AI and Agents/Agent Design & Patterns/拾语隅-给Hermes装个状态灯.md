@@ -1,15 +1,14 @@
 ---
 title: "拾语隅-给Hermes装个状态灯"
-tags: ["ai_agent", "article"]
-legacy_tags: ["ai_agent", "hermes", "agent_usage", "practical_experience", "article"]
-created: "2026-07-15"
+tags:
+  - ai_agent
+  - hermes
+  - agent_usage
+  - practical_experience
+  - article
+created: 2026-07-15
 source: "https://mp.weixin.qq.com/s/fHmKgu504dM1WWwP3iJdOg"
 description: "用 Hermes Agent 当个人助手时，如何通过 macOS 菜单栏状态灯实时显示 Agent 工作状态（工作中/待机/掉线），以及迭代过程中的方案选择。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/拾语隅-给Hermes装个状态灯.md"
-source_sha256: "a225afd29f86d90d9f0e731e8b63eeb7476128c88c4aa2f1ff5d93e6196239da"
-migration_id: "migration-20260720-64e79771"
 author: "[[拾语隅]]"
 ---
 

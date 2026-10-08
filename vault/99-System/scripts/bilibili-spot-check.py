@@ -13,11 +13,12 @@ import re
 import sys
 from datetime import date
 from pathlib import Path
-from path_config import BILI_ROOT, RECASTORY_WORKSPACE, VAULT_ROOT
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-DEFAULT_RECASTORY = RECASTORY_WORKSPACE
+VAULT_ROOT = Path(__file__).resolve().parents[2]
+BILI_ROOT = VAULT_ROOT / "02-Resources/AI and Agents/B站视频知识库"
+DEFAULT_RECASTORY = Path(r"D:\workSpace\git_clone_test\hoye-git\Recastory\workspace")
 
 SKIP_QUERY = {
     "和你何干",

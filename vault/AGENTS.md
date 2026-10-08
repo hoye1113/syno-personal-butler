@@ -51,14 +51,6 @@ PREFLIGHT -> ADMISSION -> INVENTORY -> CLASSIFY -> TRANSFORM
 - 新 B站专栏必须声明 `ingest_workflow: bilibili_opus_ingest_v2`、来源/成稿形态、声音依据、核验范围与事实状态；不要求 transcript、Recastory 或 Spot Check。
 - 基于 vault 回答时，verified 可附来源引用；partial 使用保守措辞；unverified 只作为检索线索。
 
-## 分类治理规则
-
-- `00-Inbox/` 只承担短期分流，最多保留 10 个文件；来源笔记完成校验、来源追溯和关系判断后迁入一个 Resources 主领域。
-- 来源、作者、平台和内容形态是元数据，不是长期主题目录；`B站视频知识库/` 仅作为历史导入桶逐步消化。
-- 每篇来源笔记只能有一个物理主位置；需要多个视角时更新 MOC 或类型化关系，不复制笔记。
-- 主题归类必须阅读摘要/章节或正文主线，不能仅凭文件名或单个关键词；无法判断时保留 Inbox 并说明原因。
-- 新 MOC 仍须满足同主题至少 3 篇且边界明确；新标签仍须先提议并取得用户确认。
-
 ## 修改边界
 
 - Agent 直接读写 vault 内 Markdown，不依赖 Obsidian MCP、REST API 或 Obsidian 进程。

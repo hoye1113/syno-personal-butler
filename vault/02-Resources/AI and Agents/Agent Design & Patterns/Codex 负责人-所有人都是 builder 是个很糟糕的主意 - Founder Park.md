@@ -1,15 +1,16 @@
 ---
 title: "Codex 负责人 - 所有人都是 builder 是个很糟糕的主意"
-tags: ["ai_agent", "ai_career", "ai_coding", "article", "wechat", "codex", "openai"]
-legacy_tags: ["ai_agent", "ai_career", "ai_coding", "article", "wechat", "codex", "openai"]
-created: "2026-07-03"
-source: "https://mp.weixin.qq.com/s/wJrUsBSs0owDascwDZBd-w"
+tags:
+  - ai_agent
+  - ai_career
+  - ai_coding
+  - article
+  - wechat
+  - codex
+  - openai
+created: 2026-07-03
+source: https://mp.weixin.qq.com/s/wJrUsBSs0owDascwDZBd-w
 description: "Founder Park 译 Lenny 对谈 OpenAI Codex 负责人 Andrew Ambrosino：实现廉价后 taste 最贵；PM 不消失；Codex 晚发 3 月会死；会删代码比会写更重要"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/Codex 负责人-所有人都是 builder 是个很糟糕的主意 - Founder Park.md"
-source_sha256: "0f1bbb85b50fec333d79b0cb446569fab0430fc8fdad6c1a6e203fe640953623"
-migration_id: "migration-20260720-64e79771"
 author:
   - "Founder Park"
 date: 2026-07-02

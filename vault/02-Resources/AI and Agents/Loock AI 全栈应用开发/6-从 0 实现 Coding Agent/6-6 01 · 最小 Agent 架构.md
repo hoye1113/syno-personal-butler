@@ -1,19 +1,16 @@
 ---
-title: "01 · 最小 Agent 架构 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "coding_agent", "ai_agent"]
-legacy_tags: ["loock_ai", "coding_agent", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/mini-coding-agent/01-minimal-agent/01-architecture"
-description: "拆解一个 Coding Agent 需要哪些基础部件，理解输入、状态、模型、工具、输出五层各自负责什么，为动手搭建建立清晰的心智模型。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-6 01 · 最小 Agent 架构.md"
-source_sha256: "8322f77a11a273684eeb0908b4d6b9019cf036b9527203796dd8a98c8efe7867"
-migration_id: "migration-20260720-64e79771"
+title: 01 · 最小 Agent 架构 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/mini-coding-agent/01-minimal-agent/01-architecture
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 拆解一个 Coding Agent 需要哪些基础部件，理解输入、状态、模型、工具、输出五层各自负责什么，为动手搭建建立清晰的心智模型。
+tags:
+  - loock_ai
+  - coding_agent
+  - ai_agent
 ---
 
 第 1 章 · 最小可用 Agent

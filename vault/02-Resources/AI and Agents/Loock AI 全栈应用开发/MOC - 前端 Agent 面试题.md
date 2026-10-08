@@ -1,16 +1,14 @@
 ---
-title: "MOC - 前端 Agent 面试题"
-tags: ["ai_agent", "ai_coding", "interview", "moc"]
-legacy_tags: ["ai_agent", "ai_coding", "interview", "moc"]
-created: "2026-06-09"
-source: "vault_initiative - moc - loock_ai - frontend_agent_interview - ai_agent"
-description: "前端 Agent 与 LangGraph.js 面试题锦集"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/MOC - 前端 Agent 面试题.md"
-source_sha256: "1cf9b801e078e4880954e438f3a38766cc89a5ff5441d215977a1205c33031f0"
-migration_id: "migration-20260720-64e79771"
+title: MOC - 前端 Agent 面试题
+description: 前端 Agent 与 LangGraph.js 面试题锦集
+created: 2026-06-09
 synced: 2026-06-09
+tags:
+  - ai_agent
+  - ai_coding
+  - interview
+  - moc
+source: vault_initiative - moc - loock_ai - frontend_agent_interview - ai_agent
 ---
 
 # 前端 Agent 面试题

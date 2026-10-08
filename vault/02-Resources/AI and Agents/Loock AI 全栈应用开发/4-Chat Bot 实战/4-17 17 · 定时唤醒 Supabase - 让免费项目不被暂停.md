@@ -1,19 +1,16 @@
 ---
-title: "17 · 定时唤醒 Supabase：让免费项目不被暂停 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "chatbot", "ai_agent"]
-legacy_tags: ["loock_ai", "chatbot", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/chat-bot-course/08-bonus/17-keep-supabase-alive"
-description: "Supabase 免费项目连续 7 天无活动会被自动暂停，用 GitHub Action  定时查询来保活。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/4-Chat Bot 实战/4-17 17 · 定时唤醒 Supabase - 让免费项目不被暂停.md"
-source_sha256: "e934b9eda00f3c4c73884412541470759aaa7a1d9deba8fd11ceb3e457afafa2"
-migration_id: "migration-20260720-64e79771"
+title: 17 · 定时唤醒 Supabase：让免费项目不被暂停 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/chat-bot-course/08-bonus/17-keep-supabase-alive
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: Supabase 免费项目连续 7 天无活动会被自动暂停，用 GitHub Action  定时查询来保活。
+tags:
+  - loock_ai
+  - chatbot
+  - ai_agent
 ---
 
 加更内容

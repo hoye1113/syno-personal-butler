@@ -1,19 +1,16 @@
 ---
-title: "03 · 让 Agent 学会搜索和读文件 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "coding_agent", "ai_agent"]
-legacy_tags: ["loock_ai", "coding_agent", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/mini-coding-agent/01-minimal-agent/03-search-and-read"
-description: "实现  earch 和 read_file 两个工具，让 agent 真正能\\\"看\\\"到你的代码仓库。讨论工具设计中的长度控制、结果截断和输出格式化。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-8 03 · 让 Agent 学会搜索和读文件.md"
-source_sha256: "35d317c4bd6710957a8ec3c97f081b0ddfcdc0f6faf770642dc1e11216f335e9"
-migration_id: "migration-20260720-64e79771"
+title: 03 · 让 Agent 学会搜索和读文件 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/mini-coding-agent/01-minimal-agent/03-search-and-read
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 实现  earch 和 read_file 两个工具，让 agent 真正能\"看\"到你的代码仓库。讨论工具设计中的长度控制、结果截断和输出格式化。
+tags:
+  - loock_ai
+  - coding_agent
+  - ai_agent
 ---
 
 第 1 章 · 最小可用 Agent

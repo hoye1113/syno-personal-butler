@@ -1,19 +1,16 @@
 ---
-title: "13 · Google 图片生成工具 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "chatbot", "ai_agent"]
-legacy_tags: ["loock_ai", "chatbot", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/chat-bot-course/06-advanced-features/13-google-image-generation-tool"
-description: "在统一工具系统中接入真实图片生成 API，让工具结果以 loading 卡片和最终图片卡片两段式进入聊天界面。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/4-Chat Bot 实战/4-13 13 · Google 图片生成工具.md"
-source_sha256: "502e38386d43000ee11666cdaffd9cba09e4a2c64ea235495d3783929c57a997"
-migration_id: "migration-20260720-64e79771"
+title: 13 · Google 图片生成工具 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/chat-bot-course/06-advanced-features/13-google-image-generation-tool
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 在统一工具系统中接入真实图片生成 API，让工具结果以 loading 卡片和最终图片卡片两段式进入聊天界面。
+tags:
+  - loock_ai
+  - chatbot
+  - ai_agent
 ---
 
 第六阶段 · 高级功能

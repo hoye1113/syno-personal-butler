@@ -1,18 +1,14 @@
 ---
 title: "关掉终端再打开，Agent 还记得你是谁——持久化记忆系统 — Super Agent 实战课"
-tags: ["ai_agent", "memory"]
-legacy_tags: ["ai_agent", "memory"]
-created: "2026-07-13"
 source: "https://sitor.cc/courses/super-agent/sa-11-memory"
-description: "讲解如何为 Agent 构建跨会话持久化记忆系统：用 MEMORY.md 索引加独立 .md 文件存储用户偏好、反馈、项目决策与外部资源，并通过 Prompt Pipe 注入上下文。覆盖该存什么、四种记忆类型、文件派与数据库派选型，以及精选注入与后台自动整理等生产级进阶设计。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/Super Agent 实战课/04-Memory and RAG/4-1 关掉终端再打开，Agent 还记得你是谁——持久化记忆系统.md"
-source_sha256: "8a89294064d032a69d145dc9b762770a428d31c77becb90d55738c2c9091fa69"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-07-13
+description: "讲解如何为 Agent 构建跨会话持久化记忆系统：用 MEMORY.md 索引加独立 .md 文件存储用户偏好、反馈、项目决策与外部资源，并通过 Prompt Pipe 注入上下文。覆盖该存什么、四种记忆类型、文件派与数据库派选型，以及精选注入与后台自动整理等生产级进阶设计。"
+tags:
+  - ai_agent
+  - memory
 ---
 ## 关掉终端再打开，Agent 还记得你是谁——持久化记忆系统
 

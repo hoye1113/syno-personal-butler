@@ -4,10 +4,9 @@ import json
 import re
 import sys
 from pathlib import Path
-from path_config import AUDIT_ROOT, BILI_ROOT, RECASTORY_WORKSPACE
 
-VAULT = BILI_ROOT
-WS = RECASTORY_WORKSPACE
+VAULT = Path(r"d:\workSpace\obsidian_repository\02-Resources\AI and Agents\B站视频知识库")
+WS = Path(r"D:\workSpace\git_clone_test\hoye-git\Recastory\workspace")
 MANIFEST = WS / "bilibili/manifest.json"
 
 # A-lecture: tutorial/solo — nine-section 讲义 v3 (not Host-Guest asr)
@@ -20,7 +19,7 @@ A_LECTURE_STEMS = {
     "Codex实战-Notion第二大脑与技能封装",
 }
 
-BATCH_JSON = AUDIT_ROOT / "bilibili-p0-batch.json"
+BATCH_JSON = Path(r"d:\workSpace\obsidian_repository\99-System\audit\bilibili-p0-batch.json")
 
 
 def has_s_column(entry: dict) -> bool:

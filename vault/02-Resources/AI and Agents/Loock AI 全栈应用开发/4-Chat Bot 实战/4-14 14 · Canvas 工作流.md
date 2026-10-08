@@ -1,19 +1,16 @@
 ---
-title: "14 · Canva  工作流 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "chatbot", "ai_agent"]
-legacy_tags: ["loock_ai", "chatbot", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/chat-bot-course/06-advanced-features/14-canvas-workflow"
-description: "让模型在消息正文里输出 `canva Artifact`，再把结构化 React 结果接到右侧只读 Canva  面板。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/4-Chat Bot 实战/4-14 14 · Canvas 工作流.md"
-source_sha256: "a6df140f949264571148b75f1f18bece55f93239df8c111bace04c2637601b27"
-migration_id: "migration-20260720-64e79771"
+title: 14 · Canva  工作流 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/chat-bot-course/06-advanced-features/14-canvas-workflow
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 让模型在消息正文里输出 `canva Artifact`，再把结构化 React 结果接到右侧只读 Canva  面板。
+tags:
+  - loock_ai
+  - chatbot
+  - ai_agent
 ---
 
 第六阶段 · 高级功能

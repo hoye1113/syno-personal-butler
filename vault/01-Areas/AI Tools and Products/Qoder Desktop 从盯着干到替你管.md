@@ -1,17 +1,15 @@
 ---
-title: "从「盯着干」到「替你管」，Qoder Desktop 让我重新理解了什么是 AI 编程"
-tags: ["ai_coding", "claude_code", "article", "wechat"]
-legacy_tags: ["ai_coding", "claude_code", "article", "wechat"]
-created: "2026-06-05"
-source: "https://mp.weixin.qq.com/s/7PKmLW7RjriUzXoaeYGpgA"
-description: "Qoder Desktop 评测——从\"盯着干\"到\"替你管\"的 AI 编程体验，重新理解\"什么是 AI 编程\"，核心论断\"大家问错了问题"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Tools and Products/Qoder Desktop 从盯着干到替你管.md"
-source_sha256: "cffbcbca98759d38f0f10183224096f9f45b4b3e0506c729a6d857b462191cf7"
-migration_id: "migration-20260720-64e79771"
+title: 从「盯着干」到「替你管」，Qoder Desktop 让我重新理解了什么是 AI 编程
+source: https://mp.weixin.qq.com/s/7PKmLW7RjriUzXoaeYGpgA
 author:
   - "[[三元同学]]"
+created: 2026-06-05
+description: Qoder Desktop 评测——从"盯着干"到"替你管"的 AI 编程体验，重新理解"什么是 AI 编程"，核心论断"大家问错了问题"
+tags:
+  - ai_coding
+  - claude_code
+  - article
+  - wechat
 ---
 
 # 从「盯着干」到「替你管」，Qoder Desktop 让我重新理解了什么是 AI 编程

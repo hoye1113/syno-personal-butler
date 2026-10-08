@@ -1,7 +1,6 @@
 import json
-from path_config import RECASTORY_WORKSPACE
 
-with (RECASTORY_WORKSPACE / "bilibili/manifest.json").open('r', encoding='utf-8') as f:
+with open(r'D:\workSpace\git_clone_test\hoye-git\Recastory\workspace\bilibili\manifest.json', 'r', encoding='utf-8') as f:
     data = json.load(f)
 
 entries = data['entries']

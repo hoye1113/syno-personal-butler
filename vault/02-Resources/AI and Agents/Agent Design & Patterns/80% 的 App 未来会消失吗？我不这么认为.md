@@ -1,18 +1,17 @@
 ---
-title: "80% 的 App 未来会消失吗？我不这么认为"
-tags: ["ai_agent", "taste"]
-legacy_tags: ["ai_agent", "产品观", "product_perspective", "taste", "app_vs_agent"]
-created: "2026-06-11"
-source: "https://mp.weixin.qq.com/s/SaeCkJF9FSXUWKju5P3XWQ"
-description: "反驳 Peter Steinberger 的\"80% App 消失论\"：承认 coding 门槛降低会让一部分 App 被替代，但产品价值不在功能，在品味、复杂度封装、服务；竞争维度从\"做出来\"变成\"做得好"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/80% 的 App 未来会消失吗？我不这么认为.md"
-source_sha256: "eb2ae39a4840bdbb8139dbbed0bae508dc797225b517a8a174f12485a1ad6a27"
-migration_id: "migration-20260720-64e79771"
+title: 80% 的 App 未来会消失吗？我不这么认为
+source: https://mp.weixin.qq.com/s/SaeCkJF9FSXUWKju5P3XWQ
 author:
   - "[[三元同学]]"
 published: unknown
+created: 2026-06-11
+description: 反驳 Peter Steinberger 的"80% App 消失论"：承认 coding 门槛降低会让一部分 App 被替代，但产品价值不在功能，在品味、复杂度封装、服务；竞争维度从"做出来"变成"做得好"
+tags:
+  - ai_agent
+  - 产品观
+  - product_perspective
+  - taste
+  - app_vs_agent
 ---
 
 # 80% 的 App 未来会消失吗？我不这么认为

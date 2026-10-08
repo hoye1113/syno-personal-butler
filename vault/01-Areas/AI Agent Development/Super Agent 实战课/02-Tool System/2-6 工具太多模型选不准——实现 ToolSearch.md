@@ -1,18 +1,13 @@
 ---
 title: "工具太多模型选不准——实现 ToolSearch — Super Agent 实战课"
-tags: ["ai_agent"]
-legacy_tags: ["ai_agent"]
-created: "2026-07-13"
 source: "https://sitor.cc/courses/super-agent/sa-06-dynamic-tools"
-description: "针对工具膨胀导致模型选不准与 Token 开销上涨，实现 ToolSearch 延迟加载：核心工具常驻、低频与 MCP 工具按需搜索发现，并讨论其对 Prompt Cache 的影响。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/Super Agent 实战课/02-Tool System/2-6 工具太多模型选不准——实现 ToolSearch.md"
-source_sha256: "d919b6ccb86926b8278a8e21f5a869de1f6a0d4bd20b0210968285cf552bfe85"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-07-13
+description: "针对工具膨胀导致模型选不准与 Token 开销上涨，实现 ToolSearch 延迟加载：核心工具常驻、低频与 MCP 工具按需搜索发现，并讨论其对 Prompt Cache 的影响。"
+tags:
+  - ai_agent
 ---
 ## 工具太多模型选不准——实现 ToolSearch
 

@@ -1,15 +1,15 @@
 ---
 title: "未来的 AI 编程就是 Loop 套 Loop"
-tags: ["ai_agent", "ai_coding", "article", "wechat", "loop_engineering", "harness_engineering"]
-legacy_tags: ["ai_agent", "ai_coding", "article", "wechat", "loop_engineering", "harness_engineering"]
-created: "2026-07-02"
-source: "https://mp.weixin.qq.com/s/wsuOcx1db7ydin7w1np6mA"
+tags:
+  - ai_agent
+  - ai_coding
+  - article
+  - wechat
+  - loop_engineering
+  - harness_engineering
+created: 2026-07-02
+source: https://mp.weixin.qq.com/s/wsuOcx1db7ydin7w1np6mA
 description: "魔术师卡颂：Loop Engineering=人设计循环、AI 跑至门禁通过；三层 Loop 压缩信息——代码→门禁→门禁质量→规则质量"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/未来的 AI 编程就是 Loop 套 Loop - 魔术师卡颂.md"
-source_sha256: "48abfcb7ec2a8dc70174924c60b42879765ba6725f8750b1ba500886bd08f115"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[魔术师卡颂]]"
 date: 2026-06-24

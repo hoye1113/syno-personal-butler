@@ -1,10 +1,10 @@
 # Spot check 工作表：Claude Code负责人 Boris Cherny：Tokenmaxxing与AI智能体前沿
 
-- **Vault**: `02-Resources/AI and Agents/AI Coding & Tools/Claude Code负责人 Boris Cherny-Tokenmaxxing与AI智能体前沿.md`
+- **Vault**: `02-Resources/AI and Agents/B站视频知识库/Agent架构与平台/Claude Code负责人 Boris Cherny-Tokenmaxxing与AI智能体前沿.md`
 - **时长**: 57:08
 - **spot_check**: （未登记）
 - **transcript_source**: `Recastory/workspace/bilibili-retranscribe/BV1NuGU6yE1b/article.md`
-- **ASR**: `${RECASTORY_WORKSPACE}\bilibili-retranscribe\BV1NuGU6yE1b\article.md`
+- **ASR**: `D:\workSpace\git_clone_test\hoye-git\Recastory\workspace\bilibili-retranscribe\BV1NuGU6yE1b\article.md`
 - **ASR 段数**: 58
 
 ## 相关阅读 wikilink

@@ -1,15 +1,14 @@
 ---
 title: "WorkBuddy团队-从模型到可用Agent的Harness工程"
-tags: ["ai_agent", "harness_engineering", "context_engineering", "agent_architecture", "article"]
-legacy_tags: ["ai_agent", "harness_engineering", "context_engineering", "agent_architecture", "article"]
-created: "2026-07-15"
+tags:
+  - ai_agent
+  - harness_engineering
+  - context_engineering
+  - agent_architecture
+  - article
+created: 2026-07-15
 source: "https://mp.weixin.qq.com/s/GkhemHUAhKWV-3Uxaa1Mqg"
 description: "腾讯 WorkBuddy 团队策略产品经理 Anne 从产品视角拆解 Agent 运行机制：Context Engineering、Harness Engineering、Loop Engineering 三层工程实践。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/WorkBuddy团队-从模型到可用Agent的Harness工程.md"
-source_sha256: "bbe981cfb020be865f309b11c605c51e768c72199bd33444865353d0f65d1422"
-migration_id: "migration-20260720-64e79771"
 author: "[[Anne]]"
 ---
 

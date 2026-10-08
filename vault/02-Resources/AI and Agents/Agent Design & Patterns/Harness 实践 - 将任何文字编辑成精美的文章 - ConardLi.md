@@ -1,15 +1,14 @@
 ---
 title: "Harness 实践：将任何文字编辑成精美的文章"
-tags: ["ai_agent", "article", "harness_engineering", "skills", "wechat"]
-legacy_tags: ["ai_agent", "article", "harness_engineering", "skills", "wechat"]
-created: "2026-06-17"
-source: "https://mp.weixin.qq.com/s/t0-HbOj-Z2_RcZZJRPpM9A"
+tags:
+  - ai_agent
+  - article
+  - harness_engineering
+  - skills
+  - wechat
+source: https://mp.weixin.qq.com/s/t0-HbOj-Z2_RcZZJRPpM9A
+created: 2026-06-17
 description: "ConardLi 开发 Beautiful Article Skill 的完整教程——用 Reacticle 组件协议 + 8 Phase 流程将任意文字编辑成精美网页文章，验证'好的 Harness 是可以迁移的'这一核心观点"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/Harness 实践 - 将任何文字编辑成精美的文章 - ConardLi.md"
-source_sha256: "abea2cead98c0dede5918916a8744a9fbf36fbf5dbd67236d380465401a4f39e"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[ConardLi]]"
 ---

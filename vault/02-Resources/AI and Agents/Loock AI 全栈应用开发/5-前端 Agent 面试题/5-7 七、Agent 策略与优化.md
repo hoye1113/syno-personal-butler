@@ -1,19 +1,17 @@
 ---
-title: "七、Agent 策略与优化 — 前端 Agent 面试题锦集 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "frontend_agent_interview", "interview", "ai_agent"]
-legacy_tags: ["loock_ai", "frontend_agent_interview", "interview", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/langgraphjs-frontend-agent-interview/interview"
-description: "Loock AI 前端 Agent 面试题：七、Agent 策略与优化"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/5-前端 Agent 面试题/5-7 七、Agent 策略与优化.md"
-source_sha256: "ef64849996ee50ab291cd1f0e1482cb089500cd88f26437655c29937acfac270"
-migration_id: "migration-20260720-64e79771"
+title: 七、Agent 策略与优化 — 前端 Agent 面试题锦集 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/langgraphjs-frontend-agent-interview/interview
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: Loock AI 前端 Agent 面试题：七、Agent 策略与优化
+tags:
+  - loock_ai
+  - frontend_agent_interview
+  - interview
+  - ai_agent
 ---
 
 

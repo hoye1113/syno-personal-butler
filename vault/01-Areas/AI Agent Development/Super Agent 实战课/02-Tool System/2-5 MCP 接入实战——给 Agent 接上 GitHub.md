@@ -1,18 +1,14 @@
 ---
 title: "MCP 接入实战——给 Agent 接上 GitHub — Super Agent 实战课"
-tags: ["ai_agent", "mcp"]
-legacy_tags: ["ai_agent", "mcp"]
-created: "2026-07-13"
 source: "https://sitor.cc/courses/super-agent/sa-05-mcp"
-description: "手写 MCP Client 接入 GitHub MCP Server，讲解 JSON-RPC 协议、命名空间隔离、registerMCPServer 集成与三层降级，并分析 MCP 带来的工具 Token 开销这一隐性成本。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/Super Agent 实战课/02-Tool System/2-5 MCP 接入实战——给 Agent 接上 GitHub.md"
-source_sha256: "d65f09d8d7a017f6ab08f6fc5d1a9806c77a1b40e850b404162fb00224e66806"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-07-13
+description: "手写 MCP Client 接入 GitHub MCP Server，讲解 JSON-RPC 协议、命名空间隔离、registerMCPServer 集成与三层降级，并分析 MCP 带来的工具 Token 开销这一隐性成本。"
+tags:
+  - ai_agent
+  - mcp
 ---
 ## MCP 接入实战——给 Agent 接上 GitHub
 

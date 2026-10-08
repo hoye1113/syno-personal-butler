@@ -1,18 +1,14 @@
 ---
 title: "Hook 与可观测性：怎么知道你的 Agent 在干什么 — 吃透 AI Agent 开发"
-tags: ["ai_agent", "hooks"]
-legacy_tags: ["ai_agent", "hooks"]
-created: "2026-07-13"
 source: "https://sitor.cc/courses/agent-fundamentals/28-hooks-observability"
-description: "本文讲解 Agent 开发为何需要 Hook 与可观测性：Hook 能不改源码就在 Agent 生命周期的关键节点插入拦截逻辑（共 27 种事件），可观测性则从成本、性能、质量三个维度监控 Agent 的运行，并对比 AI Gateway 与可观测性平台两类工具及最小落地路径。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/06-Harness Engineering/6-2 Hook 与可观测性.md"
-source_sha256: "3a852419a66e7cf3910d35bdab5eb07c8163d9ef7b73b27c669b0164d8c26a82"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-07-13
+description: "本文讲解 Agent 开发为何需要 Hook 与可观测性：Hook 能不改源码就在 Agent 生命周期的关键节点插入拦截逻辑（共 27 种事件），可观测性则从成本、性能、质量三个维度监控 Agent 的运行，并对比 AI Gateway 与可观测性平台两类工具及最小落地路径。"
+tags:
+  - ai_agent
+  - hooks
 ---
 ## Hook 与可观测性：怎么知道你的 Agent 在干什么
 
@@ -179,6 +175,6 @@ typescript复制`const result = await streamText({
 - HumanLayer: Skill Issue - Harness Engineering: [https://www.humanlayer.dev/blog/skill-issue-harness-engineering-for-coding-agents](https://www.humanlayer.dev/blog/skill-issue-harness-engineering-for-coding-agents)
 ## 关联
 
-- [[6-1 Harness-模型外面的这层壳|Harness]] — **依赖**：Hook 是 Harness 生命周期的插桩点。
+- [[6-1 Harness：模型外面的这层壳|Harness]] — **依赖**：Hook 是 Harness 生命周期的插桩点。
 - [[3-5 Skills - Agent 时代的知识分发系统|Skills 知识分发]] — **补充**：Hook 可触发 Skills 的加载与分发。
 - [[2-2 模型 API 容错|模型 API 容错]] — **应用**：可观测性的成本熔断器依赖容错与统计。

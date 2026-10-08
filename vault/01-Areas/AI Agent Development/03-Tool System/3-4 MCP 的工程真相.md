@@ -1,18 +1,14 @@
 ---
-title: "MCP 的工程真相：协议很好，但也有一些硬伤 — 吃透 AI Agent 开发"
-tags: ["ai_agent", "mcp"]
-legacy_tags: ["ai_agent", "mcp"]
-created: "2026-06-08"
-source: "https://sitor.ai/courses/agent-fundamentals/11-mcp"
-description: "市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/03-Tool System/3-4 MCP 的工程真相.md"
-source_sha256: "9c5dc1449db2b8b5d3387ab21b67c5036001d13e461a53b4aa351b1f5127d49a"
-migration_id: "migration-20260720-64e79771"
+title: MCP 的工程真相：协议很好，但也有一些硬伤 — 吃透 AI Agent 开发
+source: https://sitor.ai/courses/agent-fundamentals/11-mcp
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-06-08
+description: 市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。
+tags:
+  - ai_agent
+  - mcp
 ---
 
 # MCP 的工程真相：协议很好，但也有一些硬伤

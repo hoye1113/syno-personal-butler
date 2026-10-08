@@ -1,19 +1,16 @@
 ---
-title: "02 · 搜索工具：rg 与 glob — Loock AI 全栈应用开发"
-tags: ["loock_ai", "coding_agent", "ai_agent"]
-legacy_tags: ["loock_ai", "coding_agent", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/mini-coding-agent/03-tools/02-search-tools"
-description: "两种互补的搜索方式： earch 在文件内容中找关键词，glob 按路径模式列出文件。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-16 02 · 搜索工具 - rg 与 glob.md"
-source_sha256: "149ddc10ab30d48a20cd2ade0f3264db5b403e1716f2c692ebbf15cc159a49bd"
-migration_id: "migration-20260720-64e79771"
+title: 02 · 搜索工具：rg 与 glob — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/mini-coding-agent/03-tools/02-search-tools
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 两种互补的搜索方式： earch 在文件内容中找关键词，glob 按路径模式列出文件。
+tags:
+  - loock_ai
+  - coding_agent
+  - ai_agent
 ---
 
 第 3 章 · Tool Calling 与工具系统

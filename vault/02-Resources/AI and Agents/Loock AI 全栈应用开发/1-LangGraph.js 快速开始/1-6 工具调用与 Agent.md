@@ -1,19 +1,16 @@
 ---
-title: "工具调用与 Agent — Loock AI 全栈应用开发"
-tags: ["loock_ai", "langgraphjs_quickstart", "ai_agent"]
-legacy_tags: ["loock_ai", "langgraphjs-quickstart", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/quick-start/06-tool-calling"
-description: "构建真正的智能体：让 LLM 学会使用工具（Tool Calling）"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/1-LangGraph.js 快速开始/1-6 工具调用与 Agent.md"
-source_sha256: "bd722d03060e6767eca0ac56dfeb65016cffda90a25608a455b3d05308178568"
-migration_id: "migration-20260720-64e79771"
+title: 工具调用与 Agent — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/quick-start/06-tool-calling
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 构建真正的智能体：让 LLM 学会使用工具（Tool Calling）
+tags:
+  - loock_ai
+  - langgraphjs-quickstart
+  - ai_agent
 ---
 
 # 工具调用与 Agent

@@ -1,19 +1,16 @@
 ---
-title: "01 · Tool Calling 的本质 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "coding_agent", "ai_agent"]
-legacy_tags: ["loock_ai", "coding_agent", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/mini-coding-agent/03-tools/01-tool-calling"
-description: "理解为什么 Coding Agent 的核心不是模型本身，而是模型调用的工具。工具是 agent 行为的真实落点。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-15 01 · Tool Calling 的本质.md"
-source_sha256: "c54ca6b6f2bf1e16cf953b227c5c441fae45403e0da64e6c6c77bf52b1890d84"
-migration_id: "migration-20260720-64e79771"
+title: 01 · Tool Calling 的本质 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/mini-coding-agent/03-tools/01-tool-calling
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 理解为什么 Coding Agent 的核心不是模型本身，而是模型调用的工具。工具是 agent 行为的真实落点。
+tags:
+  - loock_ai
+  - coding_agent
+  - ai_agent
 ---
 
 第 3 章 · Tool Calling 与工具系统

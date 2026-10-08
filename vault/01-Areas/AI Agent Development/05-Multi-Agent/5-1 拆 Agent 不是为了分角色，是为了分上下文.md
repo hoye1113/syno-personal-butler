@@ -1,18 +1,13 @@
 ---
-title: "拆 Agent 不是为了\"分角色\"，是为了分上下文 — 吃透 AI Agent 开发"
-tags: ["ai_agent"]
-legacy_tags: ["ai_agent"]
-created: "2026-07-13"
+title: "拆 Agent 不是为了"分角色"，是为了分上下文 — 吃透 AI Agent 开发"
 source: "https://sitor.cc/courses/agent-fundamentals/25-context-splitting"
-description: "把 Agent 拆开的本质动机不是给不同角色分工，而是为了隔离和分配上下文窗口，从而控制 token 成本、降低噪声并提升每个子任务的专注度。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/05-Multi-Agent/5-1 拆 Agent 不是为了分角色，是为了分上下文.md"
-source_sha256: "d1b4b9c8f5ef7e250416f9d6ad6374052cd5332d5caae2917c4b6934bf36cafa"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-07-13
+description: "把 Agent 拆开的本质动机不是给不同角色分工，而是为了隔离和分配上下文窗口，从而控制 token 成本、降低噪声并提升每个子任务的专注度。"
+tags:
+  - ai_agent
 ---
 ## 拆 Agent 不是为了"分角色"，是为了分上下文
 
@@ -161,4 +156,4 @@ Lane 是什么概念？可以理解为"车道"。不同类型的任务走不同�
 - [[4-1 Context Engineering 全景|Context Engineering 全景]] — **依赖**：Multi-Agent 的拆分动机来自上下文窗口隔离，是 Context Engineering 在跨 Agent 维度的延伸。
 - [[4-3 上下文压缩|上下文压缩]] — **补充**：单 Agent 内靠压缩缓解 Context Rot，拆 Agent 是结构层面的互补手段。
 - [[2-3 Agent Loop 保险丝|Agent Loop 保险丝]] — **应用**：子 Agent 同样受 Loop 熔断与死循环检测约束。
-- [[5-2 Agent Swarm-让多个 Agent 像团队一样协作|Agent Swarm]] — **延伸**：本文讲拆分的动机，Swarm 讲多 Agent 协作的实现。
+- [[5-2 Agent Swarm：让多个 Agent 像团队一样协作|Agent Swarm]] — **延伸**：本文讲拆分的动机，Swarm 讲多 Agent 协作的实现。

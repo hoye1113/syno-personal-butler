@@ -1,15 +1,14 @@
 ---
 title: "OpenAI官方-GPT-5.6 提示词指南"
-tags: ["ai_agent", "article", "openai", "prompting", "context_engineering"]
-legacy_tags: ["ai_agent", "article", "openai", "prompting", "context_engineering"]
-created: "2026-07-15"
+tags:
+  - ai_agent
+  - article
+  - openai
+  - prompting
+  - context_engineering
+created: 2026-07-15
 source: "https://developers.openai.com/api/docs/guides/prompt-guidance-gpt-5p6"
 description: "OpenAI 官方 GPT-5.6 Sol 提示词指南：先做减法、结果优先、定义自主性边界与停止条件、迁移时一次只改一处。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/OpenAI官方-GPT-5.6 提示词指南.md"
-source_sha256: "55a4095c0bd22a3a20c316ad289045b497590198106c796ba3e15c82b9913a7f"
-migration_id: "migration-20260720-64e79771"
 author: OpenAI
 ---
 

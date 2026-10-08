@@ -1,16 +1,14 @@
 ---
 title: "MOC - Prompt 工程"
-tags: ["moc", "ai_agent", "prompting", "skills"]
-legacy_tags: ["moc", "ai_agent", "prompting", "skills"]
-created: "2026-06-11"
-source: "local://02-Resources/Prompts/"
 description: "Prompt 工程主题横切 MOC——跨 02-Resources/Prompts/、01-Areas/AI Agent Development/、B站视频知识库 三大子目录"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/Prompts/MOC - Prompt 工程.md"
-source_sha256: "9578c0c9db3b42f6b7f1e695afbf5498493085d0549fa59fb08a64c78680e619"
-migration_id: "migration-20260720-64e79771"
+created: 2026-06-11
 updated: 2026-06-11
+source: local://02-Resources/Prompts/
+tags:
+  - moc
+  - ai_agent
+  - prompting
+  - skills
 ---
 
 # MOC - Prompt 工程

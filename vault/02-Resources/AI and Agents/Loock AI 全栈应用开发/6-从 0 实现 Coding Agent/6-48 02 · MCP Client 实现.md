@@ -1,19 +1,17 @@
 ---
-title: "02 · MCP Client 实现 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "coding_agent", "ai_agent", "mcp"]
-legacy_tags: ["loock_ai", "coding_agent", "ai_agent", "mcp"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/mini-coding-agent/09-mcp/02-mcp-client"
-description: "通过  tdio JSON-RPC 连接 MCP  erver，发现和调用外部工具——核心只需要一个类。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-48 02 · MCP Client 实现.md"
-source_sha256: "4551a41f414dc7c2d28f0882d399e6c287b9002dda014fe96759087aee55491d"
-migration_id: "migration-20260720-64e79771"
+title: 02 · MCP Client 实现 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/mini-coding-agent/09-mcp/02-mcp-client
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 通过  tdio JSON-RPC 连接 MCP  erver，发现和调用外部工具——核心只需要一个类。
+tags:
+  - loock_ai
+  - coding_agent
+  - ai_agent
+  - mcp
 ---
 
 第 9 章 · MCP 与工具扩展协议

@@ -16,20 +16,11 @@ Markdown 是唯一事实源。Agent 读写文件；Obsidian 负责呈现；Git �
 
 ## PARA
 
-- `00-Inbox/`：暂时无法判断、尚未校验或等待决策的内容，最多 10 个文件；校验完成后必须迁出。
+- `00-Inbox/`：暂时无法判断或待处理，最多 10 个文件。
 - `01-Areas/`：长期维护的 AI Agent 核心知识。
 - `02-Resources/`：文章、课程、视频、播客、Prompt 等参考资料，按主题而非来源分类。
 - `03-Archive/`：不再关注、超过一年无更新或长期孤立的内容。
 - `99-System/`：Agent 协议、Skills、模板、脚本、附件和审计。
-
-## 主题主归属与 MOC
-
-- 来源笔记只保留一个物理主位置；跨主题通过 MOC 和类型化 wikilink 表达，不复制文件。
-- `02-Resources/AI and Agents/` 的主领域固定为：Agent 架构与运行时、Harness/上下文与可靠性、AI 评估与安全、AI Coding 与工具、AI 原生组织/产品/职业、前沿模型与具身智能。
-- `B站视频知识库/` 是历史导入桶，不是新的长期主题；新内容和迁移内容按主要问题/机制进入主领域目录。
-- 归类判定按主要问题优先：架构组件与编排进 Agent 架构；权限、反馈、验证和可观测性进 Harness；测量、红队和治理进评估与安全；具体产品工作流进 AI Coding；组织、产品和个人工作方式进组织/产品/职业；模型研究、机器人、BCI 和生物科技进前沿/具身智能。
-- MOC 是多对多的主题取景框，按问题空间、机制、争议、边界或应用组织；不要按平台、作者或公司堆叠清单。
-- 首期不新增 `primary_domain` 等字段或标签；主题以物理主目录和现有 MOC 表达，旧字段只在编辑对应笔记时渐进治理。
 
 ## Frontmatter
 
@@ -43,9 +34,6 @@ Markdown 是唯一事实源。Agent 读写文件；Obsidian 负责呈现；Git �
 - 工具：`claude_code`、`codex`、`cursor`、`devin`、`chatgpt`、`claude`、`openai`、`anthropic`
 - 细分：`harness_engineering`、`loop_engineering`、`memory`、`multi_agent`、`context_engineering`、`skills`、`hooks`、`mcp`、`prompting`、`fde`
 - 已批准扩展：`web_clipping`、`content_creation`、`text_refinement`、`author`
-- 原库迁移保留的高价值标签：`loock_ai`、`coding_agent`、`chatbot`、`column`、`interview`、`nextjs`、`frontend_agent_interview`、`dialogue`、`langgraphjs_tutorial`、`langgraphjs_quickstart`、`ai_native`、`lecture`、`agent_architecture`、`s_tier`、`taste`
-
-历史低频或非规范标签迁移到 `legacy_tags`，只参与全文检索，不进入主筛选器；中文、连字符和同义标签按固定映射归并，不由 Agent 在运行时扩充字典。
 
 Tag 只用小写英文和下划线。新 tag 先提议并取得用户确认，不直接创造。禁止中文 tag、连字符风格和旧名。
 

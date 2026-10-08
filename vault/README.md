@@ -5,7 +5,7 @@
 ## 目录结构
 
 ### 00-Inbox
-收集箱。新内容先放这里，完成校验和归类后迁入对应领域；只保留尚未判断、尚未校验或等待决策的内容，≤ 10 个文件。
+收集箱。新内容先放这里，定期整理到对应领域（按 [AGENTS.md §9](AGENTS.md) 维护原则，每周清空，≤ 10 个文件）。
 
 ### 01-Areas（领域）
 长期关注的主题，持续维护，没有截止日期。
@@ -24,17 +24,11 @@
 参考资料、Prompts、文章摘录等。**按主题分（不按来源）**——见 [AGENTS.md §2](AGENTS.md)。
 
 - **AI and Agents** — Agent 理论与实践主目录
-  - **Agent 架构与运行时** — Loop、编排、工具、状态、记忆、RAG
-  - **Harness Context & Reliability** — 权限、约束、反馈、验证、可观测性
-  - **AI Evaluation & Safety** — Benchmark、评测、红队、监控、治理
-  - **AI Coding & Tools** — Claude Code、Codex、OpenClaw、Cursor 和具体工作流
-  - **AI Native Organization Product & Career** — 组织、产品、GTM、岗位和个人工作方式
-  - **Frontier Models & Physical AI** — 模型研究、世界模型、机器人、BCI、生物科技
-  - **Agent Theory and Design**（总览入口）→ [[MOC - Agent Theory and Design]]
+  - **Agent Theory and Design**（公众号 + B 站视频）→ [[MOC - Agent Theory and Design]]
   - **Harness Engineering**（横切主题）→ [[MOC - Harness Engineering]]
   - **AI 时代个人发展与组织**（横切主题）→ [[MOC - AI 时代个人发展与组织]]
   - **Loock AI 全栈应用开发**（148 篇，6 章节 MOC）→ [[MOC - Loock AI 全栈课程]]
-  - **B 站视频知识库**（历史导入桶；1 BV = 1 canonical 文件）→ 新收录见 [图文专栏精华 SUBDOC](99-System/Skills/vskill-vault-curate/SUBDOC%20-%20B站图文专栏精华收录.md)
+  - **B 站视频知识库**（1 BV = 1 canonical 文件）→ 新收录见 [图文专栏精华 SUBDOC](99-System/Skills/vskill-vault-curate/SUBDOC%20-%20B站图文专栏精华收录.md)
   - **播客转录**（1 篇）
 - **Prompts** — Copilot 自定义提示词模板（13 个 Prompt + 1 [[MOC - Prompt 工程]]）
 - **哲学与自我认知** — 与 AI 时代相关的自我认知（[[MOC - AI 时代个人发展与组织]] 在此）
@@ -52,8 +46,8 @@
 
 ## 维护原则
 
-1. **Inbox → Areas / Resources**：新内容先放 Inbox，完成校验后尽快整理，Inbox 上限 10 篇
-2. **按主题归类**：来源笔记只保留一个物理主领域，跨主题通过 MOC 关联，不按来源平台建目录
+1. **Inbox → Areas / Resources**：新内容先放 Inbox，1-2 天内整理（按 §9）
+2. **按主题归类**：不按来源分类（按 §2）
 3. **季度审计**：跑 `python 99-System/scripts/vault-audit.py` 检查一致性（按 §9）
 4. **命名规范**：见 [AGENTS.md §6](AGENTS.md)
 5. **frontmatter 必填**：见 [AGENTS.md §3](AGENTS.md)

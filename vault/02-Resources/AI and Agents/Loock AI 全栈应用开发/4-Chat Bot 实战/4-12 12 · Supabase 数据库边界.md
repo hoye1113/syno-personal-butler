@@ -1,19 +1,16 @@
 ---
-title: "12 · Supabase 数据库边界 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "chatbot", "ai_agent"]
-legacy_tags: ["loock_ai", "chatbot", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/chat-bot-course/05-product-foundation/12-supabase-database"
-description: "把线程元数据接入 Supabase repo itory，把消息历史交给 LangGraph Supabase checkpointer，建立真实数据库边界。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/4-Chat Bot 实战/4-12 12 · Supabase 数据库边界.md"
-source_sha256: "7a1233aa8dfdaf95046d78d0f93d7e92d0de22fd2ce0b294bd5191ca38c5d342"
-migration_id: "migration-20260720-64e79771"
+title: 12 · Supabase 数据库边界 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/chat-bot-course/05-product-foundation/12-supabase-database
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 把线程元数据接入 Supabase repo itory，把消息历史交给 LangGraph Supabase checkpointer，建立真实数据库边界。
+tags:
+  - loock_ai
+  - chatbot
+  - ai_agent
 ---
 
 第五阶段 · 真实产品基础能力

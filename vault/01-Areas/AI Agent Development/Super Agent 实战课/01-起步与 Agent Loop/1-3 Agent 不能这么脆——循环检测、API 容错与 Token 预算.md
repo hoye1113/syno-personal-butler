@@ -1,18 +1,14 @@
 ---
 title: "Agent 不能这么脆——循环检测、API 容错与 Token 预算 — Super Agent 实战课"
-tags: ["ai_agent", "loop_engineering"]
-legacy_tags: ["ai_agent", "loop_engineering"]
-created: "2026-07-13"
 source: "https://sitor.cc/courses/super-agent/sa-03-fuses"
-description: "为 Agent Loop 加装三层非侵入式防护——基于指纹加滑动窗口的循环检测（Warning/Critical/熔断三级响应）、按错误分类的指数退避加抖动 API 重试、跨轮累计的 Token 预算熔断，让 Agent 从“能跑”变成生产环境“跑不挂”。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/Super Agent 实战课/01-起步与 Agent Loop/1-3 Agent 不能这么脆——循环检测、API 容错与 Token 预算.md"
-source_sha256: "303fa9d580cc76bea43656701dd43640ae0e79e7bc1583b46abfd9939f6c386f"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-07-13
+description: "为 Agent Loop 加装三层非侵入式防护——基于指纹加滑动窗口的循环检测（Warning/Critical/熔断三级响应）、按错误分类的指数退避加抖动 API 重试、跨轮累计的 Token 预算熔断，让 Agent 从“能跑”变成生产环境“跑不挂”。"
+tags:
+  - ai_agent
+  - loop_engineering
 ---
 ## Agent 不能这么脆——循环检测、API 容错与 Token 预算
 

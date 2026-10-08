@@ -1,18 +1,14 @@
 ---
 title: "从“能聊天”到“能干活”——给 Agent 装上 while 循环 — Super Agent 实战课"
-tags: ["ai_agent", "loop_engineering"]
-legacy_tags: ["ai_agent", "loop_engineering"]
-created: "2026-07-13"
 source: "https://sitor.cc/courses/super-agent/sa-02-agent-loop"
-description: "通过工具定义（description/inputSchema/execute）、fullStream 事件处理和 while 循环实现 think→act→observe 的 Agent Loop，对比 SDK 自动多步与手动循环两种方式，完成从只会聊天的 ChatBot 到能调用工具办事的 Agent 的跨越。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/Super Agent 实战课/01-起步与 Agent Loop/1-2 从“能聊天”到“能干活”——给 Agent 装上 while 循环.md"
-source_sha256: "062521ed8c8c0180fbb20b834242b60a8d97edf08c4cae27f9db98527d5463a0"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-07-13
+description: "通过工具定义（description/inputSchema/execute）、fullStream 事件处理和 while 循环实现 think→act→observe 的 Agent Loop，对比 SDK 自动多步与手动循环两种方式，完成从只会聊天的 ChatBot 到能调用工具办事的 Agent 的跨越。"
+tags:
+  - ai_agent
+  - loop_engineering
 ---
 ## 从“能聊天”到“能干活”——给 Agent 装上 while 循环
 

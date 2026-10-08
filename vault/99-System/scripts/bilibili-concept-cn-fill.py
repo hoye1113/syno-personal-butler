@@ -16,9 +16,8 @@ from __future__ import annotations
 import argparse
 import re
 from pathlib import Path
-from path_config import BILI_ROOT
 
-VAULT = BILI_ROOT
+VAULT = Path(r"d:\workSpace\obsidian_repository\02-Resources\AI and Agents\B站视频知识库")
 
 GLOSSARY: dict[str, str] = {
     "codex": "Codex 智能体",

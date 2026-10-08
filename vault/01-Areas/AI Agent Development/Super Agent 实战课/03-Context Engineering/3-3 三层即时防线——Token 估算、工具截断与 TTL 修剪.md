@@ -1,18 +1,13 @@
 ---
 title: "三层即时防线——Token 估算、工具截断与 TTL 修剪 — Super Agent 实战课"
-tags: ["ai_agent"]
-legacy_tags: ["ai_agent"]
-created: "2026-07-13"
 source: "https://sitor.cc/courses/super-agent/sa-09-context-defense"
-description: "实现三层零 LLM 成本的即时上下文防线：chars/4 加中文安全系数的 Token 估算、工具结果 Head/Tail 动态截断、以及按软硬 TTL 修剪过期工具结果并保留错误经验。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/Super Agent 实战课/03-Context Engineering/3-3 三层即时防线——Token 估算、工具截断与 TTL 修剪.md"
-source_sha256: "aaa7fa3e16edb0d3cbc7d29b35b6f534f7be1b11787f52214bc2fcab1deaad81"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-07-13
+description: "实现三层零 LLM 成本的即时上下文防线：chars/4 加中文安全系数的 Token 估算、工具结果 Head/Tail 动态截断、以及按软硬 TTL 修剪过期工具结果并保留错误经验。"
+tags:
+  - ai_agent
 ---
 ## 三层即时防线——Token 估算、工具截断与 TTL 修剪
 

@@ -2,7 +2,7 @@
 title: "B站素材结构全量统计"
 tags: [notes, bilibili, ai_agent]
 created: 2026-07-13
-source: "${RECASTORY_WORKSPACE}"
+source: "D:\workSpace\git_clone_test\hoye-git\Recastory\workspace"
 description: "Recastory B站素材的只读发现结果，供收录路由和路径漂移审计使用。"
 ---
 

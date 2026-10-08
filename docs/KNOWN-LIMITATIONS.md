@@ -8,6 +8,7 @@
 - Project-aware Knowledge MVP 已关闭为 SUPERSEDED（Owner 2026-09-01 产品方向决策），Owner 主观召回观察不再回填；live 证据保留在 `ops/acceptance/project-aware-knowledge-mvp/` 仅作追溯。下文 2026-08-26 起关于 Project 边界的描述均为历史记录。
 - 用户入口边界已结构性加固（`e49a66c`、`b634efd`）：`code_change` 意图、`allowSelfModify`/`allowSystemControl` 开关与 Windows 服务安装/卸载操作已物理删除——不是开关关闭，而是代码不存在，没有任何配置能让聊天入口改代码或控制系统。模型可声明的写入路径只有 `vault/**`；`ops/` 仅系统内部固定记录器写入；自动提交只准暂存 `vault/**`、`ops/**`，永不自动 Push。
 - 知识仓库已在 2026-09-18 完成单仓迁回：`vault/` 与 `ops/` 现由本代码仓 Git 和远端统一管理，生产环境不设置 `SYNO_KNOWLEDGE_ROOT`，planner 的 `vaultRoot` 指向本仓根目录。外部 `D:\workSpace\syno-knowledge` 与 `D:\workSpace\syno-knowledge-backup-20260918` 仅作为冻结回滚副本保留，不应继续产生生产写入；旧 D13 拆库提交只作历史追溯。回滚预案见 `docs/OPERATIONS.md`「知识库单仓运行与回滚」。
+- 2026-10-08 知识库二源合一：独立仓 `D:\workSpace\obsidian_repository`（策展主线，含 99-System 工具链与 MOC 路由体系）已全量并入本仓 `vault/`；syno 捕获管道的 74 篇独有笔记原位保留，205 篇旧布局重复副本已清除（逐 basename 校验零内容丢失，vault-audit 通过）。obsidian 仓退役为 `D:\workSpace\obsidian_repository-archive-20261008`，原路径留 junction 别名指向本仓 `vault/`。外部 `syno-knowledge` 冻结副本已不存在，知识库回滚仅依靠本仓 Git 历史。
 - 当前唯一执行事实源为 `docs/product-slimming-and-inspiration-plan.md`；当轮回归基线快照见 `NEXT_SESSION.md`。
 
 ## 发布门槛状态

@@ -1,19 +1,16 @@
 ---
-title: "02 · 三种权限级别：allow / ask / deny — Loock AI 全栈应用开发"
-tags: ["loock_ai", "coding_agent", "ai_agent"]
-legacy_tags: ["loock_ai", "coding_agent", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/mini-coding-agent/04-permissions/02-three-levels"
-description: "每种工具调用都有自己的权限级别。allow 自动放行，ask 需要确认，deny 直接拒绝。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-22 02 · 三种权限级别 - allow _ ask _ deny.md"
-source_sha256: "722ceb54cc4efead9444b1af8956aa2891323221ec559863724bd4ba6e0c10d3"
-migration_id: "migration-20260720-64e79771"
+title: 02 · 三种权限级别：allow / ask / deny — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/mini-coding-agent/04-permissions/02-three-levels
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 每种工具调用都有自己的权限级别。allow 自动放行，ask 需要确认，deny 直接拒绝。
+tags:
+  - loock_ai
+  - coding_agent
+  - ai_agent
 ---
 
 第 4 章 · Permissions 与安全权限

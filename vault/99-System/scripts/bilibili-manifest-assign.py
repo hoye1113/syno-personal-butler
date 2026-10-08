@@ -6,11 +6,10 @@ import argparse
 import json
 from datetime import date
 from pathlib import Path
-from path_config import AUDIT_ROOT, RECASTORY_WORKSPACE
 
-WS = RECASTORY_WORKSPACE
+WS = Path(r"D:\workSpace\git_clone_test\hoye-git\Recastory\workspace")
 MANIFEST = WS / "bilibili/manifest.json"
-DEFAULT_BATCH = AUDIT_ROOT / "bilibili-p0-batch.json"
+DEFAULT_BATCH = Path(r"d:\workSpace\obsidian_repository\99-System\audit\bilibili-p0-batch.json")
 
 
 def main() -> None:

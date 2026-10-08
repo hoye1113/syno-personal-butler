@@ -1,15 +1,14 @@
 ---
 title: "The Founder's Playbook - 创始人手册：打造 AI 原生创业公司"
-tags: ["ai_agent", "article"]
-legacy_tags: ["ai_agent", "article", "additive_content"]
-created: "2026-06-15"
-source: "obsidian_repository_snapshot"
+tags:
+  - ai_agent
+  - article
+  - additive_content
+created: 2026-06-15
+source:
+  - "[[The-Founders-Playbook-05062026.pdf]]"
+  - https://www.anthropic.com
 description: "Anthropic 出品的 AI 原生创业公司全周期指南——Idea/MVP/Launch/Scale 四阶段方法论，中文翻译版"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/The Founders Playbook - 打造 AI 原生创业公司.md"
-source_sha256: "5c3096bb6a3d2b39fa7261456a2b030e45f9da9610501a6c960ed67bf5d8605c"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Anthropic]]"
 ---

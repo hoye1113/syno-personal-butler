@@ -177,7 +177,7 @@ WebBridge DOM 抓取 **20** 个 opus id（分页；标题 DOM 噪声大，以 ma
 
 ## 数据源
 
-- `${RECASTORY_WORKSPACE}\bilibili\manifest.json`
-- `${RECASTORY_WORKSPACE}\bilibili\easonlee_opus_dom.json`
-- `${RECASTORY_WORKSPACE}\bilibili\easonlee_column_probe.json`
+- `D:\workSpace\git_clone_test\hoye-git\Recastory\workspace\bilibili\manifest.json`
+- `D:\workSpace\git_clone_test\hoye-git\Recastory\workspace\bilibili\easonlee_opus_dom.json`
+- `D:\workSpace\git_clone_test\hoye-git\Recastory\workspace\bilibili\easonlee_column_probe.json`
 - vault BV 扫描：`02-Resources/AI and Agents/B站视频知识库/`

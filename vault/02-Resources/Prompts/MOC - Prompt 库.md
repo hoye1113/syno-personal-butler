@@ -1,16 +1,13 @@
 ---
 title: "MOC - Prompt 库"
-tags: ["moc", "prompting"]
-legacy_tags: ["moc", "prompts", "prompting"]
-created: "2026-06-09"
-source: "local://02-Resources/Prompts/"
 description: "常用 Prompt 模板索引"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/Prompts/MOC - Prompt 库.md"
-source_sha256: "14fe4bc15de76f327878e821d0db8d34e52ebc08024a613232f81d73878e3317"
-migration_id: "migration-20260720-64e79771"
+created: 2026-06-09
 updated: 2026-06-11
+source: local://02-Resources/Prompts/
+tags:
+  - "moc"
+  - "prompts"
+  - prompting
 ---
 
 # Prompt 库

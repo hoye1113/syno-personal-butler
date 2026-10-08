@@ -4,11 +4,10 @@ import json
 import re
 from collections import Counter
 from pathlib import Path
-from path_config import AUDIT_ROOT, BILI_ROOT, RECASTORY_WORKSPACE
 
-WS = RECASTORY_WORKSPACE
-VAULT = BILI_ROOT
-OUT = AUDIT_ROOT / "bilibili-ingest-reconcile-2026-07-03.md"
+WS = Path(r"D:\workSpace\git_clone_test\hoye-git\Recastory\workspace")
+VAULT = Path(r"d:\workSpace\obsidian_repository\02-Resources\AI and Agents\B站视频知识库")
+OUT = Path(r"d:\workSpace\obsidian_repository\99-System\audit\bilibili-ingest-reconcile-2026-07-03.md")
 
 
 def ingest_path(entry: dict) -> Path | None:

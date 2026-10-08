@@ -1,16 +1,13 @@
 ---
-title: "MOC - 从 0 实现 Coding Agent"
-tags: ["ai_agent", "ai_coding", "moc"]
-legacy_tags: ["ai_agent", "ai_coding", "moc"]
-created: "2026-06-09"
-source: "vault_initiative - moc - loock_ai - coding_agent - ai_agent"
-description: "从零构建一个类 Claude Code 的 Coding Agent"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/MOC - 从 0 实现 Coding Agent.md"
-source_sha256: "8f11a4c76d7181ea7b2dba3d9499f35955e3d35e315695a64ba2fd33be45d13d"
-migration_id: "migration-20260720-64e79771"
+title: MOC - 从 0 实现 Coding Agent
+description: 从零构建一个类 Claude Code 的 Coding Agent
+created: 2026-06-09
 synced: 2026-06-09
+tags:
+  - ai_agent
+  - ai_coding
+  - moc
+source: vault_initiative - moc - loock_ai - coding_agent - ai_agent
 ---
 
 # 从 0 实现 Coding Agent

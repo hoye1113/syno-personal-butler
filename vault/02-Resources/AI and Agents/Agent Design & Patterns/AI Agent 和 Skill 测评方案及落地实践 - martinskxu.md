@@ -1,15 +1,14 @@
 ---
 title: "AI Agent & Skill 测评方案及落地实践"
-tags: ["ai_agent", "article", "ai_evaluation", "wechat", "skills"]
-legacy_tags: ["ai_agent", "article", "ai_evaluation", "wechat", "skills"]
-created: "2026-06-17"
-source: "https://mp.weixin.qq.com/s/PUbGqheJhFMmb6hGj1ZtOw"
+tags:
+  - ai_agent
+  - article
+  - ai_evaluation
+  - wechat
+  - skills
+source: https://mp.weixin.qq.com/s/PUbGqheJhFMmb6hGj1ZtOw
+created: 2026-06-17
 description: "系统性讲解如何为 AI Agent 和 Skill 设计可落地的测评方案，涵盖评什么、怎么评、用例集构建、基线管理、稳定性评估、工程化落地"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/AI Agent 和 Skill 测评方案及落地实践 - martinskxu.md"
-source_sha256: "de92a097de8f0c4a5f2967f9f564b1459415773ce28611b35d2e0021925488bd"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[martinskxu]]"
 ---

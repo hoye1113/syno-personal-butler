@@ -1,16 +1,14 @@
 ---
-title: "MOC - LangGraph.js 快速开始"
-tags: ["ai_agent", "ai_coding", "moc"]
-legacy_tags: ["ai_agent", "ai_coding", "langgraphjs", "moc"]
-created: "2026-06-09"
-source: "vault_initiative - moc - loock_ai - langgraphjs-quickstart - ai_agent"
-description: "LangGraph.js 核心概念与快速上手"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/MOC - LangGraph.js 快速开始.md"
-source_sha256: "39e9acfa993bb2e309fe38f30eeb05eb0cdd684b46bb48d88000c82ccbb1c8f8"
-migration_id: "migration-20260720-64e79771"
+title: MOC - LangGraph.js 快速开始
+description: LangGraph.js 核心概念与快速上手
+created: 2026-06-09
 synced: 2026-06-09
+tags:
+  - ai_agent
+  - ai_coding
+  - langgraphjs
+  - moc
+source: vault_initiative - moc - loock_ai - langgraphjs-quickstart - ai_agent
 ---
 
 # LangGraph.js 快速开始

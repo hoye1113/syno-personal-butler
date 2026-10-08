@@ -1,15 +1,15 @@
 ---
 title: "Loop Engineering 橙皮书"
-tags: ["ai_agent", "harness_engineering", "course"]
-legacy_tags: ["ai_agent", "harness_engineering", "course", "additive_content"]
-created: "2026-06-15"
-source: "obsidian_repository_snapshot"
+tags:
+  - ai_agent
+  - harness_engineering
+  - course
+  - additive_content
+created: 2026-06-15
+source:
+  - https://github.com/alchaincyf/loop-engineering-orange-book
+  - "[[Loop-Engineering橙皮书-v260615.pdf]]"
 description: "别再问我什么是 Loop Engineering — 橙皮书系列，花叔著，4 部分 9 章系统讲解循环工程"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/Loop Engineering 橙皮书 - 花叔.md"
-source_sha256: "9a3edb8a81e4de9099ae0e8ad99f2436fd4d395fd0de6bdc00910ad51686b127"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[花叔]]"
 ---

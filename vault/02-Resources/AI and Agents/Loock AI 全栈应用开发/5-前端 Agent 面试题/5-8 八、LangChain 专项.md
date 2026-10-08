@@ -1,19 +1,17 @@
 ---
-title: "八、LangChain 专项 — 前端 Agent 面试题锦集 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "frontend_agent_interview", "interview", "ai_agent"]
-legacy_tags: ["loock_ai", "frontend_agent_interview", "interview", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/langgraphjs-frontend-agent-interview/interview"
-description: "Loock AI 前端 Agent 面试题：八、LangChain 专项"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/5-前端 Agent 面试题/5-8 八、LangChain 专项.md"
-source_sha256: "377ecb2ed3373a863757ed3c5b6fb34112f849b5748177c6301eb87f1f2e5760"
-migration_id: "migration-20260720-64e79771"
+title: 八、LangChain 专项 — 前端 Agent 面试题锦集 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/langgraphjs-frontend-agent-interview/interview
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: Loock AI 前端 Agent 面试题：八、LangChain 专项
+tags:
+  - loock_ai
+  - frontend_agent_interview
+  - interview
+  - ai_agent
 ---
 
 

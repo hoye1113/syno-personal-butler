@@ -1,8 +1,8 @@
 ---
 title: MOC - Harness Engineering
-description: Harness Engineering 主题横切 MOC——跨课程、公众号、B站视频的 Harness 相关笔记，含历史核心条目与分类治理批次
+description: Harness Engineering 主题横切 MOC——跨课程、公众号、B站视频的 Harness 相关笔记，42 篇核心 + 跨 MOC 链接
 created: 2026-06-11
-updated: 2026-09-17
+updated: 2026-07-09
 tags:
   - ai_agent
   - harness_engineering
@@ -69,38 +69,6 @@ source: vault_initiative - moc - ai_agent - harness_engineering
 | 38 | [[Brex CEO-打造全公司共用AI型CEO]] | B站视频 | **组织 Agent** | 全公司共用 AI CEO 的组织实践 |
 | 39 | [[WorkBuddy团队-从模型到可用Agent的Harness工程]] | 公众号（Founder Park）| **产品实践** | 腾讯 WorkBuddy 五层 Harness：Context Engineering + 前馈/反馈/权限/验证/可观测 |
 
-## 按机制补充：分类治理批次（2026-09-17）
-
-### 上下文、技能与运行时反馈
-
-| 笔记 | 关联机制 |
-|---|---|
-| [[arize-ai团队-skill到底-应该写多长-哔哩哔哩-1fa0932a]] | Skill 指令容量、上下文失效、输出验证与可靠性成本 |
-| [[deepmind团队-如何大规模-运行agent-哔哩哔哩-4cc3d8de]] | 执行环境、浏览器验证、技能治理、配额与轨迹 |
-| [[galileo联创-ai时代的可观测性-哔哩哔哩-66b5ff96]] | 行为、成本、业务结果的可观测性与运行时反馈 |
-| [[linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d]] | MCP、Playbook、企业上下文与持续改进闭环 |
-| [[微软专家-agent可观测性-生产实践-哔哩哔哩-2ac0f227]] | OTEL、任务级评估、多 Agent 成本与红队闭环 |
-| [[Databricks主管-企业级Agent生产实践框架-20260916]] | 五支柱投产框架：评估、追踪、数据基础、编排与治理 |
-| [[微软Agent观测实践]] | OTEL、任务依从性、多代理红队与观察技能闭环 |
-| [[YC合伙人-YC内部AI代理基础设施]] | 统一上下文、工具注册表、透明协作与自我改进循环 |
-| [[GitHub COO-GitHub的AI革命与14倍PR增长]] | 原子技能、权限重写、队列、Actions 与环境式 AI |
-
-### 权限、验证与受保护的自我改进
-
-| 笔记 | 关联机制 |
-|---|---|
-| [[deepseek-harness橙皮书-花叔-v260814-a00322c4]] | Harness 的安装、结构、运行方式与工程边界 |
-| [[exo开发者-让agent自进化的方法-哔哩哔哩-bf4bdc38]] | 自我改进执行器、受保护状态、沙盒与回滚 |
-| [[hermes-自我改进-ai智能体-27405226]] | 记忆、技能、运行环境、自我改进与对齐边界 |
-| [[Kelo Code负责人-Agent工程方法论]] | 研究-计划-实施循环、上下文管理、代理配置与 MCP 边界 |
-| [[nvidiafu-zong-c-构建agent的-正确方式-哔哩哔哩-5adab385]] | 企业 Agent 编排、默认拒绝、沙盒、技能与治理 |
-| [[openai团队-openai的-harness工程实践-哔哩哔哩-0145f85f]] | 零人工代码、反馈循环、规范、CLI 与技能蒸馏 |
-| [[OpenAI Build Hours-用API和Codex构建Agent-20260916]] | Agent legibility、脚手架工程、非功能性需求与工单编排 |
-| [[OpenClaw教程-终极新手指南]] | VPS 隔离、安全、模型路由、心跳、定时任务与子代理 |
-| [[OpenClaw实战-养虾指南]] | 文件结构、提示词版本、端到端自动化、安全与成本 |
-| [[亚马逊Kiro团队-规范驱动开发]] | 规范驱动开发、EARS、属性测试、MCP 与活文档 |
-| [[为什么-harness-比模型更重要-3a8f81a0]] | Harness、测试时能力、循环、工具预算与治理 |
-
 ---
 
 ## Harness 的 6 大核心模块
@@ -120,61 +88,6 @@ source: vault_initiative - moc - ai_agent - harness_engineering
 
 ---
 
-### P1-A-02（2026-09-18）
-
-| 笔记 | 关联机制 |
-|---|---|
-| [[30分钟精通OpenClaw]] | OpenClaw 的安全、记忆文件、心跳和工具运行时 |
-| [[Agent工程-从第一性原理讲解Ralph Loop]] | 确定性上下文、长程循环、状态与人机边界 |
-| [[Anthropic-3亿收购开发工具初创创始人访谈]] | MCP 工具爆炸、代码执行、上下文与 API 安全 |
-| [[Anthropic团队-解析Claude Agent平台内幕]] | 云托管 Agent、平台原语、嵌套代理与可验证结果 |
-| [[Banking负责人-Agent时代平台设计]] | API/MCP 优先、机器可读规范、自助服务与验证闭环 |
-| [[Cloudflare专家-Sandbox确保AI代码安全]] | 威胁模型、能力权限、隔离、秘密代理与沙盒清单 |
-
-### P1-A-03（2026-09-18）
-
-| 笔记 | 关联机制 |
-|---|---|
-| [[Databricks-企业级Agent生产实践]] | Eval、Trace、数据基础、编排与治理五支柱 |
-| [[Hermes Agent-新OpenClaw体验]] | SQLite 记忆、成本路由、常在线运行与 Skills |
-| [[Jeff-AGENTS.md历史与最佳实践]] | 机器可读项目规则、提示槽位与 Skills 延迟加载 |
-| [[Manus创始人-深度干货-上下文工程的最佳实践]] | Compaction、summarization、隔离、Action Space 与模型切换评测 |
-
-### P1-A-04（2026-09-18）
-
-| 笔记 | 关联机制 |
-|---|---|
-| [[OpenAI研究员-Harness工程软件开发新范式]] | 非功能性需求、角色化审查、上下文预算与可靠交付 |
-| [[OpenAI员工-上下文工程和Agent记忆]] | Context reshape、failure mode、trim/compact/summarize 与记忆护栏 |
-| [[OpenClaw实战-从本地到K8S部署]] | 容器隔离、密钥管理、K8S 扩展与运行时基线 |
-| [[PlanetScale-Agent时代的基础设施]] | 安全默认、窄工具、平台 veto、Rewind 与数据状态 |
-| [[Raindrop CEO-打造Agent可观测性]] | 隐式语义信号、生产 A/B、轨迹巡检与自我诊断 |
-| [[Shopify CTO-AI时代CI范式重构]] | 代理批评循环、PR 互斥、客户模拟与自动研究 |
-| [[WorkOS-创建和使用Skills方法论]] | Skill 路由、渐进披露、置信度门控、Eval 与团队治理 |
-
-
-### P1-B-01（2026-09-18）
-
-| 笔记 | 关联机制 |
-|---|---|
-| [[Arize创始人Jason-如何开发自我改进的Agent]] | 可观测性、在线评估、沙箱与修复闭环 |
-| [[Astral创始人-智能体让PR成本归零 人类审查成瓶颈]] | Harness 不变量、自动校验与代码审查 |
-
-
-### P1-B-02（2026-09-18）
-
-| 笔记 | 关联机制 |
-|---|---|
-| [[LCA-60分钟变成AI-Native]] | People+Agents+Context、Skill Chain 与上下文闭环 |
-
-### P1-B-03（2026-09-18）
-
-| 笔记 | 关联机制 |
-|---|---|
-| [[OpenAI总裁-聊天与Agent的融合计划]] | 工具、控制权、监督和 Agent 信任 |
-| [[Peter Yang-Hermes 打造 24 小时数字员工]] | 隔离、权限、技能、任务调度与个人 Agent |
-| [[Rely AI 创始人-智能体可验证持续学习 不用微调]] | 日志、评估器、记忆层与回归感知优化 |
-
 ## 跨 MOC 链接
 
 | 横切主题 | MOC |
@@ -188,3 +101,25 @@ source: vault_initiative - moc - ai_agent - harness_engineering
 - **总笔记数**：42 核心 + 3 跨 MOC 链接
 - **最后更新**：2026-07-09（新增 S-tier 8 篇视频转录：ClawdBot、OpenClaw 教程/Every/养虾/配置、Hermes、AI 编程工具、Brex CEO）
 - **入选标准**：笔记主题必须直接讨论"围绕 Agent 的工程系统"（不是单纯的"Agent 本身"或"Agent 怎么用"）
+
+---
+
+## 迁移收录（2026-10-08 · 知识库合并）
+
+> 以下为 2026-10-08 两库合并时按来源管道成组挂载的笔记，保证 MOC 可达，后续策展融入上方结构。
+
+- [[Arize创始人Jason-如何开发自我改进的Agent|Arize创始人Jason-如何开发自我改进的Agent]]
+- [[Databricks主管-企业级Agent生产实践框架-20260916|Databricks主管：企业级Agent 生产实践 - 哔哩哔哩]]
+- [[Kelo Code负责人-Agent工程方法论|Kelo Code负责人：Agent工程方法论 - 哔哩哔哩]]
+- [[OpenAI Build Hours-用API和Codex构建Agent-20260916|OpenAI 团队：用API和Codex,构建Agent教程 - 哔哩哔哩]]
+- [[arize-ai团队-skill到底-应该写多长-哔哩哔哩-1fa0932a|Arize AI团队：Skill到底 应该写多长？ - 哔哩哔哩]]
+- [[deepmind团队-如何大规模-运行agent-哔哩哔哩-4cc3d8de|DeepMind团队：如何大规模 运行Agent - 哔哩哔哩]]
+- [[deepseek-harness橙皮书-花叔-v260814-a00322c4|DeepSeek-Harness橙皮书（花叔，v260814）]]
+- [[exo开发者-让agent自进化的方法-哔哩哔哩-bf4bdc38|Exo开发者：让Agent自进化的方法 - 哔哩哔哩]]
+- [[galileo联创-ai时代的可观测性-哔哩哔哩-66b5ff96|Galileo联创：AI时代的可观测性 - 哔哩哔哩]]
+- [[hermes-自我改进-ai智能体-27405226|Hermes 联合创始人谈如何构建自我改进的 AI 智能体 | Karan Ma]]
+- [[linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d|LinkedIn 工程师：领英的AI Agent 开发和部署实践 - 哔哩哔哩]]
+- [[nvidiafu-zong-c-构建agent的-正确方式-哔哩哔哩-5adab385|NVIDIAfu'zong'c：构建Agent的 正确方式 - 哔哩哔哩]]
+- [[openai团队-openai的-harness工程实践-哔哩哔哩-0145f85f|OpenAI团队：OpenAI的 Harness工程实践 - 哔哩哔哩]]
+- [[为什么-harness-比模型更重要-3a8f81a0|为什么 Harness 比模型更重要]]
+- [[微软专家-agent可观测性-生产实践-哔哩哔哩-2ac0f227|微软专家：Agent可观测性 生产实践 - 哔哩哔哩]]

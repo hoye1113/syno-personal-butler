@@ -2,17 +2,17 @@
 title: "Spot check - Codex实战100分钟完整教程"
 tags: [notes, bilibili, ai_agent]
 created: 2026-07-13
-source: "02-Resources/AI and Agents/AI Coding & Tools/Codex实战-100分钟完整教程.md"
+source: "Agent架构与平台/Codex实战-100分钟完整教程.md"
 description: "Codex长教程与无时间戳ASR的四锚点事实抽样。"
 ---
 
 # Spot check 工作表：Codex 实战：100 分钟完整教程
 
-- **Vault**: `02-Resources/AI and Agents/AI Coding & Tools/Codex实战-100分钟完整教程.md`
+- **Vault**: `02-Resources/AI and Agents/B站视频知识库/Agent架构与平台/Codex实战-100分钟完整教程.md`
 - **时长**: 67:09
 - **spot_check**: （未登记）
 - **transcript_source**: `bilibili-retranscribe/BV1j15A6gEcL/article.md`
-- **ASR**: `${RECASTORY_WORKSPACE}\bilibili-retranscribe\BV1j15A6gEcL\article.md`
+- **ASR**: `D:\workSpace\git_clone_test\hoye-git\Recastory\workspace\bilibili-retranscribe\BV1j15A6gEcL\article.md`
 - **ASR 段数**: 0
 
 ## 相关阅读 wikilink

@@ -1,17 +1,15 @@
 ---
-title: "OpenSquilla 的 MetaSkill：造、优化、组织，第三块拼图补上了"
-tags: ["skills", "ai_agent", "article", "wechat"]
-legacy_tags: ["skills", "ai_agent", "article", "wechat"]
-created: "2026-06-05"
-source: "https://mp.weixin.qq.com/s/8e5VWlBoc1tULBjFjrLREA"
-description: "OpenSquilla 推出 MetaSkill——Agent skill 的\"第三块拼图\"（前两块：造 + 优化；MetaSkill 补\"组织\"），让 agent 自主从一堆 Skill 里挑选/组合/排序"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Tools and Products/OpenSquilla MetaSkill 第三块拼图.md"
-source_sha256: "16eec833adc423d9f37cd538bcc06e683fa51ad82ebe61624b476931804e9ceb"
-migration_id: "migration-20260720-64e79771"
+title: OpenSquilla 的 MetaSkill：造、优化、组织，第三块拼图补上了
+source: https://mp.weixin.qq.com/s/8e5VWlBoc1tULBjFjrLREA
 author:
   - "[[花叔]]"
+created: 2026-06-05
+description: OpenSquilla 推出 MetaSkill——Agent skill 的"第三块拼图"（前两块：造 + 优化；MetaSkill 补"组织"），让 agent 自主从一堆 Skill 里挑选/组合/排序
+tags:
+  - skills
+  - ai_agent
+  - article
+  - wechat
 ---
 
 # OpenSquilla 的 MetaSkill：造、优化、组织，第三块拼图补上了

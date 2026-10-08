@@ -1,18 +1,13 @@
 ---
-title: "RAG 全流程：从一堆文档到 Agent 能用的知识库 — 吃透 AI Agent 开发"
-tags: ["ai_agent"]
-legacy_tags: ["ai_agent"]
-created: "2026-06-08"
-source: "https://sitor.ai/courses/agent-fundamentals/19-rag-pipeline"
-description: "市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/04-Context Engineering/4-6 RAG 全流程.md"
-source_sha256: "50992d52b8f60b0db2063a07a6d6c7699ed097d55db729a883cb4e37fe8dada8"
-migration_id: "migration-20260720-64e79771"
+title: RAG 全流程：从一堆文档到 Agent 能用的知识库 — 吃透 AI Agent 开发
+source: https://sitor.ai/courses/agent-fundamentals/19-rag-pipeline
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-06-08
+description: 市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。
+tags:
+  - ai_agent
 ---
 
 # RAG 全流程：从一堆文档到 Agent 能用的知识库

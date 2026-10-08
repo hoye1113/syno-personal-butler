@@ -1,19 +1,16 @@
 ---
-title: "02 · ReAct 与 Planning — Loock AI 全栈应用开发"
-tags: ["loock_ai", "coding_agent", "ai_agent"]
-legacy_tags: ["loock_ai", "coding_agent", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/mini-coding-agent/02-agent-loop/02-react-and-planning"
-description: "把 ReAct 模式完整落地到代码中。模型先规划（Plan）、再执行（Act）、然后观察结果（Ob erve），形成完整的智能循环。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-11 02 · ReAct 与 Planning.md"
-source_sha256: "317101dddf535e1c70d71e4a7b7ed356c86a20c60832b47dca7cb7b3881a2752"
-migration_id: "migration-20260720-64e79771"
+title: 02 · ReAct 与 Planning — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/mini-coding-agent/02-agent-loop/02-react-and-planning
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 把 ReAct 模式完整落地到代码中。模型先规划（Plan）、再执行（Act）、然后观察结果（Ob erve），形成完整的智能循环。
+tags:
+  - loock_ai
+  - coding_agent
+  - ai_agent
 ---
 
 第 2 章 · Agent Loop 与任务规划

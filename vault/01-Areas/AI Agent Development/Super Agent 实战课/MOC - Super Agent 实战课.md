@@ -1,15 +1,11 @@
 ---
-title: "MOC - Super Agent 实战课"
-tags: ["ai_agent", "moc"]
-legacy_tags: ["ai_agent", "moc"]
-created: "2026-07-13"
-source: "vault_initiative - moc - sitor-ai - super-agent"
-description: "三元（Sitor AI）Super Agent 实战课总索引 — 23 篇渐进式实战，最终产物对标 OpenClaw 的生产级 Agent"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/Super Agent 实战课/MOC - Super Agent 实战课.md"
-source_sha256: "c7249c1a5f0bd6a8d6cf89319d95126a31db06e8a45b6213d0ae88386fdee576"
-migration_id: "migration-20260720-64e79771"
+title: MOC - Super Agent 实战课
+description: 三元（Sitor AI）Super Agent 实战课总索引 — 23 篇渐进式实战，最终产物对标 OpenClaw 的生产级 Agent
+created: 2026-07-13
+tags:
+  - ai_agent
+  - moc
+source: vault_initiative - moc - sitor-ai - super-agent
 ---
 
 # Super Agent 实战课
@@ -36,8 +32,8 @@ TypeScript + Node.js (ESM) · Vercel AI SDK · Hono (HTTP + WebSocket) · JSONL 
 
 - [[2-1 给 Agent 一双手——Tool 注册、执行、截断与并发]]
 - [[2-2 补齐装备——edit_file、grep、glob 与 bash]]
-- [[2-3 小试牛刀——把工具组装成应用-代码分析、Research Agent、Vibe Coding]]
-- [[2-4 加餐-Agent 的 Search 工具究竟是如何来实现的？]]
+- [[2-3 小试牛刀——把工具组装成应用：代码分析、Research Agent、Vibe Coding]]
+- [[2-4 加餐：Agent 的 Search 工具究竟是如何来实现的？]]
 - [[2-5 MCP 接入实战——给 Agent 接上 GitHub]]
 - [[2-6 工具太多模型选不准——实现 ToolSearch]]
 

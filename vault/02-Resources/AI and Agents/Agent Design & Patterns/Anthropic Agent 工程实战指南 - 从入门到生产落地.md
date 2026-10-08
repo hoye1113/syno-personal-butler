@@ -1,18 +1,15 @@
 ---
 title: "Anthropic Agent 工程实战指南：从入门到生产落地"
-tags: ["ai_agent", "anthropic"]
-legacy_tags: ["ai_agent", "anthropic", "agent_engineering"]
-created: "2026-06-11"
-source: "D:\\AllDownload\\2026-06\\Anthropic Agent 工程实战指南：从入门到生产落地.md"
-description: "基于 Anthropic 官方 15 篇 Agent 工程核心技术博客的系统化梳理与翻译，按\"入门-进阶-核心-高级-生产\"路径，覆盖 Agent 基础架构、工具调用、上下文管理、长任务执行、多 Agent 协作、生产环境评测与安全"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/Anthropic Agent 工程实战指南 - 从入门到生产落地.md"
-source_sha256: "6aba9e0fc64a3996e7cdae78df62d322898fb749a3f9ac65b7e4981dfd58a01e"
-migration_id: "migration-20260720-64e79771"
+source: D:\AllDownload\2026-06\Anthropic Agent 工程实战指南：从入门到生产落地.md
 author:
   - "[[Anthropic 官方]]"
 published: unknown
+created: 2026-06-11
+description: 基于 Anthropic 官方 15 篇 Agent 工程核心技术博客的系统化梳理与翻译，按"入门-进阶-核心-高级-生产"路径，覆盖 Agent 基础架构、工具调用、上下文管理、长任务执行、多 Agent 协作、生产环境评测与安全
+tags:
+  - ai_agent
+  - anthropic
+  - agent_engineering
 ---
 
 <font style="color:rgb(0, 0, 0);background-color:rgba(0, 0, 0, 0);">本书内容全部基于 Anthropic 官方发布的 15 篇 Agent 工程核心技术博客，系统梳理了从 Agent 基础概念、架构设计、工具开发、上下文管理，到长任务执行、多智能体协作、生产环境评测与安全防护的全流程知识体系，所有经验均来自 Anthropic 生产环境的实战沉淀，旨在帮助开发者从零到一构建高效、可靠、可落地的 AI Agent 系统。</font>

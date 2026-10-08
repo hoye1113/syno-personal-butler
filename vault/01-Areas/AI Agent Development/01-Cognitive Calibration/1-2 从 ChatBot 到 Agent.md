@@ -1,18 +1,13 @@
 ---
-title: "从 ChatBot 到 Agent：一个 while 循环，凭什么让 AI 从\\\"能聊天\\\"变成\\\"能干活\\\"？ — 吃透 AI Agent 开发"
-tags: ["ai_agent"]
-legacy_tags: ["ai_agent"]
-created: "2026-05-19"
+title: "从 ChatBot 到 Agent：一个 while 循环，凭什么让 AI 从\"能聊天\"变成\"能干活\"？ — 吃透 AI Agent 开发"
 source: "https://sitor.ai/courses/agent-fundamentals/2-chatbot-to-agent"
-description: "市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/01-Cognitive Calibration/1-2 从 ChatBot 到 Agent.md"
-source_sha256: "5947e9dd7b1f3bba4a346c0fa412078bcbf228ae99a596312ec2884c811dbf93"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-05-19
+description: "市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。"
+tags:
+  - ai_agent
 ---
 ## 从 ChatBot 到 Agent：一个 while 循环改变了什么？
 

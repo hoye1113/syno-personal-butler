@@ -1,15 +1,14 @@
 ---
 title: "Fable 5 订阅权限又续了 5 天！与其被吊着，我找了个账单只有 1/3 的替代方案"
-tags: ["ai_agent", "multi_agent", "harness_engineering", "wechat", "article"]
-legacy_tags: ["ai_agent", "multi_agent", "harness_engineering", "wechat", "article"]
-created: "2026-07-07"
-source: "https://mp.weixin.qq.com/s/WbeRHxfXri_j0rJMoqcnyw"
+tags:
+  - ai_agent
+  - multi_agent
+  - harness_engineering
+  - wechat
+  - article
+created: 2026-07-07
+source: https://mp.weixin.qq.com/s/WbeRHxfXri_j0rJMoqcnyw
 description: "OpenSquilla 多模型集成协作：用 4 个国产模型组队，在 DRACO 评测中跑平 Fable 5，账单只有 1/3"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/Fable 5 订阅权限又续了 5 天 - 花叔.md"
-source_sha256: "df2d719380976e1c18f633db077e26d2f6a3e874429967a0c2945fc3a56c80a9"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[花叔]]"
 ---

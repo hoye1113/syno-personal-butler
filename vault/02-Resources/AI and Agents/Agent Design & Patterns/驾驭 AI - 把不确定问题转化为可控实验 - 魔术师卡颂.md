@@ -1,15 +1,15 @@
 ---
 title: "驾驭 AI - 把不确定问题转化为可控实验"
-tags: ["ai_agent", "ai_coding", "article", "wechat", "harness_engineering", "loop_engineering"]
-legacy_tags: ["ai_agent", "ai_coding", "article", "wechat", "harness_engineering", "loop_engineering"]
-created: "2026-07-02"
-source: "https://mp.weixin.qq.com/s/hsA6ZqJB6HlWIZ-rMnVZyA"
+tags:
+  - ai_agent
+  - ai_coding
+  - article
+  - wechat
+  - harness_engineering
+  - loop_engineering
+created: 2026-07-02
+source: https://mp.weixin.qq.com/s/hsA6ZqJB6HlWIZ-rMnVZyA
 description: "魔术师卡颂短文：Vibe Coding 里报点式协作让注意力线性增长；把修 bug 等不确定问题拆成客观标准 + 反馈闭环的可控实验，用 token 换精力"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/驾驭 AI - 把不确定问题转化为可控实验 - 魔术师卡颂.md"
-source_sha256: "b77a267f1416acc0552aa495005a4e60be200b74f979f947fb206f16ffac2647"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[魔术师卡颂]]"
 ---

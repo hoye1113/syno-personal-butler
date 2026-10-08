@@ -1,18 +1,14 @@
 ---
-title: "Agent 的记忆系统：文件派 vs 数据库派，谁才是正确答案？ — 吃透 AI Agent 开发"
-tags: ["ai_agent", "memory"]
-legacy_tags: ["ai_agent", "memory"]
-created: "2026-06-08"
-source: "https://sitor.ai/courses/agent-fundamentals/23-memory-system"
-description: "市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/04-Context Engineering/4-9 Agent 的记忆系统.md"
-source_sha256: "f44e985e3409beed05c18beee3e62855b1beb670d2fb526af34b8a636b50fa23"
-migration_id: "migration-20260720-64e79771"
+title: Agent 的记忆系统：文件派 vs 数据库派，谁才是正确答案？ — 吃透 AI Agent 开发
+source: https://sitor.ai/courses/agent-fundamentals/23-memory-system
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-06-08
+description: 市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。
+tags:
+  - ai_agent
+  - memory
 ---
 
 # Agent 的记忆系统：文件派 vs 数据库派，谁才是正确答案？

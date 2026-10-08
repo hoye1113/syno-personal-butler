@@ -1,18 +1,14 @@
 ---
-title: "Skills：Agent 时代的知识分发系统 — 吃透 AI Agent 开发"
-tags: ["ai_agent", "skills"]
-legacy_tags: ["ai_agent", "skills"]
-created: "2026-06-08"
-source: "https://sitor.ai/courses/agent-fundamentals/12-skills"
-description: "市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/03-Tool System/3-5 Skills - Agent 时代的知识分发系统.md"
-source_sha256: "8d392bd5dc930f5bfd9d2e209cc7f9ab9b35e9c82ba4ea561704dc2747c75279"
-migration_id: "migration-20260720-64e79771"
+title: Skills：Agent 时代的知识分发系统 — 吃透 AI Agent 开发
+source: https://sitor.ai/courses/agent-fundamentals/12-skills
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-06-08
+description: 市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。
+tags:
+  - ai_agent
+  - skills
 ---
 
 # Skills 全解：Agent 时代的知识分发系统

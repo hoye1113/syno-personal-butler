@@ -1,19 +1,16 @@
 ---
-title: "01 · 为什么需要 SubAgent — Loock AI 全栈应用开发"
-tags: ["loock_ai", "coding_agent", "ai_agent"]
-legacy_tags: ["loock_ai", "coding_agent", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/mini-coding-agent/10-multi-agent/01-why-subagent"
-description: "单 agent 面对复杂任务时，上下文膨胀、角色混乱。角色分工是自然的解法。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-52 01 · 为什么需要 SubAgent.md"
-source_sha256: "b615d165d940ad0b6926421ecda29d3de4393275033b6357055006e6bad0c0c9"
-migration_id: "migration-20260720-64e79771"
+title: 01 · 为什么需要 SubAgent — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/mini-coding-agent/10-multi-agent/01-why-subagent
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 单 agent 面对复杂任务时，上下文膨胀、角色混乱。角色分工是自然的解法。
+tags:
+  - loock_ai
+  - coding_agent
+  - ai_agent
 ---
 
 第 10 章 · SubAgent 协作

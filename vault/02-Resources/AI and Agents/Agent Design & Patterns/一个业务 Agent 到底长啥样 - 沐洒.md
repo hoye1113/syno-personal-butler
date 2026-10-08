@@ -1,18 +1,16 @@
 ---
 title: "一个业务 Agent 到底长啥样 - 沐洒"
-tags: ["ai_agent", "agent_architecture", "article", "wechat"]
-legacy_tags: ["ai_agent", "agent_architecture", "article", "wechat"]
-created: "2026-07-15"
-source: "https://mp.weixin.qq.com/s/uP-HdbmdXAXlyKsE1SMvmg"
-description: "沐洒把一个业务 Agent 摊开成目标/模型/上下文/工具/知识/状态/工作流/约束/人工节点/评估 10 个要素，核心结论是 Agent 是围绕明确目标运行的系统——模型只管开放判断、软件管确定性、人管价值判断，第一版追求最小闭环而非组件齐全。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/一个业务 Agent 到底长啥样 - 沐洒.md"
-source_sha256: "51a04b56943e631a9853c901b0a7bb94945ef854feee45b5399cff199bcfb6c8"
-migration_id: "migration-20260720-64e79771"
+source: https://mp.weixin.qq.com/s/uP-HdbmdXAXlyKsE1SMvmg
 author:
   - "[[沐洒]]"
 published: unknown
+created: 2026-07-15
+description: 沐洒把一个业务 Agent 摊开成目标/模型/上下文/工具/知识/状态/工作流/约束/人工节点/评估 10 个要素，核心结论是 Agent 是围绕明确目标运行的系统——模型只管开放判断、软件管确定性、人管价值判断，第一版追求最小闭环而非组件齐全。
+tags:
+  - ai_agent
+  - agent_architecture
+  - article
+  - wechat
 ---
 
 # 一个业务 Agent 到底长啥样 - 沐洒

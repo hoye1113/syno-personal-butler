@@ -1,18 +1,13 @@
 ---
 title: "一个不够就拆成多个——实现 Sub-Agent 机制 — Super Agent 实战课"
-tags: ["ai_agent"]
-legacy_tags: ["ai_agent"]
-created: "2026-07-13"
 source: "https://sitor.cc/courses/super-agent/sa-19-sub-agent"
-description: "讲解当单个 Agent 因长上下文过载而质量下降时，如何拆分出 Sub-Agent 并行执行子任务并聚合结果，缓解上下文膨胀问题。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/Super Agent 实战课/06-权限 Cron Multi-Agent/6-3 一个不够就拆成多个——实现 Sub-Agent 机制.md"
-source_sha256: "b39eb2f9088fca43a7bd037bd453a962f8c2303255f4aec16e9326b7e5ba2658"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-07-13
+description: "讲解当单个 Agent 因长上下文过载而质量下降时，如何拆分出 Sub-Agent 并行执行子任务并聚合结果，缓解上下文膨胀问题。"
+tags:
+  - ai_agent
 ---
 ## 一个不够就拆成多个——实现 Sub-Agent 机制
 
@@ -549,6 +544,6 @@ OpenCode 走了分阶段编排的路——阶段 1 最多派 3 个 Explore Agent
 ## 关联
 
 - [[5-1 拆 Agent 不是为了分角色，是为了分上下文|拆 Agent 不是为了分角色]] — **应用**：本文 Sub-Agent 即知识课“分上下文”动机的实战
-- [[5-2 Agent Swarm-让多个 Agent 像团队一样协作|Agent Swarm]] — **补充**：多 Agent 协作的另一种形态
+- [[5-2 Agent Swarm：让多个 Agent 像团队一样协作|Agent Swarm]] — **补充**：多 Agent 协作的另一种形态
 - [[3-1 Session 持久化 + Prompt Pipe——对话存档与模块化 Prompt 组装|Session 持久化]] — **依赖**：子 Agent 复用 Session/Prompt 机制
 - [[MOC - Super Agent 实战课|本课总索引]] — **总索引**

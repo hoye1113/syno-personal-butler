@@ -1,12 +1,11 @@
 import json, os
-from path_config import RECASTORY_WORKSPACE
 
-with (RECASTORY_WORKSPACE / "bilibili/manifest.json").open('r', encoding='utf-8') as f:
+with open(r'D:\workSpace\git_clone_test\hoye-git\Recastory\workspace\bilibili\manifest.json', 'r', encoding='utf-8') as f:
     data = json.load(f)
 
 entries = data['entries']
 pending = [e for e in entries if e.get('vault_status') == 'pending' and e.get('column_url')]
-root = str(RECASTORY_WORKSPACE / "bilibili-retranscribe")
+root = r'D:\workSpace\git_clone_test\hoye-git\Recastory\workspace\bilibili-retranscribe'
 
 ai_keywords = ['agent', 'ai', 'claude', 'gpt', 'codex', 'openai', 'anthropic', 'llm', 'model', 'prompt',
                'harness', 'cursor', 'copilot', 'devin', 'mcp', 'rag', 'embedding', 'fine-tun',

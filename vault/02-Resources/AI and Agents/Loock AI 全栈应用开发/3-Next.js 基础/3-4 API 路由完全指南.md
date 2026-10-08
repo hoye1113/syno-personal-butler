@@ -1,19 +1,16 @@
 ---
-title: "API 路由完全指南 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "nextjs", "ai_agent"]
-legacy_tags: ["loock_ai", "nextjs", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/nextjs/04-api-routes-guide"
-description: "全面掌握 Next.js API Route  的创建、请求处理及响应格式。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/3-Next.js 基础/3-4 API 路由完全指南.md"
-source_sha256: "4fb76f9cca8e111798fb1174237655fed6acb4b6eb9b9035e4504c789aec2efb"
-migration_id: "migration-20260720-64e79771"
+title: API 路由完全指南 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/nextjs/04-api-routes-guide
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 全面掌握 Next.js API Route  的创建、请求处理及响应格式。
+tags:
+  - loock_ai
+  - nextjs
+  - ai_agent
 ---
 
 # API 路由完全指南

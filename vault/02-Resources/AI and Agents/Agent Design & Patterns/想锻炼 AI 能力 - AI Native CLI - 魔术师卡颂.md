@@ -1,15 +1,17 @@
 ---
 title: "想锻炼 AI 能力 - AI Native CLI"
-tags: ["ai_agent", "ai_coding", "article", "wechat", "harness_engineering", "skills"]
-legacy_tags: ["ai_agent", "ai_coding", "article", "wechat", "harness_engineering", "skills"]
-created: "2026-07-02"
-source: "obsidian_repository_snapshot"
+tags:
+  - ai_agent
+  - ai_coding
+  - article
+  - wechat
+  - harness_engineering
+  - skills
+created: 2026-07-02
+source:
+  - https://mp.weixin.qq.com/s/6e-NdX3_YzRH15i5tv4Cgg
+  - https://github.com/BetaSu/docs-harness
 description: "魔术师卡颂：锻炼驾驭 AI 的好方向是把传统 CLI 改成面向 Agent 的 AI Native CLI——结构化 stdout、可恢复错误、分级权限、内置 Skill 替代文档"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/想锻炼 AI 能力 - AI Native CLI - 魔术师卡颂.md"
-source_sha256: "6f8fb03f5fd12630dcc94216760de00de58c941ba0b9029be397cc196bf97e42"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[魔术师卡颂]]"
 date: 2026-06-26

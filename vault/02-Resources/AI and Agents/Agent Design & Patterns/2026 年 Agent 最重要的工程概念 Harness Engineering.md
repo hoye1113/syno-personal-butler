@@ -1,19 +1,17 @@
 ---
-title: "2026 年 Agent 最重要的工程概念：「Harness Engineering」"
-tags: ["ai_agent", "harness_engineering", "openai", "codex"]
-legacy_tags: ["ai_agent", "harness_engineering", "openai", "codex"]
-created: "2026-06-11"
-source: "https://mp.weixin.qq.com/s/Me4mkbtCKcZAJotv8VhJRg"
-description: "特工宇宙对 OpenAI 官方 Harness Engineering 文章的精校翻译+点评；OpenAI 5 个月用 Codex 交付 100 万行 0 人工代码的内部实验，提出\"Agent 的瓶颈不在模型、在你给模型搭的工程环境\"的方法论"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/2026 年 Agent 最重要的工程概念 Harness Engineering.md"
-source_sha256: "80557d941d22ea43384017a61c1af535bef3fbec75af050a33e62ad79adf6c90"
-migration_id: "migration-20260720-64e79771"
+title: 2026 年 Agent 最重要的工程概念：「Harness Engineering」
+source: https://mp.weixin.qq.com/s/Me4mkbtCKcZAJotv8VhJRg
 author:
   - "[[特工宇宙]]"
   - "[[OpenAI]]"
 published: unknown
+created: 2026-06-11
+description: 特工宇宙对 OpenAI 官方 Harness Engineering 文章的精校翻译+点评；OpenAI 5 个月用 Codex 交付 100 万行 0 人工代码的内部实验，提出"Agent 的瓶颈不在模型、在你给模型搭的工程环境"的方法论
+tags:
+  - ai_agent
+  - harness_engineering
+  - openai
+  - codex
 ---
 
 # 2026 年 Agent 最重要的工程概念：「Harness Engineering」

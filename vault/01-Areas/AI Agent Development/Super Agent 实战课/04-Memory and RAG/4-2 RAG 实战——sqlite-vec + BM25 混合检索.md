@@ -1,18 +1,13 @@
 ---
 title: "RAG 实战——sqlite-vec + BM25 混合检索 — Super Agent 实战课"
-tags: ["ai_agent"]
-legacy_tags: ["ai_agent"]
-created: "2026-07-13"
 source: "https://sitor.cc/courses/super-agent/sa-12-rag"
-description: "从零实现完整 RAG 管线（分块、向量化、混合检索、结果注入），重点讲解向量搜索与 BM25 关键词搜索的加权合并、min-max 归一化与 MMR 去重。并给出 SQLite + sqlite-vec + FTS5 三表持久化架构与生产落地方案，以及 Agentic RAG 的多步检索思路。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/Super Agent 实战课/04-Memory and RAG/4-2 RAG 实战——sqlite-vec + BM25 混合检索.md"
-source_sha256: "102deff528028a0177c8bc733e2b4bbf1eca5d90e4f4122580245ca0557f53c3"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-07-13
+description: "从零实现完整 RAG 管线（分块、向量化、混合检索、结果注入），重点讲解向量搜索与 BM25 关键词搜索的加权合并、min-max 归一化与 MMR 去重。并给出 SQLite + sqlite-vec + FTS5 三表持久化架构与生产落地方案，以及 Agentic RAG 的多步检索思路。"
+tags:
+  - ai_agent
 ---
 ## RAG 实战——sqlite-vec + BM25 混合检索
 
@@ -707,5 +702,5 @@ const vectorStore = new SqliteVectorStore('knowledge.db');
 
 - [[4-6 RAG 全流程|RAG 全流程]] — **应用于**：本文 sqlite-vec+BM25 即知识课 RAG 管线代码落地
 - [[4-7 检索优化|检索优化]] — **补充**：混合检索/MMR 对应知识课检索优化
-- [[2-4 加餐-Agent 的 Search 工具究竟是如何来实现的？|Search 工具]] — **对比**：RAG 内部知识库 vs Search 外部检索
+- [[2-4 加餐：Agent 的 Search 工具究竟是如何来实现的？|Search 工具]] — **对比**：RAG 内部知识库 vs Search 外部检索
 - [[MOC - Super Agent 实战课|本课总索引]] — **呼应**：本课总索引

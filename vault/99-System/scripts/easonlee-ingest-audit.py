@@ -9,10 +9,7 @@ from datetime import date
 from pathlib import Path
 
 VAULT = Path(__file__).resolve().parents[2]
-RECASTORY_ENV = os.environ.get("RECASTORY_ROOT")
-if not RECASTORY_ENV:
-    raise SystemExit("Set RECASTORY_ROOT to the read-only legacy Recastory checkout")
-RECASTORY = Path(RECASTORY_ENV).resolve()
+RECASTORY = Path(r"D:/workSpace/git_clone_test/hoye-git/Recastory")
 MANIFEST = RECASTORY / "workspace/bilibili/manifest.json"
 BV_LIST = RECASTORY / "workspace/bilibili/_easonlee_bv_list.txt"
 OPUS_DOM = RECASTORY / "workspace/bilibili/easonlee_opus_dom.json"

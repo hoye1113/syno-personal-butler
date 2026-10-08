@@ -1,15 +1,17 @@
 ---
 title: "如何让 Skill 自动优化"
-tags: ["ai_agent", "article", "wechat", "skills", "loop_engineering", "harness_engineering"]
-legacy_tags: ["ai_agent", "article", "wechat", "skills", "loop_engineering", "harness_engineering"]
-created: "2026-07-02"
-source: "obsidian_repository_snapshot"
+tags:
+  - ai_agent
+  - article
+  - wechat
+  - skills
+  - loop_engineering
+  - harness_engineering
+created: 2026-07-02
+source:
+  - https://mp.weixin.qq.com/s/ADZ2YX6t6PZ5Z2cLbbKe0g
+  - https://github.com/warpdotdev/common-skills
 description: "魔术师卡颂解读 Zach Lloyd 的 Skill 自优化循环：定时任务收集 PR Review 反馈→归因规则→只改规则集；须满足规则可聚焦、正负反馈明确、可归因"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/如何让 Skill 自动优化 - 魔术师卡颂.md"
-source_sha256: "307ec017cbe765e23a034bdacee027cfda79ded46b886a6db76eef54646adccd"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[魔术师卡颂]]"
 date: 2026-06-18

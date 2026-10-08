@@ -1,15 +1,15 @@
 ---
 title: "AI Coding 时间管理 - 50% 工作法"
-tags: ["ai_agent", "ai_coding", "ai_career", "article", "wechat", "harness_engineering"]
-legacy_tags: ["ai_agent", "ai_coding", "ai_career", "article", "wechat", "harness_engineering"]
-created: "2026-07-02"
-source: "https://mp.weixin.qq.com/s/BqKWvdIfDUemU5vCwLPDlw"
+tags:
+  - ai_agent
+  - ai_coding
+  - ai_career
+  - article
+  - wechat
+  - harness_engineering
+created: 2026-07-02
+source: https://mp.weixin.qq.com/s/BqKWvdIfDUemU5vCwLPDlw
 description: "魔术师卡颂短文：AI Coding 时间分配 50% 业务 / 50% Harness 优化；少并行、拉长 Agent 自治时长，避免摸鱼导致能力退化"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/AI Coding 时间管理 - 50% 工作法 - 魔术师卡颂.md"
-source_sha256: "455ac38aa938bac5244337cde3e61feef18d4cf4c90b394f4ab7dd4caf9c2fa2"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[魔术师卡颂]]"
 date: 2026-04-10

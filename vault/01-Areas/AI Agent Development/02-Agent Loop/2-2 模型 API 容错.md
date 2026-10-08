@@ -1,18 +1,13 @@
 ---
-title: "死循环、重复犯错、Token 烧穿：你的 Agent Loop 缺这三个\"保险丝\" — 吃透 AI Agent 开发"
-tags: ["ai_agent"]
-legacy_tags: ["ai_agent"]
-created: "2026-05-19"
-source: "https://sitor.ai/courses/agent-fundamentals/7-loop-fuses"
-description: "市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/02-Agent Loop/2-2 模型 API 容错.md"
-source_sha256: "7ce2f95fdd614defcbf0f4f364b04522168e2e68446a4836efb0152c97e6a33b"
-migration_id: "migration-20260720-64e79771"
+title: 死循环、重复犯错、Token 烧穿：你的 Agent Loop 缺这三个"保险丝" — 吃透 AI Agent 开发
+source: https://sitor.ai/courses/agent-fundamentals/7-loop-fuses
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-05-19
+description: 市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。
+tags:
+  - ai_agent
 ---
 ## 模型 API 挂了怎么办？生产级容错不是加个 try-catch
 
@@ -251,4 +246,4 @@ Agent 陷入死循环，反复调用同一个工具；Token 消耗了几万还�
 
 - [[2-1 流式响应工程真相|流式架构]] — **依赖**：本篇处理的流式中断、已接收碎片的取舍，建立在上一篇讲的 SSE 流式解析架构之上。
 - [[2-3 Agent Loop 保险丝|运行时失控]] — **对比**：本篇管的是 API 挂了的外部故障，下一篇管的是 API 没挂但 Agent 自己作死的内部失控。
-- [[6-1 Harness-模型外面的这层壳|API 适配层]] — **补充**：本篇提到的多 Provider 容灾与流适配器，是模型外层 Harness 抹平差异、做容错的一部分。
+- [[6-1 Harness：模型外面的这层壳|API 适配层]] — **补充**：本篇提到的多 Provider 容灾与流适配器，是模型外层 Harness 抹平差异、做容错的一部分。

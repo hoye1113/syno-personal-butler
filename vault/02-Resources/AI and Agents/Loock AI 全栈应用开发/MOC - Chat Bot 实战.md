@@ -1,16 +1,13 @@
 ---
-title: "MOC - Chat Bot 实战"
-tags: ["ai_agent", "chatbot", "moc"]
-legacy_tags: ["ai_agent", "chatbot", "moc"]
-created: "2026-06-09"
-source: "vault_initiative - moc - loock_ai - chatbot - ai_agent"
-description: "基于 LangGraph.js 的 Chat Bot 完整项目实战"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/MOC - Chat Bot 实战.md"
-source_sha256: "199253b24d4c5b75aacc9989531f65890f3832563ec79b28981804618b7b54d2"
-migration_id: "migration-20260720-64e79771"
+title: MOC - Chat Bot 实战
+description: 基于 LangGraph.js 的 Chat Bot 完整项目实战
+created: 2026-06-09
 synced: 2026-06-09
+tags:
+  - ai_agent
+  - chatbot
+  - moc
+source: vault_initiative - moc - loock_ai - chatbot - ai_agent
 ---
 
 # Chat Bot 实战

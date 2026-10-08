@@ -1,18 +1,13 @@
 ---
 title: "Plugin 架构——让别人给你的 Agent 写功能 — Super Agent 实战课"
-tags: ["ai_agent"]
-legacy_tags: ["ai_agent"]
-created: "2026-07-13"
 source: "https://sitor.cc/courses/super-agent/sa-15-plugins"
-description: "本章讲解 Plugin 架构：通过 PluginDefinition 与受控 PluginApi 把核心与能力解耦，用 PluginManager 做命名空间隔离、错误隔离与生命周期管理，并以 Supabase 插件演示运行时动态增减工具。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/Super Agent 实战课/05-Skills Plugins Channel/5-2 Plugin 架构——让别人给你的 Agent 写功能.md"
-source_sha256: "0f86c22b5976173cfed1177ef45ddd2af49bfcff317271d3ae1a69e25c221467"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-07-13
+description: "本章讲解 Plugin 架构：通过 PluginDefinition 与受控 PluginApi 把核心与能力解耦，用 PluginManager 做命名空间隔离、错误隔离与生命周期管理，并以 Supabase 插件演示运行时动态增减工具。"
+tags:
+  - ai_agent
 ---
 ## Plugin 架构——让别人给你的 Agent 写功能
 

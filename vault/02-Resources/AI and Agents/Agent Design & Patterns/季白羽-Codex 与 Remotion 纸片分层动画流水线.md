@@ -1,15 +1,13 @@
 ---
 title: "季白羽-Codex 与 Remotion 纸片分层动画流水线"
-tags: ["ai_agent", "ai_coding", "article", "skills"]
-legacy_tags: ["ai_agent", "ai_coding", "article", "skills"]
-created: "2026-07-15"
+tags:
+  - ai_agent
+  - ai_coding
+  - article
+  - skills
+created: 2026-07-15
 source: "https://x.com/vbjby3/status/2076530524110369070"
 description: "用 Codex 当指挥家，串 Imagegen/F5-TTS/Remotion/FFmpeg 做纸片分层动画——先定镜头、拆四层、独立 PNG、错峰入场、遮挡造纵深的完整本地流水线。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/季白羽-Codex 与 Remotion 纸片分层动画流水线.md"
-source_sha256: "7bf9a314de70b66df050e1327c8225dde411e4945fac163e3c38fb687266e580"
-migration_id: "migration-20260720-64e79771"
 author: "[[季白羽]]"
 ---
 

@@ -1,18 +1,14 @@
 ---
-title: "Codex「自我改进」Prompt 曝光！Greg Brockman 让 Coding Agent 反过来优化自己的使用方式，15万人围观"
-tags: ["ai_agent", "prompting"]
-legacy_tags: ["ai_agent", "prompting"]
-created: "2026-06-09"
-source: "https://mp.weixin.qq.com/s/pSnYuU1C5v5ufOm0U-lbHQ"
-description: "Codex「自我改进」Prompt 曝光！Greg Brockman 让 Coding Agent 反过来优化自己的使用方式，15万人围观"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/Codex 自我改进 Prompt.md"
-source_sha256: "a84a062200b80263f0e92445449f80bb63ebb3321b63a9abe15467f538871548"
-migration_id: "migration-20260720-64e79771"
+title: Codex「自我改进」Prompt 曝光！Greg Brockman 让 Coding Agent 反过来优化自己的使用方式，15万人围观
+source: https://mp.weixin.qq.com/s/pSnYuU1C5v5ufOm0U-lbHQ
 author:
   - "[[智能沿界]]"
 published: 2026年5月26日 03:29
+created: 2026-06-09
+description: Codex「自我改进」Prompt 曝光！Greg Brockman 让 Coding Agent 反过来优化自己的使用方式，15万人围观
+tags:
+  - ai_agent
+  - prompting
 ---
 
 导读OpenAI 联合创始人 Greg Brockman 在 X 上放出了一段 Codex 的"自我改进 Prompt"——让 Coding Agent 回顾过去 30 天的工作记录，从中找到重复劳动，自动把高频流程打包成可复用的技能、子智能体或自动化任务。配合 OpenAI 官方的 Skills、Memories、Chronicle 等机制，coding agent 正在从"帮你写一次代码"进化成"帮你优化整套工作方式"。

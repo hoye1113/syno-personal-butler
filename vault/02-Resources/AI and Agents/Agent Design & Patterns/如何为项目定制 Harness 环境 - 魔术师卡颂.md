@@ -1,15 +1,15 @@
 ---
 title: "如何为项目定制 Harness 环境"
-tags: ["ai_agent", "ai_coding", "article", "wechat", "harness_engineering", "skills"]
-legacy_tags: ["ai_agent", "ai_coding", "article", "wechat", "harness_engineering", "skills"]
-created: "2026-07-02"
-source: "https://mp.weixin.qq.com/s/pe5urflbuXNN5c7UjWBtCg"
+tags:
+  - ai_agent
+  - ai_coding
+  - article
+  - wechat
+  - harness_engineering
+  - skills
+created: 2026-07-02
+source: https://mp.weixin.qq.com/s/pe5urflbuXNN5c7UjWBtCg
 description: "魔术师卡颂：Harness 定制心法「减框架、增基建」——从 superpowers/gstack 起步，用文档沉淀与测试/lint/schema 基建替换过重编排"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/如何为项目定制 Harness 环境 - 魔术师卡颂.md"
-source_sha256: "b7075780eb358db223857fa32441b7a37cc99c241f88cf302b53b48dee3a75db"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[魔术师卡颂]]"
 date: 2026-05-28

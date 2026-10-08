@@ -1,18 +1,15 @@
 ---
-title: "硅谷今年最火的岗位 FDE，我们闷头干了三年"
-tags: ["ai_agent", "fde"]
-legacy_tags: ["ai_agent", "fde", "ai_to_b"]
-created: "2026-06-11"
-source: "https://mp.weixin.qq.com/s/vRPEEk8_irUCAgcX9ghpkA"
-description: "佳芮讲述自己闷头做了三年的 FDE 模式——按结果收费、把懂业务的人和懂 AI 的人搭成对子下到客户现场；对比 Palantir、OpenAI、Anthropic 等巨头的同类实践"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/硅谷今年最火的岗位 FDE，我们闷头干了三年.md"
-source_sha256: "c0592e29fd2962557872aca4f1a7482b5428c7483bdef95148ef072a4164a550"
-migration_id: "migration-20260720-64e79771"
+title: 硅谷今年最火的岗位 FDE，我们闷头干了三年
+source: https://mp.weixin.qq.com/s/vRPEEk8_irUCAgcX9ghpkA
 author:
   - "[[佳芮的创业笔记]]"
 published: unknown
+created: 2026-06-11
+description: 佳芮讲述自己闷头做了三年的 FDE 模式——按结果收费、把懂业务的人和懂 AI 的人搭成对子下到客户现场；对比 Palantir、OpenAI、Anthropic 等巨头的同类实践
+tags:
+  - ai_agent
+  - fde
+  - ai_to_b
 ---
 
 # 硅谷今年最火的岗位 FDE，我们闷头干了三年

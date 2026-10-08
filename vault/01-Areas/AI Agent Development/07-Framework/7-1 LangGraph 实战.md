@@ -1,18 +1,13 @@
 ---
 title: "LangGraph 实战：用图的方式重新理解 Agent Loop — 吃透 AI Agent 开发"
-tags: ["ai_agent"]
-legacy_tags: ["ai_agent"]
-created: "2026-07-13"
 source: "https://sitor.cc/courses/agent-fundamentals/31-langgraph"
-description: "LangGraph 用 State、Node、Edge 把原本靠 while(true) 手写的 Agent Loop 与工具调用、人工审批、会话记忆重新结构化，让 Agent 的执行流程变成可观测、可中断、可恢复的图。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/07-Framework/7-1 LangGraph 实战.md"
-source_sha256: "d93f985ba4c398ca312bb75bee99481703a8d9eba66ed8abddda214812c17a73"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-07-13
+description: "LangGraph 用 State、Node、Edge 把原本靠 while(true) 手写的 Agent Loop 与工具调用、人工审批、会话记忆重新结构化，让 Agent 的执行流程变成可观测、可中断、可恢复的图。"
+tags:
+  - ai_agent
 ---
 ## LangGraph 实战：用图的方式重新理解 Agent Loop
 

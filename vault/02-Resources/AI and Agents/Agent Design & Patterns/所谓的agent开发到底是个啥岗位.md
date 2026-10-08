@@ -1,18 +1,17 @@
 ---
-title: "所谓的agent开发到底是个啥岗位"
-tags: ["ai_agent"]
-legacy_tags: ["ai_agent", "agent_组织", "agent_organization", "蜂群组织", "swarm_organization"]
-created: "2026-06-11"
-source: "https://mp.weixin.qq.com/s/IOU4XANXu7S6W4EmqkB8ww"
-description: "用生产力决定生产关系的框架，论证 Agent 开发岗的演化两阶段——当前的人机协作敏捷小组，未来的 AI 原生蜂群组织；判断未来蜂群内最小节点要的是\"业务+技术+AI协作\"综合能力"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/所谓的agent开发到底是个啥岗位.md"
-source_sha256: "56932cc34b0222f1431fe165e53e308888c56d56ee57e2b9081b9e2c9d88b764"
-migration_id: "migration-20260720-64e79771"
+title: 所谓的agent开发到底是个啥岗位
+source: https://mp.weixin.qq.com/s/IOU4XANXu7S6W4EmqkB8ww
 author:
   - "[[魔术师卡颂]]"
 published: unknown
+created: 2026-06-11
+description: 用生产力决定生产关系的框架，论证 Agent 开发岗的演化两阶段——当前的人机协作敏捷小组，未来的 AI 原生蜂群组织；判断未来蜂群内最小节点要的是"业务+技术+AI协作"综合能力
+tags:
+  - ai_agent
+  - agent_组织
+  - agent_organization
+  - 蜂群组织
+  - swarm_organization
 ---
 
 # 所谓的agent开发到底是个啥岗位

@@ -1,18 +1,17 @@
 ---
-title: "AI 时代如何面试工程师"
-tags: ["ai_agent", "ai_native", "ai_career"]
-legacy_tags: ["ai_agent", "ai_native", "engineer_evaluation", "招聘面试", "hiring_interview"]
-created: "2026-06-11"
-source: "https://mp.weixin.qq.com/s/4N1eKJYf_4kozamVqRixnw"
-description: "AI 时代工程师评估框架需要从\"考 Coder（写好代码）\"转向\"考 Engineer（做好工程决策）\"；代码贬值不可逆（编程领域天然有 RLVR 可验证奖励基建）；6 项核心能力（调用力/批判性思维/计算机思维/判断力与提问力/领导力/传播说服力）+ 1 项元能力（好奇心）"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/AI 时代如何面试工程师.md"
-source_sha256: "e8e1d8bd0b4a3bf1540bd5c3518d656a8b7e8dcd6a062515263d2613b620e3e1"
-migration_id: "migration-20260720-64e79771"
+title: AI 时代如何面试工程师
+source: https://mp.weixin.qq.com/s/4N1eKJYf_4kozamVqRixnw
 author:
   - "[[柯芃丞]]"
 published: unknown
+created: 2026-06-11
+description: AI 时代工程师评估框架需要从"考 Coder（写好代码）"转向"考 Engineer（做好工程决策）"；代码贬值不可逆（编程领域天然有 RLVR 可验证奖励基建）；6 项核心能力（调用力/批判性思维/计算机思维/判断力与提问力/领导力/传播说服力）+ 1 项元能力（好奇心）
+tags:
+  - ai_agent
+  - ai_native
+  - engineer_evaluation
+  - 招聘面试
+  - hiring_interview
 ---
 
 # AI 时代如何面试工程师

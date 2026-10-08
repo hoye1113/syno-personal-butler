@@ -1,19 +1,17 @@
 ---
-title: "十一、项目实战（Chat Bot） — 前端 Agent 面试题锦集 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "frontend_agent_interview", "interview", "ai_agent"]
-legacy_tags: ["loock_ai", "frontend_agent_interview", "interview", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/langgraphjs-frontend-agent-interview/interview"
-description: "Loock AI 前端 Agent 面试题：十一、项目实战（Chat Bot）"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/5-前端 Agent 面试题/5-11 十一、项目实战（Chat Bot）.md"
-source_sha256: "3c30d6b735829ca7f3b9ad7e4e76a57db804e13023095b4ec0e31d913dcd8469"
-migration_id: "migration-20260720-64e79771"
+title: 十一、项目实战（Chat Bot） — 前端 Agent 面试题锦集 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/langgraphjs-frontend-agent-interview/interview
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: Loock AI 前端 Agent 面试题：十一、项目实战（Chat Bot）
+tags:
+  - loock_ai
+  - frontend_agent_interview
+  - interview
+  - ai_agent
 ---
 
 

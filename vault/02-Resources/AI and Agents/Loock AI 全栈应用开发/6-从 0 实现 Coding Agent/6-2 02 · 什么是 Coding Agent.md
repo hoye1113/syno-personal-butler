@@ -1,19 +1,16 @@
 ---
-title: "02 · 什么是 Coding Agent — Loock AI 全栈应用开发"
-tags: ["loock_ai", "coding_agent", "ai_agent"]
-legacy_tags: ["loock_ai", "coding_agent", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/mini-coding-agent/00-intro/02-what-is-coding-agent"
-description: "理解 Coding Agent 的精确定义、能力边界和核心闭环，为后续实现建立统一认知。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-2 02 · 什么是 Coding Agent.md"
-source_sha256: "e96d8b09f4fcc44c1b9d5195bbcc9dcdc37d858c5c2f470ccf54d98e262c92eb"
-migration_id: "migration-20260720-64e79771"
+title: 02 · 什么是 Coding Agent — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/mini-coding-agent/00-intro/02-what-is-coding-agent
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 理解 Coding Agent 的精确定义、能力边界和核心闭环，为后续实现建立统一认知。
+tags:
+  - loock_ai
+  - coding_agent
+  - ai_agent
 ---
 
 第 0 章 · 建立全局认知

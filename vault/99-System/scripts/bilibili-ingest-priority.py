@@ -6,11 +6,10 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from path_config import AUDIT_ROOT, BILI_ROOT, RECASTORY_WORKSPACE
 
-WS = RECASTORY_WORKSPACE
-VAULT = BILI_ROOT
-OUT = AUDIT_ROOT / "bilibili-ingest-priority-2026-07-06.md"
+WS = Path(r"D:\workSpace\git_clone_test\hoye-git\Recastory\workspace")
+VAULT = Path(r"D:\workSpace\obsidian_repository\02-Resources\AI and Agents\B站视频知识库")
+OUT = Path(r"D:\workSpace\obsidian_repository\99-System\audit\bilibili-ingest-priority-2026-07-06.md")
 
 # Already in vault — penalize near-duplicate angles
 VAULT_KEYWORDS = [

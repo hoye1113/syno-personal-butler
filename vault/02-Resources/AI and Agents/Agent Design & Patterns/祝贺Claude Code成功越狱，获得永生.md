@@ -1,18 +1,15 @@
 ---
-title: "祝贺Claude Code成功越狱，获得永生"
-tags: ["ai_agent", "harness_engineering", "claude_code"]
-legacy_tags: ["ai_agent", "harness_engineering", "claude_code"]
-created: "2026-06-11"
-source: "https://mp.weixin.qq.com/s/05I-T6dGEi7fvsKeeRRVRw"
-description: "花叔逆向 Claude Code 泄露的 1902 个源文件，整理出 harness engineering 的活教材：System prompt 拼装 + 缓存分界、四层权限流水线、只记偏好的记忆系统、9 段式上下文压缩、像公司一样运转的多 Agent 框架、grep 搜索；判断 Claude Code 好用 60% 靠模型、40% 靠 harness"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/祝贺Claude Code成功越狱，获得永生.md"
-source_sha256: "aab1df2540c241c8e224117f7379385ea18864224a7797fa9bb445aaf20d09b4"
-migration_id: "migration-20260720-64e79771"
+title: 祝贺Claude Code成功越狱，获得永生
+source: https://mp.weixin.qq.com/s/05I-T6dGEi7fvsKeeRRVRw
 author:
   - "[[花叔]]"
 published: unknown
+created: 2026-06-11
+description: 花叔逆向 Claude Code 泄露的 1902 个源文件，整理出 harness engineering 的活教材：System prompt 拼装 + 缓存分界、四层权限流水线、只记偏好的记忆系统、9 段式上下文压缩、像公司一样运转的多 Agent 框架、grep 搜索；判断 Claude Code 好用 60% 靠模型、40% 靠 harness
+tags:
+  - ai_agent
+  - harness_engineering
+  - claude_code
 ---
 
 # 祝贺Claude Code成功越狱，获得永生

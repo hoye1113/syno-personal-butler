@@ -1,18 +1,16 @@
 ---
 title: "用AI的这三年，想跟你分享这9条心得。"
-tags: ["ai_agent", "ai_native", "taste"]
-legacy_tags: ["ai_agent", "ai_native", "taste", "9_tips"]
-created: "2026-06-11"
-source: "https://mp.weixin.qq.com/s/vTv0Vu4RgrMkmLbXGvnSug"
-description: "卡兹克公众号 3 周年 9 条 AI 实战心得：花钱用最好的模型/每周自动化一个任务/从搜索思维切换到实习生思维/设\"AI 能帮吗\"触发器/去创造/警惕 AI 幻觉/不要等准备好/培养品味审美/把时间还给现实的人；核心理念\"AI 是消费品位的工具，品味是这个时代最深的护城河"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/用AI的这三年，想跟你分享这9条心得.md"
-source_sha256: "33099b2ca3752e5b9e971fa1a7c9a3c66fd1be50f23beb99b533fcbf0fab9f92"
-migration_id: "migration-20260720-64e79771"
+source: https://mp.weixin.qq.com/s/vTv0Vu4RgrMkmLbXGvnSug
 author:
   - "[[数字生命卡兹克]]"
 published: unknown
+created: 2026-06-11
+description: 卡兹克公众号 3 周年 9 条 AI 实战心得：花钱用最好的模型/每周自动化一个任务/从搜索思维切换到实习生思维/设"AI 能帮吗"触发器/去创造/警惕 AI 幻觉/不要等准备好/培养品味审美/把时间还给现实的人；核心理念"AI 是消费品位的工具，品味是这个时代最深的护城河"
+tags:
+  - ai_agent
+  - ai_native
+  - taste
+  - 9_tips
 ---
 
 # 用AI的这三年，想跟你分享这9条心得。

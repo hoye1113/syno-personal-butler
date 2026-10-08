@@ -1,19 +1,16 @@
 ---
-title: "09 · 模型切换与 Provider — Loock AI 全栈应用开发"
-tags: ["loock_ai", "chatbot", "ai_agent"]
-legacy_tags: ["loock_ai", "chatbot", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/chat-bot-course/04-models-and-multimodal/09-model-switching-and-provider"
-description: "把模型选择、工具选择和线程记忆统一进同一条真实工作流，支持多模型和多 provider 切换。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/4-Chat Bot 实战/4-9 09 · 模型切换与 Provider.md"
-source_sha256: "c085d367c1952bd19403bec7f6a14e907d74065d06334e3a1f02ebec9c7100f1"
-migration_id: "migration-20260720-64e79771"
+title: 09 · 模型切换与 Provider — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/chat-bot-course/04-models-and-multimodal/09-model-switching-and-provider
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 把模型选择、工具选择和线程记忆统一进同一条真实工作流，支持多模型和多 provider 切换。
+tags:
+  - loock_ai
+  - chatbot
+  - ai_agent
 ---
 
 第四阶段 · 模型与多模态扩展

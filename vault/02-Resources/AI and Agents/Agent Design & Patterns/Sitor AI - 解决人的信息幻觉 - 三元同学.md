@@ -1,15 +1,13 @@
 ---
 title: "Sitor AI - 解决人的信息幻觉"
-tags: ["ai_agent", "ai_philosophy", "article", "wechat"]
-legacy_tags: ["ai_agent", "ai_philosophy", "article", "wechat"]
-created: "2026-07-01"
-source: "https://mp.weixin.qq.com/s/q0i77q32E-w_JNJ7Bp7doA"
+tags:
+  - ai_agent
+  - ai_philosophy
+  - article
+  - wechat
+created: 2026-07-01
+source: https://mp.weixin.qq.com/s/q0i77q32E-w_JNJ7Bp7doA
 description: "三元同学介绍 Sitor AI——以『角色』而非『工具』重塑学习体验，解决人在吸收信息时的『流畅性错觉』；通过苏格拉底式追问 / 连接个人经验 / 沉淀图解笔记 / 生成双人对谈播客重构人机共学"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/Sitor AI - 解决人的信息幻觉 - 三元同学.md"
-source_sha256: "6b099f808b90de0ff8bc35a427e759fc09595ff12fdfb09d121e603edf1c1e0d"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[三元同学]]"
 ---

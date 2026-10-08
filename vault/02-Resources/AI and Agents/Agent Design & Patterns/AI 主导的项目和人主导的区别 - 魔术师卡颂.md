@@ -1,15 +1,14 @@
 ---
 title: "AI 主导的项目和人主导的区别"
-tags: ["ai_agent", "ai_coding", "article", "wechat", "harness_engineering"]
-legacy_tags: ["ai_agent", "ai_coding", "article", "wechat", "harness_engineering"]
-created: "2026-07-02"
-source: "https://mp.weixin.qq.com/s/ZzYrfK5v_iBRWcQCLfMSEw"
+tags:
+  - ai_agent
+  - ai_coding
+  - article
+  - wechat
+  - harness_engineering
+created: 2026-07-02
+source: https://mp.weixin.qq.com/s/ZzYrfK5v_iBRWcQCLfMSEw
 description: "魔术师卡颂：AI 主导项目宜 monorepo + 统一 CLI 流程；各端差异收敛到工具层，写 web 与写 iOS 对 Agent 无本质差别"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/AI 主导的项目和人主导的区别 - 魔术师卡颂.md"
-source_sha256: "c6edb8a9ac798131f3356c6cf43e87391a691c53183d440c690995b944aa9e5d"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[魔术师卡颂]]"
 date: 2026-06-03

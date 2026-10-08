@@ -17,10 +17,9 @@ import argparse
 import json
 import re
 from pathlib import Path
-from path_config import BILI_ROOT, RECASTORY_WORKSPACE
 
-WS = RECASTORY_WORKSPACE
-VAULT = BILI_ROOT
+WS = Path(r"D:\workSpace\git_clone_test\hoye-git\Recastory\workspace")
+VAULT = Path(r"d:\workSpace\obsidian_repository\02-Resources\AI and Agents\B站视频知识库")
 MANIFEST = WS / "bilibili/manifest.json"
 
 

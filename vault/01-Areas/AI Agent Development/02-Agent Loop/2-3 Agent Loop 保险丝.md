@@ -1,18 +1,14 @@
 ---
-title: "死循环、重复犯错、Token 烧穿：你的 Agent Loop 缺这三个\\\"保险丝\\\" — 吃透 AI Agent 开发"
-tags: ["ai_agent", "loop_engineering"]
-legacy_tags: ["ai_agent", "loop_engineering"]
-created: "2026-05-19"
+title: "死循环、重复犯错、Token 烧穿：你的 Agent Loop 缺这三个\"保险丝\" — 吃透 AI Agent 开发"
 source: "https://sitor.ai/courses/agent-fundamentals/7-loop-fuses"
-description: "市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/02-Agent Loop/2-3 Agent Loop 保险丝.md"
-source_sha256: "47da08ff5ae88ffd42618c2bf7b202af0904d3f64f1a5158cbe7ad7234cb68d1"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-05-19
+description: "市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。"
+tags:
+  - ai_agent
+  - loop_engineering
 ---
 ## 死循环、重复犯错、Token 烧穿：你的 Agent Loop 大概率缺这三根"保险丝"
 

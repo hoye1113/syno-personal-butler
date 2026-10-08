@@ -1,19 +1,17 @@
 ---
-title: "React Hook  与导航 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "nextjs", "ai_agent", "hooks"]
-legacy_tags: ["loock_ai", "nextjs", "ai_agent", "hooks"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/nextjs/08-react-hooks-and-navigation"
-description: "掌握 React Hook  在 Next.js 中的应用及页面导航的最佳实践。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/3-Next.js 基础/3-8 React Hooks 与导航.md"
-source_sha256: "94abcbbee80946daeaad5ee8c4eefcf504361ecc0ca8b48c55760d765e69d0fc"
-migration_id: "migration-20260720-64e79771"
+title: React Hook  与导航 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/nextjs/08-react-hooks-and-navigation
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 掌握 React Hook  在 Next.js 中的应用及页面导航的最佳实践。
+tags:
+  - loock_ai
+  - nextjs
+  - ai_agent
+  - hooks
 ---
 
 # React Hooks 与导航

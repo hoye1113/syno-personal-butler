@@ -1,15 +1,14 @@
 ---
 title: "遇事留痕 - Loop Engineering 的基础"
-tags: ["ai_agent", "article", "harness_engineering", "loop_engineering", "wechat"]
-legacy_tags: ["ai_agent", "article", "harness_engineering", "loop_engineering", "wechat"]
-created: "2026-06-25"
+tags:
+  - ai_agent
+  - article
+  - harness_engineering
+  - loop_engineering
+  - wechat
 source: "微信公众号「AI 机会」"
+created: 2026-06-25
 description: "魔术师卡颂短文：使用 AI 时最该养成的习惯——遇事留痕；Coding Agent 的 Session Log / GitHub issue / PR 评论都是项目自我优化的燃料，是 Loop Engineering 的基础"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/遇事留痕 - Loop Engineering 的基础 - 魔术师卡颂.md"
-source_sha256: "2fd59aa134eb2d70f582a2e7ab79e6425ee0ab70702c03cd525421166d1cb88b"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[魔术师卡颂]]"
 ---

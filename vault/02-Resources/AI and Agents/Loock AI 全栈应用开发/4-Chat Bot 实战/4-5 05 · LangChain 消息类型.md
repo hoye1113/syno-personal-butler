@@ -1,19 +1,16 @@
 ---
-title: "05 · LangChain 消息类型 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "chatbot", "ai_agent"]
-legacy_tags: ["loock_ai", "chatbot", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/chat-bot-course/02-architecture/05-langchain-message-types"
-description: "建立前端消息、序列化消息和 LangChain 运行时消息的清晰边界。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/4-Chat Bot 实战/4-5 05 · LangChain 消息类型.md"
-source_sha256: "1e48c3c202cb97baa78ad1687a0e26e37e4584971bb39bafde657f3c34874ec9"
-migration_id: "migration-20260720-64e79771"
+title: 05 · LangChain 消息类型 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/chat-bot-course/02-architecture/05-langchain-message-types
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 建立前端消息、序列化消息和 LangChain 运行时消息的清晰边界。
+tags:
+  - loock_ai
+  - chatbot
+  - ai_agent
 ---
 
 第二阶段 · 结构理解与代码组织

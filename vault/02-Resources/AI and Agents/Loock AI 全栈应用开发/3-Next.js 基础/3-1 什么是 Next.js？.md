@@ -1,19 +1,16 @@
 ---
-title: "什么是 Next.js？ — Loock AI 全栈应用开发"
-tags: ["loock_ai", "nextjs", "ai_agent"]
-legacy_tags: ["loock_ai", "nextjs", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/nextjs/01-introduction-to-nextjs"
-description: "本文介绍 Next.js 的核心概念、与 React 的关系以及其主要优势。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/3-Next.js 基础/3-1 什么是 Next.js？.md"
-source_sha256: "153bafca5c0a5ee840b696d511b14dbc8c437f1ef34656e6256945b25e2ae14f"
-migration_id: "migration-20260720-64e79771"
+title: 什么是 Next.js？ — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/nextjs/01-introduction-to-nextjs
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 本文介绍 Next.js 的核心概念、与 React 的关系以及其主要优势。
+tags:
+  - loock_ai
+  - nextjs
+  - ai_agent
 ---
 
 # 什么是 Next.js？

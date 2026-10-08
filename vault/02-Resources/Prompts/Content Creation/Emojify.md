@@ -4,9 +4,6 @@ tags: [prompting, content_creation]
 created: 2026-06-11
 source: 02-Resources/Prompts/Content Creation/Emojify.md
 description: Prompt 模板：给输入文本加 emoji（自然插入位置、emoji 不相邻、保留原文、emoji 匹配语境和语气）
-source_path: "02-Resources/Prompts/Content Creation/Emojify.md"
-knowledge_state: captured
-link_status: connected
 ---
 
 ---
@@ -23,5 +20,3 @@ Add relevant emojis to enhance {}. Follow these rules:
     3. Keep all original text unchanged
     4. Choose emojis that match the context and tone
     Return only the emojified text.
-
-<!-- 关联：[[MOC - Prompt 库]] -->

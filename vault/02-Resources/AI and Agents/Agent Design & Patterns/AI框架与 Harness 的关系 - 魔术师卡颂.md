@@ -1,15 +1,15 @@
 ---
 title: "AI框架与 Harness 的关系"
-tags: ["ai_agent", "ai_coding", "article", "wechat", "harness_engineering", "skills"]
-legacy_tags: ["ai_agent", "ai_coding", "article", "wechat", "harness_engineering", "skills"]
-created: "2026-07-02"
-source: "https://mp.weixin.qq.com/s/Guo8r48RuydDolutIsc2vg"
+tags:
+  - ai_agent
+  - ai_coding
+  - article
+  - wechat
+  - harness_engineering
+  - skills
+created: 2026-07-02
+source: https://mp.weixin.qq.com/s/Guo8r48RuydDolutIsc2vg
 description: "魔术师卡颂：Harness=Agent 完整运行环境（环境约束/路由/流程编排三层）；superpowers/gstack 属顶层编排，与底层基建通过 Skill、AGENTS.md 路由串联"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/AI框架与 Harness 的关系 - 魔术师卡颂.md"
-source_sha256: "6560fa17264455714727214119c367439e07dd7aa5b89a92e94c17a5ee4fe332"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[魔术师卡颂]]"
 date: 2026-05-14

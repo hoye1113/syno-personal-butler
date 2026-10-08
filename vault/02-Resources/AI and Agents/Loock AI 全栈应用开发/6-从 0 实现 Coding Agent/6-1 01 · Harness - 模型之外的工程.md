@@ -1,19 +1,17 @@
 ---
-title: "01 · Harne ：模型之外的工程 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "coding_agent", "ai_agent", "harness_engineering"]
-legacy_tags: ["loock_ai", "coding_agent", "ai_agent", "harness_engineering"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/mini-coding-agent/00-intro/01-harness"
-description: "理解 Agent Harne  的概念，看懂 2026 年行业趋势从\\\"做模型\\\"到\\\"造底盘\\\"的转向，以及本课程 12 章如何对应一个完整 Harne  的构建过程。"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/6-从 0 实现 Coding Agent/6-1 01 · Harness - 模型之外的工程.md"
-source_sha256: "eced5723581cdddd6300c5bf132e5b47785b559d485d22022c57fcc6f12f9316"
-migration_id: "migration-20260720-64e79771"
+title: 01 · Harne ：模型之外的工程 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/mini-coding-agent/00-intro/01-harness
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 理解 Agent Harne  的概念，看懂 2026 年行业趋势从\"做模型\"到\"造底盘\"的转向，以及本课程 12 章如何对应一个完整 Harne  的构建过程。
+tags:
+  - loock_ai
+  - coding_agent
+  - ai_agent
+  - harness_engineering
 ---
 
 第 0 章 · 建立全局认知

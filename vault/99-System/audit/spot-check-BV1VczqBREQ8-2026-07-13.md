@@ -2,17 +2,17 @@
 title: "Spot check - 亚马逊Kiro规范驱动开发"
 tags: [notes, bilibili, ai_agent]
 created: 2026-07-13
-source: "Harness Context & Reliability/亚马逊Kiro团队-规范驱动开发.md"
+source: "Agent架构与平台/亚马逊Kiro团队-规范驱动开发.md"
 description: "Kiro长视频与无时间戳ASR的四锚点事实抽样。"
 ---
 
 # Spot check 工作表：亚马逊 Kiro 团队：规范驱动开发
 
-- **Vault**: `02-Resources/AI and Agents/Harness Context & Reliability/亚马逊Kiro团队-规范驱动开发.md`
+- **Vault**: `02-Resources/AI and Agents/B站视频知识库/Agent架构与平台/亚马逊Kiro团队-规范驱动开发.md`
 - **时长**: 63:50
 - **spot_check**: （未登记）
 - **transcript_source**: `bilibili-retranscribe/BV1VczqBREQ8/article.md`
-- **ASR**: `${RECASTORY_WORKSPACE}\bilibili-retranscribe\BV1VczqBREQ8\article.md`
+- **ASR**: `D:\workSpace\git_clone_test\hoye-git\Recastory\workspace\bilibili-retranscribe\BV1VczqBREQ8\article.md`
 - **ASR 段数**: 0
 
 ## 相关阅读 wikilink

@@ -1,10 +1,10 @@
 # Spot check 工作表：Claude Code实战：构建一个AI数据分析师
 
-- **Vault**: `02-Resources/AI and Agents/AI Coding & Tools/Claude Code实战-构建一个AI数据分析师.md`
+- **Vault**: `02-Resources/AI and Agents/B站视频知识库/Agent架构与平台/Claude Code实战-构建一个AI数据分析师.md`
 - **时长**: 51:46
 - **spot_check**: （未登记）
 - **transcript_source**: `Recastory/workspace/bilibili-retranscribe/BV1Mpf9B5Egk/article.md`
-- **ASR**: `${RECASTORY_WORKSPACE}\bilibili-retranscribe\BV1Mpf9B5Egk\article.md`
+- **ASR**: `D:\workSpace\git_clone_test\hoye-git\Recastory\workspace\bilibili-retranscribe\BV1Mpf9B5Egk\article.md`
 - **ASR 段数**: 57
 
 ## 相关阅读 wikilink

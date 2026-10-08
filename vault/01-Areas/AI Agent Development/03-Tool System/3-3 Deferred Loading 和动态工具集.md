@@ -1,18 +1,13 @@
 ---
-title: "工具太多模型选不准？Deferred Loading 和动态工具集 — 吃透 AI Agent 开发"
-tags: ["ai_agent"]
-legacy_tags: ["ai_agent"]
-created: "2026-06-08"
-source: "https://sitor.ai/courses/agent-fundamentals/10-dynamic-tools"
-description: "市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/03-Tool System/3-3 Deferred Loading 和动态工具集.md"
-source_sha256: "4eee8f63e01388688c7c32d0c9a61e5d59b8b9b35d6d517a1112f81c66afcc8f"
-migration_id: "migration-20260720-64e79771"
+title: 工具太多模型选不准？Deferred Loading 和动态工具集 — 吃透 AI Agent 开发
+source: https://sitor.ai/courses/agent-fundamentals/10-dynamic-tools
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-06-08
+description: 市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。
+tags:
+  - ai_agent
 ---
 
 # 工具太多模型选不准？动态工具集和延迟加载的生存之道

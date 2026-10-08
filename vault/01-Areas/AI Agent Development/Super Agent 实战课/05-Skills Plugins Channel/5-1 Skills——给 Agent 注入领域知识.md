@@ -1,18 +1,14 @@
 ---
 title: "Skills——给 Agent 注入领域知识 — Super Agent 实战课"
-tags: ["ai_agent", "skills"]
-legacy_tags: ["ai_agent", "skills"]
-created: "2026-07-13"
 source: "https://sitor.cc/courses/super-agent/sa-14-skills"
-description: "本章讲解如何为 Agent 实现 Skill 机制：区分 Tool 与 Skill，用 SkillLoader 渐进式注入领域 SOP（如 code-review），并通过 /skill 命令按需激活，让 Agent 从通才变专家。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/Super Agent 实战课/05-Skills Plugins Channel/5-1 Skills——给 Agent 注入领域知识.md"
-source_sha256: "5eff9ef46eb041330d31884fe9c5ee493f28ba4bc48aaef62fdb8ad161196b5f"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-07-13
+description: "本章讲解如何为 Agent 实现 Skill 机制：区分 Tool 与 Skill，用 SkillLoader 渐进式注入领域 SOP（如 code-review），并通过 /skill 命令按需激活，让 Agent 从通才变专家。"
+tags:
+  - ai_agent
+  - skills
 ---
 ## Skills——给 Agent 注入领域知识
 

@@ -1,15 +1,16 @@
 ---
 title: "smart-draw 手绘风可编辑 AI 图表 - 极客公园"
-tags: ["ai_agent", "ai_coding", "article", "wechat", "prompting"]
-legacy_tags: ["ai_agent", "ai_coding", "article", "wechat", "prompting"]
-created: "2026-07-02"
-source: "obsidian_repository_snapshot"
+tags:
+  - ai_agent
+  - ai_coding
+  - article
+  - wechat
+  - prompting
+created: 2026-07-02
+source:
+  - https://mp.weixin.qq.com/s/wUQdVxLPQA3eDLhnZ7T16g
+  - https://github.com/liujuntao123/smart-excalidraw-next
 description: "极客公园「AI 上新」：smart-draw（Smart Excalidraw）用自然语言生成手绘风 Excalidraw 可编辑图表，补 AI 生图不可改与 Mermaid 工业味之间的缺口"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/smart-draw 手绘风可编辑 AI 图表 - 极客公园.md"
-source_sha256: "43e16d14a88e90f8d64c9709c09ed71c2143cb114e027614c85e34d5f9205751"
-migration_id: "migration-20260720-64e79771"
 author:
   - "金光浩"
 date: 2026-01-20

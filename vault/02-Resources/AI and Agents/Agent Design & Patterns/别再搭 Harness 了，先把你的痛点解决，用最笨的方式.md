@@ -1,18 +1,14 @@
 ---
-title: "别再搭 Harness 了，先把你的痛点解决，用最笨的方式"
-tags: ["ai_agent", "harness_engineering"]
-legacy_tags: ["ai_agent", "harness_engineering"]
-created: "2026-06-09"
-source: "https://mp.weixin.qq.com/s/V48j4ut06_-xT4lIFjcvWg"
-description: "别再搭 Harness 了，先把你的痛点解决，用最笨的方式"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/别再搭 Harness 了，先把你的痛点解决，用最笨的方式.md"
-source_sha256: "7b95d09e4166d7da0f1d34b42e2880feefd5ee971b8b734ef0f7dac5b0ec0b56"
-migration_id: "migration-20260720-64e79771"
+title: 别再搭 Harness 了，先把你的痛点解决，用最笨的方式
+source: https://mp.weixin.qq.com/s/V48j4ut06_-xT4lIFjcvWg
 author:
   - "[[三元同学]]"
 published: 2026年6月3日 10:32
+created: 2026-06-09
+description: 别再搭 Harness 了，先把你的痛点解决，用最笨的方式
+tags:
+  - ai_agent
+  - harness_engineering
 ---
 
 很多人一上来就想搞一个完美的 Harness 系统或者 AI 工作流，把一套现有的系统直接搬过来直接用，这个想法大部分情况都是一种妄念。

@@ -1,18 +1,13 @@
 ---
-title: "Function Calling 与 Structured Output：模型是怎么\\\"学会\\\"调用你写的函数的？ — 吃透 AI Agent 开发"
-tags: ["ai_agent"]
-legacy_tags: ["ai_agent"]
-created: "2026-05-19"
+title: "Function Calling 与 Structured Output：模型是怎么\"学会\"调用你写的函数的？ — 吃透 AI Agent 开发"
 source: "https://sitor.ai/courses/agent-fundamentals/8-function-calling"
-description: "市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/03-Tool System/3-1 Function Calling 与 Structured Output.md"
-source_sha256: "c9566821bed91c7fc28df6e64877f9b088aa29969242fb724569decb1d67c8db"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-05-19
+description: "市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。"
+tags:
+  - ai_agent
 ---
 ## Function Calling：模型是怎么"学会"调用你写的函数的？
 

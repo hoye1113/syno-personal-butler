@@ -1,10 +1,10 @@
 # Spot check 工作表：Cursor负责人：Composer模型如何训练的？
 
-- **Vault**: `02-Resources/AI and Agents/Frontier Models & Physical AI/Cursor负责人-Composer模型如何训练的.md`
+- **Vault**: `02-Resources/AI and Agents/B站视频知识库/Agent架构与平台/Cursor负责人-Composer模型如何训练的.md`
 - **时长**: 45:12
 - **spot_check**: （未登记）
 - **transcript_source**: `Recastory/workspace/bilibili-retranscribe/BV1iH7R6tEfJ/article.md`
-- **ASR**: `${RECASTORY_WORKSPACE}\bilibili-retranscribe\BV1iH7R6tEfJ\article.md`
+- **ASR**: `D:\workSpace\git_clone_test\hoye-git\Recastory\workspace\bilibili-retranscribe\BV1iH7R6tEfJ\article.md`
 - **ASR 段数**: 49
 
 ## 相关阅读 wikilink

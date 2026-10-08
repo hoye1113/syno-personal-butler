@@ -12,11 +12,10 @@ import argparse
 import re
 from datetime import date
 from pathlib import Path
-from path_config import BILI_ROOT, RECASTORY_WORKSPACE, REPO_ROOT
 
-VAULT = BILI_ROOT
-REPO = REPO_ROOT
-WS = RECASTORY_WORKSPACE
+VAULT = Path(r"d:\workSpace\obsidian_repository\02-Resources\AI and Agents\B站视频知识库")
+REPO = Path(r"d:\workSpace\obsidian_repository")
+WS = Path(r"D:\workSpace\git_clone_test\hoye-git\Recastory\workspace")
 
 SKIP_FM_KEYS = {"lecture_colloquial", "curate_method", "dialogue_version", "genre"}
 

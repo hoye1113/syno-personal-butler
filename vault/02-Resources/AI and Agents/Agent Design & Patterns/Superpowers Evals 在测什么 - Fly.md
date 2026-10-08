@@ -1,15 +1,19 @@
 ---
 title: "Superpowers Evals 在测什么"
-tags: ["ai_agent", "ai_evaluation", "article", "wechat", "harness_engineering", "skills"]
-legacy_tags: ["ai_agent", "ai_evaluation", "article", "wechat", "harness_engineering", "skills"]
-created: "2026-07-07"
-source: "obsidian_repository_snapshot"
+tags:
+  - ai_agent
+  - ai_evaluation
+  - article
+  - wechat
+  - harness_engineering
+  - skills
+created: 2026-07-07
+source:
+  - https://mp.weixin.qq.com/s/n07-XVlpA_0FkV11pzd_yw
+  - https://github.com/prime-radiant-inc/superpowers-evals
+  - https://blog.fsck.com/2026/06/15/Superpowers-6/
+  - https://github.com/obra/superpowers
 description: "Fly 解读 Superpowers Evals：workflow 行为合规评测（Gauntlet + post-checks 双层判定）；三场景举例；Superpowers 6 eval 驱动优化与 reviewer 上下文风险"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Agent Design & Patterns/Superpowers Evals 在测什么 - Fly.md"
-source_sha256: "131fbf2676acef3a3c38070e3547a83a5e9fa9fbba93eb23ffa4a26a104bbb32"
-migration_id: "migration-20260720-64e79771"
 author:
   - Fly
 date: 2026-07-07

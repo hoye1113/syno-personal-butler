@@ -1,18 +1,13 @@
 ---
 title: "补齐装备——edit_file、grep、glob 与 bash — Super Agent 实战课"
-tags: ["ai_agent"]
-legacy_tags: ["ai_agent"]
-created: "2026-07-13"
 source: "https://sitor.cc/courses/super-agent/sa-04b-builtin-tools"
-description: "在既有 ToolRegistry 上新增 edit_file、glob、grep、bash 四个工具，分别说明精确替换的零/多匹配错误处理、递归文件搜索、内容检索格式，以及最危险工具的超时与环境检测设计。"
-knowledge_state: captured
-link_status: connected
-source_path: "01-Areas/AI Agent Development/Super Agent 实战课/02-Tool System/2-2 补齐装备——edit_file、grep、glob 与 bash.md"
-source_sha256: "27cedf07534782b8a87651ece0c1b620f79445b9f5ea6d694070bb96b005790f"
-migration_id: "migration-20260720-64e79771"
 author:
   - "[[Sitor AI]]"
 published:
+created: 2026-07-13
+description: "在既有 ToolRegistry 上新增 edit_file、glob、grep、bash 四个工具，分别说明精确替换的零/多匹配错误处理、递归文件搜索、内容检索格式，以及最危险工具的超时与环境检测设计。"
+tags:
+  - ai_agent
 ---
 ## 补齐装备——edit_file、grep、glob 与 bash
 

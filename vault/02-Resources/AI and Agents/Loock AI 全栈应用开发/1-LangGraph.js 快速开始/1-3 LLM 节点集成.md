@@ -1,19 +1,16 @@
 ---
-title: "LLM 节点集成 — Loock AI 全栈应用开发"
-tags: ["loock_ai", "langgraphjs_quickstart", "ai_agent"]
-legacy_tags: ["loock_ai", "langgraphjs-quickstart", "ai_agent"]
-created: "2026-06-09"
-source: "https://ai-full-stack.loock.vip/docs/quick-start/03-llm-integration"
-description: "将大语言模型引入你的工作流，构建智能节点"
-knowledge_state: captured
-link_status: connected
-source_path: "02-Resources/AI and Agents/Loock AI 全栈应用开发/1-LangGraph.js 快速开始/1-3 LLM 节点集成.md"
-source_sha256: "887ab56f6ac3add72a940fee0932889653a4317212b4a968a39104a6ccb9a987"
-migration_id: "migration-20260720-64e79771"
+title: LLM 节点集成 — Loock AI 全栈应用开发
+source: https://ai-full-stack.loock.vip/docs/quick-start/03-llm-integration
 author:
   - "[[Loock AI]]"
 published:
+created: 2026-06-09
 synced: 2026-06-09
+description: 将大语言模型引入你的工作流，构建智能节点
+tags:
+  - loock_ai
+  - langgraphjs-quickstart
+  - ai_agent
 ---
 
 # LLM 节点集成
