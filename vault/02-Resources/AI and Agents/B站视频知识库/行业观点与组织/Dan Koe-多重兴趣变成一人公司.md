@@ -16,7 +16,6 @@ column_source: bilibili
 ingest_dir: "D:/workSpace/git_clone_test/hoye-git/Recastory/workspace/bilibili-retranscribe/BV1EJjN6XETy/ingest"
 duration: 28min
 saved: 2026-07-08
-created: 2026-07-08
 updated: 2026-07-08
 description: "Dan Koe 拆解多重兴趣者如何将'博而不精'的特质转化为一人公司——研究、包装、系统化输出的完整路径"
 material_tier: S

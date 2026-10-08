@@ -337,11 +337,6 @@
 - `03-Archive/issues/scripts_runbook_backfill.md` （真孤岛）
 - `02-Resources/哲学与自我认知/e45-人何以自处-复习整理版-3c22f102.md` （真孤岛）
 - `02-Resources/AI and Agents/B站视频知识库/README.md` （真孤岛）
-- `02-Resources/AI and Agents/Frontier Models & Physical AI/amp团队-ai竞赛与算力网-6714592d.md` （真孤岛）
-- `02-Resources/AI and Agents/Frontier Models & Physical AI/deepmind研究总监-ai时代的-天气预报-adde12bf.md` （真孤岛）
-- `02-Resources/AI and Agents/Frontier Models & Physical AI/lambda联创-gpu神话与ai算力-ab88b896.md` （真孤岛）
-- `02-Resources/AI and Agents/Frontier Models & Physical AI/recursive-ceo-让ai自己构建-更强的ai-哔哩哔哩-72d3ad0c.md` （真孤岛）
-- `02-Resources/AI and Agents/Frontier Models & Physical AI/强化学习之父-持续学习-212a4104.md` （真孤岛）
 
 ## 3. 无 frontmatter 的文件
 
@@ -373,7 +368,7 @@
 - `03-Archive/issues/infrastructure_baseline_hardening.md`
 - `03-Archive/issues/scripts_runbook_backfill.md`
 
-## 4. frontmatter 必填字段缺失
+## 4. frontmatter 字段问题（缺失 / 重复）
 
 - `99-System/audit/bilibili-a-tier-v3-rewrite-2026-07-03.md` 缺失: source
 - `99-System/audit/bilibili-enrich-partial-2026-07-03.md` 缺失: source

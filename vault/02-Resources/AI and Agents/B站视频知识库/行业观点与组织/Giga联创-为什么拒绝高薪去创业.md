@@ -16,7 +16,6 @@ column_source: bilibili
 ingest_dir: "D:/workSpace/git_clone_test/hoye-git/Recastory/workspace/bilibili-retranscribe/BV1rEEh6KEVF/ingest"
 duration: 30min
 saved: 2026-07-08
-created: 2026-07-08
 updated: 2026-07-08
 description: "GigaML 联创 Varun 拆解拒绝 55 万美金量化工作去创业的心路——YC 面试被拒方向、8 人团队赢下 DoorDash、AI 代理本质是 Markdown 迭代"
 material_tier: S

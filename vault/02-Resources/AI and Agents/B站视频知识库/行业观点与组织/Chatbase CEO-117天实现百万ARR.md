@@ -16,7 +16,6 @@ column_source: bilibili
 ingest_dir: "D:/workSpace/git_clone_test/hoye-git/Recastory/workspace/bilibili-retranscribe/BV1YfE36TEyz/ingest"
 duration: 35min
 saved: 2026-07-08
-created: 2026-07-08
 updated: 2026-07-08
 description: "Chatbase 创始人 Yasser 拆解不融资如何在 117 天内实现百万 ARR——从 GPT 包装器到 AI Agent 平台的产品演进、自力更生的增长心法"
 material_tier: S

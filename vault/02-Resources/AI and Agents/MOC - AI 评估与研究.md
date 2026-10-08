@@ -45,7 +45,6 @@ source: vault_initiative - moc - split from Agent Theory and Design
 | 职业与组织 | [[MOC - AI 时代个人发展与组织]] |
 | Loock 全栈课程 | [[MOC - Loock AI 全栈课程]] |
 
-
 ---
 
 ## 迁移收录（2026-10-08 · 知识库合并）

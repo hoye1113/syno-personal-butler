@@ -204,10 +204,6 @@ source: vault_initiative - moc - ai_agent - ai_career - ai_philosophy
 
 ## 维护
 
-- **总笔记数**：9 核心 + 79 行业观点/访谈（2026-07-15 从原 Agent Theory 总览 S-tier 迁入）
-- **最后更新**：2026-07-15（从原 Agent Theory 总览迁入行业观点/访谈 S-tier，dedup 后 +N 篇）
-- **入选标准**：笔记主题直接讨论"AI 时代下的人/职业/组织/自我认知"（不是 Agent 本身的实现细节）
-
 ---
 
 ## 迁移收录（2026-10-08 · 知识库合并）
@@ -236,3 +232,7 @@ source: vault_initiative - moc - ai_agent - ai_career - ai_philosophy
 - [[wispr增长负责人-用ai打造一台1亿美元增长引擎-a4b9750d|Wispr增长负责人：用AI打造一台1亿美元增长引擎]]
 - [[代理时代的设计方法-6b140cee|代理时代的设计方法]]
 - [[黄仁勋-成就英伟达的心态|黄仁勋-成就英伟达的心态]]
+
+- **总笔记数**：9 核心 + 79 行业观点/访谈（2026-07-15 从原 Agent Theory 总览 S-tier 迁入）
+- **最后更新**：2026-07-15（从原 Agent Theory 总览迁入行业观点/访谈 S-tier，dedup 后 +N 篇）
+- **入选标准**：笔记主题直接讨论"AI 时代下的人/职业/组织/自我认知"（不是 Agent 本身的实现细节）

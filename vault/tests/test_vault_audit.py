@@ -123,6 +123,33 @@ source: https://example.com/broken
             # 没有任何入链的普通笔记仍应保留为孤岛。
             self.assertIn("notes/NoFrontmatter.md", orphan_paths)
 
+    def test_audit_vault_reports_duplicate_frontmatter_fields(self):
+        # 重复字段会被 parse_frontmatter 静默覆盖，但下游（Syno validator）视为硬错误，
+        # 审计必须显式报告（2026-10-08 合并回归教训）。
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir)
+            (vault_root / "notes").mkdir()
+            (vault_root / "notes" / "Dup.md").write_text(
+                """---
+title: "Dup"
+tags: [ai_agent]
+created: 2026-07-08
+source: https://example.com/dup
+created: 2026-07-08
+---
+
+正文
+""",
+                encoding="utf-8",
+            )
+
+            audit_data = self.module.audit_vault(vault_root)
+
+            self.assertEqual(
+                audit_data["duplicate_frontmatter"],
+                {"notes/Dup.md": ["created"]},
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

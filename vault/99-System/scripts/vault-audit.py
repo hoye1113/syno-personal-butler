@@ -146,6 +146,33 @@ def parse_frontmatter(content):
     return result
 
 
+def find_duplicate_frontmatter_fields(content):
+    """返回 frontmatter 中重复出现的顶层字段名列表（无重复返回空表）。
+
+    parse_frontmatter 对重复字段静默覆盖（后值赢），但下游消费者
+    （如 Syno validator）会把重复字段当硬错误——审计必须显式暴露。
+    """
+    if not content.startswith("---"):
+        return []
+    end = content.find("\n---", 3)
+    if end == -1:
+        return []
+    fm_block = content[3:end].strip()
+    seen = set()
+    dups = []
+    for line in fm_block.split("\n"):
+        # 只数顶层 key（行首非空白、含冒号），列表项与缩进行跳过
+        if line[:1].isspace() or ":" not in line:
+            continue
+        key = line.partition(":")[0].strip()
+        if not key:
+            continue
+        if key in seen and key not in dups:
+            dups.append(key)
+        seen.add(key)
+    return dups
+
+
 def extract_wikilinks(content):
     """提取所有 [[wikilink]]"""
     return re.findall(r"\[\[([^\]]+)\]\]", content)
@@ -178,6 +205,7 @@ def audit_vault(vault_path):
     # 2. 报告数据
     no_frontmatter = []
     incomplete_frontmatter = defaultdict(list)
+    duplicate_frontmatter = defaultdict(list)  # file -> [重复字段名]
     bad_tags = defaultdict(list)  # file -> [(tag, reason)]
     dead_links = defaultdict(list)  # file -> [(link, target)]
     unmatched_links = defaultdict(list)  # 既不是文件也不是目录（可能作者引用或真死链）
@@ -203,6 +231,8 @@ def audit_vault(vault_path):
             for field in REQUIRED_FIELDS:
                 if field not in fm or not fm[field]:
                     incomplete_frontmatter[rel].append(field)
+            for dup in find_duplicate_frontmatter_fields(content):
+                duplicate_frontmatter[rel].append(dup)
             # tag 风格
             tags = fm.get("tags", [])
             if isinstance(tags, str):
@@ -254,6 +284,7 @@ def audit_vault(vault_path):
         "total_files": len(all_md),
         "no_frontmatter": no_frontmatter,
         "incomplete_frontmatter": dict(incomplete_frontmatter),
+        "duplicate_frontmatter": dict(duplicate_frontmatter),
         "bad_tags": dict(bad_tags),
         "unmatched_links": dict(unmatched_links),
         "orphan_files": orphan_files,
@@ -306,13 +337,16 @@ def generate_report(data, vault_path):
         lines.append("✅ 所有文件都有 frontmatter\n")
     lines.append("")
 
-    # 4. frontmatter 字段缺失
-    lines.append("## 4. frontmatter 必填字段缺失\n")
+    # 4. frontmatter 字段问题（缺失 / 重复）
+    lines.append("## 4. frontmatter 字段问题（缺失 / 重复）\n")
     if data["incomplete_frontmatter"]:
         for path, fields in data["incomplete_frontmatter"].items():
             lines.append(f"- `{path}` 缺失: {', '.join(fields)}")
-    else:
-        lines.append("✅ 所有文件 frontmatter 完整\n")
+    if data["duplicate_frontmatter"]:
+        for path, fields in data["duplicate_frontmatter"].items():
+            lines.append(f"- `{path}` 重复字段: {', '.join(fields)}")
+    if not data["incomplete_frontmatter"] and not data["duplicate_frontmatter"]:
+        lines.append("✅ 所有文件 frontmatter 完整且无重复字段\n")
     lines.append("")
 
     # 5. tag 风格问题
@@ -377,6 +411,7 @@ def main():
     print(f"  - Orphan files: {len(data['orphan_files'])}")
     print(f"  - No frontmatter: {len(data['no_frontmatter'])}")
     print(f"  - Incomplete FM: {len(data['incomplete_frontmatter'])}")
+    print(f"  - Duplicate FM fields: {len(data['duplicate_frontmatter'])}")
     print(f"  - Bad tags: {len(data['bad_tags'])}")
     print(f"  - Bad filenames: {len(data['bad_filenames'])}")
     print(f"  - Report: {report_path}")
