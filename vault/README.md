@@ -15,7 +15,8 @@
   - 02-Agent Loop — Agent 循环机制
   - 03-Tool System — 工具系统
   - 04-Context Engineering — 上下文工程
-  - 05-Memory / 06-Multi-Agent / 07-Harness Engineering — 章节名占位（待 P1/P2 扩展）
+  - 05-Multi-Agent / 06-Harness Engineering / 08-结语 — 已收录部分章节
+  - **Super Agent 实战课** — 实战课程笔记（02-Tool System、05-Skills Plugins Channel、07-部署 等）
 - **Workflow and Skill Management** — 工作流与技能管理
 - **AI Tools and Products** — AI 工具与产品评测（**P2 阶段可能迁至 Resources**）
 - **Programming and Engineering** — 编程与工程实践（踩坑经验、技术方案）
@@ -23,13 +24,13 @@
 ### 02-Resources（资源）
 参考资料、Prompts、文章摘录等。**按主题分（不按来源）**——见 [AGENTS.md §2](AGENTS.md)。
 
-- **AI and Agents** — Agent 理论与实践主目录
-  - **Agent Theory and Design**（公众号 + B 站视频）→ [[MOC - Agent Theory and Design]]
-  - **Harness Engineering**（横切主题）→ [[MOC - Harness Engineering]]
-  - **AI 时代个人发展与组织**（横切主题）→ [[MOC - AI 时代个人发展与组织]]
+- **AI and Agents** — Agent 理论与实践主目录（**主题以 MOC 为枢纽，物理目录从简**）
+  - **Agent Design & Patterns** — 公众号/网页文章沉淀
+  - **Agent Architecture & Runtime / AI Coding & Tools / AI Evaluation & Safety / AI Native Organization Product & Career / Harness Context & Reliability / Frontier Models & Physical AI** — 捕获管道按主题落盘的目录（2026-10-08 两库合并后原位保留）
+  - **B 站视频知识库**（1 BV = 1 canonical 文件，按主题子目录）→ 新收录见 [图文专栏精华 SUBDOC](99-System/Skills/vskill-vault-curate/SUBDOC%20-%20B站图文专栏精华收录.md)
   - **Loock AI 全栈应用开发**（148 篇，6 章节 MOC）→ [[MOC - Loock AI 全栈课程]]
-  - **B 站视频知识库**（1 BV = 1 canonical 文件）→ 新收录见 [图文专栏精华 SUBDOC](99-System/Skills/vskill-vault-curate/SUBDOC%20-%20B站图文专栏精华收录.md)
-  - **播客转录**（1 篇）
+  - **Authors** — 作者页；**播客转录**
+  - 主题 MOC：[[MOC - Agent Theory and Design]]、[[MOC - Agent 架构与工程]]、[[MOC - Harness Engineering]]、[[MOC - AI Coding 与工具]]、[[MOC - AI 评估与研究]]、[[MOC - 具身智能与脑机接口]]；个人发展主题见 [[MOC - AI 时代个人发展与组织]]（在 哲学与自我认知/）
 - **Prompts** — Copilot 自定义提示词模板（13 个 Prompt + 1 [[MOC - Prompt 工程]]）
 - **哲学与自我认知** — 与 AI 时代相关的自我认知（[[MOC - AI 时代个人发展与组织]] 在此）
 
@@ -79,6 +80,7 @@
 ---
 
 **变更记录**：
+- 2026-10-08：知识库二源合一——syno vault 分叉并入本库（74 篇捕获原位保留、205 篇旧布局重复清除、零丢失）；新增 [[MOC - 具身智能与脑机接口]] 并接入导航路由表；vault-audit 新增重复 frontmatter 字段检查。
 - 2026-07-13：Markdown 成为唯一事实源；Agent 控制面与 B站双轴收录 v2。
 - 2026-07-13：B站默认收录改为用户提供图文专栏；ASR/Recastory 冻结为 Legacy。
 - 2026-07-13：专栏协议升级为 `bilibili_opus_ingest_v2`；S级默认对谈出版并增加类型化知识关系。

@@ -1,6 +1,25 @@
-# 当前执行状态（2026-09-24）
+# 当前执行状态（2026-10-08）
 
-本节是当前交接摘要；下方「2026-09-18 交接」与「历史交接」仅用于追溯，不能覆盖这里的迁移事实。
+本节是当前交接摘要；下方各期交接仅用于追溯，不能覆盖这里的事实。
+
+## 知识库二源合一 + dsh 升级
+
+- **分支/远端**：`main` 本地领先 `origin/main` 的提交（`20f145d` 合并 + `1feffee` 回归修复，连同此前未推的 `0cec716`、`4cafac5`）已于 2026-10-08 推送同步。
+- **知识库唯一事实源**：本仓 `vault/`。obsidian_repository 策展主线已并入（547 文件同步 / 205 篇旧布局重复清除 / 74 篇捕获原位保留 / 逐 basename 校验零丢失）；obsidian 仓退役为 `D:\workSpace\obsidian_repository-archive-20261008`，junction 别名待 `D:\workSpace\switch-vault-alias.ps1` 在无程序占用时执行（当轮 Claude 会话自身占用该路径未能执行）。
+- **dsh 升级**：`SYNO_DSH_ROOT=D:\workSpace\deepseek-harness` fast-forward 至 `0.1.7-alpha.2`（`00102833df`），`pnpm install` + `pnpm run build` 完成，`harness:doctor` 全 ok。0.2.x 未跟进（跨契约，按 ADR-0007 需先补契约测试）。
+- **回归基线**：`pnpm test` 782/782；`pnpm verify` 2319 files + 8 active docs；vault pytest 58/58；vault-audit 623 files / 338 unmatched / 69 orphan / 27 no-FM / 25 incomplete / Duplicate FM fields 0（新增指标）。
+- **合并回归与修复**：obsidian 主线 4 篇 B站笔记携带重复 `created` 字段（syno 迁移管道曾修复，覆盖时回归），击穿 validator 致 `KnowledgeStore.rebuild` 崩溃——`1feffee` 删重 + vault-audit 增加重复字段检查与测试防线。
+- **生产运行态**：单仓形态不变；`SYNO_KNOWLEDGE_ROOT` 用户级/系统级均未设置且必须保持未设置；ops 仍归本仓。
+- **下一步（按序）**：
+  1. 无程序占用 `D:\workSpace\obsidian_repository` 时运行 `D:\workSpace\switch-vault-alias.ps1` 完成 junction 别名（幂等、带回滚）。
+  2. obsidian 远端仓 `hoye1113/longterm-ai-vault` 后续保留只读或删除由 Owner 定夺。
+  3. 既有产品路线不变：B5 删除类、C1b 尾段、C5、Phase D/E（见 2026-09-24 交接）。
+
+---
+
+# 2026-09-24 交接（追溯用）
+
+本节是当时交接摘要；下方「2026-09-18 交接」与「历史交接」仅用于追溯，不能覆盖当时的迁移事实。
 
 ## Claw 直通 DSH 迁移（ADR 0007）
 

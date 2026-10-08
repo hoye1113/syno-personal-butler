@@ -105,7 +105,7 @@ M1 上下文管理 + host 端口修复 + **Phase 1 收尾** + **M2 记忆保真�
 ## 6. 既有约束（务必遵守）
 
 - **不 Push**（分支 `codex/round3-remediation`，全部本地）。
-- 原 Obsidian 库 `D:\workSpace\obsidian_repository` **永久只读**。
+- 原 Obsidian 库 `D:\workSpace\obsidian_repository` **永久只读**。（2026-10-08 起作废：该库已并入本仓 `vault/` 成为唯一事实源，原路径将转为 junction 别名——见 KNOWN-LIMITATIONS 同日条目）
 - 知识写入走受控 Job；不绕过 Policy、不 reset、不预创建 LearningState。
 - Provider token 不泄露。
 
