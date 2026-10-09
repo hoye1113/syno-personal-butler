@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -9,9 +9,10 @@ import { pathToFileURL } from "node:url";
 // 生产行为不受影响：使用独立 DSH_HOME / workspace / runtime / localData。
 
 const SYNO_ROOT = path.resolve(import.meta.dirname, "..");
-const DSH_ROOT = String(process.env.SYNO_DSH_ROOT || "").trim();
+const localVendor = path.join(SYNO_ROOT, "vendor", "deepseek-harness");
+const DSH_ROOT = String(process.env.SYNO_DSH_ROOT || "").trim() || (existsSync(localVendor) ? localVendor : "");
 if (!DSH_ROOT) {
-  console.error("spike:capabilities 需要 SYNO_DSH_ROOT 指向已构建（pnpm run build）的 deepseek-harness clone");
+  console.error("spike:capabilities 需要 SYNO_DSH_ROOT 指向已构建（pnpm run build）的 deepseek-harness clone，或内置 vendor/deepseek-harness");
   process.exit(2);
 }
 

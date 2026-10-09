@@ -230,15 +230,20 @@ pnpm harness:status
 pnpm windows:status
 ```
 
-产品只走 DeepSeek Harness。启动前必须设置 `SYNO_DSH_ROOT` 为本机 `deepseek-harness` 克隆的绝对路径；未设置时 sidecar 拒绝启动。
+产品只走 DeepSeek Harness。既可使用本仓内置的 Git Submodule `vendor/deepseek-harness`（推荐，无需设置环境变量；克隆时使用 `git clone --recurse-submodules` 并执行 `pnpm harness:setup`），亦可设置环境变量 `SYNO_DSH_ROOT` 指向外部 `deepseek-harness` 克隆的绝对路径。
 
 ```powershell
+# 方式 A：使用内置 Submodule（推荐缺省）
+pnpm harness:setup
+pnpm start
+
+# 方式 B：使用外部已有克隆
 $env:SYNO_DSH_ROOT = "<absolute-path-to-deepseek-harness>"
 pnpm harness:doctor
 pnpm start
 ```
 
-Clone 还要在 `$env:SYNO_DSH_ROOT` 里 `pnpm run build`，否则 8888 会起来但 3088 起不来。完整踩坑见上文「DeepSeek Harness 生产 chat」。
+运行时 clone 必须执行 `pnpm run build`，否则 8888 会起来但 3088 起不来（可直接运行 `pnpm harness:setup` 自动编译并检查）。完整踩坑见上文「DeepSeek Harness 生产 chat」。
 
 `harness:doctor` 不把密钥写进输出。协议冒烟用 `pnpm probe:harness`（假 sidecar + 中文 UTF-8）；`pnpm probe:harness -- --real` 验证真实 Harness runtime closure 可发现并报告缺失项。显式设置 `SYNO_RUN_REAL_DSH=1` 的测试文件才允许执行真实模型验收；API key 只从宿主环境读取，不写入测试参数、日志、仓库文件或验收产物。
 

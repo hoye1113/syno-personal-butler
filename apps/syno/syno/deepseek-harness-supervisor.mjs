@@ -31,7 +31,6 @@ const JSONRPC_DSH_PROFILES = Object.freeze({
 const JSONRPC_BOOTSTRAP_PACKAGES = Object.freeze([
   "@deepseek-ai/dsh-app-boot",
   "@deepseek-ai/cordis",
-  "@deepseek-ai/dsh-invariants",
   "@deepseek-ai/dsh-sdk-app",
   "@deepseek-ai/dsh-sdk-jsonrpc-server",
   "@deepseek-ai/dsh-sdk-minimal",
@@ -42,9 +41,12 @@ function runtimeError(code, message, details) {
   return Object.assign(new Error(message), { code, ...(details ? { details } : {}) });
 }
 
-function defaultDshRoot() {
+function defaultDshRoot(repoRoot = PATHS.repoRoot) {
   const raw = String(process.env.SYNO_DSH_ROOT || "").trim();
-  return raw ? path.resolve(raw) : "";
+  if (raw) return path.resolve(raw);
+  const localVendor = path.join(repoRoot, "vendor", "deepseek-harness");
+  if (existsSync(localVendor)) return localVendor;
+  return "";
 }
 
 function defaultKillTree(pid) {

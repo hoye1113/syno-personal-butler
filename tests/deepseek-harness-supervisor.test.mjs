@@ -45,7 +45,6 @@ async function writeDshLaunchFixture(root, { missingRuntime = [] } = {}) {
   const packageNames = new Set([
     "@deepseek-ai/dsh-app-boot",
     "@deepseek-ai/cordis",
-    "@deepseek-ai/dsh-invariants",
     "@deepseek-ai/dsh-sdk-app",
     "@deepseek-ai/dsh-sdk-jsonrpc-server",
     "@deepseek-ai/dsh-sdk-protocol",
@@ -213,7 +212,6 @@ test("launch discovery selects official DSH SDK profiles only with a complete ru
   assert.deepEqual(launch.runtimeClosure.required, [...new Set([
     "@deepseek-ai/cordis",
     "@deepseek-ai/dsh-app-boot",
-    "@deepseek-ai/dsh-invariants",
     "@deepseek-ai/dsh-sdk-app",
     "@deepseek-ai/dsh-sdk-jsonrpc-server",
     "@deepseek-ai/dsh-sdk-protocol",

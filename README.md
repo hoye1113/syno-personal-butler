@@ -5,14 +5,21 @@ Syno 是一个 Windows 本地运行的主动式知识闭环私人管家。它以
 ## 快速开始
 
 ```powershell
+# 1. 递归拉取主仓与 deepseek-harness 子模块
+git clone --recurse-submodules <repo-url>
+cd syno-personal-butler
+
+# 2. 安装依赖并构建运行时（若未递归克隆，执行 pnpm harness:setup 亦会自动拉取与构建）
 pnpm install --frozen-lockfile
+pnpm harness:setup
+
+# 3. 运行测试并启动
 pnpm test
 pnpm verify
-$env:SYNO_DSH_ROOT = "<absolute-path-to-deepseek-harness>"
 pnpm start
 ```
 
-`SYNO_DSH_ROOT` 里的 clone 必须先 `pnpm run build`。浏览器打开 <http://127.0.0.1:8888> 进入控制面（凭据、渠道、Policy）。日常对话在受控 DSH Web（默认 <http://127.0.0.1:3088>），与微信同一会话。启动、事件协议和 permission 表的踩坑见 [运维](docs/OPERATIONS.md)。Syno 不依赖 Obsidian，也不依赖 OpenClaw。
+若未设置环境变量 `$env:SYNO_DSH_ROOT`，系统会自动缺省使用本仓内置的子模块 `./vendor/deepseek-harness`。如果本机已有独立的 Harness 克隆，亦可通过 `$env:SYNO_DSH_ROOT = "<外部路径>"` 覆盖。浏览器打开 <http://127.0.0.1:8888> 进入控制面（凭据、渠道、Policy）。日常对话在受控 DSH Web（默认 <http://127.0.0.1:3088>），与微信同一会话。启动、事件协议和 permission 表的踩坑见 [运维](docs/OPERATIONS.md)。Syno 不依赖 Obsidian，也不依赖 OpenClaw。
 
 知识库与运行记录住在知识仓库（由 `SYNO_KNOWLEDGE_ROOT` 指向；未设置时回退到代码仓库根的单库形态，见 [运维](docs/OPERATIONS.md)「知识仓库拆分」）。token-cloud Provider、飞书和微信均按需配置；未配置时不影响本地知识阅读、任务、提醒与待决策项。
 
