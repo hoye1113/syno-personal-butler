@@ -1,0 +1,226 @@
+{
+  "scannedAt": "2026-10-10T16:56:54.618Z",
+  "total": 22,
+  "items": [
+    {
+      "fullName": "anthropics/skills",
+      "htmlUrl": "https://github.com/anthropics/skills",
+      "stars": 180301,
+      "pushedAt": "2026-10-09",
+      "description": "Public repository for Agent Skills",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 0,
+      "styleTag": "⚡ 现代轻量实战"
+    },
+    {
+      "fullName": "DietrichGebert/ponytail",
+      "htmlUrl": "https://github.com/DietrichGebert/ponytail",
+      "stars": 160257,
+      "pushedAt": "2026-10-10",
+      "description": "Makes your AI agent think like the laziest senior dev in the room. The best code is the code you never wrote.",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 0,
+      "styleTag": "⚡ 现代轻量实战"
+    },
+    {
+      "fullName": "addyosmani/agent-skills",
+      "htmlUrl": "https://github.com/addyosmani/agent-skills",
+      "stars": 104392,
+      "pushedAt": "2026-10-10",
+      "description": "Production-grade engineering skills for AI coding agents.",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 0,
+      "styleTag": "⚡ 现代轻量实战"
+    },
+    {
+      "fullName": "nexu-io/open-design",
+      "htmlUrl": "https://github.com/nexu-io/open-design",
+      "stars": 100370,
+      "pushedAt": "2026-10-10",
+      "description": "🎨 Best DeepSeek Harness Design Plugin. The open-source Claude Design alternative. 🖥️ Local-first desktop app. 🖼️ Your coding agent becomes the design engine: prototypes, landing pages, dashboards, slides, images & video — real files, HTML/PDF/PPTX/MP4 export. 🤖 Claude Code / Codex / Cursor / DeepSeek Harness / OpenCode & 20+ CLIs via BYOK.",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 0,
+      "styleTag": "🌟 强模型高杠杆心智"
+    },
+    {
+      "fullName": "thedotmack/claude-mem",
+      "htmlUrl": "https://github.com/thedotmack/claude-mem",
+      "stars": 99159,
+      "pushedAt": "2026-10-09",
+      "description": "Persistent Context Across Sessions for Every Agent –  Captures everything your agent does during sessions, compresses it with AI, and injects relevant context back into future sessions. Works with Claude Code, OpenClaw, Codex, Gemini, Hermes, Copilot, OpenCode + More",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 1,
+      "styleTag": "⚡ 现代轻量实战"
+    },
+    {
+      "fullName": "Egonex-AI/Understand-Anything",
+      "htmlUrl": "https://github.com/Egonex-AI/Understand-Anything",
+      "stars": 85827,
+      "pushedAt": "2026-10-10",
+      "description": "Graphs that teach > graphs that impress. Turn any code into an interactive knowledge graph you can explore, search, and ask questions about. Works with Claude Code, Codex, Cursor, Copilot, Gemini CLI, and more.",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 0,
+      "styleTag": "⚡ 现代轻量实战"
+    },
+    {
+      "fullName": "tt-a1i/archify",
+      "htmlUrl": "https://github.com/tt-a1i/archify",
+      "stars": 81582,
+      "pushedAt": "2026-10-10",
+      "description": "Turn any idea, plan, or codebase into a beautiful interactive diagram. An agent skill for Claude Code, Codex, and more.",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 0,
+      "styleTag": "🌟 强模型高杠杆心智"
+    },
+    {
+      "fullName": "ComposioHQ/awesome-claude-skills",
+      "htmlUrl": "https://github.com/ComposioHQ/awesome-claude-skills",
+      "stars": 76799,
+      "pushedAt": "2026-09-18",
+      "description": "A curated list of awesome Claude Skills, resources, and tools for customizing Claude AI workflows",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 22,
+      "styleTag": "⚡ 现代轻量实战"
+    },
+    {
+      "fullName": "career-ops-hq/career-ops",
+      "htmlUrl": "https://github.com/career-ops-hq/career-ops",
+      "stars": 73959,
+      "pushedAt": "2026-10-10",
+      "description": "Open-source AI job search agent and job finder: scan job boards, score each job 1-5 against your CV before you apply, tailor an ATS-friendly resume and cover letter, get interview prep and a job application tracker. It helps you fill in each application; you press Submit. Runs locally in your AI coding CLI (Claude Code, Codex, OpenCode and more).",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 0,
+      "styleTag": "⚡ 现代轻量实战"
+    },
+    {
+      "fullName": "code-yeongyu/oh-my-openagent",
+      "htmlUrl": "https://github.com/code-yeongyu/oh-my-openagent",
+      "stars": 69935,
+      "pushedAt": "2026-10-10",
+      "description": "OmO: Just type \"mass ulw\" keyword with your prompt. Now you are the master of graph engineering.",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 0,
+      "styleTag": "⚡ 现代轻量实战"
+    },
+    {
+      "fullName": "morluto/rea",
+      "htmlUrl": "https://github.com/morluto/rea",
+      "stars": 66092,
+      "pushedAt": "2026-10-10",
+      "description": "Reverse engineer anything with agents, from app behavior down to native binaries.",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 0,
+      "styleTag": "🌟 强模型高杠杆心智"
+    },
+    {
+      "fullName": "ayghri/i-have-adhd",
+      "htmlUrl": "https://github.com/ayghri/i-have-adhd",
+      "stars": 56261,
+      "pushedAt": "2026-10-06",
+      "description": "A skill to stop your coding agent from burying the answer. ADHD-friendly output.",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 3,
+      "styleTag": "⚡ 现代轻量实战"
+    },
+    {
+      "fullName": "blader/humanizer",
+      "htmlUrl": "https://github.com/blader/humanizer",
+      "stars": 55403,
+      "pushedAt": "2026-09-28",
+      "description": "Agent skill that removes signs of AI-generated writing from text",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 12,
+      "styleTag": "⚡ 现代轻量实战"
+    },
+    {
+      "fullName": "hesreallyhim/awesome-claude-code",
+      "htmlUrl": "https://github.com/hesreallyhim/awesome-claude-code",
+      "stars": 55360,
+      "pushedAt": "2026-10-10",
+      "description": "A hand-picked collection of the finest of resources for the most awesome of agents, Claude Code, the undisputed champion of coding companions, from the unstoppable team at Anthropic PBC (no affiliation). A delectable showcase of top tier skills, ambidextrous agents, scintillating status lines, top notch developer tooling, and also we have plugins",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 0,
+      "styleTag": "⚡ 现代轻量实战"
+    },
+    {
+      "fullName": "coreyhaines31/marketingskills",
+      "htmlUrl": "https://github.com/coreyhaines31/marketingskills",
+      "stars": 54027,
+      "pushedAt": "2026-10-08",
+      "description": "Marketing skills for Claude Code and AI agents. CRO, copywriting, SEO, analytics, and growth engineering.",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 1,
+      "styleTag": "⚡ 现代轻量实战"
+    },
+    {
+      "fullName": "VoltAgent/awesome-openclaw-skills",
+      "htmlUrl": "https://github.com/VoltAgent/awesome-openclaw-skills",
+      "stars": 53033,
+      "pushedAt": "2026-10-05",
+      "description": "The awesome collection of OpenClaw skills. 5,400+ skills filtered and categorized from the official OpenClaw Skills Registry.🦞",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 5,
+      "styleTag": "⚡ 现代轻量实战"
+    },
+    {
+      "fullName": "CherryHQ/cherry-studio",
+      "htmlUrl": "https://github.com/CherryHQ/cherry-studio",
+      "stars": 52519,
+      "pushedAt": "2026-10-10",
+      "description": "AI productivity studio with smart chat, autonomous agents, and 300+ assistants. Unified access to frontier LLMs",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 0,
+      "styleTag": "⚡ 现代轻量实战"
+    },
+    {
+      "fullName": "cathrynlavery/diagram-design",
+      "htmlUrl": "https://github.com/cathrynlavery/diagram-design",
+      "stars": 48663,
+      "pushedAt": "2026-10-10",
+      "description": "Editorial diagram design for Claude Code, Codex, GitHub Copilot, Factory Droid, and Pi. 44 diagram types. Self-contained HTML + SVG. No shadows. No Mermaid slop.",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 0,
+      "styleTag": "🌟 强模型高杠杆心智"
+    },
+    {
+      "fullName": "K-Dense-AI/scientific-agent-skills",
+      "htmlUrl": "https://github.com/K-Dense-AI/scientific-agent-skills",
+      "stars": 48282,
+      "pushedAt": "2026-10-05",
+      "description": "Turn any AI agent into an AI Scientist. The #1 Agent Skills library for science, used by 250,000+ scientists worldwide. 177 ready-to-use validated skills plus 100+ scientific databases covering biology, chemistry, medicine, and drug discovery. Compatible with Cursor, Claude Code, Codex, Pi, Antigravity, and the open Agent Skills standard.",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 5,
+      "styleTag": "⚡ 现代轻量实战"
+    },
+    {
+      "fullName": "wshobson/agents",
+      "htmlUrl": "https://github.com/wshobson/agents",
+      "stars": 40326,
+      "pushedAt": "2026-10-05",
+      "description": "Multi-harness agentic plugin marketplace for Claude Code, Codex, Cursor, OpenCode, GitHub Copilot, Google Antigravity, and Pi",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 5,
+      "styleTag": "🌟 强模型高杠杆心智"
+    },
+    {
+      "fullName": "VoltAgent/awesome-agent-skills",
+      "htmlUrl": "https://github.com/VoltAgent/awesome-agent-skills",
+      "stars": 35465,
+      "pushedAt": "2026-10-08",
+      "description": "A curated collection of 1000+ agent skills from official dev teams and the community, compatible with Claude Code, Codex, Gemini CLI, Cursor, and more.",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 2,
+      "styleTag": "⚡ 现代轻量实战"
+    },
+    {
+      "fullName": "nanocoai/nanoclaw",
+      "htmlUrl": "https://github.com/nanocoai/nanoclaw",
+      "stars": 30911,
+      "pushedAt": "2026-10-10",
+      "description": "A lightweight alternative to OpenClaw that runs in containers for security. Connects to WhatsApp, Telegram, Slack, Discord, Gmail and other messaging apps,, has memory, scheduled jobs, and runs directly on Anthropic's Agents SDK",
+      "freshness": "🟢 极度活跃",
+      "diffDays": 0,
+      "styleTag": "🌟 强模型高杠杆心智"
+    }
+  ]
+}
