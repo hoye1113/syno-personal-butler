@@ -2,7 +2,7 @@
 title: "工具太多模型选不准——实现 ToolSearch — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-06-dynamic-tools"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "针对工具膨胀导致模型选不准与 Token 开销上涨，实现 ToolSearch 延迟加载：核心工具常驻、低频与 MCP 工具按需搜索发现，并讨论其对 Prompt Cache 的影响。"

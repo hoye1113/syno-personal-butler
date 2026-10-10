@@ -2,7 +2,7 @@
 title: "加餐：Agent 的 Search 工具究竟是如何来实现的？ — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-04d-search-tool"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "对比 Tavily（自动挡）与 Serper（手动挡）两类搜索 API 的选型差异，并给出 web_search 双引擎实现与配套 web_fetch（HTML 转 Markdown）的实现思路。"

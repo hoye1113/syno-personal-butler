@@ -2,7 +2,7 @@
 title: "Hook 与可观测性：怎么知道你的 Agent 在干什么 — 吃透 AI Agent 开发"
 source: "https://sitor.cc/courses/agent-fundamentals/28-hooks-observability"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "本文讲解 Agent 开发为何需要 Hook 与可观测性：Hook 能不改源码就在 Agent 生命周期的关键节点插入拦截逻辑（共 27 种事件），可观测性则从成本、性能、质量三个维度监控 Agent 的运行，并对比 AI Gateway 与可观测性平台两类工具及最小落地路径。"

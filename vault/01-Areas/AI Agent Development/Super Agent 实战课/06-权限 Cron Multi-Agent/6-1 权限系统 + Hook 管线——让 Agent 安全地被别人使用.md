@@ -2,7 +2,7 @@
 title: "权限系统 + Hook 管线——让 Agent 安全地被别人使用 — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-17-permissions"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "讲解 Agent 接入飞书群等多人环境后，如何用权限系统拦截危险操作，并用 Hook 管线在工具执行前后插入审计日志与格式校验等自定义逻辑。"

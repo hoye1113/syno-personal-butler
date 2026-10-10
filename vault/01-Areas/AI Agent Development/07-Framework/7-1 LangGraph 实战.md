@@ -2,7 +2,7 @@
 title: "LangGraph 实战：用图的方式重新理解 Agent Loop — 吃透 AI Agent 开发"
 source: "https://sitor.cc/courses/agent-fundamentals/31-langgraph"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "LangGraph 用 State、Node、Edge 把原本靠 while(true) 手写的 Agent Loop 与工具调用、人工审批、会话记忆重新结构化，让 Agent 的执行流程变成可观测、可中断、可恢复的图。"

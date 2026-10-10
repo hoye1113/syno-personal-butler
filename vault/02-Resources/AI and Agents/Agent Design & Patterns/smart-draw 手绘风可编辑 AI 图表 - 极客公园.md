@@ -86,3 +86,53 @@ smart-draw 填的缝：**Excalidraw 原生格式 + 手绘风**。AI 做 95%，�
 - [[Harness 实践 - 将任何文字编辑成精美的文章 - ConardLi]] — 同一类「接口层」产品思路
 - [[驾驭 AI - 把不确定问题转化为可控实验 - 魔术师卡颂]] — AI 生图不可微调 = 不确定；Excalidraw 可编辑 = 客观标准 + 人工闭环
 - [[万人大厂宣布裁员 40% 利润在涨人却多余了]] — 同来源极客公园公众号
+
+
+---
+
+## 🖼️ 原文高清架构与图解附录
+
+![配图 1](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-01.png)
+
+![配图 2](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-02.png)
+
+![配图 3](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-03.png)
+
+![配图 4](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-04.png)
+
+![配图 5](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-05.png)
+
+![配图 6](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-06.png)
+
+![配图 7](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-07.png)
+
+![配图 8](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-08.png)
+
+![配图 9](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-09.png)
+
+![配图 10](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-10.png)
+
+![配图 11](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-11.png)
+
+![配图 12](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-12.png)
+
+![配图 13](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-13.png)
+
+![配图 14](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-14.png)
+
+![配图 15](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-15.png)
+
+![配图 16](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-16.png)
+
+![配图 17](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-17.png)
+
+![配图 18](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-18.png)
+
+![配图 19](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-19.png)
+
+![配图 20](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-20.jpg)
+
+![配图 21](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-21.png)
+
+![配图 22](../../../99-System/Attachments/WeChat Articles/smart-draw-geekpark/fig-22.png)
+

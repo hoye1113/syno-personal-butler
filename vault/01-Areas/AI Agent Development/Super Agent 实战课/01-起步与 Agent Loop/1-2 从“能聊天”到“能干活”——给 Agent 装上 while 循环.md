@@ -2,7 +2,7 @@
 title: "从“能聊天”到“能干活”——给 Agent 装上 while 循环 — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-02-agent-loop"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "通过工具定义（description/inputSchema/execute）、fullStream 事件处理和 while 循环实现 think→act→observe 的 Agent Loop，对比 SDK 自动多步与手动循环两种方式，完成从只会聊天的 ChatBot 到能调用工具办事的 Agent 的跨越。"

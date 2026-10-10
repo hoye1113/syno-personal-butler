@@ -2,7 +2,7 @@
 title: "Skills——给 Agent 注入领域知识 — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-14-skills"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "本章讲解如何为 Agent 实现 Skill 机制：区分 Tool 与 Skill，用 SkillLoader 渐进式注入领域 SOP（如 code-review），并通过 /skill 命令按需激活，让 Agent 从通才变专家。"

@@ -113,3 +113,11 @@ Loop 套得越多，人盯的信息越少——这是卡颂眼中的 **AI 编程
 - [[如何为项目定制 Harness 环境 - 魔术师卡颂]] — 加厚测试/lint 等「门禁」基建
 - [[AI Coding 时间管理 - 50% 工作法 - 魔术师卡颂]] — 50% 时间投 Harness / 门禁
 - [[MOC - Harness Engineering]] — 横切入口
+
+
+---
+
+## 🖼️ 原文高清架构与图解附录
+
+![配图 1](../../../99-System/Attachments/WeChat Articles/kasong-loop-in-loop/fig-01.png)
+

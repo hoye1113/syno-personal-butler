@@ -2,7 +2,7 @@
 title: "小试牛刀——把工具组装成应用：代码分析、Research Agent、Vibe Coding — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-04c-mini-apps"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "用既有工具系统组装三个可直接运行的应用：代码分析 Agent、基于 fetch_url 的 Research Agent，以及用 write_file 加浏览器内 TSX 加载器实现的 Vibe Coding 多文件 React 应用生成。"

@@ -2,7 +2,7 @@
 title: "记忆会变坏——给 Agent 的记忆库做体检 — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-13-memory-maintenance"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "分析记忆会过期失效的危害（污染、爆炸、过期、冲突），并给出四层维护防线：不存清单做源头控污、按类型 TTL 分级、lint 定期体检发现问题、dream 让 Agent 根据报告自主合并与清理。强调记忆系统需要像代码一样持续维护。"

@@ -2,7 +2,7 @@
 title: "Plugin 架构——让别人给你的 Agent 写功能 — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-15-plugins"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "本章讲解 Plugin 架构：通过 PluginDefinition 与受控 PluginApi 把核心与能力解耦，用 PluginManager 做命名空间隔离、错误隔离与生命周期管理，并以 Supabase 插件演示运行时动态增减工具。"

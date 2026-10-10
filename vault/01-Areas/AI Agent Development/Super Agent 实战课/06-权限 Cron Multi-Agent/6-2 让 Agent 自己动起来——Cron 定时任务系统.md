@@ -2,7 +2,7 @@
 title: "让 Agent 自己动起来——Cron 定时任务系统 — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-18-cron"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "讲解如何为被动式 Agent 增加 Cron 定时任务能力，使其能主动按周期执行日报、监控、周报等任务而不依赖人工触发。"

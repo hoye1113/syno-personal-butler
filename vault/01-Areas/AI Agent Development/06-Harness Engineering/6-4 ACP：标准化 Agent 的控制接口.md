@@ -2,7 +2,7 @@
 title: "ACP：标准化 Agent 的控制接口 — 吃透 AI Agent 开发"
 source: "https://sitor.cc/courses/agent-fundamentals/30-acp"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "ACP（Agent Client Protocol）为客户端与编码 Agent 之间提供统一的控制接口，避免每新增一个宿主应用就要重写一遍 Agent 适配的 N×M 困境，类比 LSP 之于编辑器与语言。"

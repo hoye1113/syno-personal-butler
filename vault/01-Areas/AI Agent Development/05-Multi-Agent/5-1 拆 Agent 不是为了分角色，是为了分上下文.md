@@ -2,7 +2,7 @@
 title: "拆 Agent 不是为了"分角色"，是为了分上下文 — 吃透 AI Agent 开发"
 source: "https://sitor.cc/courses/agent-fundamentals/25-context-splitting"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "把 Agent 拆开的本质动机不是给不同角色分工，而是为了隔离和分配上下文窗口，从而控制 token 成本、降低噪声并提升每个子任务的专注度。"

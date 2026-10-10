@@ -122,5 +122,27 @@ fact_check（事实核查）
 
 ## 相关阅读
 
-- [[MOC - Prompt 工程]] — Skills / Prompt 主题横切 MOC
+- [[MOC - Harness Engineering|MOC - Prompt / Harness 工程]] — Skills / Prompt 主题横切 MOC
+
+
+
+---
+
+## 🖼️ 原文高清架构与图解附录
+
+![配图 1](../../99-System/Attachments/WeChat Articles/huashu-opensquilla-metaskill/fig-01.jpg)
+
+![配图 2](../../99-System/Attachments/WeChat Articles/huashu-opensquilla-metaskill/fig-02.jpg)
+
+![配图 3](../../99-System/Attachments/WeChat Articles/huashu-opensquilla-metaskill/fig-03.jpg)
+
+![配图 4](../../99-System/Attachments/WeChat Articles/huashu-opensquilla-metaskill/fig-04.jpg)
+
+![配图 5](../../99-System/Attachments/WeChat Articles/huashu-opensquilla-metaskill/fig-05.jpg)
+
+![配图 6](../../99-System/Attachments/WeChat Articles/huashu-opensquilla-metaskill/fig-06.png)
+
+![配图 7](../../99-System/Attachments/WeChat Articles/huashu-opensquilla-metaskill/fig-07.png)
+
+![配图 8](../../99-System/Attachments/WeChat Articles/huashu-opensquilla-metaskill/fig-08.jpg)
 

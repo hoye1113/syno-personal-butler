@@ -2,7 +2,7 @@
 title: "Session 持久化 + Prompt Pipe——对话存档与模块化 Prompt 组装 — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-07-session-prompt"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "用 JSONL 实现 Session 持久化让对话关掉再开也能恢复，并用 Prompt Pipe 模式把 system prompt 拆成可按运行时条件加载的模块化管道，遵循先静后动以提升 KV Cache 命中。"

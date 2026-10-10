@@ -152,3 +152,18 @@ Brockman 这个 Prompt 代表了一种趋势：**agent 每完成一次任务，�
 — END —
 
 — END —
+
+---
+
+## 🖼️ 原文高清架构与图解附录
+
+![配图 1](../../../99-System/Attachments/WeChat Articles/codex-self-improving-prompt/fig-01.jpg)
+
+![配图 2](../../../99-System/Attachments/WeChat Articles/codex-self-improving-prompt/fig-02.jpg)
+
+![配图 3](../../../99-System/Attachments/WeChat Articles/codex-self-improving-prompt/fig-03.jpg)
+
+![配图 4](../../../99-System/Attachments/WeChat Articles/codex-self-improving-prompt/fig-04.jpg)
+
+![配图 5](../../../99-System/Attachments/WeChat Articles/codex-self-improving-prompt/fig-05.jpg)
+

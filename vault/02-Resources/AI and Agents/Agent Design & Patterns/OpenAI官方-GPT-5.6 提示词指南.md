@@ -328,7 +328,7 @@ Stop rules: [何时重试、兜底、弃权、提问或停止]
 - **补充** [[OpenAI员工-上下文工程和Agent记忆]] — 本指南"删冗余、改而非加"的减法范式，正是那篇上下文工程三大记忆模式（burst/trim/compact/summarize）在提示词侧的落地。
 - **示例** [[Qodo研究员-长上下文越多Agent越笨]] — 长上下文致笨的 U 型曲线是问题诊断；本指南 §1 删冗余、§6 压缩里程碑是其直接对策。
 - **支持** [[Manus创始人-深度干货-上下文工程的最佳实践]] — avoid over-engineering 与本指南的减法主线一致：约束和上下文不是越多越稳。
-- 被 [[MOC - Prompt 工程]] §C 上下文工程 索引；被 [[MOC - Agent Theory and Design]] §D Agent 架构与原理 索引。
+- 被 [[MOC - Harness Engineering|MOC - Prompt / Harness 工程]] §C 上下文工程 索引；被 [[MOC - Agent Theory and Design]] §D Agent 架构与原理 索引。
 
 ## 来源说明
 

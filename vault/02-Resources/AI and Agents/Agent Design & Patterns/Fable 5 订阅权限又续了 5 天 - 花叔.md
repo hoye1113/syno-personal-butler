@@ -19,6 +19,8 @@ author:
 
 ---
 
+
+
 ## 背景
 
 Fable 5（Claude Opus 5）订阅权限反复延期——太平洋时间 7 月 7 日到期后又延 5 天到 7 月 12 日。五天一续、没准信的用法比一刀切断更难受。
@@ -93,3 +95,25 @@ Token 用量是 Fable 5 的 6 倍，但单价低一个量级——**便宜不是
 - [[祝贺Claude Code成功越狱，获得永生]] — 花叔 Claude Code 源码逆向
 - [[OpenSquilla MetaSkill 第三块拼图]] — 花叔对 OpenSquilla Skill 组织的早期分析
 - [[MOC - Harness Engineering]] — Harness 工程主题索引
+
+
+---
+
+## 🖼️ 原文高清架构与图解附录
+
+![配图 1](../../../99-System/Attachments/WeChat Articles/huashu-fable-5/fig-01.png)
+
+![配图 2](../../../99-System/Attachments/WeChat Articles/huashu-fable-5/fig-02.png)
+
+![配图 3](../../../99-System/Attachments/WeChat Articles/huashu-fable-5/fig-03.png)
+
+![配图 4](../../../99-System/Attachments/WeChat Articles/huashu-fable-5/fig-04.png)
+
+![配图 5](../../../99-System/Attachments/WeChat Articles/huashu-fable-5/fig-05.png)
+
+![配图 6](../../../99-System/Attachments/WeChat Articles/huashu-fable-5/fig-06.png)
+
+![配图 7](../../../99-System/Attachments/WeChat Articles/huashu-fable-5/fig-07.png)
+
+![配图 8](../../../99-System/Attachments/WeChat Articles/huashu-fable-5/fig-08.png)
+

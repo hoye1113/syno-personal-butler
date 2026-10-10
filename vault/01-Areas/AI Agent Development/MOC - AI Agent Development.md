@@ -12,7 +12,7 @@ source: vault_initiative - moc - sitor-ai - ai_agent
 
 本 MOC 汇总 [三元（Sitor AI）](https://sitor.ai/courses/agent-fundamentals)「吃透 AI Agent 开发」课程的全部内容。课程从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，按 PARA 原则归入 `01-Areas/AI Agent Development/` 下。
 
-> 免责声明：本笔记仅供个人学习使用，版权归原作者 [[Sitor AI]] 所有。
+> 免责声明：本笔记仅供个人学习使用，版权归原作者 [[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]] 所有。
 
 ## 六大支柱
 
@@ -113,5 +113,4 @@ source: vault_initiative - moc - sitor-ai - ai_agent
 
 - [[MOC - Super Agent 实战课|Super Agent 实战课]] — 同作者实战落地课，与知识体系课主题一一对应、互补
 - [[MOC - Agent Theory and Design]] — 外部文章索引
-- [[MOC - Loock AI 全栈课程|Loock AI 全栈课程]] — LangGraph.js + Coding Agent 实战课程
 - [[MOC - Agent Theory and Design]] — 视频转录知识库

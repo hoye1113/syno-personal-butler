@@ -427,5 +427,5 @@ hermes-ultra model
 
 ## 相关阅读
 
-- [[MOC - Loock AI 全栈课程]] — Loock AI 全栈课程（含 LangGraph.js 实战）
+- [[MOC - AI Agent Development|MOC - AI Agent 架构开发]] — Loock AI 全栈课程（含 LangGraph.js 实战）
 

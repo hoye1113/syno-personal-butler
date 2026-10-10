@@ -174,7 +174,7 @@ Sitor 想做后者。效率工具解决「拿不到」，角色伙伴解决「�
 
 > Sitor 本身的工程背景（vault 内已有 ~30 篇 Sitor AI 课程笔记）
 
-- [[Sitor AI]]（Areas 课程作者的产品本体）
+- [[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]（Areas 课程作者的产品本体）
 - [[1-1 搞定 Agent 六大支柱]]（Sitor 课程）— Sitor 如何用苏格拉底追问引导用户
 
 > 概念术语回链
@@ -196,3 +196,21 @@ Sitor 想做后者。效率工具解决「拿不到」，角色伙伴解决「�
 - [[魔术师卡颂]] 作者笔记待建
 - [[花叔]] 作者笔记待建
 - [[ConardLi]] 作者笔记待建
+
+
+---
+
+## 🖼️ 原文高清架构与图解附录
+
+![配图 1](../../../99-System/Attachments/WeChat Articles/sitor-ai-information-hallucination/fig-01.png)
+
+![配图 2](../../../99-System/Attachments/WeChat Articles/sitor-ai-information-hallucination/fig-02.png)
+
+![配图 3](../../../99-System/Attachments/WeChat Articles/sitor-ai-information-hallucination/fig-03.png)
+
+![配图 4](../../../99-System/Attachments/WeChat Articles/sitor-ai-information-hallucination/fig-04.jpg)
+
+![配图 5](../../../99-System/Attachments/WeChat Articles/sitor-ai-information-hallucination/fig-05.png)
+
+![配图 6](../../../99-System/Attachments/WeChat Articles/sitor-ai-information-hallucination/fig-06.jpg)
+

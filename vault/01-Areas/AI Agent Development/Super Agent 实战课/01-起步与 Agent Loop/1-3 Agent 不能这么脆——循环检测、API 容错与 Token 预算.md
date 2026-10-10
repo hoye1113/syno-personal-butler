@@ -2,7 +2,7 @@
 title: "Agent 不能这么脆——循环检测、API 容错与 Token 预算 — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-03-fuses"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "为 Agent Loop 加装三层非侵入式防护——基于指纹加滑动窗口的循环检测（Warning/Critical/熔断三级响应）、按错误分类的指数退避加抖动 API 重试、跨轮累计的 Token 预算熔断，让 Agent 从“能跑”变成生产环境“跑不挂”。"

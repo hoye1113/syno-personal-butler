@@ -2,7 +2,7 @@
 title: "让对话越来越便宜——Prompt Cache 与成本追踪 — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-10-cache-and-cost"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "梳理各厂商 Prompt Cache 的隐式与显式模式差异、命中折扣与杀 Cache 的踩坑点，并给 Agent 加上 normalizeUsage 成本追踪与 /context、/usage 终端面板量化缓存省下的钱。"

@@ -28,10 +28,8 @@ source: vault_initiative - moc - ai_agent - harness_engineering - claude_code - 
 | AI 评估与研究 | [[MOC - AI 评估与研究]] | frontier eval / benchmark / LLM-as-judge / RL / 论文 |
 | Harness / Loop 工程 | [[MOC - Harness Engineering]] | harness 6 大模块，42 篇 |
 | 职业与组织 / 行业观点 | [[MOC - AI 时代个人发展与组织]] | FDE / 蜂群 / 趋势 / 产品观 / S-tier 访谈 |
-| Prompt / 上下文工程 | [[MOC - Prompt 工程]] | Prompt 模板 / Skills / 上下文工程 |
 
 ## 课程 MOC
-- [[MOC - Loock AI 全栈课程]] — LangGraph.js + Next.js + Coding Agent 全栈（148 篇）
 - [[MOC - AI Agent Development]] — 三元·Sitor 系统课程（底层实现视角）
 - [[MOC - Super Agent 实战课]]
 

@@ -2,7 +2,7 @@
 title: "对话太长了怎么办——Microcompact + LLM 摘要压缩 — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-08-compaction"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "讲对话过长时的两层压缩：Microcompact 用占位符清理旧工具结果做无损紧凑化，再用模板化 LLM 摘要有损压缩早期对话，原则是先 Compaction 后 Summarization。"

@@ -14,7 +14,7 @@ source: vault_initiative - moc - sitor-ai - super-agent
 
 > 与 [[MOC - AI Agent Development|吃透 AI Agent 开发（知识体系课）]] 的关系：本课是知识体系课的**实战落地版**，主题一一对应（Agent Loop / Tool / Context / Memory / Skills / 权限 / Multi-Agent），两课互为前置与印证。
 
-> 免责声明：本笔记仅供个人学习使用，版权归原作者 [[Sitor AI]] 所有。
+> 免责声明：本笔记仅供个人学习使用，版权归原作者 [[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]] 所有。
 
 ## 技术栈
 
@@ -83,4 +83,3 @@ TypeScript + Node.js (ESM) · Vercel AI SDK · Hono (HTTP + WebSocket) · JSONL 
 ## 关联笔记
 
 - [[MOC - AI Agent Development|吃透 AI Agent 开发（知识体系课）]] — 同作者，本课是其实战落地版
-- [[MOC - Loock AI 全栈课程|Loock AI 全栈课程]] — 另一门 Agent 实战课程，可对照

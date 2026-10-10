@@ -127,3 +127,11 @@ Codex + superpowers 开发时，修 bug 也会走 superpowers 编排好的 **deb
 - [[2026 年 Agent 最重要的工程概念 Harness Engineering]] — OpenAI 侧 harness = 约束 + 反馈 + docs
 - [[祝贺Claude Code成功越狱，获得永生]] — Claude Code harness 六模块对照
 - [[MOC - Harness Engineering]] — 横切入口
+
+
+---
+
+## 🖼️ 原文高清架构与图解附录
+
+![配图 1](../../../99-System/Attachments/WeChat Articles/kasong-framework-vs-harness/fig-01.png)
+

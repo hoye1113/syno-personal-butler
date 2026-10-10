@@ -2,7 +2,7 @@
 title: "给 Agent 一双手——Tool 注册、执行、截断与并发 — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-04-tool-system"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "讲解如何为 Agent 搭建统一工具系统：定义 ToolDefinition 接口、用 ToolRegistry 注册并转换工具、以 Head/Tail 60/40 结果截断守护上下文，并用读写锁实现只读工具并发、读写工具独占执行。"

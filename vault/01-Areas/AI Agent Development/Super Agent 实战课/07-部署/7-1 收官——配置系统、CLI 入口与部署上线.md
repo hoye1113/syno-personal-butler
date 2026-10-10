@@ -2,7 +2,7 @@
 title: "收官——配置系统、CLI 入口与部署上线 — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-20-config-deploy"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "本章收官 Super Agent 项目：将散落的硬编码参数收敛进 JSON 配置文件，配合 Zod 校验与环境变量替换实现集中管理；新增交互式 init 引导命令与 CLI 入口；最后部署到 Linux 服务器并用 pm2 守护进程实现 24 小时常驻运行。"

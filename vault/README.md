@@ -28,10 +28,10 @@
   - **Agent Design & Patterns** — 公众号/网页文章沉淀
   - **Agent Architecture & Runtime / AI Coding & Tools / AI Evaluation & Safety / AI Native Organization Product & Career / Harness Context & Reliability / Frontier Models & Physical AI** — 捕获管道按主题落盘的目录（2026-10-08 两库合并后原位保留）
   - **B 站视频知识库**（1 BV = 1 canonical 文件，按主题子目录）→ 新收录见 [图文专栏精华 SUBDOC](99-System/Skills/vskill-vault-curate/SUBDOC%20-%20B站图文专栏精华收录.md)
-  - **Loock AI 全栈应用开发**（148 篇，6 章节 MOC）→ [[MOC - Loock AI 全栈课程]]
+  - **Loock AI 全栈应用开发**（148 篇，6 章节 MOC）→ [[MOC - AI Agent Development|MOC - AI Agent 架构开发]]
   - **Authors** — 作者页；**播客转录**
   - 主题 MOC：[[MOC - Agent Theory and Design]]、[[MOC - Agent 架构与工程]]、[[MOC - Harness Engineering]]、[[MOC - AI Coding 与工具]]、[[MOC - AI 评估与研究]]、[[MOC - 具身智能与脑机接口]]；个人发展主题见 [[MOC - AI 时代个人发展与组织]]（在 哲学与自我认知/）
-- **Prompts** — Copilot 自定义提示词模板（13 个 Prompt + 1 [[MOC - Prompt 工程]]）
+- **Prompts** — Copilot 自定义提示词模板（13 个 Prompt + 1 [[MOC - Harness Engineering|MOC - Prompt / Harness 工程]]）
 - **哲学与自我认知** — 与 AI 时代相关的自我认知（[[MOC - AI 时代个人发展与组织]] 在此）
 
 ### 03-Archive（归档）

@@ -244,3 +244,11 @@ bun run quorum show <run-dir>
 - [[AI Agent 和 Skill 测评方案及落地实践 - martinskxu]] — Agent/Skill 测评体系设计与落地
 - [[Codex 自我改进 Prompt]] — traces → evals → harness 改动的官方 improvement loop
 - [[MOC - Harness Engineering]] — Harness 横切入口
+
+
+---
+
+## 🖼️ 原文高清架构与图解附录
+
+![配图 1](../../../99-System/Attachments/WeChat Articles/fly-superpowers-evals/fig-01.png)
+

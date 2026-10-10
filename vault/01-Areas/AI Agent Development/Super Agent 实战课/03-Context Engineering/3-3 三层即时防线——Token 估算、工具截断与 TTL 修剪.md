@@ -2,7 +2,7 @@
 title: "三层即时防线——Token 估算、工具截断与 TTL 修剪 — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-09-context-defense"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "实现三层零 LLM 成本的即时上下文防线：chars/4 加中文安全系数的 Token 估算、工具结果 Head/Tail 动态截断、以及按软硬 TTL 修剪过期工具结果并保留错误经验。"

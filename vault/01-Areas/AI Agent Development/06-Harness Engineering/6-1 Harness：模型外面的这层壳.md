@@ -2,7 +2,7 @@
 title: "Harness：模型外面的这层壳 — 吃透 AI Agent 开发"
 source: "https://sitor.cc/courses/agent-fundamentals/27-harness"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "Harness 是包裹在模型之外的控制层（最大步数、工具系统、上下文工程、记忆与多智能体分工），决定 Agent 真实表现；模型越强，部分失效的 Harness 被删减，但系统级约束仍需保留。"

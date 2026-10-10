@@ -2,7 +2,7 @@
 title: 搞定 Agent 六大支柱：今天出个 Manus 明天出个 OpenClaw，你到底应该学什么？ — 吃透 AI Agent 开发
 source: https://sitor.ai/courses/agent-fundamentals/1-agent-landscape
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-05-19
 description: 市面上的 Agent 教程要么太浅要么太碎。这门课从「底层实现级」角度拆解 Claude Code、Manus、OpenClaw 等真实产品的工程决策，帮你建立完整的 Agent 知识体系。30+ 篇深度内容，覆盖 Agent Loop、Tool System、Context Engineering、Memory & RAG、Multi-Agent 等六大支柱。

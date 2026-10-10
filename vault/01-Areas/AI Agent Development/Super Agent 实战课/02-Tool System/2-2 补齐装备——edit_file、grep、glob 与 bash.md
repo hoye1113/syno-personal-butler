@@ -2,7 +2,7 @@
 title: "补齐装备——edit_file、grep、glob 与 bash — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-04b-builtin-tools"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "在既有 ToolRegistry 上新增 edit_file、glob、grep、bash 四个工具，分别说明精确替换的零/多匹配错误处理、递归文件搜索、内容检索格式，以及最危险工具的超时与环境检测设计。"

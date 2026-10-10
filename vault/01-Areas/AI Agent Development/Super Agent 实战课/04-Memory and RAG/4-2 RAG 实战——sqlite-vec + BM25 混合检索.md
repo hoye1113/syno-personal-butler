@@ -2,7 +2,7 @@
 title: "RAG 实战——sqlite-vec + BM25 混合检索 — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-12-rag"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "从零实现完整 RAG 管线（分块、向量化、混合检索、结果注入），重点讲解向量搜索与 BM25 关键词搜索的加权合并、min-max 归一化与 MMR 去重。并给出 SQLite + sqlite-vec + FTS5 三表持久化架构与生产落地方案，以及 Agentic RAG 的多步检索思路。"

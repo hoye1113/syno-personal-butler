@@ -2,7 +2,7 @@
 title: "结课：从 10 行代码到 Agent 六大支柱 — 吃透 AI Agent 开发"
 source: "https://sitor.cc/courses/agent-fundamentals/33-end"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "本文是 Sitor AI Agent 入门课程的结课篇，用一段 10 行 while 循环回看整门课，指出 Agent 的本质就是'模型在何时被调用、该喂给它什么信息'这一核心问题，并串起 Loop、Context、Tool、Memory、Multi-Agent、Harness 六大支柱。"

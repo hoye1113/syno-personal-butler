@@ -161,3 +161,13 @@ tags:
 - 事实核验：`verification_scope: column_only`——笔记忠实于原文正文；未读取付费课程其余章节，原作者主张以原文为准。
 - 删除项：课程付费引导、文末 10 道自测题（其判断点已融入正文判断与反例）、往期文章推荐、关注/点赞/在看提示、平台 UI 噪声。
 - 作者备注：`[[沐洒]]` 暂为悬空引用，vault 内尚无作者笔记；如后续收录沐洒其他文章，可建立作者 MOC。
+
+
+---
+
+## 🖼️ 原文高清架构与图解附录
+
+![配图 1](../../../99-System/Attachments/WeChat Articles/business-agent-anatomy/fig-01.jpg)
+
+![配图 2](../../../99-System/Attachments/WeChat Articles/business-agent-anatomy/fig-02.png)
+

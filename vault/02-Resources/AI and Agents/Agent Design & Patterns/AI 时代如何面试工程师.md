@@ -167,10 +167,30 @@ AI 时代的工具和最佳实践，迭代速度是前所未有的。一个工�
 
 | 能力 | 在其他笔记里的对应 |
 |------|--------------------|
-| **调用力**（用什么工具/模型/流程） | [[2026 年 Agent 最重要的工程概念 Harness Engineering\|OpenAI Harness Engineering]]——"AGENTS.md 当地图、docs/ 当 source of truth、linter + CI 强制不变量"就是一种系统级的"调用力" |
-| **批判性思维**（发现 AI 悄悄失效） | [[祝贺Claude Code成功越狱，获得永生\|花叔逆向 Claude Code]]——四层权限流水线 + 熔断机制就是给 AI 装"批判性思维" |
+| **调用力**（用什么工具/模型/流程） | [[2026 年 Agent 最重要的工程概念 Harness Engineering|OpenAI Harness Engineering]]——"AGENTS.md 当地图、docs/ 当 source of truth、linter + CI 强制不变量"就是一种系统级的"调用力" |
+| **批判性思维**（发现 AI 悄悄失效） | [[祝贺Claude Code成功越狱，获得永生|花叔逆向 Claude Code]]——四层权限流水线 + 熔断机制就是给 AI 装"批判性思维" |
 | **计算机思维**（结构化、抽象化） | [[2026 年 Agent 最重要的工程概念 Harness Engineering]]——强制依赖方向（Types → Config → Repo → Service → Runtime → UI）就是机械化的计算机思维 |
-| **判断力与提问力**（找关键问题、做取舍） | [[硅谷今年最火的岗位 FDE，我们闷头干了三年\|佳芮 FDE]]——FDE 第一件事不是写代码，是"进场先摸客户怎么赚钱" |
+| **判断力与提问力**（找关键问题、做取舍） | [[硅谷今年最火的岗位 FDE，我们闷头干了三年|佳芮 FDE]]——FDE 第一件事不是写代码，是"进场先摸客户怎么赚钱" |
 | **领导力**（对 AI 的领导力） | [[硅谷今年最火的岗位 FDE，我们闷头干了三年]]——FDE 站在最前面，背后是"业务专家 + 工程师 + 句子守护"接住 |
-| **传播与说服力** | [[所谓的agent开发到底是个啥岗位\|卡颂]]——把"未来蜂群组织"讲清楚本身就是一种说服力 |
+| **传播与说服力** | [[所谓的agent开发到底是个啥岗位|卡颂]]——把"未来蜂群组织"讲清楚本身就是一种说服力 |
 | **元能力：好奇心** | [[硅谷今年最火的岗位 FDE，我们闷头干了三年]]——FDE 负责人是"学法语的 00 后女生"，靠的就是好奇心跨过行业壁垒 |
+
+
+---
+
+## 🖼️ 原文高清架构与图解附录
+
+![配图 1](../../../99-System/Attachments/WeChat Articles/how-to-interview-engineers-in-ai-era/fig-01.png)
+
+![配图 2](../../../99-System/Attachments/WeChat Articles/how-to-interview-engineers-in-ai-era/fig-02.jpg)
+
+![配图 3](../../../99-System/Attachments/WeChat Articles/how-to-interview-engineers-in-ai-era/fig-03.jpg)
+
+![配图 4](../../../99-System/Attachments/WeChat Articles/how-to-interview-engineers-in-ai-era/fig-04.jpg)
+
+![配图 5](../../../99-System/Attachments/WeChat Articles/how-to-interview-engineers-in-ai-era/fig-05.jpg)
+
+![配图 6](../../../99-System/Attachments/WeChat Articles/how-to-interview-engineers-in-ai-era/fig-06.jpg)
+
+![配图 7](../../../99-System/Attachments/WeChat Articles/how-to-interview-engineers-in-ai-era/fig-07.jpg)
+

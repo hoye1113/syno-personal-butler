@@ -2,7 +2,7 @@
 title: "Channel 抽象——让 Agent 活在飞书群里 — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-16-channel"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "本章讲解 Channel 抽象：用 ChannelDefinition 与 ChannelGateway 把消息收发与 Agent 核心解耦，实现飞书长连接 Bot 适配器与本地 Dashboard 测试，并说明 Channel 如何作为 Plugin 扩展点。"

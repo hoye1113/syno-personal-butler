@@ -2,7 +2,7 @@
 title: "一个不够就拆成多个——实现 Sub-Agent 机制 — Super Agent 实战课"
 source: "https://sitor.cc/courses/super-agent/sa-19-sub-agent"
 author:
-  - "[[Sitor AI]]"
+  - "[[Sitor AI - 解决人的信息幻觉 - 三元同学|Sitor AI]]"
 published:
 created: 2026-07-13
 description: "讲解当单个 Agent 因长上下文过载而质量下降时，如何拆分出 Sub-Agent 并行执行子任务并聚合结果，缓解上下文膨胀问题。"
