@@ -715,7 +715,7 @@ Claude 可以对 AI 生成的代码进行有用的初步安全审查，并可以
 ## 相关阅读
 
 - [[Loop Engineering 橙皮书 - 花叔]] — Loop engineering 同样关注 AI 时代创业的工程实践
-- [[Harness Engineering]] — 工程化思维应用到 AI 原生产品
+- [[2026 年 Agent 最重要的工程概念 Harness Engineering|Harness Engineering]] — 工程化思维应用到 AI 原生产品
 - [[Anthropic Agent 工程实战指南 - 从入门到生产落地]] — Anthropic 的完整方法论
 - [[Claude Code]] — Launch 阶段的核心工具
 - [[MOC - AI 时代个人发展与组织]] — AI 时代创业者的个人发展

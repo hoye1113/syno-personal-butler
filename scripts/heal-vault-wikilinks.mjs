@@ -44,12 +44,18 @@ async function main() {
 
     // 2. 修复多余转义反斜杠与别名管道转义
     if (text.includes("\\]]")) {
-      text = text.replace(/\\\]\]/g, "]]");
-      syntaxFixedCount++;
+      const replaced = text.replace(/\\\]\]/g, "]]");
+      if (replaced !== text) {
+        text = replaced;
+        syntaxFixedCount++;
+      }
     }
-    if (text.includes("\\|")) {
-      text = text.replace(/\[\[([^\]]+)\\\|/g, "[[$1|");
-      syntaxFixedCount++;
+    if (/\[\[[^\]]+\\\|/.test(text)) {
+      const replaced = text.replace(/\[\[([^\]]+)\\\|/g, "[[$1|");
+      if (replaced !== text) {
+        text = replaced;
+        syntaxFixedCount++;
+      }
     }
 
     // 3. 修复标题逗号缺失
@@ -65,6 +71,12 @@ async function main() {
     }
     if (text.includes("[[MOC - Loock AI 全栈课程]]")) {
       text = text.replace(/\[\[MOC - Loock AI 全栈课程\]\]/g, "[[MOC - AI Agent Development|MOC - AI Agent 架构开发]]");
+      aliasFixedCount++;
+    }
+
+    // 5. 修复 Harness Engineering 别名
+    if (text.includes("[[Harness Engineering]]")) {
+      text = text.replace(/\[\[Harness Engineering\]\]/g, "[[2026 年 Agent 最重要的工程概念 Harness Engineering|Harness Engineering]]");
       aliasFixedCount++;
     }
 

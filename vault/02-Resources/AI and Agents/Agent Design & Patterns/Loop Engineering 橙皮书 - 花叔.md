@@ -84,13 +84,13 @@ author:
 ## 与其他笔记的关系
 
 Loop engineering 坐在 **harness 的上一层楼**：
-- [[Harness Engineering]] 负责武装单次 agent 运行
+- [[2026 年 Agent 最重要的工程概念 Harness Engineering|Harness Engineering]] 负责武装单次 agent 运行
 - **Loop engineering** 是它之上那层外壳：在定时器上跑、自己孵化小帮手、验证产出、记下做过什么、决定下一步
 
 ---
 
 ## 相关阅读
 
-- [[Harness Engineering]] — Loop 的下一层，单次运行的全套武装
+- [[2026 年 Agent 最重要的工程概念 Harness Engineering|Harness Engineering]] — Loop 的下一层，单次运行的全套武装
 - [[Context Engineering]] — Loop 的第二层，窗口里放什么
 - [[MOC - Harness Engineering]] — Harness 主题索引
