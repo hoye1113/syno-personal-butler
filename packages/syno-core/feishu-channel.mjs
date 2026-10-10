@@ -120,6 +120,12 @@ class FeishuCredentialStore {
     await atomicWrite(this.metadataFile, JSON.stringify({ appId: value.appId, ownerOpenId: value.ownerOpenId || "", updatedAt: new Date().toISOString() }, null, 2));
     return this.status();
   }
+  async updateOwner(ownerOpenId) {
+    const current = await this.load();
+    if (!current?.appId) throw new Error("飞书凭据未配置");
+    await atomicWrite(this.metadataFile, JSON.stringify({ appId: current.appId, ownerOpenId: String(ownerOpenId || ""), updatedAt: new Date().toISOString() }, null, 2));
+    return this.status();
+  }
   async load() {
     try {
       const metadata = JSON.parse(await fs.readFile(this.metadataFile, "utf8"));
@@ -135,7 +141,7 @@ class FeishuCredentialStore {
 async function officialSdk() { return import("@larksuiteoapi/node-sdk"); }
 
 class FeishuChannelAdapter {
-  constructor({ credentials = new FeishuCredentialStore(), stateStore = new FeishuStateStore(), processLock = new ProcessFileLock({ file: `${stateStore.file || path.join(PATHS.runtimeRoot, "locks", "feishu-channel")}.lock`, timeoutMs: 250 }), sdkLoader = officialSdk, channelFactory, onMessage = async () => ({ text: "已收到" }), retryDelayMs = 30_000 } = {}) {
+  constructor({ credentials = new FeishuCredentialStore(), stateStore = new FeishuStateStore(), processLock = new ProcessFileLock({ file: `${stateStore.file || path.join(PATHS.runtimeRoot, "locks", "feishu-channel")}.lock`, failFast: true, metadata: { entrypoint: "feishu-channel" } }), sdkLoader = officialSdk, channelFactory, onMessage = async () => ({ text: "已收到" }), retryDelayMs = 30_000 } = {}) {
     this.credentials = credentials; this.sdkLoader = sdkLoader; this.channelFactory = channelFactory; this.onMessage = onMessage;
     this.stateStore = stateStore; this.processLock = processLock; this.processLease = null; this.retryDelayMs = retryDelayMs;
     this.channel = null; this.running = false; this.ownerBound = false; this.lastError = ""; this.queue = []; this.draining = false; this.drainPromise = null; this.seen = new Set(); this.inflight = new Set(); this.retryTimer = null;
@@ -150,7 +156,7 @@ class FeishuChannelAdapter {
     if (!credential) return this.status();
     try { this.processLease = await this.processLock.acquire(); }
     catch (error) {
-      if (error.code !== "PROCESS_LOCK_TIMEOUT") throw error;
+      if (error.code !== "PROCESS_LOCK_TIMEOUT" && error.code !== "PROCESS_LOCK_HELD") throw error;
       this.lastError = "FEISHU_PROCESS_LOCKED";
       return this.status();
     }
@@ -263,7 +269,21 @@ class FeishuChannelAdapter {
   async #enqueue(message, credential, ownerGeneration) {
     if (ownerGeneration !== this.ownerGeneration || !this.running || !this.processLease) return;
     if (!message?.messageId || this.seen.has(message.messageId) || this.inflight.has(message.messageId)) return;
-    if (message.chatType !== "p2p" || !credential.ownerOpenId || message.senderId !== credential.ownerOpenId) return;
+    if (message.chatType !== "p2p" || !message.senderId) return;
+    if (!credential.ownerOpenId) {
+      credential.ownerOpenId = message.senderId;
+      if (typeof this.credentials?.updateOwner === "function") {
+        await this.credentials.updateOwner(message.senderId).catch(() => {});
+      } else if (typeof this.credentials?.save === "function") {
+        await this.credentials.save({
+          appId: credential.appId,
+          appSecret: credential.appSecret,
+          ownerOpenId: message.senderId,
+        }).catch(() => {});
+      }
+      this.ownerBound = true;
+    }
+    if (message.senderId !== credential.ownerOpenId) return;
     if (!await this.stateStore.reserve(message)) return;
     if (ownerGeneration !== this.ownerGeneration || !this.running || !this.processLease) return;
     this.#queueReserved(message);

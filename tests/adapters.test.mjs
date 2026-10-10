@@ -373,6 +373,53 @@ test("Feishu long connection accepts only owner DMs and deduplicates messages", 
   await adapter.stop();
 });
 
+test("Feishu first contact in p2p chat binds the owner and rejects subsequent strangers", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-feishu-first-contact-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const handlers = new Map();
+  const sent = [];
+  const channel = {
+    on(name, handler) { handlers.set(name, handler); },
+    async connect() {}, async disconnect() {},
+    async send(chatId, body, options) { sent.push({ chatId, body, options }); },
+  };
+  const received = [];
+  let updatedOwner = "";
+  const credentials = {
+    async load() { return { appId: "cli_test", appSecret: "secret", ownerOpenId: updatedOwner }; },
+    async updateOwner(ownerOpenId) { updatedOwner = ownerOpenId; },
+  };
+  const adapter = new FeishuChannelAdapter({
+    credentials,
+    stateStore: new FeishuStateStore({ file: path.join(root, "state.json") }),
+    channelFactory: () => channel,
+    onMessage: async (message) => { received.push(message); return { text: "认主成功" }; },
+  });
+  await adapter.start();
+  assert.equal(adapter.status().ownerBound, false);
+
+  handlers.get("message")({ messageId: "m1", chatId: "c1", chatType: "group", senderId: "user_a", content: "group" });
+  assert.equal(updatedOwner, "");
+
+  handlers.get("message")({ messageId: "m2", chatId: "c2", chatType: "p2p", senderId: "user_a", content: "hello owner" });
+  for (let index = 0; index < 20 && !sent.length; index += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(updatedOwner, "user_a");
+  assert.equal(adapter.status().ownerBound, true);
+  assert.equal(received.length, 1);
+  assert.equal(received[0].text, "hello owner");
+
+  handlers.get("message")({ messageId: "m3", chatId: "c3", chatType: "p2p", senderId: "user_b", content: "stranger message" });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(received.length, 1);
+
+  handlers.get("message")({ messageId: "m4", chatId: "c2", chatType: "p2p", senderId: "user_a", content: "second message" });
+  for (let index = 0; index < 20 && sent.length < 2; index += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(received.length, 2);
+  assert.equal(received[1].text, "second message");
+
+  await adapter.stop();
+});
+
 test("Feishu channel gives the SDK a silent logger so request errors cannot print App Secret", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-feishu-logger-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
