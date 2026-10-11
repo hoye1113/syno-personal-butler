@@ -23,6 +23,11 @@
   - 运行 `node scripts/sync-vault-catalog-to-bitable.mjs`，累计收录增至 **239 篇**正文笔记，100% 保持端云镜像对齐。
 - **全景技能资产盘点与梯队分层**：
   - 完成对 `skill-collection`（15分类/197技能）及本地独立工程（`BiliNote`、`SlideNarrator`、`meeting_minutes_agent`、`tenacitOS`）的四梯队全量扫描，输出 `ops/artifacts/candidates/full-skills-inventory.json`。
+- **武器库反哺管家执行契约全面升级（Butler Feedback & Capability Elevation）**：
+  - `vault/99-System/Agent/ROUTER.md` 升至 v4，将 31 大 S 级武器库卡片全面编织进管家任务路由网关，实现一跳按需唤醒；
+  - `vault/99-System/Agent/DENSITY-PROFILE.md` 升至 v4，深度融合李继刚汪曾祺/阿城纯正中文白描（五刀三磨彻底去 AI 味）、Matt Pocock `writing-for-agents` 契约写作天梯，以及 Manus 上下文压缩三板斧（Reduce, Offload, Isolate）；
+  - `vault/99-System/Agent/INGEST-CONTRACT.md` 扩充多模态与视觉出卡扩展协议（`BiliNote` 抽帧、`yichen-x-slicer` 切片与 `ljg-card` 思想铸卡）；
+  - `vault/AGENTS.md` 启动契约全面绑定现代研发心智（Frontier 需求拷问、怪异代码考古、双轨架构设计与纯正中文画像）。
 - **回归基线与门禁**：
   - 仓库完整性门禁：`node scripts/verify-repository.mjs` 扫描全通过（零个人路径硬编码）。
   - 测试套件：`tests/adapters.test.mjs` 与 `tests/feishu-bitable-sync.test.mjs` 42/42 pass。

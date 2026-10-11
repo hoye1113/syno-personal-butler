@@ -5,23 +5,29 @@
 ## 每次进入仓库
 
 1. 先读本文件，确认项目边界和权限。
-2. 按任务读取 [ROUTER](99-System/Agent/ROUTER.md)。
-3. 收录任务必须再读 [INGEST-CONTRACT](99-System/Agent/INGEST-CONTRACT.md) 和对应 canonical Skill。
-4. 写正文前读取 [DENSITY-PROFILE](99-System/Agent/DENSITY-PROFILE.md)。
-5. 目录、PARA、frontmatter、tag 与 MOC 细则见 [PROJECT](99-System/Agent/PROJECT.md)。
-6. 查找或反哺知识库内容（找笔记、跨笔记讨论）先读 [MOC - 知识库导航](MOC - 知识库导航.md)，按其加载梯子最小化 context。
+2. 按任务读取 [ROUTER](99-System/Agent/ROUTER.md)，并根据场景按需唤醒 [[MOC - Agent Skills 武器库]] 中的 31 大 S 级神级武器库。
+3. 复杂需求对齐、代码考古、架构设计或契约写作前，遵循现代研发心智：
+   - 需求存在未解假设时触发 [[grilling - 交互式需求深度拷问与反向对齐|grilling]]（前沿推进，查环境不问人，附带推荐）；
+   - 遇到反常遗留代码时触发 [[wait-what - 历史代码考古学与防御性治理|wait-what]]（强制刹车，Git 考古，特征测试先行，严禁盲目重构）；
+   - 重大方案设计时触发 [[design-it-twice - 深度模块设计与强制双对立方案裁决|design-it-twice]]（小接口大实现，强制双轨对立方案权衡比对）；
+   - 编写 Agent 文档与规范时触发 [[writing-for-agents - 高确定性高密度 Agent 契约指令写作法|writing-for-agents]]（两项负荷平衡，信息天梯，抗早熟完成防线）。
+4. 收录任务必须再读 [INGEST-CONTRACT](99-System/Agent/INGEST-CONTRACT.md) 和对应 canonical Skill。
+5. 写正文前读取 [DENSITY-PROFILE](99-System/Agent/DENSITY-PROFILE.md)（严格执行汪曾祺/阿城纯正中文白描，彻底清除 AI 塑料味）。
+6. 目录、PARA、frontmatter、tag 与 MOC 细则见 [PROJECT](99-System/Agent/PROJECT.md)。
+7. 查找或反哺知识库内容（找笔记、跨笔记讨论）先读 [MOC - 知识库导航](MOC - 知识库导航.md)，按其加载梯子最小化 context。
 
 权威顺序：用户当前指令 > 本文件 > Agent 工作流契约 > canonical Skill > 形态专项 SUBDOC > README > 历史审计报告。
 
 ## 任务路由
 
-| 用户意图 | canonical Skill |
+| 用户意图 | canonical Skill / 武器库网关 |
 |---|---|
-| 收录 URL、PDF、截图、粘贴或 B 站图文专栏 | `vskill-vault-curate` |
-| 基于素材写观点文或对谈稿 | `vskill-vault-write` |
-| 找反向链 | `vskill-vault-relate` |
-| 基于已有笔记讨论 | `vskill-vault-discuss` |
+| 收录外部内容、推文、视频笔记 | `vskill-vault-curate` + [[INGEST-CONTRACT]] |
+| 基于素材写观点文或对谈稿 | `vskill-vault-write` / [[ljg-writes]] |
+| 找反向链与知识关联 | `vskill-vault-relate` |
+| 基于已有笔记讨论与跨知识探讨 | `vskill-vault-discuss` |
 | 新建、合并、拆分或审计 MOC | `vskill-vault-moc-builder` |
+| 31 大高阶专项任务（攻坚/研报/思辨/生活） | 参见 [[ROUTER]] 与 [[MOC - Agent Skills 武器库]] |
 
 B 站 opus/cv 图文专栏任务使用 `bilibili_opus_ingest_v2`，必须先读：
 

@@ -87,6 +87,11 @@
    - Table 2（`tblnyAKG4iUEMgMv`）正文笔记索引从 205 增至 228，再增至 233，最终达到 **239 篇**，100% 保持端云镜像对齐。
 5. **全景资产盘点与梯队分层大盘**：
    - 扫描 `skill-collection`（15分类/197技能）与本地全栈工程，输出 `ops/artifacts/candidates/full-skills-inventory.json`，确立 4 大推荐梯队。
+6. **武器库全面反哺管家执行契约（Butler Feedback & Capability Elevation）**：
+   - 升级 `vault/99-System/Agent/ROUTER.md` 至 v4，把 31 大 S 级武器库卡片全面编织进管家任务路由网关，实现一跳按需唤醒；
+   - 升级 `vault/99-System/Agent/DENSITY-PROFILE.md` 至 v4，深度融合李继刚汪曾祺/阿城纯正中文白描（五刀三磨彻底去 AI 味）、Matt Pocock `writing-for-agents` 契约写作天梯，以及 Manus 上下文压缩三板斧（Reduce, Offload, Isolate）；
+   - 升级 `vault/99-System/Agent/INGEST-CONTRACT.md`，扩充多模态与视觉出卡扩展协议（`BiliNote` 抽帧、`yichen-x-slicer` 切片与 `ljg-card` 思想铸卡）；
+   - 升级 `vault/AGENTS.md`，全面绑定现代研发心智（Frontier 需求拷问、怪异代码考古、双轨架构设计与纯正中文画像）。
 
 ---
 
