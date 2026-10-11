@@ -2,23 +2,25 @@
 
 本节是当前交接摘要；下方各期交接仅用于追溯，不能覆盖这里的事实。
 
-## 知识库 V4 排版跃迁、Agent Skills 范式重构与 22 大 S 级神级武器库全景沉淀
+## 知识库 V4 排版跃迁、Agent Skills 范式重构与 27 大 S 级神级武器库全景沉淀
 
 - **分支/远端**：`main` 与 `origin/main`（`https://github.com/hoye1113/syno-personal-butler.git`）保持同步；工作区严格受控。
-- **Agent Skills 武器库全量收录（22 大原子卡片 + 1 统一 MOC 导航）**：
+- **Agent Skills 武器库全量收录（27 大原子卡片 + 1 统一 MOC 导航）**：
   - **第一批（9 个）**：`ponytail`（架构师减法）、`archify`（交互动态架构图）、`reality-check`（代码诚实度审计）、`open-design`（开源全能设计引擎）、`concept-fable`（零术语寓言）、`geo-content-optimizer`（GEO生成式引用优化）、`huashu-excel`（严谨对账与口径治理）、`travel-memory-sticker-card`（水粉剪纸手帐贴纸卡）、`kid-papercraft`（儿童折纸定格动画短片）。
   - **第二批（8 个）**：`deep-interview`（苏格拉底自适应访谈）、`sigma`（Bloom 2-Sigma认知导师）、`financial-report-reader`（财报三表10项暴雷排查）、`hv-analysis`（横纵深度研报）、`web-video-presentation`（16:9网页伪视频）、`yichen-x-slicer`（推文切片视频引擎）、`khazix-writer`（卡兹克长文去AI味）、`reverse-skill`（逆向工程与安全路由包）。
-  - **第三批（5 个 S 级新核心）**：
-    1. `BiliNote` — 视频音画智能笔记与截图沉淀助手（Fast-Whisper转写 + 核心论点自动抽帧截图 + 时间戳跳转）；
-    2. `book-study` — 读书教练与深度知识库编译系统（掌握度检验铁律驱动，编译生成 Obsidian 双链 `book-wiki/`，艾宾浩斯复习）；
-    3. `remotion-best-practices` — Remotion 纯代码视频构建标准（React 声明式视频，Spring 物理曲线，Mediabunny 抽帧，Zod 参数化）；
-    4. `equity-researcher` — 机构级上市公司投研研报生成器（覆盖 A/港/美股，Tear Sheet 投资速览与 ≥25页 DCF 深度研报模型）；
-    5. `product-behavioral-nudge-engine` — 行为心理学与防疲惫助推引擎（任务积压时熔断清单，推选 5 分钟微冲刺，零内耗无痛退出）。
-  - **总导航枢纽**：`vault/02-Resources/AI and Agents/MOC - Agent Skills 武器库.md` 同步更新，形成覆盖工程、视听、研报与生活成长的四象限 22 矩阵场景决策树。
+  - **第三批（5 个 S 级新核心）**：`BiliNote`（视频音画智能笔记与截图沉淀）、`book-study`（读书教练与深度知识库编译）、`remotion-best-practices`（Remotion 纯代码视频构建标准）、`equity-researcher`（机构级上市公司投研研报生成器）、`product-behavioral-nudge-engine`（行为心理学与防疲惫助推引擎）。
+  - **第四批（李继刚认知与思想铸造全景套件 · 方案 A：1 主套件 + 4 核心原子卡片）**：
+    1. `ljg-suite` — 李继刚认知与思想铸造全景套件（15大心智模型总览、统一Prompt哲学与按需路由）；
+    2. `ljg-card` — 思想铸卡与老宋体视觉排版（金陵老宋体、SVG几何卡片、留白呼吸感排版契约）；
+    3. `ljg-think-rank` — 追本之箭与认知降秩生成器（反向剥离噪音、追问第一性原理、升维思考降秩落地）；
+    4. `ljg-writes` — 汪曾祺与阿城笔调纯正中文写作引擎（反翻译腔、反八股AI味、短句白描生活质感）；
+    5. `ljg-invest` — 秩序创造机器与创生公式投资法（热力学熵减视角、负熵流甄别、组织韧性护城河）。
+  - **总导航枢纽**：`vault/02-Resources/AI and Agents/MOC - Agent Skills 武器库.md` 同步更新，形成覆盖工程攻坚、深度研究、知识萃取、视听生活与认知哲学的 27 大矩阵场景决策树。
 - **飞书多维表格（Bitable Table 2 `tblnyAKG4iUEMgMv`）全量同步**：
-  - 运行 `node scripts/sync-vault-catalog-to-bitable.mjs`，累计收录增至 **228 篇**正文笔记，100% 保持端云镜像对齐。
+  - 运行 `node scripts/sync-vault-catalog-to-bitable.mjs`，累计收录增至 **233 篇**正文笔记，100% 保持端云镜像对齐。
 - **全景技能资产盘点与梯队分层**：
   - 完成对 `skill-collection`（15分类/197技能）及本地独立工程（`BiliNote`、`SlideNarrator`、`meeting_minutes_agent`、`tenacitOS`）的四梯队全量扫描，输出 `ops/artifacts/candidates/full-skills-inventory.json`。
+  - 深度发掘本地潜在遗漏高价值资产：`mattpocock-skills`（Total TypeScript 作者 Matt Pocock 打造的高杠杆研发套件）与 `Miscellaneous/文档生成/insights/`（Harness Engineering、上下文压缩等深度研报）。
 - **回归基线与门禁**：
   - 仓库完整性门禁：`node scripts/verify-repository.mjs` 扫描全通过（零个人路径硬编码）。
   - 测试套件：`tests/adapters.test.mjs` 与 `tests/feishu-bitable-sync.test.mjs` 42/42 pass。

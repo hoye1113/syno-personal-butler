@@ -66,9 +66,9 @@
 
 ---
 
-## 五、实战武器库收录推进（Batch 1 & Batch 2 全量沉淀）
+## 五、实战武器库收录推进（全量 27 篇 S 级核心资产沉淀）
 
-1. **原子卡片沉淀（全量 22 篇 S 级核心资产）**：
+1. **原子卡片沉淀（全量 27 篇 S 级核心资产）**：
    - 第一批（9 篇）：`ponytail`、`archify`、`reality-check`、`open-design`、`concept-fable`、`geo-content-optimizer`、`huashu-excel`、`travel-memory-sticker-card`、`kid-papercraft`。
    - 第二批（8 篇）：`deep-interview`、`sigma`、`financial-report-reader`、`hv-analysis`、`web-video-presentation`、`yichen-x-slicer`、`khazix-writer`、`reverse-skill`。
    - 第三批（5 篇 S 级新核心）：
@@ -77,12 +77,19 @@
      - `remotion-best-practices`：Remotion 纯代码视频构建标准（React 声明式视频，Spring 物理曲线，Mediabunny 抽帧，Zod 参数化）；
      - `equity-researcher`：机构级上市公司投研研报生成器（覆盖 A/港/美股，Tear Sheet 投资速览与 ≥25页 DCF 深度研报模型）；
      - `product-behavioral-nudge-engine`：行为心理学与防疲惫助推引擎（任务积压时熔断清单，推选 5 分钟微冲刺，零内耗无痛退出）。
+   - 第四批（李继刚认知与思想铸造全景套件 · 方案 A：1 主套件 + 4 核心原子卡片）：
+     - `ljg-suite`：李继刚认知与思想铸造全景套件（15大心智模型总览、统一Prompt哲学与按需路由）；
+     - `ljg-card`：思想铸卡与老宋体视觉排版（金陵老宋体、SVG几何卡片、留白呼吸感排版契约）；
+     - `ljg-think-rank`：追本之箭与认知降秩生成器（反向剥离噪音、追问第一性原理、升维思考降秩落地）；
+     - `ljg-writes`：汪曾祺与阿城笔调纯正中文写作引擎（反翻译腔、反八股AI味、短句白描生活质感）；
+     - `ljg-invest`：秩序创造机器与创生公式投资法（热力学熵减视角、负熵流甄别、组织韧性护城河）。
 2. **总导航 MOC 重构**：
-   - 统一收拢至 `vault/02-Resources/AI and Agents/MOC - Agent Skills 武器库.md`，构建工程攻坚、深度研究、知识萃取、视听生活四大四象限 22 矩阵场景决策树。
+   - 统一收拢至 `vault/02-Resources/AI and Agents/MOC - Agent Skills 武器库.md`，构建工程攻坚、深度研究、知识萃取、视听生活与认知哲学五大维度 27 矩阵场景决策树。
 3. **飞书多维表格大盘同步**：
-   - Table 2（`tblnyAKG4iUEMgMv`）正文笔记索引从 205 增至 **228 篇**，100% 保持端云镜像对齐。
+   - Table 2（`tblnyAKG4iUEMgMv`）正文笔记索引从 205 增至 228，再增至 **233 篇**，100% 保持端云镜像对齐。
 4. **全景资产盘点与梯队分层大盘**：
    - 扫描 `skill-collection`（15分类/197技能）与本地全栈工程，输出 `ops/artifacts/candidates/full-skills-inventory.json`，确立 4 大推荐梯队。
+   - 挖掘出 Matt Pocock（Total TypeScript 作者）研发套件（`grilling`, `wait-what`, `design-it-twice`）与 `Miscellaneous/文档生成/insights` 系列深度研报。
 
 ---
 
@@ -91,6 +98,6 @@
 1. **雷达巡检集成**：
    可将 `node scripts/radar-trending-skills.mjs` 配置在每周定时任务中，输出简报推送到微信或飞书。
 2. **场景化按需唤醒**：
-   22 大 S 级神级武器库卡片作为管家的高杠杆思维资产，在面对日常编程排错、深度研报、视频制作与财务对账时，按 MOC 路由决策树即时调取。
+   27 大 S 级神级武器库卡片作为管家的高杠杆思维资产，在面对日常编程排错、深度研报、视频制作与认知思辨时，按 MOC 路由决策树即时调取。
 
 
