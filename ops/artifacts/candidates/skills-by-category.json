@@ -1,0 +1,818 @@
+{
+  "agent": [
+    {
+      "name": "agent-browser",
+      "desc": ""
+    },
+    {
+      "name": "agent-reach",
+      "desc": "<h1 align=\"center\">👁️ Agent Reach</h1>"
+    },
+    {
+      "name": "aviz-skills-installer",
+      "desc": "Install skills from the AVIZ Skills Library. Use when user wants to install a skill, browse available skills, set up Claude Code skills, or asks about"
+    },
+    {
+      "name": "browser-skill",
+      "desc": "|"
+    },
+    {
+      "name": "claudability-analyzer",
+      "desc": "Analyzes professions/jobs for Claude Code automation opportunities. Triggers: 'how can Claude help me', 'what can Claude do for', 'I'm a [profession]'"
+    },
+    {
+      "name": "deep-research-swarm",
+      "desc": ">"
+    },
+    {
+      "name": "kimi-webbridge",
+      "desc": "|"
+    },
+    {
+      "name": "openclaw-agent-forge",
+      "desc": "Generate, review, and optimize OpenClaw or FlowyClaw agent workspaces from a skill, workflow, or existing workspace brief. Use when the user asks to g"
+    }
+  ],
+  "business": [
+    {
+      "name": "beachhead-segment",
+      "desc": "Identify the first beachhead market segment for a product launch. Evaluates segments against burning pain, willingness to pay, winnable market share, "
+    },
+    {
+      "name": "churn-prevention",
+      "desc": "Reduce voluntary and involuntary churn through cancel flow design, save offers, exit surveys, and dunning sequences. Use when designing or optimizing "
+    },
+    {
+      "name": "competitive-battlecard",
+      "desc": "Create sales-ready competitive battlecards comparing your product against a specific competitor — positioning, feature comparison, objection handling,"
+    },
+    {
+      "name": "equity-researcher",
+      "desc": "机构级投研报告生成技能。覆盖中国A股、港股、美股上市公司。输出模式：1）投资速览：3-5页，含公司概览、核心财务指标、估值倍数、投资逻辑与风险因素；2）深度研报：≥25页，含行业分析、产业链图谱、三表模型、DCF估值、情景分析与敏感性测试。触发条件：1）直接请求：分析/看看/研究/调研/介绍一下 +"
+    },
+    {
+      "name": "financial-report-reader",
+      "desc": "财报三表（利润表、资产负债表、现金流量表）深度解读，自动进行同比/环比变动分析并执行多维度财务异常检测（如应收账款暴增、经营现金流与净利润背离、存货积压及毛利率突变等）。当用户需要解读财报、分析三表、做同比/环比比较、检测财务异常信号、评估现金流质量或计算关键财务比率时触发，关键词包括财报、三表、同"
+    },
+    {
+      "name": "growth-loops",
+      "desc": "Identify growth loops (flywheels) for sustainable traction. Evaluates 5 loop types: Viral, Usage, Collaboration, User-Generated, and Referral. Use whe"
+    },
+    {
+      "name": "gtm-motions",
+      "desc": "Identify the best GTM motions and tools across 7 motion types: Inbound, Outbound, Paid Digital, Community, Partners, ABM, and PLG. Use when selecting "
+    },
+    {
+      "name": "gtm-strategy",
+      "desc": "Create a go-to-market strategy covering marketing channels, messaging, success metrics, and launch timeline. Use when planning a product launch, creat"
+    },
+    {
+      "name": "ideal-customer-profile",
+      "desc": "Identify the Ideal Customer Profile (ICP) from research data with demographics, behaviors, JTBD, and needs. Use when defining your ICP, analyzing PMF "
+    },
+    {
+      "name": "marketing-ideas",
+      "desc": "Generate 5 creative, cost-effective marketing ideas with channels, messaging, and engagement rationale. Use when brainstorming marketing campaigns, pl"
+    },
+    {
+      "name": "north-star-metric",
+      "desc": "Define a North Star Metric and 3-5 supporting input metrics that form a metrics constellation. Classify the business game (Attention, Transaction, Pro"
+    },
+    {
+      "name": "paywall-upgrade-cro",
+      "desc": "When the user wants to create or optimize in-app paywalls, upgrade screens, upsell modals, or feature gates. Also use when the user mentions \"paywall,"
+    },
+    {
+      "name": "positioning-ideas",
+      "desc": "Brainstorm product positioning ideas differentiated from competitors. Identifies top competitors and generates positioning statements with rationale. "
+    },
+    {
+      "name": "pricing-strategy",
+      "desc": "Design, optimize, and communicate SaaS pricing — tier structure, value metrics, pricing pages, and price increase strategy. Use when building a pricin"
+    },
+    {
+      "name": "product-name",
+      "desc": "Brainstorm 5 unique, memorable product names with rationale aligned to brand values and target audience. Use when naming a new product, rebranding, or"
+    },
+    {
+      "name": "stock-finance-profiler",
+      "desc": "股票基本面分析工具：基于用户提供的三张财务报表（资产负债表、利润表、现金流量表），计算超过 20 项核心财务指标（涵盖盈利能力、偿债能力、流动性、营运效率、每股指标、现金流和成长能力）并进行详细的杜邦分析。当用户提及财报分析、基本面分析、财务指标计算、杜邦分解、ROE 分析，或使用类似“帮我分析一下"
+    },
+    {
+      "name": "value-invest-scorer",
+      "desc": "巴菲特/格雷厄姆风格的价值投资评估技能，从护城河、管理层、财务、估值四大维度共20个细项对目标公司进行系统性评分（满分100分），并给出综合评级与投资建议。当用户需要进行价值投资分析、基本面打分、护城河或管理层评估、财务健康度检查、估值判断、安全边际计算，或使用诸如“分析一下XX的基本面”、“用巴菲"
+    },
+    {
+      "name": "value-prop-statements",
+      "desc": "Generate value proposition statements for marketing, sales, and onboarding from existing value propositions. Use when writing marketing copy, creating"
+    }
+  ],
+  "code-quality": [
+    {
+      "name": "agent-readiness",
+      "desc": "Run a full 5-phase agent-readiness audit on the current repository — scan, discover apps, evaluate 82 criteria via parallel subagents, validate, and g"
+    },
+    {
+      "name": "ai-humanizer",
+      "desc": ">"
+    },
+    {
+      "name": "code-review",
+      "desc": "按照团队 Code Review 规范审查代码变更（本地 git diff、staged diff、分支范围或 GitHub PR），并在需要时执行深度架构、安全、性能与冗余代码审查。当用户要求 review 代码、审查 PR、检查代码质量、关注 SOLID/架构/安全/race condition"
+    },
+    {
+      "name": "code-review-expert",
+      "desc": "Expert code review of current git changes with a senior engineer lens. Detects SOLID violations, security risks, and proposes actionable improvements."
+    },
+    {
+      "name": "content-density-review",
+      "desc": ">-"
+    },
+    {
+      "name": "humanizer-zh",
+      "desc": "|"
+    },
+    {
+      "name": "neat-freak",
+      "desc": ">-"
+    },
+    {
+      "name": "reality-check",
+      "desc": "Deep code audit that detects misleading patterns — fake tests, mock abuse, shallow health checks, overly optimistic error handling, hidden debt. Produ"
+    }
+  ],
+  "creative": [
+    {
+      "name": "creative-seeds",
+      "desc": "Inject creative absurdity to break AI pattern-thinking before creative tasks. Randomly samples surreal micro-stories to spark unconventional thinking."
+    },
+    {
+      "name": "embed-subtitles",
+      "desc": "Burn subtitles onto videos using FFmpeg. Use for: hardcode subtitles, embed captions, video subtitling."
+    },
+    {
+      "name": "gpt-image-2",
+      "desc": "面向 GPT Image 2 的图像生成 / 编辑技能。可在 3 种环境下使用：(A) Garden 本地模式，通过 OpenAI 兼容接口直接出图并落盘；(B) Host-Native 模式，把本 Skill 当作提示词工程指引，把渲染好的 prompt 交给宿主 Agent 自带的图像工具出图；"
+    },
+    {
+      "name": "guizang-ppt-skill",
+      "desc": "生成\"电子杂志 × 电子墨水\"风格的横向翻页网页 PPT（单 HTML 文件），含 WebGL 流体背景、衬线标题 + 非衬线正文、章节幕封、数据大字报、图片网格等模板。当用户需要制作分享 / 演讲 / 发布会风格的网页 PPT，或提到\"杂志风 PPT\"、\"horizontal swipe deck"
+    },
+    {
+      "name": "image-generation",
+      "desc": "Generate images with Gemini (default) or fal.ai FLUX.2 klein 4B (--cheap for fast/low-cost). Generate videos with Grok Imagine (default) or fal.ai LTX"
+    },
+    {
+      "name": "music-generator",
+      "desc": "Generate AI music with ElevenLabs Music API. Use for: background music, soundtracks, jingles, theme songs, instrumental tracks, AI music composition."
+    },
+    {
+      "name": "nano-banana-poster",
+      "desc": "Generate images and posters with Google Gemini. Use for: create image, generate visual, AI image generation, marketing poster."
+    },
+    {
+      "name": "quick-voice",
+      "desc": "Spin up an instant browser voice session (OpenAI Realtime gpt-realtime-2) to close a topic in a short conversation instead of working through document"
+    },
+    {
+      "name": "speech-generator",
+      "desc": "Generate speech audio from text using ElevenLabs TTS. Use when user asks to 'send voice', 'send audio message', 'create voice', 'generate speech', 'sa"
+    },
+    {
+      "name": "translate-video",
+      "desc": "Translate video subtitles to any language with native-quality refinement. Full pipeline: transcribe → translate → refine → embed RTL-safe subtitles. U"
+    },
+    {
+      "name": "travel-memory-card-duo",
+      "desc": "Transform one user-supplied travel, street, landscape, lifestyle, portrait, or pet photo into a coordinated two-image deliverable: one complete horizo"
+    },
+    {
+      "name": "travel-memory-sticker-card",
+      "desc": "Transform a user-uploaded photograph into one horizontal collectible memory card with a large quiet editorial illustration, six integrated journaling-"
+    },
+    {
+      "name": "web-video-presentation",
+      "desc": "把一篇文章或口播稿，做成\"看起来像视频\"的点击驱动 16:9 网页演示，可选合成口播音频。流程：原始文章 → **一次产出**口播稿 + outline 开发计划 → 用户**一次对齐** 5 件事（稿子 / outline / 主题 / 素材 / 开发模式）→ 网页开发（逐章 / 顺序 / 并行）"
+    },
+    {
+      "name": "youtube-uploader",
+      "desc": "Upload videos to YouTube with title, description, tags. Use for: youtube upload, publish video, share on youtube."
+    }
+  ],
+  "dev-workflow": [
+    {
+      "name": "batch-download",
+      "desc": ">"
+    },
+    {
+      "name": "ecc",
+      "desc": ""
+    },
+    {
+      "name": "find-my-project",
+      "desc": "Helps beginners find their first AGENTIC project through pain point identification. Guides through questioning, analysis, project suggestion, and fold"
+    },
+    {
+      "name": "gh-pages-deploy",
+      "desc": "Deploy static or interactive frontend content to GitHub Pages using gh CLI. Use when the user wants to publish, share, or make accessible any HTML/CSS"
+    },
+    {
+      "name": "html-to-pdf",
+      "desc": "Convert HTML to PDF with pixel-perfect rendering and excellent Hebrew/RTL support. Use when the user asks to 'convert HTML to PDF', 'generate PDF from"
+    },
+    {
+      "name": "html-to-pptx",
+      "desc": "Convert HTML to PowerPoint (PPTX) with excellent Hebrew/RTL support. Use when the user asks to 'convert HTML to PowerPoint', 'create presentation from"
+    },
+    {
+      "name": "ljg-skills",
+      "desc": "> 李继刚 (lijigang) 个人 Claude Code 技能集合 — 涵盖内容创作 / 投资分析 / 关系分析 / 旅行研究 等多领域"
+    },
+    {
+      "name": "mattpocock-skills",
+      "desc": ""
+    },
+    {
+      "name": "search-history",
+      "desc": "Search across all Claude Code conversation history (JSONL files) across all projects."
+    },
+    {
+      "name": "storage-analyzer",
+      "desc": ">"
+    },
+    {
+      "name": "superpowers",
+      "desc": ""
+    },
+    {
+      "name": "swarm-coding",
+      "desc": "Coordinate swarm coding work for substantial software tasks, including general repositories and webapps. Use when a task benefits from delegation, par"
+    },
+    {
+      "name": "transcribe",
+      "desc": "Transcribe audio/video to SRT subtitles using ElevenLabs Scribe v2. Use for: transcription, subtitles, captions, SRT generation."
+    },
+    {
+      "name": "wordpress-publisher",
+      "desc": "Publish posts to WordPress. Use for: publish blog post, upload to WordPress, פרסם בבלוג."
+    },
+    {
+      "name": "youtube-downloader",
+      "desc": "Download YouTube videos with quality presets. Use for: download youtube, yt download, video download, youtube to whatsapp, youtube mp3."
+    }
+  ],
+  "frontend-ui": [
+    {
+      "name": "apple-kickstarter-landing-page",
+      "desc": "Use when creating a standalone landing page for a hardware/product Kickstarter campaign that should follow Apple's product page design language — clea"
+    },
+    {
+      "name": "cinematic-slides",
+      "desc": "Create cinematic HTML presentations with AI video backgrounds, deployed to GitHub Pages. Use for: slides, presentation, deck, cinematic slides, video "
+    },
+    {
+      "name": "figma",
+      "desc": "|"
+    },
+    {
+      "name": "frontend-interface-design",
+      "desc": "Build, refine, and review production-grade frontend interfaces inside real products and codebases. Use when the request is to implement, polish, or au"
+    },
+    {
+      "name": "frontend-slides-main",
+      "desc": "Create stunning, animation-rich HTML presentations from scratch or by converting PowerPoint files. Use when the user wants to build a presentation, co"
+    },
+    {
+      "name": "html-component-builder",
+      "desc": "组件化 HTML 页面构建。为 UI 设计师和前端开发者提供模块化的 HTML 开发规范，将单体 HTML 拆分为独立组件（导航栏、标签页、弹窗、卡片、表单、侧边栏、轮播图、下拉菜单、面包屑、页脚、表格等），每个组件独立 HTML 文件，自带 CSS 命名空间隔离（.cmp-{name}）和 JS "
+    },
+    {
+      "name": "huashu-design",
+      "desc": "花叔Design——用HTML做高保真原型、幻灯片、动画、可视化与专家评审。任何新设计100%先出三个方向初稿给用户选（指定风格/品牌也不豁免），选定后才执行。触发词：做原型、PPT、幻灯片、动画、设计风格、评审、做个HTML页面、UI mockup、导出MP4/GIF、做个好看的。生产级Web A"
+    },
+    {
+      "name": "impeccable",
+      "desc": "```"
+    },
+    {
+      "name": "react-best-practices",
+      "desc": "React and Next.js performance optimization guidelines from Vercel Engineering. This skill should be used when writing, reviewing, or refactoring React"
+    },
+    {
+      "name": "semi-ui-skills",
+      "desc": "使用 Semi Design 组件的完整指南，包括 MCP 工具使用流程、常见模式、最佳实践。当你需要查询 Semi Design 组件、生成组件代码或解决使用问题时，请使用此技能。"
+    },
+    {
+      "name": "ui-ux-pro-max",
+      "desc": "UI/UX design intelligence. 50 styles, 21 palettes, 50 font pairings, 20 charts, 9 stacks (React, Next.js, Vue, Svelte, SwiftUI, React Native, Flutter,"
+    },
+    {
+      "name": "web-design-engineer",
+      "desc": "Build or redesign polished browser-rendered visual artifacts with HTML/CSS/JavaScript/React: pages, dashboards, prototypes, slide decks, animations, U"
+    },
+    {
+      "name": "web-visual-artifacts",
+      "desc": "|"
+    }
+  ],
+  "learning": [
+    {
+      "name": "book-study",
+      "desc": "Reading coach: guides users through books systematically with knowledge compilation, mastery testing, spaced repetition, and knowledge querying. Use w"
+    },
+    {
+      "name": "deep-interview",
+      "desc": "Conduct deep adaptive interviews to extract and organize knowledge into structured files and folders. Use when user says \"interview me about X\", \"deep"
+    },
+    {
+      "name": "kb-retriever",
+      "desc": "面向本地知识库目录的检索和问答助手。核心流程：(1)分层索引导航 (2)遇到PDF/Excel时必须先读取references学习处理方法 (3)处理文件后再检索。按文件类型组合使用 grep、Read、pdfplumber、pandas 进行渐进式检索，避免整文件加载。用户问题涉及\"从知识库目录回"
+    },
+    {
+      "name": "learn",
+      "desc": "Teach Claude ANY topic - code libraries, APIs, concepts, tools, methodologies, or domains. Researches via web and docs, then retains knowledge as a pe"
+    },
+    {
+      "name": "sigma",
+      "desc": "Personalized 1-on-1 AI tutor using Bloom's 2-Sigma mastery learning. Guides users through any topic with Socratic questioning, adaptive pacing, and ri"
+    },
+    {
+      "name": "teach-by-doing",
+      "desc": "Never teach a principle without an immediate rep. When designing ANY teaching content — a workshop, a lesson plan, a deck, a course module, a webinar,"
+    },
+    {
+      "name": "wiki-ingest",
+      "desc": "Compile articles, documents, or notes into a structured wiki knowledge base. Use when user says 'ingest to wiki', 'compile to knowledge base', 'update"
+    }
+  ],
+  "product": [
+    {
+      "name": "analyze-feature-requests",
+      "desc": "Analyze and prioritize a list of feature requests by theme, strategic alignment, impact, effort, and risk. Use when reviewing customer feature request"
+    },
+    {
+      "name": "ansoff-matrix",
+      "desc": "Generate an Ansoff Matrix analysis mapping growth strategies across market penetration, market development, product development, and diversification. "
+    },
+    {
+      "name": "brainstorm-experiments-existing",
+      "desc": "Design experiments to test assumptions for an existing product — prototypes, A/B tests, spikes, and other low-effort validation methods. Use when vali"
+    },
+    {
+      "name": "brainstorm-experiments-new",
+      "desc": "Design lean startup experiments (pretotypes) for a new product. Creates XYZ hypotheses and suggests low-effort validation methods like landing pages, "
+    },
+    {
+      "name": "brainstorm-ideas-existing",
+      "desc": "Brainstorm product ideas for an existing product using multi-perspective ideation from PM, Designer, and Engineer viewpoints. Use when generating new "
+    },
+    {
+      "name": "brainstorm-ideas-new",
+      "desc": "Brainstorm feature ideas for a new product in initial discovery from PM, Designer, and Engineer perspectives. Use when starting product discovery for "
+    },
+    {
+      "name": "brainstorm-okrs",
+      "desc": "Brainstorm team-level OKRs aligned with company objectives — qualitative objectives with measurable key results. Use when setting quarterly OKRs, alig"
+    },
+    {
+      "name": "business-model",
+      "desc": "Generate a Business Model Canvas with all 9 building blocks. Use when creating a business model, documenting how a business creates value, or analyzin"
+    },
+    {
+      "name": "create-prd",
+      "desc": "Create a Product Requirements Document using a comprehensive 8-section template covering problem, objectives, segments, value propositions, solution, "
+    },
+    {
+      "name": "draft-nda",
+      "desc": "Draft a detailed Non-Disclosure Agreement between two parties covering information types, jurisdiction, and clauses needing legal review. Use when cre"
+    },
+    {
+      "name": "dummy-dataset",
+      "desc": "Generate realistic dummy datasets for testing with customizable columns, constraints, and output formats (CSV, JSON, SQL, Python script). Use when cre"
+    },
+    {
+      "name": "identify-assumptions-existing",
+      "desc": "Identify risky assumptions for a feature idea in an existing product across Value, Usability, Viability, and Feasibility. Uses multi-perspective devil"
+    },
+    {
+      "name": "identify-assumptions-new",
+      "desc": "Identify risky assumptions for a new product idea across 8 risk categories including Go-to-Market, Strategy, and Team. Use when evaluating startup ris"
+    },
+    {
+      "name": "intended-vs-implemented",
+      "desc": "The method for finding the gap between what a system is supposed to do and what the code actually does — the class of bug generic scanners miss becaus"
+    },
+    {
+      "name": "job-stories",
+      "desc": "Create job stories using the 'When [situation], I want to [motivation], so I can [outcome]' format with detailed acceptance criteria. Use when writing"
+    },
+    {
+      "name": "lean-canvas",
+      "desc": "Generate a Lean Canvas with problem, solution, metrics, cost structure, UVP, unfair advantage, channels, segments, and revenue. Use when exploring a l"
+    },
+    {
+      "name": "metrics-dashboard",
+      "desc": "Define and design a product metrics dashboard with key metrics, data sources, visualization types, and alert thresholds. Use when creating a metrics d"
+    },
+    {
+      "name": "monetization-strategy",
+      "desc": "Brainstorm 3-5 monetization strategies with audience fit, risks, and validation experiments. Use when exploring revenue models, evaluating pricing str"
+    },
+    {
+      "name": "opportunity-solution-tree",
+      "desc": "Build an Opportunity Solution Tree (OST) to structure product discovery — map a desired outcome to opportunities, solutions, and experiments. Based on"
+    },
+    {
+      "name": "outcome-roadmap",
+      "desc": "Transform an output-focused roadmap into an outcome-focused one that communicates strategic intent. Rewrites initiatives as outcome statements reflect"
+    },
+    {
+      "name": "pestle-analysis",
+      "desc": "Perform a PESTLE analysis covering Political, Economic, Social, Technological, Legal, and Environmental factors. Use when assessing the macro environm"
+    },
+    {
+      "name": "porters-five-forces",
+      "desc": "Perform Porter's Five Forces analysis — competitive rivalry, supplier power, buyer power, threat of substitutes, and threat of new entrants. Use when "
+    },
+    {
+      "name": "pre-mortem",
+      "desc": "Run a pre-mortem risk analysis on a PRD or launch plan. Categorizes risks as Tigers (real problems), Paper Tigers (overblown concerns), and Elephants "
+    },
+    {
+      "name": "pricing-strategy",
+      "desc": "Analyze and design pricing strategies including pricing models, competitive pricing analysis, willingness-to-pay estimation, and price elasticity. Use"
+    },
+    {
+      "name": "prioritization-frameworks",
+      "desc": "Reference guide to 9 prioritization frameworks with formulas, when-to-use guidance, and templates — RICE, ICE, Kano, MoSCoW, Opportunity Score, and mo"
+    },
+    {
+      "name": "prioritize-assumptions",
+      "desc": "Prioritize assumptions using an Impact × Risk matrix and suggest experiments for each. Use when triaging a list of assumptions, deciding what to test "
+    },
+    {
+      "name": "prioritize-features",
+      "desc": "Prioritize a backlog of feature ideas based on impact, effort, risk, and strategic alignment with top 5 recommendations. Use when prioritizing a featu"
+    },
+    {
+      "name": "privacy-policy",
+      "desc": "Draft a detailed privacy policy covering data types, jurisdiction, GDPR and compliance considerations, and clauses needing legal review. Use when crea"
+    },
+    {
+      "name": "product-strategy",
+      "desc": "Create a comprehensive product strategy using the 9-section Product Strategy Canvas — vision, segments, costs, value propositions, trade-offs, metrics"
+    },
+    {
+      "name": "product-vision",
+      "desc": "Brainstorm an inspiring, achievable, and emotional product vision that motivates teams and aligns stakeholders. Use when defining or refining a produc"
+    },
+    {
+      "name": "release-notes",
+      "desc": "Generate user-facing release notes from tickets, PRDs, or changelogs. Creates clear, engaging summaries organized by category (new features, improveme"
+    },
+    {
+      "name": "retro",
+      "desc": "Facilitate a structured sprint retrospective — what went well, what didn't, and prioritized action items with owners and deadlines. Use when running a"
+    },
+    {
+      "name": "review-resume",
+      "desc": "Comprehensive PM resume review and tailoring against 10 best practices including XYZ+S formula, keyword optimization, job-specific tailoring, and stru"
+    },
+    {
+      "name": "shipping-artifacts",
+      "desc": "The durable documentation set that makes an AI-built (vibe-coded) app reviewable before shipping. A small core every app needs — architecture, user/pe"
+    },
+    {
+      "name": "sprint-plan",
+      "desc": "Plan a sprint with capacity estimation, story selection, dependency mapping, and risk identification. Use when preparing for sprint planning, estimati"
+    },
+    {
+      "name": "stakeholder-map",
+      "desc": "Build a stakeholder map using a power/interest grid, identify communication strategies per quadrant, and generate a communication plan. Use when manag"
+    },
+    {
+      "name": "startup-canvas",
+      "desc": "Generate a Startup Canvas combining Product Strategy (9 sections) and Business Model (costs + revenue) for a new product. An alternative to BMC and Le"
+    },
+    {
+      "name": "strategy-red-team",
+      "desc": "Red-team a PRD, roadmap, or strategy by attacking its load-bearing assumptions before reality does. Steelmans then attacks each claim, ranks failure m"
+    },
+    {
+      "name": "summarize-meeting",
+      "desc": "Summarize a meeting transcript into structured notes with date, participants, topic, key decisions, summary points, and action items. Use when process"
+    },
+    {
+      "name": "swot-analysis",
+      "desc": "Perform a detailed SWOT analysis — strengths, weaknesses, opportunities, and threats with actionable recommendations. Use when doing strategic assessm"
+    },
+    {
+      "name": "test-scenarios",
+      "desc": "Create comprehensive test scenarios from user stories with test objectives, starting conditions, user roles, step-by-step actions, and expected outcom"
+    },
+    {
+      "name": "user-stories",
+      "desc": "Create user stories following the 3 C's (Card, Conversation, Confirmation) and INVEST criteria with descriptions, design links, and acceptance criteri"
+    },
+    {
+      "name": "value-proposition",
+      "desc": "Design a detailed value proposition using a 6-part JTBD template — Who, Why, What before, How, What after, Alternatives. Use when creating a value pro"
+    },
+    {
+      "name": "wwas",
+      "desc": "Create product backlog items in Why-What-Acceptance format — independent, valuable, testable items with strategic context. Use when writing structured"
+    }
+  ],
+  "productivity": [
+    {
+      "name": "calendar",
+      "desc": "Google Calendar integration via Apps Script API. Use when checking schedule, meetings, today's events, weekly calendar, or adding events."
+    },
+    {
+      "name": "docx",
+      "desc": "Create, edit, repair, and review Word documents (.docx). Use for docx-js document creation, in-place editing of existing .docx files, comments, tracke"
+    },
+    {
+      "name": "get-contact",
+      "desc": "Find contact details by name. Searches local contacts/CRM and returns email/phone. Use before scheduling meetings or sending messages when you need co"
+    },
+    {
+      "name": "gmail",
+      "desc": "Gmail automation via Google Apps Script. Use for: send emails, read inbox, create drafts, search messages."
+    },
+    {
+      "name": "huashu-excel",
+      "desc": "数据分析全流程：体检脏表、清洗、定口径、算指标、对账、出报告。处理 Excel/CSV/系统导出数据，做透视写公式，查两个数为什么对不上，判断一个数靠不靠谱时用。核心是让算出来的数字经得起追问。幻灯片和 PPT 交给 huashu-design。"
+    },
+    {
+      "name": "imap-smtp-email",
+      "desc": "通过 IMAP/SMTP 连接个人邮箱，支持完整邮件收发、抄送、附件、HTML、收件箱检索与附件下载；是当前邮件体系中唯一的个人邮箱主通道。"
+    },
+    {
+      "name": "pdf",
+      "desc": "Create and process PDF files. Creation covers reports, papers, and documents with charts, tables, math formulas, and code listings. Processing covers "
+    },
+    {
+      "name": "whatsapp",
+      "desc": "WhatsApp automation (Green API primary, WAHA fallback). Use for: send/receive messages, send voice/images/files, retrieve incoming messages (text, voi"
+    },
+    {
+      "name": "xlsx",
+      "desc": "Create and analyze Excel spreadsheets (.xlsx/.csv). Supports formula-driven analysis, charts, conditional formatting, styled reports, and financial mo"
+    },
+    {
+      "name": "yichen-skills",
+      "desc": ""
+    },
+    {
+      "name": "zoom-meeting",
+      "desc": "Schedule Zoom meetings with calendar invites. Use when scheduling client calls, consultations, or any video meeting. Triggers: 'zoom meeting with...',"
+    }
+  ],
+  "research": [
+    {
+      "name": "ab-test-analysis",
+      "desc": "Analyze A/B test results with statistical significance, sample size validation, confidence intervals, and ship/extend/stop recommendations. Use when e"
+    },
+    {
+      "name": "cohort-analysis",
+      "desc": "Perform cohort analysis on user engagement data — retention curves, feature adoption trends, and segment-level insights. Use when analyzing user reten"
+    },
+    {
+      "name": "competitive-analysis",
+      "desc": "Perform a deep competitive analysis for a solopreneur business. Use when mapping competitors in detail, finding exploitable gaps, understanding compet"
+    },
+    {
+      "name": "competitor-analysis",
+      "desc": "Analyze competitors with strengths, weaknesses, and differentiation opportunities. Identifies direct competitors and maps the competitive landscape. U"
+    },
+    {
+      "name": "competitor-monitoring",
+      "desc": "Track competitors with pricing alerts, feature changes, positioning analysis, and strategic dossiers."
+    },
+    {
+      "name": "customer-journey-map",
+      "desc": "Create an end-to-end customer journey map with stages, touchpoints, emotions, pain points, and opportunities. Use when mapping the customer experience"
+    },
+    {
+      "name": "geo-content-optimizer",
+      "desc": "Optimize content for AI citations in ChatGPT, Perplexity, AI Overviews, Gemini, Claude. AI引用优化/GEO优化/AI搜索"
+    },
+    {
+      "name": "hv-analysis",
+      "desc": "|"
+    },
+    {
+      "name": "interview-script",
+      "desc": "Create a structured customer interview script with JTBD probing questions, warm-up, core exploration, and wrap-up sections. Follows The Mom Test princ"
+    },
+    {
+      "name": "jtbd-analyzer",
+      "desc": "Uncover the real \"job\" customers hire your product to do. Goes beyond features to understand functional, emotional, and social motivations. Use when u"
+    },
+    {
+      "name": "market-research",
+      "desc": "Research markets with sizing, segmentation, competitor mapping, pricing checks, and demand validation that turn fuzzy ideas into decision-ready eviden"
+    },
+    {
+      "name": "market-segments",
+      "desc": "Identify 3-5 potential customer segments with demographics, JTBD, and product fit analysis. Use when exploring market segments, identifying target aud"
+    },
+    {
+      "name": "market-sizing",
+      "desc": "Estimate market size using TAM, SAM, and SOM with top-down and bottom-up approaches. Use when sizing a market opportunity, estimating addressable mark"
+    },
+    {
+      "name": "prompts",
+      "desc": ""
+    },
+    {
+      "name": "reddit-insights",
+      "desc": "|"
+    },
+    {
+      "name": "sentiment-analysis",
+      "desc": "Analyze user feedback data to identify segments with sentiment scores, JTBD, and product satisfaction insights. Use when analyzing user feedback at sc"
+    },
+    {
+      "name": "seo-audit",
+      "desc": "When the user wants to audit, review, or diagnose SEO issues on their site. Also use when the user mentions \"SEO audit,\" \"technical SEO,\" \"why am I no"
+    },
+    {
+      "name": "serp-analysis",
+      "desc": "Analyze SERPs: ranking factors, features, intent patterns, AI overviews, featured snippets. SERP分析/搜索结果"
+    },
+    {
+      "name": "sql-queries",
+      "desc": "Generate SQL queries from natural language descriptions. Supports BigQuery, PostgreSQL, MySQL, and other dialects. Reads database schemas from uploade"
+    },
+    {
+      "name": "summarize-interview",
+      "desc": "Summarize a customer interview transcript into a structured template with JTBD, satisfaction signals, and action items. Use when processing interview "
+    },
+    {
+      "name": "trend-researcher",
+      "desc": "专注行业趋势分析和技术前瞻的研究专家，帮团队看清未来 6-18 个月的方向，在正确的时间做正确的事。"
+    },
+    {
+      "name": "user-personas",
+      "desc": "Create refined user personas from research data — 3 personas with JTBD, pains, gains, and unexpected insights. Use when building personas from survey "
+    },
+    {
+      "name": "user-segmentation",
+      "desc": "Segment users from feedback data based on behavior, JTBD, and needs. Identifies at least 3 distinct user segments. Use when segmenting a user base, an"
+    },
+    {
+      "name": "x-bookmarks-fetcher",
+      "desc": "Fetch X (Twitter) bookmarks via the official X API v2. Downloads recent bookmarks with text, images, and videos into a local folder. Use whenever user"
+    }
+  ],
+  "security": [
+    {
+      "name": "reverse-skill",
+      "desc": "<p align=\"center\">"
+    }
+  ],
+  "skill-management": [
+    {
+      "name": "darwin-skill",
+      "desc": "Darwin Skill 2.0 (达尔文.skill 2.0): autonomous skill optimizer, v2.0 integrates Microsoft Research SkillLens (arXiv 2605.23899) 9-dim rubric + SkillOpt "
+    },
+    {
+      "name": "find-skills",
+      "desc": "Helps users discover and install agent skills when they ask questions like \"how do I do X\", \"find a skill for X\", \"is there a skill that can...\", or e"
+    },
+    {
+      "name": "github-skills-main",
+      "desc": "A collection of AI Skills for managing and evolving your skill library. These tools help you create,"
+    },
+    {
+      "name": "leader",
+      "desc": "把一句话的想法拆成 AI agent 能独立跑完的目标任务书。用户说「帮我给 agent 写个目标」「帮我详细拆一下这个目标」「写个任务书/brief 给 agent」「写个 goal 提示词」「让 agent 自己跑这个项目」「把活分给几个 agent 并行」时使用。先进代码库实测、必要时联网调研"
+    },
+    {
+      "name": "luban",
+      "desc": "|"
+    },
+    {
+      "name": "nuwa-skill",
+      "desc": "|"
+    },
+    {
+      "name": "skill-creator",
+      "desc": "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude"
+    },
+    {
+      "name": "skill-forge",
+      "desc": "Create high-quality, production-grade skills for Claude Code. Expert guidance on skill architecture, workflow design, prompt engineering, and packagin"
+    },
+    {
+      "name": "skill-review",
+      "desc": "Quality review and audit for Claude Code skills. Analyzes skill structure, description quality, workflow design, token efficiency, and anti-patterns a"
+    }
+  ],
+  "video": [
+    {
+      "name": "directing-stickman-videos",
+      "desc": "Use when turning copy, notes, articles, or topics into one-minute English stick-figure videos, kinetic line-animation explainers, motivational shorts,"
+    },
+    {
+      "name": "hand-drawn-video-prompts",
+      "desc": "Use when a user provides a Chinese voiceover script and needs copy-ready vertical B-roll prompts or an assembled 9:16 video in a modern Q-version hand"
+    },
+    {
+      "name": "hypit",
+      "desc": "Direct and produce videos with Hypit, primarily through generated media and authored components while incorporating briefs, references or supplied mat"
+    },
+    {
+      "name": "jianying-headless",
+      "desc": "面向剪映专业版 macOS 的本地自动化工具。通过结构化剪辑计划生成可编辑草稿，"
+    },
+    {
+      "name": "kid-papercraft",
+      "desc": "这是一个创意的儿童折纸风格定格动画生日祝福视频生成器。当用户想要给小孩子制作个性化生日祝福动画时激活。该技能通过三段式的剧情（创意出场 -> 生日祝福 -> 暖心叮嘱），结合 5 大热门儿童 IP（汪汪队、小猪佩奇、奥特曼、海绵宝宝、哆啦A梦），生成用于 Gemini Omni Flash 的标准分"
+    },
+    {
+      "name": "kinetic-video-creator",
+      "desc": "Create professional kinetic typography videos from scratch. Includes speech writing, TTS with emotional dynamics, music generation, and animated text."
+    },
+    {
+      "name": "openmontage",
+      "desc": "OpenMontage 开源 agentic 视频生产系统（外部安装，AGPL-3.0）入口指引。当用户要求端到端制作成片级视频——动画讲解、纪录片混剪（真实素材）、预告片/品牌片、口播/虚拟人、播客切片、多语言配音、角色动画——且需要\"调研→提案→脚本→分镜→素材→剪辑→合成\"完整管线时使用。本 "
+    },
+    {
+      "name": "remotion",
+      "desc": "This is an internal package and has no documentation."
+    },
+    {
+      "name": "seedance2-skill-main",
+      "desc": "Write effective prompts for Jimeng Seedance 2.0 multimodal AI video generation. Use when users want to create video prompts using text, images, videos"
+    },
+    {
+      "name": "story-to-handdrawn-video",
+      "desc": "[中文](#中文) | [English](#english)"
+    },
+    {
+      "name": "tutorial-creator",
+      "desc": "Creates professional tutorials from raw screen recordings - with narration, music, subtitles, and au"
+    }
+  ],
+  "writing": [
+    {
+      "name": "ad-creative",
+      "desc": "When the user wants to generate, iterate, or scale ad creative — headlines, descriptions, primary text, or full ad variations — for any paid advertisi"
+    },
+    {
+      "name": "aihot",
+      "desc": "查询 AIHOT 的中文 AI 资讯、精选、当前热点和日报。用户询问今天或最近的 AI 新闻、AI 圈动态、大模型或产品发布、OpenAI／Anthropic／Google 最新消息、AI 论文、AI 日报、AIHOT 精选、当前最热事件，或需要同步当前全部精选时使用。必须通过 aihot.news"
+    },
+    {
+      "name": "beautiful-article",
+      "desc": "把用户提供的素材（网页 URL / PDF / DOCX / Markdown / 纯文本 / 截图 / 粘贴材料）编辑、设计成一篇美丽的、可离线打开和分享的**单文件 HTML 网页文章**。基于 reacticle 组件协议：不手写裸 HTML/CSS，而用语义组件 + 受主题约束的 Raw 自"
+    },
+    {
+      "name": "concept-fable",
+      "desc": "围绕用户给的 {concept} 写一则寓言来完整地解释它。1000字以内的虚构故事，2-3 个角色，全程不出现概念名称/术语，最后让读者隐约意识到讲的是什么；接着给概念解析 + 2 个具体可答的检验问题（理解检验 + 迁移检验）。触发词：「用寓言讲 X」「写个故事解释 X」「fable expla"
+    },
+    {
+      "name": "copy-editing",
+      "desc": "When the user wants to edit, review, or improve existing marketing copy. Also use when the user mentions 'edit this copy,' 'review my copy,' 'copy fee"
+    },
+    {
+      "name": "general-writing",
+      "desc": ">"
+    },
+    {
+      "name": "grammar-check",
+      "desc": "Identify grammar, logical, and flow errors in text and suggest targeted fixes without rewriting the entire text. Use when proofreading content, checki"
+    },
+    {
+      "name": "khazix-writer",
+      "desc": "|"
+    },
+    {
+      "name": "news-aggregator-skill",
+      "desc": ""
+    },
+    {
+      "name": "paper-writing",
+      "desc": ">"
+    },
+    {
+      "name": "presentation-architect",
+      "desc": "Transform high-level ideas or briefs into fully structured presentation scripts saved as Markdown files, describing presentations slide by slide with "
+    },
+    {
+      "name": "report-writing",
+      "desc": ">"
+    },
+    {
+      "name": "ten-by-ten",
+      "desc": "The 10x10 method — generate breadth, then converge with human judgment. Use whenever a single AI output won't nail it and quality matters (design, cop"
+    },
+    {
+      "name": "tutorial-narration-writer",
+      "desc": "Writes narration scripts for tutorials in Aviz's style - casual, friendly, like sharing with friends"
+    }
+  ]
+}

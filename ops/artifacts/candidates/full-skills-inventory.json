@@ -1,0 +1,1401 @@
+{
+  "total": 197,
+  "categoriesCount": 15,
+  "categoryBreakdown": {
+    "agent": 8,
+    "business": 18,
+    "code-quality": 8,
+    "creative": 14,
+    "dev-workflow": 15,
+    "frontend-ui": 13,
+    "learning": 7,
+    "product": 44,
+    "productivity": 11,
+    "research": 24,
+    "security": 1,
+    "skill-management": 9,
+    "video": 11,
+    "writing": 14
+  },
+  "inventory": [
+    {
+      "category": "agent",
+      "name": "agent-browser",
+      "hasSkill": false,
+      "hasReadme": false,
+      "desc": ""
+    },
+    {
+      "category": "agent",
+      "name": "agent-reach",
+      "hasSkill": false,
+      "hasReadme": true,
+      "desc": "<h1 align=\"center\">👁️ Agent Reach</h1>"
+    },
+    {
+      "category": "agent",
+      "name": "aviz-skills-installer",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Install skills from the AVIZ Skills Library. Use when user wants to install a skill, browse available skills, set up Claude Code skills, or asks about"
+    },
+    {
+      "category": "agent",
+      "name": "browser-skill",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "|"
+    },
+    {
+      "category": "agent",
+      "name": "claudability-analyzer",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Analyzes professions/jobs for Claude Code automation opportunities. Triggers: 'how can Claude help me', 'what can Claude do for', 'I'm a [profession]'"
+    },
+    {
+      "category": "agent",
+      "name": "deep-research-swarm",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": ">"
+    },
+    {
+      "category": "agent",
+      "name": "kimi-webbridge",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "|"
+    },
+    {
+      "category": "agent",
+      "name": "openclaw-agent-forge",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Generate, review, and optimize OpenClaw or FlowyClaw agent workspaces from a skill, workflow, or existing workspace brief. Use when the user asks to g"
+    },
+    {
+      "category": "business",
+      "name": "beachhead-segment",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Identify the first beachhead market segment for a product launch. Evaluates segments against burning pain, willingness to pay, winnable market share, "
+    },
+    {
+      "category": "business",
+      "name": "churn-prevention",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Reduce voluntary and involuntary churn through cancel flow design, save offers, exit surveys, and dunning sequences. Use when designing or optimizing "
+    },
+    {
+      "category": "business",
+      "name": "competitive-battlecard",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Create sales-ready competitive battlecards comparing your product against a specific competitor — positioning, feature comparison, objection handling,"
+    },
+    {
+      "category": "business",
+      "name": "equity-researcher",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "机构级投研报告生成技能。覆盖中国A股、港股、美股上市公司。输出模式：1）投资速览：3-5页，含公司概览、核心财务指标、估值倍数、投资逻辑与风险因素；2）深度研报：≥25页，含行业分析、产业链图谱、三表模型、DCF估值、情景分析与敏感性测试。触发条件：1）直接请求：分析/看看/研究/调研/介绍一下 +"
+    },
+    {
+      "category": "business",
+      "name": "financial-report-reader",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "财报三表（利润表、资产负债表、现金流量表）深度解读，自动进行同比/环比变动分析并执行多维度财务异常检测（如应收账款暴增、经营现金流与净利润背离、存货积压及毛利率突变等）。当用户需要解读财报、分析三表、做同比/环比比较、检测财务异常信号、评估现金流质量或计算关键财务比率时触发，关键词包括财报、三表、同"
+    },
+    {
+      "category": "business",
+      "name": "growth-loops",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Identify growth loops (flywheels) for sustainable traction. Evaluates 5 loop types: Viral, Usage, Collaboration, User-Generated, and Referral. Use whe"
+    },
+    {
+      "category": "business",
+      "name": "gtm-motions",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Identify the best GTM motions and tools across 7 motion types: Inbound, Outbound, Paid Digital, Community, Partners, ABM, and PLG. Use when selecting "
+    },
+    {
+      "category": "business",
+      "name": "gtm-strategy",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Create a go-to-market strategy covering marketing channels, messaging, success metrics, and launch timeline. Use when planning a product launch, creat"
+    },
+    {
+      "category": "business",
+      "name": "ideal-customer-profile",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Identify the Ideal Customer Profile (ICP) from research data with demographics, behaviors, JTBD, and needs. Use when defining your ICP, analyzing PMF "
+    },
+    {
+      "category": "business",
+      "name": "marketing-ideas",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Generate 5 creative, cost-effective marketing ideas with channels, messaging, and engagement rationale. Use when brainstorming marketing campaigns, pl"
+    },
+    {
+      "category": "business",
+      "name": "north-star-metric",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Define a North Star Metric and 3-5 supporting input metrics that form a metrics constellation. Classify the business game (Attention, Transaction, Pro"
+    },
+    {
+      "category": "business",
+      "name": "paywall-upgrade-cro",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "When the user wants to create or optimize in-app paywalls, upgrade screens, upsell modals, or feature gates. Also use when the user mentions \"paywall,"
+    },
+    {
+      "category": "business",
+      "name": "positioning-ideas",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Brainstorm product positioning ideas differentiated from competitors. Identifies top competitors and generates positioning statements with rationale. "
+    },
+    {
+      "category": "business",
+      "name": "pricing-strategy",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Design, optimize, and communicate SaaS pricing — tier structure, value metrics, pricing pages, and price increase strategy. Use when building a pricin"
+    },
+    {
+      "category": "business",
+      "name": "product-name",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Brainstorm 5 unique, memorable product names with rationale aligned to brand values and target audience. Use when naming a new product, rebranding, or"
+    },
+    {
+      "category": "business",
+      "name": "stock-finance-profiler",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "股票基本面分析工具：基于用户提供的三张财务报表（资产负债表、利润表、现金流量表），计算超过 20 项核心财务指标（涵盖盈利能力、偿债能力、流动性、营运效率、每股指标、现金流和成长能力）并进行详细的杜邦分析。当用户提及财报分析、基本面分析、财务指标计算、杜邦分解、ROE 分析，或使用类似“帮我分析一下"
+    },
+    {
+      "category": "business",
+      "name": "value-invest-scorer",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "巴菲特/格雷厄姆风格的价值投资评估技能，从护城河、管理层、财务、估值四大维度共20个细项对目标公司进行系统性评分（满分100分），并给出综合评级与投资建议。当用户需要进行价值投资分析、基本面打分、护城河或管理层评估、财务健康度检查、估值判断、安全边际计算，或使用诸如“分析一下XX的基本面”、“用巴菲"
+    },
+    {
+      "category": "business",
+      "name": "value-prop-statements",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Generate value proposition statements for marketing, sales, and onboarding from existing value propositions. Use when writing marketing copy, creating"
+    },
+    {
+      "category": "code-quality",
+      "name": "agent-readiness",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Run a full 5-phase agent-readiness audit on the current repository — scan, discover apps, evaluate 82 criteria via parallel subagents, validate, and g"
+    },
+    {
+      "category": "code-quality",
+      "name": "ai-humanizer",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": ">"
+    },
+    {
+      "category": "code-quality",
+      "name": "code-review",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "按照团队 Code Review 规范审查代码变更（本地 git diff、staged diff、分支范围或 GitHub PR），并在需要时执行深度架构、安全、性能与冗余代码审查。当用户要求 review 代码、审查 PR、检查代码质量、关注 SOLID/架构/安全/race condition"
+    },
+    {
+      "category": "code-quality",
+      "name": "code-review-expert",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "Expert code review of current git changes with a senior engineer lens. Detects SOLID violations, security risks, and proposes actionable improvements."
+    },
+    {
+      "category": "code-quality",
+      "name": "content-density-review",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": ">-"
+    },
+    {
+      "category": "code-quality",
+      "name": "humanizer-zh",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "|"
+    },
+    {
+      "category": "code-quality",
+      "name": "neat-freak",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": ">-"
+    },
+    {
+      "category": "code-quality",
+      "name": "reality-check",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Deep code audit that detects misleading patterns — fake tests, mock abuse, shallow health checks, overly optimistic error handling, hidden debt. Produ"
+    },
+    {
+      "category": "creative",
+      "name": "creative-seeds",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Inject creative absurdity to break AI pattern-thinking before creative tasks. Randomly samples surreal micro-stories to spark unconventional thinking."
+    },
+    {
+      "category": "creative",
+      "name": "embed-subtitles",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Burn subtitles onto videos using FFmpeg. Use for: hardcode subtitles, embed captions, video subtitling."
+    },
+    {
+      "category": "creative",
+      "name": "gpt-image-2",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "面向 GPT Image 2 的图像生成 / 编辑技能。可在 3 种环境下使用：(A) Garden 本地模式，通过 OpenAI 兼容接口直接出图并落盘；(B) Host-Native 模式，把本 Skill 当作提示词工程指引，把渲染好的 prompt 交给宿主 Agent 自带的图像工具出图；"
+    },
+    {
+      "category": "creative",
+      "name": "guizang-ppt-skill",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "生成\"电子杂志 × 电子墨水\"风格的横向翻页网页 PPT（单 HTML 文件），含 WebGL 流体背景、衬线标题 + 非衬线正文、章节幕封、数据大字报、图片网格等模板。当用户需要制作分享 / 演讲 / 发布会风格的网页 PPT，或提到\"杂志风 PPT\"、\"horizontal swipe deck"
+    },
+    {
+      "category": "creative",
+      "name": "image-generation",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Generate images with Gemini (default) or fal.ai FLUX.2 klein 4B (--cheap for fast/low-cost). Generate videos with Grok Imagine (default) or fal.ai LTX"
+    },
+    {
+      "category": "creative",
+      "name": "music-generator",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Generate AI music with ElevenLabs Music API. Use for: background music, soundtracks, jingles, theme songs, instrumental tracks, AI music composition."
+    },
+    {
+      "category": "creative",
+      "name": "nano-banana-poster",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Generate images and posters with Google Gemini. Use for: create image, generate visual, AI image generation, marketing poster."
+    },
+    {
+      "category": "creative",
+      "name": "quick-voice",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Spin up an instant browser voice session (OpenAI Realtime gpt-realtime-2) to close a topic in a short conversation instead of working through document"
+    },
+    {
+      "category": "creative",
+      "name": "speech-generator",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Generate speech audio from text using ElevenLabs TTS. Use when user asks to 'send voice', 'send audio message', 'create voice', 'generate speech', 'sa"
+    },
+    {
+      "category": "creative",
+      "name": "translate-video",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Translate video subtitles to any language with native-quality refinement. Full pipeline: transcribe → translate → refine → embed RTL-safe subtitles. U"
+    },
+    {
+      "category": "creative",
+      "name": "travel-memory-card-duo",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "Transform one user-supplied travel, street, landscape, lifestyle, portrait, or pet photo into a coordinated two-image deliverable: one complete horizo"
+    },
+    {
+      "category": "creative",
+      "name": "travel-memory-sticker-card",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "Transform a user-uploaded photograph into one horizontal collectible memory card with a large quiet editorial illustration, six integrated journaling-"
+    },
+    {
+      "category": "creative",
+      "name": "web-video-presentation",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "把一篇文章或口播稿，做成\"看起来像视频\"的点击驱动 16:9 网页演示，可选合成口播音频。流程：原始文章 → **一次产出**口播稿 + outline 开发计划 → 用户**一次对齐** 5 件事（稿子 / outline / 主题 / 素材 / 开发模式）→ 网页开发（逐章 / 顺序 / 并行）"
+    },
+    {
+      "category": "creative",
+      "name": "youtube-uploader",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Upload videos to YouTube with title, description, tags. Use for: youtube upload, publish video, share on youtube."
+    },
+    {
+      "category": "dev-workflow",
+      "name": "batch-download",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": ">"
+    },
+    {
+      "category": "dev-workflow",
+      "name": "ecc",
+      "hasSkill": false,
+      "hasReadme": false,
+      "desc": ""
+    },
+    {
+      "category": "dev-workflow",
+      "name": "find-my-project",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Helps beginners find their first AGENTIC project through pain point identification. Guides through questioning, analysis, project suggestion, and fold"
+    },
+    {
+      "category": "dev-workflow",
+      "name": "gh-pages-deploy",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Deploy static or interactive frontend content to GitHub Pages using gh CLI. Use when the user wants to publish, share, or make accessible any HTML/CSS"
+    },
+    {
+      "category": "dev-workflow",
+      "name": "html-to-pdf",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Convert HTML to PDF with pixel-perfect rendering and excellent Hebrew/RTL support. Use when the user asks to 'convert HTML to PDF', 'generate PDF from"
+    },
+    {
+      "category": "dev-workflow",
+      "name": "html-to-pptx",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "Convert HTML to PowerPoint (PPTX) with excellent Hebrew/RTL support. Use when the user asks to 'convert HTML to PowerPoint', 'create presentation from"
+    },
+    {
+      "category": "dev-workflow",
+      "name": "ljg-skills",
+      "hasSkill": false,
+      "hasReadme": true,
+      "desc": "> 李继刚 (lijigang) 个人 Claude Code 技能集合 — 涵盖内容创作 / 投资分析 / 关系分析 / 旅行研究 等多领域"
+    },
+    {
+      "category": "dev-workflow",
+      "name": "mattpocock-skills",
+      "hasSkill": false,
+      "hasReadme": false,
+      "desc": ""
+    },
+    {
+      "category": "dev-workflow",
+      "name": "search-history",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "Search across all Claude Code conversation history (JSONL files) across all projects."
+    },
+    {
+      "category": "dev-workflow",
+      "name": "storage-analyzer",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": ">"
+    },
+    {
+      "category": "dev-workflow",
+      "name": "superpowers",
+      "hasSkill": false,
+      "hasReadme": false,
+      "desc": ""
+    },
+    {
+      "category": "dev-workflow",
+      "name": "swarm-coding",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Coordinate swarm coding work for substantial software tasks, including general repositories and webapps. Use when a task benefits from delegation, par"
+    },
+    {
+      "category": "dev-workflow",
+      "name": "transcribe",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Transcribe audio/video to SRT subtitles using ElevenLabs Scribe v2. Use for: transcription, subtitles, captions, SRT generation."
+    },
+    {
+      "category": "dev-workflow",
+      "name": "wordpress-publisher",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Publish posts to WordPress. Use for: publish blog post, upload to WordPress, פרסם בבלוג."
+    },
+    {
+      "category": "dev-workflow",
+      "name": "youtube-downloader",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Download YouTube videos with quality presets. Use for: download youtube, yt download, video download, youtube to whatsapp, youtube mp3."
+    },
+    {
+      "category": "frontend-ui",
+      "name": "apple-kickstarter-landing-page",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Use when creating a standalone landing page for a hardware/product Kickstarter campaign that should follow Apple's product page design language — clea"
+    },
+    {
+      "category": "frontend-ui",
+      "name": "cinematic-slides",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Create cinematic HTML presentations with AI video backgrounds, deployed to GitHub Pages. Use for: slides, presentation, deck, cinematic slides, video "
+    },
+    {
+      "category": "frontend-ui",
+      "name": "figma",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "|"
+    },
+    {
+      "category": "frontend-ui",
+      "name": "frontend-interface-design",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Build, refine, and review production-grade frontend interfaces inside real products and codebases. Use when the request is to implement, polish, or au"
+    },
+    {
+      "category": "frontend-ui",
+      "name": "frontend-slides-main",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "Create stunning, animation-rich HTML presentations from scratch or by converting PowerPoint files. Use when the user wants to build a presentation, co"
+    },
+    {
+      "category": "frontend-ui",
+      "name": "html-component-builder",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "组件化 HTML 页面构建。为 UI 设计师和前端开发者提供模块化的 HTML 开发规范，将单体 HTML 拆分为独立组件（导航栏、标签页、弹窗、卡片、表单、侧边栏、轮播图、下拉菜单、面包屑、页脚、表格等），每个组件独立 HTML 文件，自带 CSS 命名空间隔离（.cmp-{name}）和 JS "
+    },
+    {
+      "category": "frontend-ui",
+      "name": "huashu-design",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "花叔Design——用HTML做高保真原型、幻灯片、动画、可视化与专家评审。任何新设计100%先出三个方向初稿给用户选（指定风格/品牌也不豁免），选定后才执行。触发词：做原型、PPT、幻灯片、动画、设计风格、评审、做个HTML页面、UI mockup、导出MP4/GIF、做个好看的。生产级Web A"
+    },
+    {
+      "category": "frontend-ui",
+      "name": "impeccable",
+      "hasSkill": false,
+      "hasReadme": true,
+      "desc": "```"
+    },
+    {
+      "category": "frontend-ui",
+      "name": "react-best-practices",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "React and Next.js performance optimization guidelines from Vercel Engineering. This skill should be used when writing, reviewing, or refactoring React"
+    },
+    {
+      "category": "frontend-ui",
+      "name": "semi-ui-skills",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "使用 Semi Design 组件的完整指南，包括 MCP 工具使用流程、常见模式、最佳实践。当你需要查询 Semi Design 组件、生成组件代码或解决使用问题时，请使用此技能。"
+    },
+    {
+      "category": "frontend-ui",
+      "name": "ui-ux-pro-max",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "UI/UX design intelligence. 50 styles, 21 palettes, 50 font pairings, 20 charts, 9 stacks (React, Next.js, Vue, Svelte, SwiftUI, React Native, Flutter,"
+    },
+    {
+      "category": "frontend-ui",
+      "name": "web-design-engineer",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "Build or redesign polished browser-rendered visual artifacts with HTML/CSS/JavaScript/React: pages, dashboards, prototypes, slide decks, animations, U"
+    },
+    {
+      "category": "frontend-ui",
+      "name": "web-visual-artifacts",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "|"
+    },
+    {
+      "category": "learning",
+      "name": "book-study",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Reading coach: guides users through books systematically with knowledge compilation, mastery testing, spaced repetition, and knowledge querying. Use w"
+    },
+    {
+      "category": "learning",
+      "name": "deep-interview",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Conduct deep adaptive interviews to extract and organize knowledge into structured files and folders. Use when user says \"interview me about X\", \"deep"
+    },
+    {
+      "category": "learning",
+      "name": "kb-retriever",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "面向本地知识库目录的检索和问答助手。核心流程：(1)分层索引导航 (2)遇到PDF/Excel时必须先读取references学习处理方法 (3)处理文件后再检索。按文件类型组合使用 grep、Read、pdfplumber、pandas 进行渐进式检索，避免整文件加载。用户问题涉及\"从知识库目录回"
+    },
+    {
+      "category": "learning",
+      "name": "learn",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Teach Claude ANY topic - code libraries, APIs, concepts, tools, methodologies, or domains. Researches via web and docs, then retains knowledge as a pe"
+    },
+    {
+      "category": "learning",
+      "name": "sigma",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "Personalized 1-on-1 AI tutor using Bloom's 2-Sigma mastery learning. Guides users through any topic with Socratic questioning, adaptive pacing, and ri"
+    },
+    {
+      "category": "learning",
+      "name": "teach-by-doing",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Never teach a principle without an immediate rep. When designing ANY teaching content — a workshop, a lesson plan, a deck, a course module, a webinar,"
+    },
+    {
+      "category": "learning",
+      "name": "wiki-ingest",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Compile articles, documents, or notes into a structured wiki knowledge base. Use when user says 'ingest to wiki', 'compile to knowledge base', 'update"
+    },
+    {
+      "category": "product",
+      "name": "analyze-feature-requests",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Analyze and prioritize a list of feature requests by theme, strategic alignment, impact, effort, and risk. Use when reviewing customer feature request"
+    },
+    {
+      "category": "product",
+      "name": "ansoff-matrix",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Generate an Ansoff Matrix analysis mapping growth strategies across market penetration, market development, product development, and diversification. "
+    },
+    {
+      "category": "product",
+      "name": "brainstorm-experiments-existing",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Design experiments to test assumptions for an existing product — prototypes, A/B tests, spikes, and other low-effort validation methods. Use when vali"
+    },
+    {
+      "category": "product",
+      "name": "brainstorm-experiments-new",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Design lean startup experiments (pretotypes) for a new product. Creates XYZ hypotheses and suggests low-effort validation methods like landing pages, "
+    },
+    {
+      "category": "product",
+      "name": "brainstorm-ideas-existing",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Brainstorm product ideas for an existing product using multi-perspective ideation from PM, Designer, and Engineer viewpoints. Use when generating new "
+    },
+    {
+      "category": "product",
+      "name": "brainstorm-ideas-new",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Brainstorm feature ideas for a new product in initial discovery from PM, Designer, and Engineer perspectives. Use when starting product discovery for "
+    },
+    {
+      "category": "product",
+      "name": "brainstorm-okrs",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Brainstorm team-level OKRs aligned with company objectives — qualitative objectives with measurable key results. Use when setting quarterly OKRs, alig"
+    },
+    {
+      "category": "product",
+      "name": "business-model",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Generate a Business Model Canvas with all 9 building blocks. Use when creating a business model, documenting how a business creates value, or analyzin"
+    },
+    {
+      "category": "product",
+      "name": "create-prd",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Create a Product Requirements Document using a comprehensive 8-section template covering problem, objectives, segments, value propositions, solution, "
+    },
+    {
+      "category": "product",
+      "name": "draft-nda",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Draft a detailed Non-Disclosure Agreement between two parties covering information types, jurisdiction, and clauses needing legal review. Use when cre"
+    },
+    {
+      "category": "product",
+      "name": "dummy-dataset",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Generate realistic dummy datasets for testing with customizable columns, constraints, and output formats (CSV, JSON, SQL, Python script). Use when cre"
+    },
+    {
+      "category": "product",
+      "name": "identify-assumptions-existing",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Identify risky assumptions for a feature idea in an existing product across Value, Usability, Viability, and Feasibility. Uses multi-perspective devil"
+    },
+    {
+      "category": "product",
+      "name": "identify-assumptions-new",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Identify risky assumptions for a new product idea across 8 risk categories including Go-to-Market, Strategy, and Team. Use when evaluating startup ris"
+    },
+    {
+      "category": "product",
+      "name": "intended-vs-implemented",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "The method for finding the gap between what a system is supposed to do and what the code actually does — the class of bug generic scanners miss becaus"
+    },
+    {
+      "category": "product",
+      "name": "job-stories",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Create job stories using the 'When [situation], I want to [motivation], so I can [outcome]' format with detailed acceptance criteria. Use when writing"
+    },
+    {
+      "category": "product",
+      "name": "lean-canvas",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Generate a Lean Canvas with problem, solution, metrics, cost structure, UVP, unfair advantage, channels, segments, and revenue. Use when exploring a l"
+    },
+    {
+      "category": "product",
+      "name": "metrics-dashboard",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Define and design a product metrics dashboard with key metrics, data sources, visualization types, and alert thresholds. Use when creating a metrics d"
+    },
+    {
+      "category": "product",
+      "name": "monetization-strategy",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Brainstorm 3-5 monetization strategies with audience fit, risks, and validation experiments. Use when exploring revenue models, evaluating pricing str"
+    },
+    {
+      "category": "product",
+      "name": "opportunity-solution-tree",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Build an Opportunity Solution Tree (OST) to structure product discovery — map a desired outcome to opportunities, solutions, and experiments. Based on"
+    },
+    {
+      "category": "product",
+      "name": "outcome-roadmap",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Transform an output-focused roadmap into an outcome-focused one that communicates strategic intent. Rewrites initiatives as outcome statements reflect"
+    },
+    {
+      "category": "product",
+      "name": "pestle-analysis",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Perform a PESTLE analysis covering Political, Economic, Social, Technological, Legal, and Environmental factors. Use when assessing the macro environm"
+    },
+    {
+      "category": "product",
+      "name": "porters-five-forces",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Perform Porter's Five Forces analysis — competitive rivalry, supplier power, buyer power, threat of substitutes, and threat of new entrants. Use when "
+    },
+    {
+      "category": "product",
+      "name": "pre-mortem",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Run a pre-mortem risk analysis on a PRD or launch plan. Categorizes risks as Tigers (real problems), Paper Tigers (overblown concerns), and Elephants "
+    },
+    {
+      "category": "product",
+      "name": "pricing-strategy",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Analyze and design pricing strategies including pricing models, competitive pricing analysis, willingness-to-pay estimation, and price elasticity. Use"
+    },
+    {
+      "category": "product",
+      "name": "prioritization-frameworks",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Reference guide to 9 prioritization frameworks with formulas, when-to-use guidance, and templates — RICE, ICE, Kano, MoSCoW, Opportunity Score, and mo"
+    },
+    {
+      "category": "product",
+      "name": "prioritize-assumptions",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Prioritize assumptions using an Impact × Risk matrix and suggest experiments for each. Use when triaging a list of assumptions, deciding what to test "
+    },
+    {
+      "category": "product",
+      "name": "prioritize-features",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Prioritize a backlog of feature ideas based on impact, effort, risk, and strategic alignment with top 5 recommendations. Use when prioritizing a featu"
+    },
+    {
+      "category": "product",
+      "name": "privacy-policy",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Draft a detailed privacy policy covering data types, jurisdiction, GDPR and compliance considerations, and clauses needing legal review. Use when crea"
+    },
+    {
+      "category": "product",
+      "name": "product-strategy",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Create a comprehensive product strategy using the 9-section Product Strategy Canvas — vision, segments, costs, value propositions, trade-offs, metrics"
+    },
+    {
+      "category": "product",
+      "name": "product-vision",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Brainstorm an inspiring, achievable, and emotional product vision that motivates teams and aligns stakeholders. Use when defining or refining a produc"
+    },
+    {
+      "category": "product",
+      "name": "release-notes",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Generate user-facing release notes from tickets, PRDs, or changelogs. Creates clear, engaging summaries organized by category (new features, improveme"
+    },
+    {
+      "category": "product",
+      "name": "retro",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Facilitate a structured sprint retrospective — what went well, what didn't, and prioritized action items with owners and deadlines. Use when running a"
+    },
+    {
+      "category": "product",
+      "name": "review-resume",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Comprehensive PM resume review and tailoring against 10 best practices including XYZ+S formula, keyword optimization, job-specific tailoring, and stru"
+    },
+    {
+      "category": "product",
+      "name": "shipping-artifacts",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "The durable documentation set that makes an AI-built (vibe-coded) app reviewable before shipping. A small core every app needs — architecture, user/pe"
+    },
+    {
+      "category": "product",
+      "name": "sprint-plan",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Plan a sprint with capacity estimation, story selection, dependency mapping, and risk identification. Use when preparing for sprint planning, estimati"
+    },
+    {
+      "category": "product",
+      "name": "stakeholder-map",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Build a stakeholder map using a power/interest grid, identify communication strategies per quadrant, and generate a communication plan. Use when manag"
+    },
+    {
+      "category": "product",
+      "name": "startup-canvas",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Generate a Startup Canvas combining Product Strategy (9 sections) and Business Model (costs + revenue) for a new product. An alternative to BMC and Le"
+    },
+    {
+      "category": "product",
+      "name": "strategy-red-team",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Red-team a PRD, roadmap, or strategy by attacking its load-bearing assumptions before reality does. Steelmans then attacks each claim, ranks failure m"
+    },
+    {
+      "category": "product",
+      "name": "summarize-meeting",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Summarize a meeting transcript into structured notes with date, participants, topic, key decisions, summary points, and action items. Use when process"
+    },
+    {
+      "category": "product",
+      "name": "swot-analysis",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Perform a detailed SWOT analysis — strengths, weaknesses, opportunities, and threats with actionable recommendations. Use when doing strategic assessm"
+    },
+    {
+      "category": "product",
+      "name": "test-scenarios",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Create comprehensive test scenarios from user stories with test objectives, starting conditions, user roles, step-by-step actions, and expected outcom"
+    },
+    {
+      "category": "product",
+      "name": "user-stories",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Create user stories following the 3 C's (Card, Conversation, Confirmation) and INVEST criteria with descriptions, design links, and acceptance criteri"
+    },
+    {
+      "category": "product",
+      "name": "value-proposition",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Design a detailed value proposition using a 6-part JTBD template — Who, Why, What before, How, What after, Alternatives. Use when creating a value pro"
+    },
+    {
+      "category": "product",
+      "name": "wwas",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Create product backlog items in Why-What-Acceptance format — independent, valuable, testable items with strategic context. Use when writing structured"
+    },
+    {
+      "category": "productivity",
+      "name": "calendar",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Google Calendar integration via Apps Script API. Use when checking schedule, meetings, today's events, weekly calendar, or adding events."
+    },
+    {
+      "category": "productivity",
+      "name": "docx",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Create, edit, repair, and review Word documents (.docx). Use for docx-js document creation, in-place editing of existing .docx files, comments, tracke"
+    },
+    {
+      "category": "productivity",
+      "name": "get-contact",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Find contact details by name. Searches local contacts/CRM and returns email/phone. Use before scheduling meetings or sending messages when you need co"
+    },
+    {
+      "category": "productivity",
+      "name": "gmail",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Gmail automation via Google Apps Script. Use for: send emails, read inbox, create drafts, search messages."
+    },
+    {
+      "category": "productivity",
+      "name": "huashu-excel",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "数据分析全流程：体检脏表、清洗、定口径、算指标、对账、出报告。处理 Excel/CSV/系统导出数据，做透视写公式，查两个数为什么对不上，判断一个数靠不靠谱时用。核心是让算出来的数字经得起追问。幻灯片和 PPT 交给 huashu-design。"
+    },
+    {
+      "category": "productivity",
+      "name": "imap-smtp-email",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "通过 IMAP/SMTP 连接个人邮箱，支持完整邮件收发、抄送、附件、HTML、收件箱检索与附件下载；是当前邮件体系中唯一的个人邮箱主通道。"
+    },
+    {
+      "category": "productivity",
+      "name": "pdf",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Create and process PDF files. Creation covers reports, papers, and documents with charts, tables, math formulas, and code listings. Processing covers "
+    },
+    {
+      "category": "productivity",
+      "name": "whatsapp",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "WhatsApp automation (Green API primary, WAHA fallback). Use for: send/receive messages, send voice/images/files, retrieve incoming messages (text, voi"
+    },
+    {
+      "category": "productivity",
+      "name": "xlsx",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Create and analyze Excel spreadsheets (.xlsx/.csv). Supports formula-driven analysis, charts, conditional formatting, styled reports, and financial mo"
+    },
+    {
+      "category": "productivity",
+      "name": "yichen-skills",
+      "hasSkill": false,
+      "hasReadme": false,
+      "desc": ""
+    },
+    {
+      "category": "productivity",
+      "name": "zoom-meeting",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Schedule Zoom meetings with calendar invites. Use when scheduling client calls, consultations, or any video meeting. Triggers: 'zoom meeting with...',"
+    },
+    {
+      "category": "research",
+      "name": "ab-test-analysis",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Analyze A/B test results with statistical significance, sample size validation, confidence intervals, and ship/extend/stop recommendations. Use when e"
+    },
+    {
+      "category": "research",
+      "name": "cohort-analysis",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Perform cohort analysis on user engagement data — retention curves, feature adoption trends, and segment-level insights. Use when analyzing user reten"
+    },
+    {
+      "category": "research",
+      "name": "competitive-analysis",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Perform a deep competitive analysis for a solopreneur business. Use when mapping competitors in detail, finding exploitable gaps, understanding compet"
+    },
+    {
+      "category": "research",
+      "name": "competitor-analysis",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Analyze competitors with strengths, weaknesses, and differentiation opportunities. Identifies direct competitors and maps the competitive landscape. U"
+    },
+    {
+      "category": "research",
+      "name": "competitor-monitoring",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Track competitors with pricing alerts, feature changes, positioning analysis, and strategic dossiers."
+    },
+    {
+      "category": "research",
+      "name": "customer-journey-map",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Create an end-to-end customer journey map with stages, touchpoints, emotions, pain points, and opportunities. Use when mapping the customer experience"
+    },
+    {
+      "category": "research",
+      "name": "geo-content-optimizer",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Optimize content for AI citations in ChatGPT, Perplexity, AI Overviews, Gemini, Claude. AI引用优化/GEO优化/AI搜索"
+    },
+    {
+      "category": "research",
+      "name": "hv-analysis",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "|"
+    },
+    {
+      "category": "research",
+      "name": "interview-script",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Create a structured customer interview script with JTBD probing questions, warm-up, core exploration, and wrap-up sections. Follows The Mom Test princ"
+    },
+    {
+      "category": "research",
+      "name": "jtbd-analyzer",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Uncover the real \"job\" customers hire your product to do. Goes beyond features to understand functional, emotional, and social motivations. Use when u"
+    },
+    {
+      "category": "research",
+      "name": "market-research",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Research markets with sizing, segmentation, competitor mapping, pricing checks, and demand validation that turn fuzzy ideas into decision-ready eviden"
+    },
+    {
+      "category": "research",
+      "name": "market-segments",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Identify 3-5 potential customer segments with demographics, JTBD, and product fit analysis. Use when exploring market segments, identifying target aud"
+    },
+    {
+      "category": "research",
+      "name": "market-sizing",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Estimate market size using TAM, SAM, and SOM with top-down and bottom-up approaches. Use when sizing a market opportunity, estimating addressable mark"
+    },
+    {
+      "category": "research",
+      "name": "prompts",
+      "hasSkill": false,
+      "hasReadme": false,
+      "desc": ""
+    },
+    {
+      "category": "research",
+      "name": "reddit-insights",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "|"
+    },
+    {
+      "category": "research",
+      "name": "sentiment-analysis",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Analyze user feedback data to identify segments with sentiment scores, JTBD, and product satisfaction insights. Use when analyzing user feedback at sc"
+    },
+    {
+      "category": "research",
+      "name": "seo-audit",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "When the user wants to audit, review, or diagnose SEO issues on their site. Also use when the user mentions \"SEO audit,\" \"technical SEO,\" \"why am I no"
+    },
+    {
+      "category": "research",
+      "name": "serp-analysis",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Analyze SERPs: ranking factors, features, intent patterns, AI overviews, featured snippets. SERP分析/搜索结果"
+    },
+    {
+      "category": "research",
+      "name": "sql-queries",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Generate SQL queries from natural language descriptions. Supports BigQuery, PostgreSQL, MySQL, and other dialects. Reads database schemas from uploade"
+    },
+    {
+      "category": "research",
+      "name": "summarize-interview",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Summarize a customer interview transcript into a structured template with JTBD, satisfaction signals, and action items. Use when processing interview "
+    },
+    {
+      "category": "research",
+      "name": "trend-researcher",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "专注行业趋势分析和技术前瞻的研究专家，帮团队看清未来 6-18 个月的方向，在正确的时间做正确的事。"
+    },
+    {
+      "category": "research",
+      "name": "user-personas",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Create refined user personas from research data — 3 personas with JTBD, pains, gains, and unexpected insights. Use when building personas from survey "
+    },
+    {
+      "category": "research",
+      "name": "user-segmentation",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Segment users from feedback data based on behavior, JTBD, and needs. Identifies at least 3 distinct user segments. Use when segmenting a user base, an"
+    },
+    {
+      "category": "research",
+      "name": "x-bookmarks-fetcher",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "Fetch X (Twitter) bookmarks via the official X API v2. Downloads recent bookmarks with text, images, and videos into a local folder. Use whenever user"
+    },
+    {
+      "category": "security",
+      "name": "reverse-skill",
+      "hasSkill": false,
+      "hasReadme": true,
+      "desc": "<p align=\"center\">"
+    },
+    {
+      "category": "skill-management",
+      "name": "darwin-skill",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "Darwin Skill 2.0 (达尔文.skill 2.0): autonomous skill optimizer, v2.0 integrates Microsoft Research SkillLens (arXiv 2605.23899) 9-dim rubric + SkillOpt "
+    },
+    {
+      "category": "skill-management",
+      "name": "find-skills",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Helps users discover and install agent skills when they ask questions like \"how do I do X\", \"find a skill for X\", \"is there a skill that can...\", or e"
+    },
+    {
+      "category": "skill-management",
+      "name": "github-skills-main",
+      "hasSkill": false,
+      "hasReadme": true,
+      "desc": "A collection of AI Skills for managing and evolving your skill library. These tools help you create,"
+    },
+    {
+      "category": "skill-management",
+      "name": "leader",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "把一句话的想法拆成 AI agent 能独立跑完的目标任务书。用户说「帮我给 agent 写个目标」「帮我详细拆一下这个目标」「写个任务书/brief 给 agent」「写个 goal 提示词」「让 agent 自己跑这个项目」「把活分给几个 agent 并行」时使用。先进代码库实测、必要时联网调研"
+    },
+    {
+      "category": "skill-management",
+      "name": "luban",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "|"
+    },
+    {
+      "category": "skill-management",
+      "name": "nuwa-skill",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "|"
+    },
+    {
+      "category": "skill-management",
+      "name": "skill-creator",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude"
+    },
+    {
+      "category": "skill-management",
+      "name": "skill-forge",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "Create high-quality, production-grade skills for Claude Code. Expert guidance on skill architecture, workflow design, prompt engineering, and packagin"
+    },
+    {
+      "category": "skill-management",
+      "name": "skill-review",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Quality review and audit for Claude Code skills. Analyzes skill structure, description quality, workflow design, token efficiency, and anti-patterns a"
+    },
+    {
+      "category": "video",
+      "name": "directing-stickman-videos",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Use when turning copy, notes, articles, or topics into one-minute English stick-figure videos, kinetic line-animation explainers, motivational shorts,"
+    },
+    {
+      "category": "video",
+      "name": "hand-drawn-video-prompts",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Use when a user provides a Chinese voiceover script and needs copy-ready vertical B-roll prompts or an assembled 9:16 video in a modern Q-version hand"
+    },
+    {
+      "category": "video",
+      "name": "hypit",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Direct and produce videos with Hypit, primarily through generated media and authored components while incorporating briefs, references or supplied mat"
+    },
+    {
+      "category": "video",
+      "name": "jianying-headless",
+      "hasSkill": false,
+      "hasReadme": true,
+      "desc": "面向剪映专业版 macOS 的本地自动化工具。通过结构化剪辑计划生成可编辑草稿，"
+    },
+    {
+      "category": "video",
+      "name": "kid-papercraft",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "这是一个创意的儿童折纸风格定格动画生日祝福视频生成器。当用户想要给小孩子制作个性化生日祝福动画时激活。该技能通过三段式的剧情（创意出场 -> 生日祝福 -> 暖心叮嘱），结合 5 大热门儿童 IP（汪汪队、小猪佩奇、奥特曼、海绵宝宝、哆啦A梦），生成用于 Gemini Omni Flash 的标准分"
+    },
+    {
+      "category": "video",
+      "name": "kinetic-video-creator",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Create professional kinetic typography videos from scratch. Includes speech writing, TTS with emotional dynamics, music generation, and animated text."
+    },
+    {
+      "category": "video",
+      "name": "openmontage",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "OpenMontage 开源 agentic 视频生产系统（外部安装，AGPL-3.0）入口指引。当用户要求端到端制作成片级视频——动画讲解、纪录片混剪（真实素材）、预告片/品牌片、口播/虚拟人、播客切片、多语言配音、角色动画——且需要\"调研→提案→脚本→分镜→素材→剪辑→合成\"完整管线时使用。本 "
+    },
+    {
+      "category": "video",
+      "name": "remotion",
+      "hasSkill": false,
+      "hasReadme": true,
+      "desc": "This is an internal package and has no documentation."
+    },
+    {
+      "category": "video",
+      "name": "seedance2-skill-main",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "Write effective prompts for Jimeng Seedance 2.0 multimodal AI video generation. Use when users want to create video prompts using text, images, videos"
+    },
+    {
+      "category": "video",
+      "name": "story-to-handdrawn-video",
+      "hasSkill": false,
+      "hasReadme": true,
+      "desc": "[中文](#中文) | [English](#english)"
+    },
+    {
+      "category": "video",
+      "name": "tutorial-creator",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Creates professional tutorials from raw screen recordings - with narration, music, subtitles, and au"
+    },
+    {
+      "category": "writing",
+      "name": "ad-creative",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "When the user wants to generate, iterate, or scale ad creative — headlines, descriptions, primary text, or full ad variations — for any paid advertisi"
+    },
+    {
+      "category": "writing",
+      "name": "aihot",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "查询 AIHOT 的中文 AI 资讯、精选、当前热点和日报。用户询问今天或最近的 AI 新闻、AI 圈动态、大模型或产品发布、OpenAI／Anthropic／Google 最新消息、AI 论文、AI 日报、AIHOT 精选、当前最热事件，或需要同步当前全部精选时使用。必须通过 aihot.news"
+    },
+    {
+      "category": "writing",
+      "name": "beautiful-article",
+      "hasSkill": true,
+      "hasReadme": true,
+      "desc": "把用户提供的素材（网页 URL / PDF / DOCX / Markdown / 纯文本 / 截图 / 粘贴材料）编辑、设计成一篇美丽的、可离线打开和分享的**单文件 HTML 网页文章**。基于 reacticle 组件协议：不手写裸 HTML/CSS，而用语义组件 + 受主题约束的 Raw 自"
+    },
+    {
+      "category": "writing",
+      "name": "concept-fable",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "围绕用户给的 {concept} 写一则寓言来完整地解释它。1000字以内的虚构故事，2-3 个角色，全程不出现概念名称/术语，最后让读者隐约意识到讲的是什么；接着给概念解析 + 2 个具体可答的检验问题（理解检验 + 迁移检验）。触发词：「用寓言讲 X」「写个故事解释 X」「fable expla"
+    },
+    {
+      "category": "writing",
+      "name": "copy-editing",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "When the user wants to edit, review, or improve existing marketing copy. Also use when the user mentions 'edit this copy,' 'review my copy,' 'copy fee"
+    },
+    {
+      "category": "writing",
+      "name": "general-writing",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": ">"
+    },
+    {
+      "category": "writing",
+      "name": "grammar-check",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Identify grammar, logical, and flow errors in text and suggest targeted fixes without rewriting the entire text. Use when proofreading content, checki"
+    },
+    {
+      "category": "writing",
+      "name": "khazix-writer",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "|"
+    },
+    {
+      "category": "writing",
+      "name": "news-aggregator-skill",
+      "hasSkill": false,
+      "hasReadme": false,
+      "desc": ""
+    },
+    {
+      "category": "writing",
+      "name": "paper-writing",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": ">"
+    },
+    {
+      "category": "writing",
+      "name": "presentation-architect",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Transform high-level ideas or briefs into fully structured presentation scripts saved as Markdown files, describing presentations slide by slide with "
+    },
+    {
+      "category": "writing",
+      "name": "report-writing",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": ">"
+    },
+    {
+      "category": "writing",
+      "name": "ten-by-ten",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "The 10x10 method — generate breadth, then converge with human judgment. Use whenever a single AI output won't nail it and quality matters (design, cop"
+    },
+    {
+      "category": "writing",
+      "name": "tutorial-narration-writer",
+      "hasSkill": true,
+      "hasReadme": false,
+      "desc": "Writes narration scripts for tutorials in Aviz's style - casual, friendly, like sharing with friends"
+    }
+  ]
+}
