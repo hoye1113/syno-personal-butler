@@ -2,26 +2,28 @@
 
 本节是当前交接摘要；下方各期交接仅用于追溯，不能覆盖这里的事实。
 
-## 知识库 V4 排版跃迁、Agent Skills 范式重构与雷达巡检
+## 知识库 V4 排版跃迁、Agent Skills 范式重构与 17 大高杠杆武器库收录
 
-- **分支/远端**：`main` 与 `origin/main`（`https://github.com/hoye1113/syno-personal-butler.git`）100% 对齐，已提交并推送至 `f95cf32`；工作区完全整洁（`nothing to commit, working tree clean`）。
-- **全库 35 篇核心长文 V4 级美学排版与端云同步**：
-  - 35 篇核心深度微信长文已全部完成 V4 级排版跃迁（顶部三行呼吸感留白、H1 原生分割线、正文层级重构、流程图与终端代码块化、微信图片本地化防防盗链）。
-  - 飞书 Wiki 空间首页与本地全局 MOC 导航完成重构；飞书多维表格知识大盘（Table 2 `tblnyAKG4iUEMgMv`）全量 205 篇正文笔记 100% 对齐。
-  - 运行 `scripts/heal-vault-wikilinks.mjs`，治愈 60+ 处 `[[Sitor AI]]` 及 `[[Harness Engineering]]` 规范别名断链，修剪 239 条废弃 MOC 坏死行。
-  - `vault/00-Inbox/` 历史原始 JSON 缓存文件规范归档移入 `ops/artifacts/candidates/`，Inbox 保持 100% 纯净。
+- **分支/远端**：`main` 与 `origin/main`（`https://github.com/hoye1113/syno-personal-butler.git`）保持同步；工作区严格受控。
+- **Agent Skills 武器库全量收录（17 大原子卡片 + 1 统一 MOC 导航）**：
+  - **第一批（9 个）**：`ponytail`（架构师减法）、`archify`（交互动态架构图）、`reality-check`（代码诚实度审计）、`open-design`（开源全能设计引擎）、`concept-fable`（零术语寓言）、`geo-content-optimizer`（GEO生成式引用优化）、`huashu-excel`（严谨对账与口径治理）、`travel-memory-sticker-card`（水粉剪纸手帐贴纸卡）、`kid-papercraft`（儿童折纸定格动画短片）。
+  - **第二批（8 个）**：
+    1. `deep-interview` — 苏格拉底自适应深度访谈萃取法（边聊边落盘提取主人隐性经验）；
+    2. `sigma` — Bloom 2-Sigma 一对一自适应认知导师（80% 掌握度门禁，绝不直接给答案）；
+    3. `financial-report-reader` — 财报三表联动与 10 项暴雷异常检测（Python CLI 确定性排雷引擎）；
+    4. `hv-analysis` — 横纵深度分析法（索绪尔历时-共时融合，出版级 PDF 研报）；
+    5. `web-video-presentation` — 16:9 网页伪视频与口播演说生成器（React 步进驱动，零重渲染录屏成片）；
+    6. `yichen-x-slicer` — X/Twitter 推文与 Thread 自动化切片视频引擎（Playwright 3:4 琥珀色排版 + 原生音画装配）；
+    7. `khazix-writer` — 数字生命卡兹克公众号长文写作心智（“有见识的普通人”，HKR 质检去 AI 味）；
+    8. `reverse-skill` — 逆向工程与安全研究技能路由包（44 路由规则驱动 IDA/Frida/Jadx/Burp/Kali 体系）。
+  - **总导航枢纽**：`vault/02-Resources/AI and Agents/MOC - Agent Skills 武器库.md` 同步更新，形成涵盖工程、研究、创作与视听的四大四象限场景决策树。
+- **飞书多维表格（Bitable Table 2 `tblnyAKG4iUEMgMv`）全量同步**：
+  - 运行 `node scripts/sync-vault-catalog-to-bitable.mjs`，新增 8 篇正文笔记索引，全库正文笔记达 **223 篇**，100% 映射对齐。
 - **收录自动化与通道增强**：
   - 升级 `scripts/sync-feishu-intake.mjs`，新增 `--watch` 与 `--interval <minutes>` 支持，可作为常驻守护进程自动轮询多维表格表 1 待收录条目。
-  - 完善飞书通道首次会话自动认主与服务 API 白名单（`104ea9b`）。
-- **Agent Skills 演进哲学与规范笔记入库**：
-  - 面对 Claude 5.5 / GPT-6.1 / DeepSeek V4.1 强模型时代，淘汰以 `superpowers`、`ECC` 为代表的第二代“流程官僚主义与过度规训”，确立现代 Harness 三大原则：姿态胜于步骤（Stance over Steps）、负向红线胜于八股（Negative Boundaries）、感官镜子胜于手把手（Sensory Feedback）。
-  - 撰写并入库规范知识笔记：`vault/02-Resources/AI and Agents/Agent Design & Patterns/从过度规训到大松绑——强模型时代的 Agent Skills 演进与重构.md`。
-- **全网爆款 Agent Skills 自动雷达巡检工具**：
-  - 研发并部署 `scripts/radar-trending-skills.mjs`，通过 GitHub Search API 自动化检索 `topic:agent-skills` / `topic:claude-skills`，内置过度规训诊断与强模型高杠杆心智标记。
-  - 完成全网首飞扫描，快照沉淀至 `ops/artifacts/candidates/skills-radar-latest.json`。
-  - 深度挖掘本地合集，提炼出 6 大高杠杆与生活兴趣技能（`geo-content-optimizer`、`huashu-excel`、`web-video-presentation`、`financial-report-reader`、`kid-papercraft`、`reverse-skill`）。
+  - 研发并部署 `scripts/radar-trending-skills.mjs` 爆款雷达巡检工具，快照沉淀至 `ops/artifacts/candidates/skills-radar-latest.json`。
 - **回归基线与门禁**：
-  - 仓库完整性门禁：`node scripts/verify-repository.mjs` 扫描 2,303 个文件全通过（零个人路径硬编码）。
+  - 仓库完整性门禁：`node scripts/verify-repository.mjs` 扫描全通过（零个人路径硬编码）。
   - 测试套件：`tests/adapters.test.mjs` 与 `tests/feishu-bitable-sync.test.mjs` 42/42 pass。
 
 ---

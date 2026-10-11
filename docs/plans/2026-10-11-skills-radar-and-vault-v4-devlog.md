@@ -66,9 +66,30 @@
 
 ---
 
-## 五、后续建议与行动指南
+## 五、实战武器库收录推进（Batch 1 & Batch 2 全量沉淀）
+
+1. **原子卡片沉淀（共 17 篇）**：
+   - 第一批（9 篇）：`ponytail`、`archify`、`reality-check`、`open-design`、`concept-fable`、`geo-content-optimizer`、`huashu-excel`、`travel-memory-sticker-card`、`kid-papercraft`。
+   - 第二批（8 篇）：
+     - `deep-interview`：苏格拉底自适应深度访谈萃取法（知识显性化与即时写盘）；
+     - `sigma`：Bloom 2-Sigma 一对一自适应认知导师（80% 掌握度门禁与严师姿态）；
+     - `financial-report-reader`：财报三表联动与 10 项暴雷异常检测（Python CLI 确定性排雷引擎）；
+     - `hv-analysis`：横纵深度研究分析法（索绪尔历时-共时融合研报）；
+     - `web-video-presentation`：16:9 网页伪视频与口播演说生成器（React 步进式零重渲染录屏成片）；
+     - `yichen-x-slicer`：X/Twitter 推文与 Thread 自动化切片视频引擎（Playwright 3:4 琥珀色排版 + 原生音画装配）；
+     - `khazix-writer`：数字生命卡兹克公众号长文写作心智（“有见识的普通人”，HKR 质检去 AI 味）；
+     - `reverse-skill`：逆向工程与安全研究技能路由包（44 路由规则驱动 IDA/Frida/Jadx/Burp/Kali 体系）。
+2. **总导航 MOC 重构**：
+   - 统一收拢至 `vault/02-Resources/AI and Agents/MOC - Agent Skills 武器库.md`，构建工程攻坚、深度研究、知识萃取、视听生活四大四象限场景决策树。
+3. **飞书多维表格大盘同步**：
+   - Table 2（`tblnyAKG4iUEMgMv`）正文笔记索引从 205 增至 223 篇，100% 保持端云镜像对齐。
+
+---
+
+## 六、后续建议与行动指南
 
 1. **雷达巡检集成**：
    可将 `node scripts/radar-trending-skills.mjs` 配置在每周定时任务中，输出简报推送到微信或飞书。
-2. **高价值 Skills 按需采纳**：
-   针对本次挖掘出的实用与兴趣技能（如 `geo-content-optimizer`、`huashu-excel`、`travel-memory-sticker-card` 等），在后续遇到特定场景时，以轻量卡片和心智姿态形式按需激活，保持系统的轻快与高杠杆。
+2. **场景化按需唤醒**：
+   17 大武器库卡片作为管家的高杠杆思维资产，在面对日常编程排错、深度研报、视频制作与财务对账时，按 MOC 路由决策树即时调取。
+
