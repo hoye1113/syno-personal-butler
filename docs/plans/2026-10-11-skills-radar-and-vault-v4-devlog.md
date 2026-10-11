@@ -66,30 +66,27 @@
 
 ---
 
-## 五、实战武器库收录推进（全量 27 篇 S 级核心资产沉淀）
+## 五、实战武器库与理论双核推进（全量 31 篇 S 级武器库 + 2 篇理论长文）
 
-1. **原子卡片沉淀（全量 27 篇 S 级核心资产）**：
+1. **原子卡片沉淀（全量 31 篇 S 级核心资产）**：
    - 第一批（9 篇）：`ponytail`、`archify`、`reality-check`、`open-design`、`concept-fable`、`geo-content-optimizer`、`huashu-excel`、`travel-memory-sticker-card`、`kid-papercraft`。
    - 第二批（8 篇）：`deep-interview`、`sigma`、`financial-report-reader`、`hv-analysis`、`web-video-presentation`、`yichen-x-slicer`、`khazix-writer`、`reverse-skill`。
-   - 第三批（5 篇 S 级新核心）：
-     - `BiliNote`：视频音画智能笔记助手（Fast-Whisper 本地转写 + 核心论点自动抽帧截图 + 时间戳跳转）；
-     - `book-study`：读书教练与深度知识库编译系统（掌握度检验铁律驱动，编译生成 Obsidian 双链 `book-wiki/`，艾宾浩斯复习）；
-     - `remotion-best-practices`：Remotion 纯代码视频构建标准（React 声明式视频，Spring 物理曲线，Mediabunny 抽帧，Zod 参数化）；
-     - `equity-researcher`：机构级上市公司投研研报生成器（覆盖 A/港/美股，Tear Sheet 投资速览与 ≥25页 DCF 深度研报模型）；
-     - `product-behavioral-nudge-engine`：行为心理学与防疲惫助推引擎（任务积压时熔断清单，推选 5 分钟微冲刺，零内耗无痛退出）。
-   - 第四批（李继刚认知与思想铸造全景套件 · 方案 A：1 主套件 + 4 核心原子卡片）：
-     - `ljg-suite`：李继刚认知与思想铸造全景套件（15大心智模型总览、统一Prompt哲学与按需路由）；
-     - `ljg-card`：思想铸卡与老宋体视觉排版（金陵老宋体、SVG几何卡片、留白呼吸感排版契约）；
-     - `ljg-think-rank`：追本之箭与认知降秩生成器（反向剥离噪音、追问第一性原理、升维思考降秩落地）；
-     - `ljg-writes`：汪曾祺与阿城笔调纯正中文写作引擎（反翻译腔、反八股AI味、短句白描生活质感）；
-     - `ljg-invest`：秩序创造机器与创生公式投资法（热力学熵减视角、负熵流甄别、组织韧性护城河）。
-2. **总导航 MOC 重构**：
-   - 统一收拢至 `vault/02-Resources/AI and Agents/MOC - Agent Skills 武器库.md`，构建工程攻坚、深度研究、知识萃取、视听生活与认知哲学五大维度 27 矩阵场景决策树。
-3. **飞书多维表格大盘同步**：
-   - Table 2（`tblnyAKG4iUEMgMv`）正文笔记索引从 205 增至 228，再增至 **233 篇**，100% 保持端云镜像对齐。
-4. **全景资产盘点与梯队分层大盘**：
+   - 第三批（5 篇 S 级新核心）：`BiliNote`、`book-study`、`remotion-best-practices`、`equity-researcher`、`product-behavioral-nudge-engine`。
+   - 第四批（李继刚认知套件 · 方案 A）：`ljg-suite`、`ljg-card`、`ljg-think-rank`、`ljg-writes`、`ljg-invest`。
+   - 第五批（Matt Pocock 顶级研发心智流套件 · 4 篇原子卡）：
+     - `grilling`：交互式需求深度拷问与反向对齐（决策树 Frontier 推进，在敲代码前挖尽未解假设与隐性决策）；
+     - `wait-what`：历史代码考古学与防御性治理（反常遗留代码强制刹车，Git 考古，特征测试先行，拒绝盲目重构）；
+     - `design-it-twice`：深度模块设计与强制双对立方案裁决（John Ousterhout 深度模块哲学，小接口大实现，强制双轨方案权衡）；
+     - `writing-for-agents`：高确定性高密度 Agent 契约指令写作法（两项负荷平衡，信息天梯，抗早熟完成防线）。
+2. **理论基石长文沉淀（2 篇重磅研报）**：
+   - `AI 产品上下文压缩方法论与三板斧实践.md`：深入剖析 Manus/Claude Code/OpenClaw 的 Reduce/Offload/Isolate 三板斧，文件系统作为外挂大脑，KV Cache 命中优化。
+   - `原位自演化智能体 In-situ Self-evolving Agent 架构.md`：解构零预设工具 Zero-Skills 起步、运行期原位动态造工具与双环沙箱门禁。
+3. **总导航 MOC 重构**：
+   - 统一收拢至 `vault/02-Resources/AI and Agents/MOC - Agent Skills 武器库.md`，构建工程攻坚、深度研究、知识萃取、视听生活与认知哲学五大维度 31 矩阵场景决策树。
+4. **飞书多维表格大盘同步**：
+   - Table 2（`tblnyAKG4iUEMgMv`）正文笔记索引从 205 增至 228，再增至 233，最终达到 **239 篇**，100% 保持端云镜像对齐。
+5. **全景资产盘点与梯队分层大盘**：
    - 扫描 `skill-collection`（15分类/197技能）与本地全栈工程，输出 `ops/artifacts/candidates/full-skills-inventory.json`，确立 4 大推荐梯队。
-   - 挖掘出 Matt Pocock（Total TypeScript 作者）研发套件（`grilling`, `wait-what`, `design-it-twice`）与 `Miscellaneous/文档生成/insights` 系列深度研报。
 
 ---
 
@@ -98,6 +95,6 @@
 1. **雷达巡检集成**：
    可将 `node scripts/radar-trending-skills.mjs` 配置在每周定时任务中，输出简报推送到微信或飞书。
 2. **场景化按需唤醒**：
-   27 大 S 级神级武器库卡片作为管家的高杠杆思维资产，在面对日常编程排错、深度研报、视频制作与认知思辨时，按 MOC 路由决策树即时调取。
+   31 大 S 级神级武器库卡片作为管家的高杠杆思维资产，在面对日常编程排错、深度研报、视频制作与认知思辨时，按 MOC 路由决策树即时调取。
 
 
