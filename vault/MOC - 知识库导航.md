@@ -35,6 +35,7 @@ Step 4  沿类型化关系加载一跳     ← 支持/补充/反驳/限制，优
 | 具身智能 / 脑机接口 / BCI / 物理 AI / 前沿模型 / 机器人 / GPU 算力 | [[MOC - 具身智能与脑机接口]] | domain |
 | 底层实现 / 系统课程 / 认知校准 / agent loop / 工具系统（三元·Sitor） | [[MOC - AI Agent Development]] | Areas |
 | Super Agent 实战 | [[MOC - Super Agent 实战课]] | 课程 |
+| Agent 技能武器库 / 实战姿态 / 架构图 / 视觉设计 / 旅行手帐 / 概念寓言 / 对账 | [[MOC - Agent Skills 武器库]] | 工具 |
 | 都不命中 | tag grep + vskill-vault-relate | 兜底 |
 
 ## ★ 35 篇核心长文与端云对齐总揽
