@@ -10,6 +10,8 @@ $commonScript = Join-Path $PSScriptRoot "windows-service-common.ps1"
 . $commonScript
 $logPolicyScript = Join-Path $PSScriptRoot "syno-launcher-log-policy.ps1"
 . $logPolicyScript
+$crashAlertScript = Join-Path $PSScriptRoot "syno-launcher-crash-alert.ps1"
+. $crashAlertScript
 # Canonical web port: mirror packages/syno-core/paths.mjs DEFAULT_WEB_PORT (PORT env overrides).
 $synoPort = if ($env:PORT) { [int]$env:PORT } else { 8888 }
 $server = Join-Path $resolvedRoot "apps\syno\server.mjs"
@@ -23,6 +25,7 @@ New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
 $logPath = Join-Path $logRoot ("windows-task-{0}.jsonl" -f (Get-Date -Format "yyyy-MM-dd"))
 $script:synoLogPath = $logPath
 $script:launcherLogPolicyState = New-SynoLauncherLogPolicyState
+$script:crashAlertState = New-SynoCrashAlertState
 Get-ChildItem -LiteralPath $logRoot -Filter "windows-task-*.jsonl" -File -ErrorAction SilentlyContinue |
   Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-14) } |
   Remove-Item -Force -ErrorAction SilentlyContinue
@@ -102,12 +105,14 @@ Remove-Item Env:SYNO_WEB_ONLY -ErrorAction SilentlyContinue
 # only on a graceful shutdown (code 0). A persistent failure (e.g. a bad config
 # that keeps crashing node) respawns once per backoff indefinitely by design --
 # giving up would mean permanent downtime, and RestartOnFailure can no longer be
-# relied on to recover -- but every attempt is logged (launcher.host_crashed) so
-# the loop is observable, not silent. Because this wrapper owns the host's
-# lifetime, a durable stop must terminate the scheduled task: Stop-ScheduledTask
-# kills this wrapper and skips the finally/respawn path, whereas killing only the
-# host pid (Stop-SynoHost) just triggers a respawn after the backoff. All managed
-# stop paths already pair the two.
+# relied on to recover -- but every attempt is logged (launcher.host_crashed)
+# and a sustained fast-crash loop also raises a desktop alert
+# (launcher.crash_loop, re-armed hourly), so the loop is observable, not silent.
+# Because this wrapper owns the host's lifetime, a durable stop must terminate
+# the scheduled task: Stop-ScheduledTask kills this wrapper and skips the
+# finally/respawn path, whereas killing only the host pid (Stop-SynoHost) just
+# triggers a respawn after the backoff. All managed stop paths already pair
+# the two.
 $restartBackoffSeconds = 60
 while ($true) {
   # If a healthy Syno Host already owns the loopback port -- at startup (a
@@ -128,6 +133,7 @@ while ($true) {
 
   # Port is free (or its owner just exited): spawn our own host and wait on it.
   $child = Start-Process -FilePath $resolvedNode -ArgumentList @("`"$server`"") -WorkingDirectory $resolvedRoot -WindowStyle Hidden -PassThru
+  $childStartedAt = $child.StartTime.ToUniversalTime()
   Write-HostOwnership $child "owned"
   Write-SynoLauncherLog "launcher.host_started" @{ pid = $child.Id }
   try {
@@ -141,6 +147,12 @@ while ($true) {
     }
   }
   if ($exitCode -eq 0) { exit 0 }
-  Write-SynoLauncherLog "launcher.host_crashed" @{ pid = $child.Id; exitCode = $exitCode; backoffSeconds = $restartBackoffSeconds }
+  $uptimeSeconds = [Math]::Round(([DateTime]::UtcNow - $childStartedAt).TotalSeconds, 1)
+  Write-SynoLauncherLog "launcher.host_crashed" @{ pid = $child.Id; exitCode = $exitCode; uptimeSeconds = $uptimeSeconds; backoffSeconds = $restartBackoffSeconds }
+  if (Test-SynoCrashAlertDue -State $script:crashAlertState -UptimeSeconds $uptimeSeconds -Now ([DateTime]::UtcNow)) {
+    $alertBody = Format-SynoCrashLoopAlertBody -FastCrashStreak $script:crashAlertState.fastCrashStreak -ExitCode $exitCode -LogRoot $logRoot
+    $popupDelivered = Send-SynoCrashLoopPopup -Title "Syno Host crash loop" -Body $alertBody
+    Write-SynoLauncherLog "launcher.crash_loop" @{ consecutiveFastCrashes = $script:crashAlertState.fastCrashStreak; exitCode = $exitCode; lastUptimeSeconds = $uptimeSeconds; alertsSent = $script:crashAlertState.alertsSent; popupDelivered = $popupDelivered }
+  }
   Start-Sleep -Seconds $restartBackoffSeconds
 }

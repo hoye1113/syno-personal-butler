@@ -70,6 +70,8 @@ pnpm state:archive -- restore D:\Backups\syno-state-20260717
 5. 运行针对性测试后再跑完整测试。
 6. 生成 `BugReport` 或 `ImprovementProposal`；不要让 Agent 修改源码绕过故障。
 
+Windows 计划任务（launcher）监督日志在 `%LOCALAPPDATA%\Syno\logs\windows-task-YYYY-MM-DD.jsonl`（保留 14 天），事件包括 `launcher.started`、`host_started`、`host_crashed`（含 `exitCode` 与 `uptimeSeconds`）、`adopted`、`health_ok`、`crash_loop`。Host 连续 3 次在启动后 60 秒内崩溃时，launcher 追加 `launcher.crash_loop` 事件并在桌面弹出 120 秒自动关闭的告警弹窗；弹窗投递失败（`popupDelivered=false`）不中断 60 秒退避重启循环，告警最多每小时重复一次，Host 一次正常存活 ≥60 秒即重置计数。排查启动崩溃循环时先看 `host_crashed` 的 `exitCode`/`uptimeSeconds`，再查 vault 数据与契约状态（历史案例：坏 frontmatter 击穿启动校验导致每 62 秒一崩的循环）。
+
 收录工作流终态审计（只读，不改任何状态）：
 
 ```powershell

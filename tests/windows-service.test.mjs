@@ -262,6 +262,60 @@ test("launcher log policy caps healthy five-second polling to hourly heartbeats 
   assert.equal(result.failed, 17_280);
 });
 
+test("launcher crash alert escalates fast crashes, rearms hourly, and resets after a healthy run", { skip: process.platform !== "win32" }, async () => {
+  const modulePath = path.join(root, "scripts", "syno-launcher-crash-alert.ps1").replaceAll("'", "''");
+  const plan = [
+    "@{ uptime = 3 }",
+    "@{ uptime = 4 }",
+    "@{ uptime = 2 }",
+    "@{ uptime = 2 }",
+    "@{ uptime = 2; plusMinutes = 61 }",
+    "@{ uptime = 300 }",
+    "@{ uptime = 2 }",
+    "@{ uptime = 2 }",
+    "@{ uptime = 2 }",
+  ].join(", ");
+  const script = [
+    `. '${modulePath}'`,
+    "$state = New-SynoCrashAlertState",
+    "$now = [DateTime]'2026-07-30T00:00:00Z'",
+    `$plan = @(${plan})`,
+    "$results = @()",
+    "foreach ($step in $plan) { $now = $now.AddSeconds(62)",
+    "  if ($step.plusMinutes) { $now = $now.AddMinutes($step.plusMinutes) }",
+    "  $results += [bool](Test-SynoCrashAlertDue -State $state -UptimeSeconds $step.uptime -Now $now)",
+    "}",
+    "$message = Format-SynoCrashLoopAlertBody -FastCrashStreak 3 -ExitCode 1 -LogRoot 'C:\\Logs'",
+    "[ordered]@{ results = @($results); alertsSent = $state.alertsSent; streak = $state.fastCrashStreak; message = $message } | ConvertTo-Json -Compress",
+  ].join("; ");
+  const result = JSON.parse(await runPowerShell(script));
+
+  assert.deepEqual(result.results, [false, false, true, false, true, false, false, false, true]);
+  assert.equal(result.alertsSent, 3);
+  assert.equal(result.streak, 3);
+  assert.match(result.message, /crashed 3 times in a row within seconds of starting \(last exit code 1\)/);
+  assert.match(result.message, /C:\\Logs/);
+});
+
+test("launcher wires the crash-loop alert into the supervise loop", async () => {
+  const launcher = await fs.readFile(path.join(root, "scripts", "start-syno.ps1"), "utf8");
+  const alert = await fs.readFile(path.join(root, "scripts", "syno-launcher-crash-alert.ps1"), "utf8");
+  assert.match(launcher, /syno-launcher-crash-alert\.ps1/);
+  assert.match(launcher, /New-SynoCrashAlertState/);
+  assert.match(launcher, /Test-SynoCrashAlertDue/);
+  assert.match(launcher, /Format-SynoCrashLoopAlertBody/);
+  assert.match(launcher, /Send-SynoCrashLoopPopup/);
+  assert.match(launcher, /launcher\.crash_loop/);
+  assert.match(launcher, /uptimeSeconds/);
+  const crashedLog = launcher.indexOf('"launcher.host_crashed"');
+  const alertDue = launcher.indexOf("Test-SynoCrashAlertDue");
+  const backoffSleep = launcher.indexOf("Start-Sleep -Seconds $restartBackoffSeconds");
+  assert.ok(crashedLog >= 0 && alertDue > crashedLog && backoffSleep > alertDue, "the alert must run after the crash log and before the backoff sleep");
+  assert.match(alert, /WScript\.Shell/);
+  assert.match(alert, /Popup\(/);
+  assert.match(alert, /catch/);
+});
+
 test("Windows service common policy recognizes only this repository's launcher wrapper", { skip: process.platform !== "win32" }, async () => {
   const common = path.join(root, "scripts", "windows-service-common.ps1").replaceAll("'", "''");
   const command = `. '${common}'; $good=[pscustomobject]@{Name='powershell.exe';CommandLine='powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\\Syno\\scripts\\start-syno.ps1" -RepoRoot "C:\\Syno" -NodePath "C:\\Node\\node.exe"'}; $mention=[pscustomobject]@{Name='powershell.exe';CommandLine='powershell.exe -Command "Write-Host C:\\Syno\\scripts\\start-syno.ps1 C:\\Syno C:\\Node\\node.exe"'}; $extra=[pscustomobject]@{Name='powershell.exe';CommandLine='powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\\Syno\\scripts\\start-syno.ps1" -RepoRoot "C:\\Syno" -NodePath "C:\\Node\\node.exe" -Danger yes'}; [ordered]@{good=(Test-SynoWrapperProcess $good 'C:\\Syno\\scripts\\start-syno.ps1' 'C:\\Syno' 'C:\\Node\\node.exe');mention=(Test-SynoWrapperProcess $mention 'C:\\Syno\\scripts\\start-syno.ps1' 'C:\\Syno' 'C:\\Node\\node.exe');extra=(Test-SynoWrapperProcess $extra 'C:\\Syno\\scripts\\start-syno.ps1' 'C:\\Syno' 'C:\\Node\\node.exe')} | ConvertTo-Json -Compress`;
