@@ -33,6 +33,13 @@
         providers:
           kimi-coding:
             apiKeyEnv: KIMI_API_KEY
+            reasoning: low
+            modelOverrides:
+              kimi-for-coding:
+                reasoningEfforts:
+                  low: low
+                  high: high
+                  max: max
             requestImagePixelBudget: 1048576
             requestImageMaxBytes: 786432
             maxRequestImageBytes: 1400000

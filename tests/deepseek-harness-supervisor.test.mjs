@@ -180,6 +180,7 @@ test("cordis configs live in the Syno repo and never inline API keys", async () 
   assert.match(capture, /id: persistent-bash\s+disabled: true/);
   assert.match(capture, /id: persistent-pwsh\s+disabled: true/);
   assert.match(capture, /name: '@deepseek-ai\/dsh-llm-pi-ai'[\s\S]*kimi-coding[\s\S]*apiKeyEnv: KIMI_API_KEY/);
+  assert.match(capture, /reasoning: low[\s\S]*modelOverrides/);
   assert.doesNotMatch(capture, /deepseek-v4|deepseek-chat|deepseek-v4-pro/);
   assert.doesNotMatch(capture, /DEEPSEEK_API_KEY/);
   assert.doesNotMatch(capture, /name:.*dsh-(tool-bash|tool-fs|tool-web)|dsh-web-search/);

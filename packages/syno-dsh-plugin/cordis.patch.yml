@@ -111,11 +111,21 @@
 
 # Kimi Code route through the pi-ai twin's installed catalog provider. Image
 # budgets stay under Kimi's ~2 MB per-request cap with text headroom.
+# 0.1.7 生产根的 kimi-for-coding 目录条目缺 thinkingLevelMap，未声明档位时
+# 请求不启用 thinking，模型会把过程叙述写进正文（2026-10-12 实测）；
+# modelOverrides 补齐档位后 route 级 reasoning: high 才会真正下发 thinking。
 - id: llm-pi-ai
   config:
     providers:
       kimi-coding:
         apiKeyEnv: KIMI_API_KEY
+        reasoning: high
+        modelOverrides:
+          kimi-for-coding:
+            reasoningEfforts:
+              low: low
+              high: high
+              max: max
         requestImagePixelBudget: 1048576
         requestImageMaxBytes: 786432
         maxRequestImageBytes: 1400000
