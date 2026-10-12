@@ -61,3 +61,15 @@
 
 知识仓 `vault/AGENTS.md` 及 `vault/99-System/Agent/` 中的 canonical Skill 继续约束知识收录、关联、写作和 MOC。平台入口只负责转发，不复制业务规则。
 
+## 多智能体自主研发流水线 (Codex -> Gemini -> Claude Code)
+
+1. **角色分工**：
+   - **Codex (架构师 / 需求端)**：负责需求拆解、编写带验收标准的 Issue（标为 `spec`），并在 PR 最终合格后由 Codex 客户端完成验收与合并。
+   - **Gemini (反重力 / 核心研发)**：负责认领任务、拉分支编码、自测提 PR；若审查被打回，**由 Gemini 自己获取审查意见并完成全部代码修复**。
+   - **Claude Code (Kimi / 资深审查员)**：担任只读审查员（禁止使用写工具修改文件），挂载 `/code-review --depth deep` 等审查技能，严格对照验收标准指出缺陷。
+2. **门禁与执行铁律**：
+   - **严禁自审**：PR 提交后必须且只能调用 `node scripts/review-with-claude.mjs --pr <PR_NUMBER>` 触发 Claude Code 审查。
+   - **返修优先**：调度遵循“一次只做一件，返修优先”，处于 `changes-requested` 的 PR 拥有最高处理优先级。
+   - **终态通知**：只有当 Claude 审查打出 `[APPROVED]` 且 GitHub 标签变为 `approved` 时，才触发桌面通知让 Codex/主人验收合并。
+
+
