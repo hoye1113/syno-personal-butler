@@ -141,9 +141,10 @@ class FeishuCredentialStore {
 async function officialSdk() { return import("@larksuiteoapi/node-sdk"); }
 
 class FeishuChannelAdapter {
-  constructor({ credentials = new FeishuCredentialStore(), stateStore = new FeishuStateStore(), processLock = new ProcessFileLock({ file: `${stateStore.file || path.join(PATHS.runtimeRoot, "locks", "feishu-channel")}.lock`, failFast: true, metadata: { entrypoint: "feishu-channel" } }), sdkLoader = officialSdk, channelFactory, onMessage = async () => ({ text: "已收到" }), retryDelayMs = 30_000 } = {}) {
+  constructor({ credentials = new FeishuCredentialStore(), stateStore = new FeishuStateStore(), processLock = new ProcessFileLock({ file: `${stateStore.file || path.join(PATHS.runtimeRoot, "locks", "feishu-channel")}.lock`, failFast: true, metadata: { entrypoint: "feishu-channel" } }), sdkLoader = officialSdk, channelFactory, onMessage = async () => ({ text: "已收到" }), typingIndicator = true, retryDelayMs = 30_000 } = {}) {
     this.credentials = credentials; this.sdkLoader = sdkLoader; this.channelFactory = channelFactory; this.onMessage = onMessage;
     this.stateStore = stateStore; this.processLock = processLock; this.processLease = null; this.retryDelayMs = retryDelayMs;
+    this.typingIndicator = typingIndicator !== false;
     this.channel = null; this.running = false; this.ownerBound = false; this.lastError = ""; this.queue = []; this.draining = false; this.drainPromise = null; this.seen = new Set(); this.inflight = new Set(); this.retryTimer = null;
     this.ownerGeneration = 0;
     this.registration = null; this.registrationState = { status: "idle" };
@@ -225,6 +226,48 @@ class FeishuChannelAdapter {
       deliveryCapability: "at_least_once",
       ...(deliveryKey ? { deliveryKey: String(deliveryKey), stableProviderIdentity: null } : {}),
     };
+  }
+
+  // 飞书没有 typing API：用一条可 patch 的 interactive 卡片承接「正在回复中」，
+  // 答复就绪后原位更新同一条消息（im.v1.message.patch），失败则收回占位卡
+  // 并退回普通发送。全链路 best-effort，占位失败不阻断正常回复。
+  #statusCard(markdown, summary) {
+    return {
+      schema: "2.0",
+      config: { update_multi: true, ...(summary ? { summary: { content: String(summary).slice(0, 80) } } : {}) },
+      body: { elements: [{ tag: "markdown", content: String(markdown || "") }] },
+    };
+  }
+
+  async #openTypingCard(message) {
+    if (!this.typingIndicator || !this.running || typeof this.channel?.send !== "function") return null;
+    try {
+      const result = await this.channel.send(
+        message.chatId,
+        { card: this.#statusCard("⏳ Syno 正在回复中…", "Syno 正在回复中…") },
+        message.messageId ? { replyTo: message.messageId } : undefined,
+      );
+      return result?.messageId || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async #clearTypingCard(messageId) {
+    if (!messageId || typeof this.channel?.recallMessage !== "function") return;
+    try { await this.channel.recallMessage(messageId); } catch {}
+  }
+
+  async #deliverReply(message, text, typingCardId) {
+    if (typingCardId && typeof this.channel?.updateCard === "function") {
+      try {
+        await this.channel.updateCard(typingCardId, this.#statusCard(text, text));
+        return { delivered: true, deliveryCapability: "at_least_once", updatedTypingCard: true };
+      } catch {
+        await this.#clearTypingCard(typingCardId);
+      }
+    }
+    return this.send({ chatId: message.chatId, replyTo: message.messageId, text });
   }
 
   async beginRegistration() {
@@ -332,7 +375,9 @@ class FeishuChannelAdapter {
     try {
       while (this.queue.length) {
         const message = this.queue.shift();
+        let typingCardId = null;
         try {
+          typingCardId = await this.#openTypingCard(message);
           const response = await this.onMessage({
             channel: "feishu",
             id: message.messageId,
@@ -342,19 +387,22 @@ class FeishuChannelAdapter {
             privateConversation: true,
           });
           if (response?.deferredDelivery === true) {
+            await this.#clearTypingCard(typingCardId);
             await this.stateStore.complete(message.messageId);
             this.seen.add(message.messageId);
             if (this.seen.size > 2_000) this.seen.delete(this.seen.values().next().value);
             this.lastError = "";
             continue;
           }
-          const delivery = await this.send({ chatId: message.chatId, replyTo: message.messageId, text: response?.text || "任务已记录，请在 Syno 查看状态。" });
+          const text = response?.text || "任务已记录，请在 Syno 查看状态。";
+          const delivery = await this.#deliverReply(message, text, typingCardId);
           if (!delivery?.delivered) throw Object.assign(new Error(`飞书回复未送达：${delivery?.reason || "unknown"}`), { code: "FEISHU_REPLY_UNDELIVERED", retryable: true });
           await this.stateStore.complete(message.messageId);
           this.seen.add(message.messageId);
           if (this.seen.size > 2_000) this.seen.delete(this.seen.values().next().value);
           this.lastError = "";
         } catch (error) {
+          await this.#clearTypingCard(typingCardId);
           this.lastError = error.message;
           this.#scheduleRetry();
         } finally {

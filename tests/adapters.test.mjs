@@ -356,6 +356,7 @@ test("Feishu long connection accepts only owner DMs and deduplicates messages", 
   };
   const received = [];
   const adapter = new FeishuChannelAdapter({
+    typingIndicator: false,
     credentials: { async load() { return { appId: "cli_test", appSecret: "secret", ownerOpenId: "owner" }; } },
     stateStore: new FeishuStateStore({ file: path.join(root, "state.json") }),
     channelFactory: () => channel,
@@ -390,6 +391,7 @@ test("Feishu first contact in p2p chat binds the owner and rejects subsequent st
     async updateOwner(ownerOpenId) { updatedOwner = ownerOpenId; },
   };
   const adapter = new FeishuChannelAdapter({
+    typingIndicator: false,
     credentials,
     stateStore: new FeishuStateStore({ file: path.join(root, "state.json") }),
     channelFactory: () => channel,
@@ -459,6 +461,7 @@ test("Feishu persists successful dedupe and recovers a failed owner DM after res
   };
   let attempts = 0;
   const first = new FeishuChannelAdapter({
+    typingIndicator: false,
     credentials, stateStore: new FeishuStateStore({ file: stateFile }), channelFactory, retryDelayMs: 60_000,
     onMessage: async () => { attempts += 1; if (attempts === 2) throw new Error("forced"); return { text: "ok" }; },
   });
@@ -471,6 +474,7 @@ test("Feishu persists successful dedupe and recovers a failed owner DM after res
 
   const recovered = [];
   const second = new FeishuChannelAdapter({
+    typingIndicator: false,
     credentials, stateStore: new FeishuStateStore({ file: stateFile }), channelFactory,
     onMessage: async (message) => { recovered.push(message.id); return { text: "recovered" }; },
   });
@@ -572,6 +576,7 @@ test("Feishu keeps a message pending when reply delivery returns false", async (
   const stateStore = new FeishuStateStore({ file: path.join(root, "state.json") });
   const handlers = new Map();
   const adapter = new FeishuChannelAdapter({
+    typingIndicator: false,
     credentials: { async load() { return { appId: "app", appSecret: "secret", ownerOpenId: "owner" }; } },
     stateStore, retryDelayMs: 60_000,
     channelFactory: () => ({ on(name, handler) { handlers.set(name, handler); }, async connect() {}, async disconnect() {}, async send() {} }),

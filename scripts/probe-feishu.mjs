@@ -55,7 +55,7 @@ async function main(argv = process.argv.slice(2), {
     error.code = "FEISHU_NOT_CONFIGURED";
     throw error;
   }
-  const channel = adapter || new FeishuChannelAdapter({ credentials });
+  const channel = adapter || new FeishuChannelAdapter({ credentials, typingIndicator: false });
   try {
     const status = await channel.start();
     const report = { ...summarizeFeishu(status, credentialStatus), source: "standalone_probe" };

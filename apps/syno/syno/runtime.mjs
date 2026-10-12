@@ -1082,6 +1082,8 @@ function createSynoRuntime(options = {}) {
   const channelOwner = resolveChannelOwner(process.env);
   const weixinChannel = channelOwner === "dsh" ? delegateChannel(weixin, channelOwner) : weixin;
   const feishu = options.feishu || new FeishuChannelAdapter({
+    // 「正在回复中」占位卡默认开；SYNO_FEISHU_TYPING=0|false 可关（关闭后退回单条最终回复）。
+    typingIndicator: envToggle(process.env.SYNO_FEISHU_TYPING, { defaultOn: true }),
     onMessage: (message) => channelConversationHandler.handle({ ...message, ownerKey: "local-user", threadKey: "main", channel: "feishu" }),
   });
   const channels = options.channels || new ChannelHub({ weixin: weixinChannel, feishu });
