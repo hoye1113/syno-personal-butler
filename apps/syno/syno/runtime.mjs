@@ -1470,21 +1470,8 @@ function createSynoRuntime(options = {}) {
         if (lifecycleState === "stopping") throw Object.assign(new Error("Syno Runtime 正在停止"), { code: "RUNTIME_STOPPING" });
         componentState.store = "ready";
         await recordEvent("syno.host.recovered");
-        // 重启后用持久化 outbox 重建「主动通道连续失败」计数：计数器是进程级 let，重启归零，
-        // 否则 health.deliveryOk 会在通道仍坏时短暂假绿。口径与 live 计数器一致——从最新事件向前
-        // 累加连续失败态事件的 attempts。best-effort：扫描失败不阻断 initialize。
-        try {
-          const homeChannel = channels.homeChannel;
-          if (channelDeliveryOutbox && homeChannel) {
-            // list 在服务端按 sourceType/targetChannel 过滤后再切片，避免被其它类型事件挤出窗口导致假绿。
-            const scoped = await channelDeliveryOutbox.list({ limit: 200, order: "desc", sourceType: "proactive_bundle", targetChannel: homeChannel });
-            const { consecutiveFailures: seed } = aggregateDeliveryFailures(scoped);
-            proactiveDeliveryConsecutiveFailures = seed;
-            if (seed) await recordEvent("proactive.delivery.seeded_failures", { homeChannel, consecutiveFailures: seed });
-          }
-        } catch (error) {
-          await recordEvent("proactive.delivery.seed_failed", { error }, { level: "warning" }).catch(() => {});
-        }
+        // 主动通道连续失败计数的重启种子在 channels.start() 完成后执行（见下方 .then）：
+        // 持久化 home 通道只有那时才恢复，提前读取会用默认 weixin 误种历史失败（2026-10-12 实测）。
         reconciliationWorker?.start();
         if (runtimeMode === "deepseek-harness") {
           try {
@@ -1507,6 +1494,22 @@ function createSynoRuntime(options = {}) {
             componentState.channels = "ready";
             refreshLifecycleState();
             await recordEvent("syno.channels.started");
+            // 重启后用持久化 outbox 重建「主动通道连续失败」计数：计数器是进程级 let，重启归零，
+            // 否则 health.deliveryOk 会在通道仍坏时短暂假绿。必须在 channels.start() 之后执行——
+            // 持久化 home 通道在该调用内恢复，提前读取会用默认 weixin 误种历史失败（2026-10-12 实测）。
+            // 口径与 live 计数器一致：从最新事件向前累加连续失败态事件的 attempts。best-effort。
+            try {
+              const homeChannel = channels.homeChannel;
+              if (channelDeliveryOutbox && homeChannel) {
+                // list 在服务端按 sourceType/targetChannel 过滤后再切片，避免被其它类型事件挤出窗口导致假绿。
+                const scoped = await channelDeliveryOutbox.list({ limit: 200, order: "desc", sourceType: "proactive_bundle", targetChannel: homeChannel });
+                const { consecutiveFailures: seed } = aggregateDeliveryFailures(scoped);
+                proactiveDeliveryConsecutiveFailures = seed;
+                if (seed) await recordEvent("proactive.delivery.seeded_failures", { homeChannel, consecutiveFailures: seed });
+              }
+            } catch (error) {
+              await recordEvent("proactive.delivery.seed_failed", { error }, { level: "warning" }).catch(() => {});
+            }
             await drainWorkflowOutbox();
             await drainChannelDeliveryOutbox();
             if (mobileDeliveryMode.is("v2")) {
