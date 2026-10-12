@@ -24,8 +24,8 @@ function assertCognitiveCapabilities(report, { expectedTools } = {}) {
     for (const name of ["agentSelectableModel", "providerFallback", "dynamicMcp", "sourceWrite", "memoryWrite", "yolo", "skillMutation"]) {
       if (report[name] !== false) throw capabilityError(`CognitiveRuntime v3 禁止能力未关闭：${name}`);
     }
-    if (!Array.isArray(report.models) || !report.models.length || report.models.some((model) => !/^deepseek\/\S+$/.test(String(model)))) {
-      throw capabilityError("CognitiveRuntime v3 模型链必须是 DeepSeek 官方 deepseek/<model>");
+    if (!Array.isArray(report.models) || !report.models.length || report.models.some((model) => !/^kimi-coding\/\S+$/.test(String(model)))) {
+      throw capabilityError("CognitiveRuntime v3 模型链必须是 Kimi Code kimi-coding/<model>");
     }
     const tools = [...new Set((report.tools || []).map(String))].sort();
     if (expectedTools) {

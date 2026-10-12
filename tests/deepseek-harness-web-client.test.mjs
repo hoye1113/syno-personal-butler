@@ -245,7 +245,7 @@ test("DeepSeekHarnessWebClient exchanges the launch token and runs a turn over t
   t.after(() => fake.close());
   const client = makeClient(fake);
   t.after(() => client.close());
-  await client.initialize({ cwd: "/tmp/workspace", provider: "deepseek-official", model: "deepseek-v4-flash" });
+  await client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" });
   const result = await client.runTurn("syno-main-test", [{ type: "text", text: "你好" }]);
   assert.equal(result.finalResponse, "web-hello");
   assert.deepEqual(fake.state.tokenExchanges, [GOOD_TOKEN]);
@@ -263,7 +263,7 @@ test("DeepSeekHarnessWebClient without a token is rejected by the auth fence", a
   const client = makeClient(fake, { token: null, initializeTimeoutMs: 400 });
   t.after(() => client.close());
   await assert.rejects(
-    () => client.initialize({ cwd: "/tmp/workspace", provider: "deepseek-official", model: "deepseek-v4-flash" }),
+    () => client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" }),
     (error) => error.code === "HARNESS_TRANSPORT_ERROR" && error.retryable === false,
   );
 });
@@ -274,7 +274,7 @@ test("DeepSeekHarnessWebClient fails fast when the token exchange sets no cookie
   const client = makeClient(fake, { token: "wrong-token" });
   t.after(() => client.close());
   await assert.rejects(
-    () => client.initialize({ cwd: "/tmp/workspace", provider: "deepseek-official", model: "deepseek-v4-flash" }),
+    () => client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" }),
     (error) => error.code === "HARNESS_AUTH_FAILED" && error.retryable === true,
   );
 });
@@ -286,8 +286,8 @@ test("DeepSeekHarnessWebClient pins the requested agent preset on new sessions",
   t.after(() => client.close());
   await client.initialize({
     cwd: "/tmp/workspace",
-    provider: "deepseek-official",
-    model: "deepseek-v4-flash",
+    provider: "kimi-coding",
+    model: "kimi-for-coding",
     agentPreset: "syno",
   });
   await client.runTurn("syno-preset", [{ type: "text", text: "你好" }]);
@@ -304,7 +304,7 @@ test("DeepSeekHarnessWebClient settles on turn/end even without assistant text",
   t.after(() => fake.close());
   const client = makeClient(fake);
   t.after(() => client.close());
-  await client.initialize({ cwd: "/tmp/workspace", provider: "deepseek-official", model: "deepseek-v4-flash" });
+  await client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" });
   const started = Date.now();
   const result = await client.runTurn("syno-empty", [{ type: "text", text: "你好" }]);
   assert.equal(result.finalResponse, "");
@@ -340,7 +340,7 @@ test("DeepSeekHarnessWebClient waits for the paired turn/end when a stale one ra
   t.after(() => fake.close());
   const client = makeClient(fake, { turnSettleQuietMs: 60 });
   t.after(() => client.close());
-  await client.initialize({ cwd: "/tmp/workspace", provider: "deepseek-official", model: "deepseek-v4-flash" });
+  await client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" });
   let resolvedAt = 0;
   const pending = client.runTurn("syno-race", [{ type: "text", text: "读这个链接" }]).then((result) => {
     resolvedAt = Date.now();
@@ -371,7 +371,7 @@ test("DeepSeekHarnessWebClient keeps turn events that race ahead of the prompt r
   t.after(() => fake.close());
   const client = makeClient(fake);
   t.after(() => client.close());
-  await client.initialize({ cwd: "/tmp/workspace", provider: "deepseek-official", model: "deepseek-v4-flash" });
+  await client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" });
   const started = Date.now();
   const result = await client.runTurn("syno-early-events", [{ type: "text", text: "你好" }]);
   assert.equal(result.finalResponse, "early-hello");
@@ -383,7 +383,7 @@ test("DeepSeekHarnessWebClient keeps event streams after initializeTimeoutMs", a
   t.after(() => fake.close());
   const client = makeClient(fake, { initializeTimeoutMs: 500 });
   t.after(() => client.close());
-  await client.initialize({ cwd: "/tmp/workspace", provider: "deepseek-official", model: "deepseek-v4-flash" });
+  await client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" });
   await new Promise((resolve) => setTimeout(resolve, 700));
   const result = await client.runTurn("syno-after-timeout", [{ type: "text", text: "你好" }]);
   assert.equal(result.finalResponse, "web-hello");
@@ -403,7 +403,7 @@ test("DeepSeekHarnessWebClient fails the turn when selectModel is unavailable", 
   t.after(() => fake.close());
   const client = makeClient(fake, { onNotice: (notice) => notices.push(notice) });
   t.after(() => client.close());
-  await client.initialize({ cwd: "/tmp/workspace", provider: "deepseek-official", model: "deepseek-v4-flash" });
+  await client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" });
   await assert.rejects(
     () => client.runTurn("syno-select-fail", [{ type: "text", text: "你好" }]),
     (error) => error.code === "HARNESS_MODEL_SELECT_FAILED" && error.retryable === true,
@@ -418,11 +418,11 @@ test("DeepSeekHarnessWebClient retries the mux after a partial connect failure",
   const client = makeClient(fake);
   t.after(() => client.close());
   await assert.rejects(
-    () => client.initialize({ cwd: "/tmp/workspace", provider: "deepseek-official", model: "deepseek-v4-flash" }),
+    () => client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" }),
     (error) => error.code === "HARNESS_TRANSPORT_ERROR" || error.code === "HARNESS_NOT_RUNNING",
   );
   fake.state.rejectMux = false;
-  await client.initialize({ cwd: "/tmp/workspace", provider: "deepseek-official", model: "deepseek-v4-flash" });
+  await client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" });
   const result = await client.runTurn("syno-retry-streams", [{ type: "text", text: "你好" }]);
   assert.equal(result.finalResponse, "web-hello");
 });

@@ -418,7 +418,7 @@ test("model capability failures degrade to a proposed decision instead of failed
     async analyze() {
       throw Object.assign(new Error("OpenCode 模型尝试全部失败"), {
         code: "OPENCODE_ATTEMPTS_EXHAUSTED", retryable: false,
-        attempts: [{ modelId: "deepseek/deepseek-v4-flash", elapsedMs: 43, status: "failed", failureCode: "HTTP_429" }],
+        attempts: [{ modelId: "kimi-coding/kimi-for-coding", elapsedMs: 43, status: "failed", failureCode: "HTTP_429" }],
       });
     },
     onEvent: async (event) => { events.push(event); },
@@ -489,7 +489,7 @@ test("workflow.failed forwards model attempt diagnostics to onEvent", async (t) 
   });
   ingest.readArtifact = async () => ({ id: "artifact", title: "t", body: "ordinary body", relationCandidates: [] });
   const attempts = [{
-    modelId: "deepseek/deepseek-v4-flash", elapsedMs: 43, status: "failed",
+    modelId: "kimi-coding/kimi-for-coding", elapsedMs: 43, status: "failed",
     failureCode: "HTTP_404", detail: "{\"error\":\"not found\"}",
   }];
   const events = [];

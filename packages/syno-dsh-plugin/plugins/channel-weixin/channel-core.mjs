@@ -5,7 +5,7 @@ import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import { WeixinSessionMap } from "./session-map.mjs";
 import { awaitSessionTurn } from "./session-turn.mjs";
 
-const DEFAULT_MODEL = Object.freeze({ provider: "deepseek-official", model: "deepseek-v4-flash" });
+const DEFAULT_MODEL = Object.freeze({ provider: "kimi-coding", model: "kimi-for-coding" });
 const DEFAULT_PRESET = "syno";
 const DEFAULT_TIMEOUT_MS = 120_000;
 

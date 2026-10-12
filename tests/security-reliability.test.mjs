@@ -190,7 +190,7 @@ test("Harness Web API exposes status, restart, and authenticated Bridge MCP only
     },
     async restartHarness() { calls.push("restart"); return { state: "running" }; },
     harnessCognitiveRuntime: {
-      lastAttempts: [{ modelId: "deepseek/deepseek-v4-flash-vision-exp", status: "completed" }],
+      lastAttempts: [{ modelId: "kimi-coding/kimi-for-coding", status: "completed" }],
       capabilities() { return { version: 3, adapter: "deepseek-harness-sdk" }; },
     },
     toolBridge: {

@@ -25,10 +25,10 @@ for (const dir of [homeRoot, workspaceRoot, sessionRoot]) mkdirSync(dir, { recur
 const profile = await import(pathToFileURL(path.join(SYNO_ROOT, "apps", "syno", "syno", "syno-dsh-profile.mjs")).href);
 await profile.ensureSynoDshProfiles({ homeRoot, repoRoot: SYNO_ROOT });
 
-const keyLoader = await import(pathToFileURL(path.join(SYNO_ROOT, "apps", "syno", "syno", "deepseek-key-loader.mjs")).href);
-const apiKey = process.env.DEEPSEEK_API_KEY || (await keyLoader.defaultDeepseekKeyLoader({}));
-if (!apiKey) {
-  console.error("spike:capabilities 未找到 DeepSeek key（DEEPSEEK_API_KEY 或 opencode auth.json）");
+const keyLoader = await import(pathToFileURL(path.join(SYNO_ROOT, "apps", "syno", "syno", "syno-key-loader.mjs")).href);
+const secrets = await keyLoader.defaultSynoSecretLoader({});
+if (!secrets.KIMI_API_KEY) {
+  console.error("spike:capabilities 未找到 Kimi Code key（KIMI_API_KEY 或仓库根 .env）");
   process.exit(2);
 }
 
@@ -57,7 +57,7 @@ const env = {
   SYNO_LOCAL_DATA: path.join(SCRATCH, "localdata"),
   ...(process.env.SYNO_CHAT_TOOLS ? { SYNO_CHAT_TOOLS: process.env.SYNO_CHAT_TOOLS } : {}),
   ...(process.env.SYNO_WEIXIN_SPIKE ? { SYNO_WEIXIN_SPIKE: process.env.SYNO_WEIXIN_SPIKE } : {}),
-  DEEPSEEK_API_KEY: apiKey,
+  ...secrets,
 };
 delete env.SYNO_KNOWLEDGE_ROOT;
 

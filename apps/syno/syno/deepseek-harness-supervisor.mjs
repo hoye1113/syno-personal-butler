@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 import { DeepSeekHarnessJsonRpcClient } from "./deepseek-harness-jsonrpc-client.mjs";
 import { DeepSeekHarnessWebClient } from "./deepseek-harness-web-client.mjs";
-import { defaultDeepseekKeyLoader } from "./deepseek-key-loader.mjs";
+import { defaultSynoSecretLoader } from "./syno-key-loader.mjs";
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
 import { RuntimeJournal } from "../../../packages/syno-core/runtime-journal.mjs";
 import {
@@ -510,7 +510,7 @@ class DeepSeekHarnessSupervisor {
     spawnImpl = spawn,
     webClientFactory = (options) => new DeepSeekHarnessWebClient(options),
     killTree = defaultKillTree,
-    deepseekKeyLoader = defaultDeepseekKeyLoader,
+    secretLoader = defaultSynoSecretLoader,
     journal = new RuntimeJournal(),
     bridgeOrigin,
     bridgeToken,
@@ -525,7 +525,7 @@ class DeepSeekHarnessSupervisor {
     this.spawnImpl = spawnImpl;
     this.webClientFactory = webClientFactory;
     this.killTree = killTree;
-    this.deepseekKeyLoader = deepseekKeyLoader;
+    this.secretLoader = secretLoader;
     this.journal = journal;
     this.bridgeOrigin = bridgeOrigin;
     this.bridgeToken = bridgeToken;
@@ -609,7 +609,7 @@ class DeepSeekHarnessSupervisor {
     return slot.client;
   }
 
-  async ensure(profile, { provider = "deepseek-official", model = "deepseek-v4-flash-vision-exp" } = {}) {
+  async ensure(profile, { provider = "kimi-coding", model = "kimi-for-coding" } = {}) {
     if (!HARNESS_PROFILES.includes(profile)) throw runtimeError("HARNESS_PROFILE_INVALID", `未知 Harness profile：${profile}`);
     const slot = this.slots.get(profile);
     if (slot?.client?.initialized && slot.child?.exitCode === null && slot.provider === provider && slot.model === model) {
@@ -619,7 +619,7 @@ class DeepSeekHarnessSupervisor {
     return this.start(profile, { provider, model });
   }
 
-  async start(profile, { provider = "deepseek-official", model = "deepseek-v4-flash-vision-exp" } = {}) {
+  async start(profile, { provider = "kimi-coding", model = "kimi-for-coding" } = {}) {
     if (!this.launch) await this.discover();
     if (profile === "chat" && this.chatSurface === "web") {
       if (this.webLaunch?.bootable === false) {
@@ -658,7 +658,7 @@ class DeepSeekHarnessSupervisor {
     const persona = await fs.readFile(personaFile, "utf8").catch(() => (profile === "capture"
       ? "You are Syno's capture analyzer. Output only one JSON object. Do not use tools."
       : "You are Syno."));
-    const deepseekKey = process.env.DEEPSEEK_API_KEY || (this.deepseekKeyLoader ? await this.deepseekKeyLoader() : "");
+    const secrets = this.secretLoader ? await this.secretLoader() : {};
     const sessionRoot = path.join(this.localRoot, "sessions", profile);
     const homeRoot = path.join(this.localRoot, "home");
     const workspaceRoot = path.join(this.localRoot, "workspace", profile);
@@ -677,7 +677,7 @@ class DeepSeekHarnessSupervisor {
       SYNO_SKILL_ROOT: path.join(this.configDir, "skills"),
       ...(this.bridgeOrigin ? { SYNO_BRIDGE_ORIGIN: this.bridgeOrigin } : {}),
       ...(this.bridgeToken ? { SYNO_BRIDGE_TOKEN: this.bridgeToken } : {}),
-      ...(deepseekKey ? { DEEPSEEK_API_KEY: deepseekKey } : {}),
+      ...secrets,
     };
     return { env, configPath, workspaceRoot, homeRoot, sessionRoot };
   }

@@ -17,8 +17,8 @@ import { isCoreChatToolName } from "../../../config/deepseek-harness/syno-tool-s
 
 const HARNESS_ADAPTER = "deepseek-harness-sdk";
 const HARNESS_MODEL_CHAIN = Object.freeze([
-  "deepseek/deepseek-v4-flash-vision-exp",
-  "deepseek/deepseek-v4-flash",
+  "kimi-coding/kimi-for-coding",
+  "kimi-coding/k3-256k",
 ]);
 const DEFAULT_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
 const ATTEMPT_DETAIL_LIMIT = 500;
@@ -27,14 +27,14 @@ function parseHarnessModel(qualifiedModel) {
   const value = String(qualifiedModel || "");
   const slash = value.indexOf("/");
   if (slash <= 0) {
-    throw Object.assign(new Error(`Harness 模型链必须是 deepseek/<model>：${value}`), { code: "HARNESS_MODEL_INVALID" });
+    throw Object.assign(new Error(`Harness 模型链必须是 kimi-coding/<model>：${value}`), { code: "HARNESS_MODEL_INVALID" });
   }
   const providerID = value.slice(0, slash);
   const modelID = value.slice(slash + 1);
-  if (providerID !== "deepseek" || !modelID) {
-    throw Object.assign(new Error(`Harness 只允许 DeepSeek 官方模型：${value}`), { code: "HARNESS_MODEL_INVALID" });
+  if (providerID !== "kimi-coding" || !modelID) {
+    throw Object.assign(new Error(`Harness 只允许 Kimi Code 模型：${value}`), { code: "HARNESS_MODEL_INVALID" });
   }
-  return { provider: "deepseek-official", model: modelID, qualified: value };
+  return { provider: "kimi-coding", model: modelID, qualified: value };
 }
 
 async function atomicJson(file, value) {
@@ -302,7 +302,7 @@ class DeepSeekHarnessCognitiveRuntime {
       version: 3,
       adapter: HARNESS_ADAPTER,
       agentCount: 1,
-      provider: "deepseek",
+      provider: "kimi-coding",
       models: this.models,
       agentSelectableModel: false,
       providerFallback: false,

@@ -11,7 +11,7 @@ export const inject = ["agents", "agentPresets", "workspaceRegistry"];
 
 const SPIKE_PREFIX = "[syno-spike-a]";
 const SPIKE_TIMEOUT_MS = Number(process.env.SYNO_SPIKE_TIMEOUT_MS || 180_000);
-const SPIKE_MODEL = process.env.SYNO_SPIKE_MODEL || "deepseek-v4-flash";
+const SPIKE_MODEL = process.env.SYNO_SPIKE_MODEL || "kimi-for-coding";
 const SEARCH_TOOL = canonicalToolName(KNOWLEDGE_SEARCH_TOOL_NAME);
 const READ_SNIPPET_TOOL = canonicalToolName(KNOWLEDGE_READ_SNIPPET_TOOL_NAME);
 
@@ -114,7 +114,7 @@ async function runSpike(ctx) {
   const handle = await ctx.agents.create({
     sessionId,
     meta: { cwd: workspace.path, agentPreset: preset.id },
-    agentOptions: { provider: "deepseek-official", model: SPIKE_MODEL },
+    agentOptions: { provider: "kimi-coding", model: SPIKE_MODEL },
     setup: async (agentCtx) => {
       await ctx.agentPresets.mount(agentCtx, preset.id);
     },
@@ -165,8 +165,30 @@ async function runSpike(ctx) {
   const thirdText = observed.finalText;
   line(`turn-3 ${thirdReason} ${thirdText}`);
 
+  const fourth = nextTurn();
+  observed.finalText = "";
+  handle.agent.followup(createUserMessage({
+    content: [{ type: "text", text: "请调用 web_search 工具搜索「今天的 AI 新闻」，然后用一句话告诉我返回了几条来源。" }],
+    source: { kind: "user" },
+  }));
+  const fourthReason = await timed(fourth);
+  const fourthText = observed.finalText;
+  line(`turn-4 ${fourthReason} ${fourthText}`);
+
+  const fifth = nextTurn();
+  observed.finalText = "";
+  handle.agent.followup(createUserMessage({
+    content: [{ type: "text", text: "请调用 web_fetch 工具读取 https://example.com ，然后用一句话说明页面标题。" }],
+    source: { kind: "user" },
+  }));
+  const fifthReason = await timed(fifth);
+  const fifthText = observed.finalText;
+  line(`turn-5 ${fifthReason} ${fifthText}`);
+
   const toolCalled = observed.toolCalls.includes(SEARCH_TOOL);
   const readSnippetCalled = observed.toolCalls.includes(READ_SNIPPET_TOOL);
+  const webSearchCalled = observed.toolCalls.includes("web_search");
+  const webFetchCalled = observed.toolCalls.includes("web_fetch");
   const payload = {
     sessionId,
     preset: preset.id,
@@ -179,9 +201,13 @@ async function runSpike(ctx) {
     secondText,
     thirdReason,
     thirdText,
+    fourthReason,
+    fourthText,
+    fifthReason,
+    fifthText,
     elapsedMs: Date.now() - started,
   };
-  if (!toolCalled || !readSnippetCalled || secondReason !== "completed" || thirdReason !== "completed") {
+  if (!toolCalled || !readSnippetCalled || !webSearchCalled || !webFetchCalled || secondReason !== "completed" || thirdReason !== "completed" || fourthReason !== "completed" || fifthReason !== "completed") {
     line(`SPIKE_A_FAIL tool-call mismatch ${JSON.stringify(payload)}`);
     setTimeout(() => process.exit(1), 100);
     return;

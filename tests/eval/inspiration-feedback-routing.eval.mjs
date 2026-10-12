@@ -3,8 +3,8 @@
 // 路由对不对必须拿真模型跑。不进 CI glob（npm test 只匹配 *.test.mjs）。
 //
 // 手动跑：
-//   $env:DEEPSEEK_API_KEY="..."; $env:SYNO_LIVE_EVAL="1"; node --test tests/eval/inspiration-feedback-routing.eval.mjs
-//   （模型名可用 DEEPSEEK_EVAL_MODEL 覆盖，默认 deepseek-chat）
+//   $env:KIMI_API_KEY="..."; $env:SYNO_LIVE_EVAL="1"; node --test tests/eval/inspiration-feedback-routing.eval.mjs
+//   （模型名可用 KIMI_EVAL_MODEL 覆盖，默认 kimi-for-coding）
 //
 // 三个决策点（计划冻结）：
 //   1. 有待反馈卡 + 「有用」→ 恰好一次落账（feedback=useful）；
@@ -22,9 +22,9 @@ import { createInspirationFeedbackTool } from "../../apps/syno/syno/inspiration-
 import { InspirationStore } from "../../packages/syno-core/inspiration-store.mjs";
 import { ToolRegistry } from "../../apps/syno/syno/tool-registry.mjs";
 
-const LIVE = process.env.SYNO_LIVE_EVAL === "1" && Boolean(process.env.DEEPSEEK_API_KEY);
-const MODEL = process.env.DEEPSEEK_EVAL_MODEL || "deepseek-chat";
-const ENDPOINT = process.env.DEEPSEEK_EVAL_ENDPOINT || "https://api.deepseek.com/chat/completions";
+const LIVE = process.env.SYNO_LIVE_EVAL === "1" && Boolean(process.env.KIMI_API_KEY);
+const MODEL = process.env.KIMI_EVAL_MODEL || "kimi-for-coding";
+const ENDPOINT = process.env.KIMI_EVAL_ENDPOINT || "https://api.kimi.com/coding/v1/chat/completions";
 
 // 与生产聊天面同口径的最小提示：工具约束照抄 syno-agent.md 的 core 规则句（保持同步靠人工——
 // eval 本就是定期人工跑的探针，伪造「自动同步」反而掩盖提示词漂移）。
@@ -44,7 +44,7 @@ async function chatLoop({ registry, userText, executions }) {
   for (let turn = 0; turn < 4; turn += 1) {
     const response = await fetch(ENDPOINT, {
       method: "POST",
-      headers: { authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`, "content-type": "application/json" },
+      headers: { authorization: `Bearer ${process.env.KIMI_API_KEY}`, "content-type": "application/json" },
       body: JSON.stringify({
         model: MODEL,
         messages,

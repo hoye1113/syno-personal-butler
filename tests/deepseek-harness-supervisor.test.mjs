@@ -103,7 +103,8 @@ test("Harness child environment is an explicit whitelist and drops host secrets"
     HTTPS_PROXY: "http://127.0.0.1:7892",
     HTTP_PROXY: "http://user:password@127.0.0.1:7892",
     FEISHU_APP_SECRET: "must-not-leak",
-    DEEPSEEK_API_KEY: "must-not-inherit",
+    KIMI_API_KEY: "must-not-inherit",
+    TAVILY_API_KEY: "must-not-inherit",
     SYNO_OPENCODE_API_KEY: "must-not-inherit",
     SYNO_CAPABILITIES_TOOLS: "1",
     SYNO_CHAT_TOOLS: "plugin",
@@ -158,6 +159,9 @@ test("Syno agent instructions match the shared core chat tool set", async () => 
   }
   // D6（2026-09-01）：学习/项目子系统工具已从 core 集物理移除，提示词不得再出现
   assert.doesNotMatch(instructions, /syno_learning_|syno_projects_/);
+  // 搜索恢复：web_search 指引与「不可信数据」防注入规约必须写在提示词里
+  assert.match(instructions, /web_search/);
+  assert.match(instructions, /不可信数据/);
 });
 
 test("cordis configs live in the Syno repo and never inline API keys", async () => {
@@ -169,20 +173,19 @@ test("cordis configs live in the Syno repo and never inline API keys", async () 
   assert.match(chat, /syno-tool-bridge-plugin/);
   assert.match(chat, /toolSet: core/);
   assert.match(chat, /id: fs-sandbox[\s\S]*DSH_CWD/);
-  assert.match(chat, /id: deepseek-v4-flash-vision-exp[\s\S]*inputModalities:[\s\S]*- image/);
-  assert.match(chat, /id: deepseek-v4-flash[\s\S]*contextWindow: 128000/);
-  assert.doesNotMatch(chat, /deepseek-chat|deepseek-v4-pro/);
+  assert.match(chat, /id: llm-pi-ai[\s\S]*kimi-coding[\s\S]*apiKeyEnv: KIMI_API_KEY/);
+  assert.doesNotMatch(chat, /deepseek-v4|deepseek-chat|deepseek-v4-pro/);
   assert.doesNotMatch(chat, /dsh-web-search-exa|dsh-web-search-perplexity/);
   assert.match(capture, /toolSet: all/);
   assert.match(capture, /id: persistent-bash\s+disabled: true/);
   assert.match(capture, /id: persistent-pwsh\s+disabled: true/);
-  assert.match(capture, /id: deepseek-v4-flash-vision-exp[\s\S]*inputModalities:[\s\S]*- image/);
-  assert.match(capture, /id: deepseek-v4-flash[\s\S]*contextWindow: 128000/);
-  assert.doesNotMatch(capture, /deepseek-chat|deepseek-v4-pro/);
+  assert.match(capture, /name: '@deepseek-ai\/dsh-llm-pi-ai'[\s\S]*kimi-coding[\s\S]*apiKeyEnv: KIMI_API_KEY/);
+  assert.doesNotMatch(capture, /deepseek-v4|deepseek-chat|deepseek-v4-pro/);
+  assert.doesNotMatch(capture, /DEEPSEEK_API_KEY/);
   assert.doesNotMatch(capture, /name:.*dsh-(tool-bash|tool-fs|tool-web)|dsh-web-search/);
   for (const text of [chat, capture]) {
     assert.doesNotMatch(text, /sk-[A-Za-z0-9]/);
-    assert.match(text, /apiKeyEnv: DEEPSEEK_API_KEY/);
+    assert.match(text, /apiKeyEnv: KIMI_API_KEY/);
   }
 });
 
@@ -269,14 +272,14 @@ test("supervisor fails closed on an incomplete runtime closure without selecting
   assert.equal(spawned.length, 0);
 });
 
-test("DeepSeekHarnessSupervisor injects DEEPSEEK_API_KEY into a replaced child env", async (t) => {
+test("DeepSeekHarnessSupervisor injects Kimi and search keys into a replaced child env", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-harness-supervisor-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const saved = process.env.DEEPSEEK_API_KEY;
-  delete process.env.DEEPSEEK_API_KEY;
+  const saved = process.env.KIMI_API_KEY;
+  delete process.env.KIMI_API_KEY;
   t.after(() => {
-    if (saved === undefined) delete process.env.DEEPSEEK_API_KEY;
-    else process.env.DEEPSEEK_API_KEY = saved;
+    if (saved === undefined) delete process.env.KIMI_API_KEY;
+    else process.env.KIMI_API_KEY = saved;
   });
   let spawnedEnv;
   let spawnedArgs;
@@ -286,7 +289,7 @@ test("DeepSeekHarnessSupervisor injects DEEPSEEK_API_KEY into a replaced child e
     localRoot: root,
     bridgeOrigin: "http://127.0.0.1:9/api/syno/bridge/mcp",
     bridgeToken: "bridge-token",
-    deepseekKeyLoader: async () => "stored-key",
+    secretLoader: async () => ({ KIMI_API_KEY: "stored-key", TAVILY_API_KEY: "search-key" }),
     spawnImpl: (command, args, options) => {
       spawnedEnv = options.env;
       spawnedArgs = args;
@@ -294,8 +297,10 @@ test("DeepSeekHarnessSupervisor injects DEEPSEEK_API_KEY into a replaced child e
     },
   });
   t.after(() => supervisor.stop());
-  await supervisor.start("chat", { model: "deepseek-v4-flash" });
-  assert.equal(spawnedEnv.DEEPSEEK_API_KEY, "stored-key");
+  await supervisor.start("chat", { model: "kimi-for-coding" });
+  assert.equal(spawnedEnv.KIMI_API_KEY, "stored-key");
+  assert.equal(spawnedEnv.TAVILY_API_KEY, "search-key");
+  assert.equal(spawnedEnv.DEEPSEEK_API_KEY, undefined);
   assert.equal(spawnedEnv.SYNO_BRIDGE_TOKEN, "bridge-token");
   assert.equal(spawnedEnv.SYNO_DSH_ROOT, supervisor.dshRoot);
   assert.equal(spawnedEnv.DSH_HOME, path.join(root, "home"));
@@ -326,7 +331,7 @@ test("capture launches DSH sdk-minimal with its restricted Syno overlay", async 
     },
   });
   t.after(() => supervisor.stop());
-  await supervisor.start("capture", { model: "deepseek-v4-flash-vision-exp" });
+  await supervisor.start("capture", { model: "kimi-for-coding" });
   assert.deepEqual(spawnedArgs.slice(-4), [
     "--profile",
     "sdk-minimal",
@@ -347,7 +352,7 @@ test("fake chat surface stays jsonrpc and does not spawn dsh web", async (t) => 
   t.after(() => supervisor.stop());
   await supervisor.discover();
   assert.equal(supervisor.chatSurface, "jsonrpc");
-  await supervisor.start("chat", { model: "deepseek-v4-flash" });
+  await supervisor.start("chat", { model: "kimi-for-coding" });
   assert.equal(supervisor.status("chat").surface, "jsonrpc");
   assert.equal(supervisor.status("chat").origin, null);
 });
@@ -380,7 +385,7 @@ test("JSON-RPC sidecar shutdown terminates the owned process tree instead of rac
     localRoot: root,
   });
   t.after(() => supervisor.stop().catch(() => {}));
-  const client = await supervisor.start("chat", { model: "deepseek-v4-flash" });
+  const client = await supervisor.start("chat", { model: "kimi-for-coding" });
   let protocolShutdownCalled = false;
   client.shutdown = async () => { protocolShutdownCalled = true; };
   await supervisor.stop("chat");
@@ -413,7 +418,8 @@ test("harness doctor reports cordis configs and never dumps keys", async () => {
   assert.equal(Object.hasOwn(report, "defaultDshRoot"), false);
   const serialized = JSON.stringify(report);
   assert.doesNotMatch(serialized, /sk-[A-Za-z0-9]/);
-  assert.equal(Object.hasOwn(report, "DEEPSEEK_API_KEY"), false);
+  assert.equal(Object.hasOwn(report, "KIMI_API_KEY"), false);
+  assert.equal(report.checks.find((item) => item.name === "kimi-key").ok, true);
 });
 
 test("waitForWebReady only accepts the expected loopback origin", async () => {
@@ -536,6 +542,6 @@ test("Web supervisor pins the Syno agent preset when initializing the client", a
     },
   });
   t.after(() => supervisor.stop().catch(() => {}));
-  await supervisor.start("chat", { model: "deepseek-v4-flash" });
+  await supervisor.start("chat", { model: "kimi-for-coding" });
   assert.equal(initializeOptions?.agentPreset, "syno");
 });

@@ -25,8 +25,8 @@ async function probeFake() {
   try {
     await client.initialize({
       cwd: PATHS.repoRoot,
-      provider: "deepseek-official",
-      model: "deepseek-v4-flash-vision-exp",
+      provider: "kimi-coding",
+      model: "kimi-for-coding",
     });
     const turn = await client.runTurn("probe-zh", [{ type: "text", text: "你好，管家" }]);
     return {

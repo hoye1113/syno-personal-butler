@@ -1,6 +1,41 @@
-# 当前执行状态（2026-10-11）
+# 当前执行状态（2026-10-12）
 
 本节是当前交接摘要；下方各期交接仅用于追溯，不能覆盖这里的事实。
+
+## 认知层 Provider 切换 + 搜索链恢复（代码侧完成，待 Owner 真机验收）
+
+- **分支/远端**：`main`，本轮切换改动**未提交**；不自动 Push。
+- **决策**：产品认知层改用 Kimi Code 订阅（ADR 0008）。模型链 `kimi-coding/kimi-for-coding` → `kimi-coding/k3-256k`，经 DSH 内置 pi-ai 适配器的 `kimi-coding` 目录路由（`https://api.kimi.com/coding`，Anthropic Messages 协议）。`llm-deepseek` 保留惰性挂载作为回滚面。
+- **密钥链路**：仓库根 `.env`（gitignored，Owner 已填 `KIMI_API_KEY` + 三把搜索 key）→ supervisor 统一读出后按进程环境变量注入三个 DSH 子进程（chat web / chat JSON-RPC / capture）；`syno-key-loader.mjs` 取代旧 deepseek loader（删除 opencode `auth.json` 兜底）；`.env.example` 入库。
+- **web_search 恢复**：自研 `syno-search` 链（ADR 0009）——豆包搜索（500 次/月免费，中文优先）→ Tavily（1000 credit/月，英文优先）→ Exa（每月 $10 额度），按查询语言路由、失败/限流/空结果确定性回退、缺 key 自动跳过；单次 ≤8 条、单 provider 15s 超时；`SYNO_WEB_SEARCH_CHAIN` 可覆盖链前缀。生产 web profile 与 JSON-RPC chat 回退面同链（回退面相对路径加载，插件对 `@deepseek-ai/dsh-web` 采用可选解析）；preset `tool-web` 已同时开放 `search` 与 `fetch`。kimi 路由图片预算收紧（单图 786KB / 聚合 1.4MB base64）对齐 Kimi ~2MB 请求上限。
+- **改动面**：`apps/syno/syno/`（`syno-key-loader.mjs`、supervisor、cognitive-runtime）、`packages/syno-dsh-plugin/`（生产 overlay、新 `plugins/web-search/`、channel-core 默认模型、capabilities spike）、`config/deepseek-harness/`（chat/capture overlay、syno-agent.md 含防注入规约）、`scripts/`（doctor/spike/probe）、受影响测试与当前态文档；新增 `docs/adr/0008`、`docs/adr/0009`、`docs/plans/kimi-code-provider-switch.md` 与 `ops/acceptance/kimi-provider-switch/` 证据。
+- **验证基线**：`pnpm test` **809/809 pass**；`pnpm verify` 通过（2350 files）；`harness:doctor` closure ok + `kimi-key present` + `search-keys {doubao,tavily,exa} 全 true`；真实链路 `pnpm spike:capabilities` 四轮全绿（pong → syno_knowledge_search → read_snippet → **真实 web_search 返回 8 条来源**）；三家搜索 API 直连探针 CN/EN 全 200（豆包 456ms/198ms、Tavily 2.9s/3.8s、Exa 0.95s/0.39s，均无需代理）；capture sidecar 与旧 DeepSeek 会话延续均已验证（证据 `ops/acceptance/kimi-provider-switch/spike-evidence-2026-10-12.md`）。
+- **环境发现（本轮不修复，待 Owner 决策）**：
+  1. 用户级 `SYNO_DSH_ROOT` 指向一个外部克隆（**0.1.7-alpha.2**，生产正在使用）；repo 钉住的是子模块 **0.2.1-alpha.1**（2026-10-08 升级目标）。两者本轮均验证可用，但版本漂移需收敛。
+  2. 子模块 0.2.1 的 runtime closure 检查把外部依赖 `@deepseek-ai/libreoffice-kit` 判为 `#runtime-entry` missing（pnpm 严格布局下该包不在根 node_modules），导致**未设置 `SYNO_DSH_ROOT` 时** `harness:doctor` 的 capture-sidecar 报 closure 不完整；外部克隆（0.1.7）无此依赖所以不受影响。
+  3. 收敛二选一：升级外部克隆到 0.2.1，或修 closure 的外部依赖解析后切回子模块缺省。
+- **下一步（按序）**：
+  1. Owner 审阅工作树并提交本轮切换（注意：工作树另有一批并发会话的 vault/巡检改动，勿混入同一提交）。
+  2. Owner 重启 Host（`pnpm windows:restart`），微信真实验收：知识检索、「新对话」、收录一条、灵感卡反馈、**联网搜索一条（如「搜一下今天的 AI 新闻」）**；观察 `waiting_provider` 与失败码分布。
+  3. 当日对账：Kimi 控制台额度 + 豆包/Tavily/Exa 三家搜索用量（均由控制台查看）。
+  4. 首 72h 观察失败码（401/403/429）；回滚 = 还原本轮提交 + `.env` 保留/移除对应 key（`llm-deepseek` 惰性挂载即回滚面；搜索回滚 = overlay 摘 `syno-web-search` 行并恢复 `search:false`）。
+- **边界**：不改 `vendor/`；不内联 key；不新增高频自动调用（Kimi 社区规则禁止非交互批量自动化）。
+
+## 知识库维护巡检优化与孤岛笔记双链闭环（2026-10-12 完成）
+
+- **背景与根因**：飞书周报此前误报 54 篇孤岛笔记（`99-System` 41 篇、`03-Archive` 2 篇、`02-Resources` 10 篇）。排查发现：
+  1. 系统/审计/历史归档（`99-System/`、`03-Archive/`）等技术设施被当成普通知识笔记巡检；
+  2. 孤岛检测在统计 `corpus` 时排除了 MOC 文件，导致 MOC 目录中的双链没有计入；且只支持绝对字符串匹配 `[[${basename}]]`，无法识别管道别名 `[[basename|alias]]`、小节锚点 `[[basename#heading]]` 和相对路径。
+- **治理与落地**：
+  1. **管家巡检逻辑修复**：在 `packages/syno-core/knowledge-maintenance-source.mjs` 中过滤技术设施前缀，并在全库范围（含 MOC）提取规范链接目标集合并支持管道别名；
+  2. **深度文章补齐双链**：为 9 篇优质深度长文补齐 `## 🔗 双向链接与引用`，并反向更新到 3 大关键 MOC 枢纽（[[MOC - AI 时代个人发展与组织]]、[[MOC - Harness Engineering]]、[[MOC - 具身智能与脑机接口]]），同时为儿童折纸定格动画与水粉剪纸贴纸卡补全了技能回链；
+  3. **实测孤岛清零**：运行 `weeklySummary()` 实测全库孤岛笔记总数从 54 篇降为 **0 篇**；自动化测试 794/794 全部通过，`verify-repository` 验证通过。
+
+---
+
+# 2026-10-11 交接（追溯用）
+
+本节是当时交接摘要；下方各期交接仅用于追溯，不能覆盖当时的迁移事实。
 
 ## 知识库 V4 排版跃迁、Agent Skills 范式重构与 31 大 S 级神级武器库全景沉淀
 

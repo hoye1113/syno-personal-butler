@@ -26,7 +26,7 @@ pnpm start
 ## 核心约束
 
 - Markdown 是唯一长期事实源；索引和数据库都是可重建缓存。
-- 产品只启用 `DeepSeekHarnessCognitiveRuntime`；模型链固定为 `deepseek/deepseek-v4-flash-vision-exp` → `deepseek/deepseek-v4-flash`。绝不自动切换 Provider、Runtime 或升级到另一个 Agent。
+- 产品只启用 `DeepSeekHarnessCognitiveRuntime`；模型链固定为 `kimi-coding/kimi-for-coding` → `kimi-coding/k3-256k`（Kimi Code 订阅，经 DSH 内置 pi-ai 路由；key 由仓库根 `.env` 的 `KIMI_API_KEY` 提供）。绝不自动切换 Provider、Runtime 或升级到另一个 Agent。
 - OpenCode 与 Hermes 已从产品路径删除，不是可选运行时。
 - 读取可直接执行；任何写入先形成 Job，并在隔离 worktree 中产生可审计差异。
 - 删除、覆盖、移动、新 MOC、新 tag 与代码修改在隔离工作区自动执行，并产生可审计差异。

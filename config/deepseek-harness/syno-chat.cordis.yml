@@ -1,26 +1,27 @@
 # DSH sdk overlay for the JSON-RPC chat fallback.
 # Production chat uses the separate loopback Web profile and Syno agent preset.
-# This overlay keeps the same model route, isolated workspace, and core Syno
-# tools for an explicitly selected JSON-RPC surface.
+# This overlay keeps the same Kimi Code model route (pi-ai twin), isolated
+# workspace, and core Syno tools for an explicitly selected JSON-RPC surface.
 
 - id: system-prompt
   config:
     personaPrefix: !!js process.env.DSH_SYSTEM_PROMPT ?? 'You are Syno.'
     personaSuffix: Your working directory is {{cwd}}.
 
-- id: llm-deepseek
+- id: llm-pi-ai
   config:
-    apiKeyEnv: DEEPSEEK_API_KEY
-    thinking: enabled
-    reasoningEffort: high
-    models:
-      - id: deepseek-v4-flash-vision-exp
-        inputModalities:
-          - text
-          - image
-        contextWindow: 128000
-      - id: deepseek-v4-flash
-        contextWindow: 128000
+    providers:
+      kimi-coding:
+        apiKeyEnv: KIMI_API_KEY
+        requestImagePixelBudget: 1048576
+        requestImageMaxBytes: 786432
+        maxRequestImageBytes: 1400000
+
+# web_search 由此链提供，与生产 web profile 同一接缝（未配置 key 的 provider 自动跳过）。
+- id: web
+  config:
+    searchProvider: syno-search
+    fetchProvider: http
 
 - id: sandbox-policy
   config:
@@ -43,6 +44,8 @@
     compression: none
 
 - insert:
+    - id: syno-web-search
+      name: ../../packages/syno-dsh-plugin/plugins/web-search/index.mjs
     - id: syno-tool-bridge
       name: ./syno-tool-bridge-plugin.mjs
       config:

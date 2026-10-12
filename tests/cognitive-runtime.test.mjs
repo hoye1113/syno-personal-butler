@@ -9,8 +9,8 @@ test("CognitiveRuntime v3 allows sandboxed terminal write but still forbids sour
     version: 3,
     adapter: "deepseek-harness-sdk",
     agentCount: 1,
-    provider: "deepseek",
-    models: ["deepseek/deepseek-v4-flash-vision-exp", "deepseek/deepseek-v4-flash"],
+    provider: "kimi-coding",
+    models: ["kimi-coding/kimi-for-coding", "kimi-coding/k3-256k"],
     agentSelectableModel: false,
     providerFallback: false,
     dynamicMcp: false,
@@ -25,13 +25,13 @@ test("CognitiveRuntime v3 allows sandboxed terminal write but still forbids sour
   assert.equal(assertCognitiveCapabilities(report, { expectedTools: ["syno_knowledge_search"] }).adapter, "deepseek-harness-sdk");
   assert.throws(() => assertCognitiveCapabilities({ ...report, dynamicMcp: true }), /dynamicMcp/);
   assert.throws(() => assertCognitiveCapabilities({ ...report, sourceWrite: true }), /sourceWrite/);
-  assert.throws(() => assertCognitiveCapabilities({ ...report, models: ["deepseek/deepseek-v4-flash-vision-exp", "opencode/mimo-v2.5-free"] }), /模型链/);
+  assert.throws(() => assertCognitiveCapabilities({ ...report, models: ["kimi-coding/kimi-for-coding", "opencode/mimo-v2.5-free"] }), /模型链/);
   assert.throws(() => assertCognitiveCapabilities({
     version: 2,
     adapter: "opencode-cli-server",
     agentCount: 1,
     provider: "opencode",
-    models: ["deepseek/deepseek-v4-flash"],
+    models: ["kimi-coding/kimi-for-coding"],
     agentSelectableModel: false,
     providerFallback: false,
     dynamicMcp: false,

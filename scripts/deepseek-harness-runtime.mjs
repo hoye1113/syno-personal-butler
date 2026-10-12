@@ -12,6 +12,7 @@ import {
   resolveWebLaunch,
 } from "../apps/syno/syno/deepseek-harness-supervisor.mjs";
 import { DEFAULT_WEB_PORT } from "../packages/syno-core/paths.mjs";
+import { defaultSynoSecretLoader } from "../apps/syno/syno/syno-key-loader.mjs";
 
 async function fileExists(file) {
   try {
@@ -81,12 +82,20 @@ async function doctor({
     if (!await fileExists(target)) missing.push(path.join("skills", skill, "SKILL.md"));
   }
   checks.push({ name: "syno-cordis", ok: missing.length === 0, missing });
-  const keyPresent = Boolean(String(process.env.DEEPSEEK_API_KEY || "").trim());
+  const secrets = await defaultSynoSecretLoader({});
   checks.push({
-    name: "deepseek-key",
+    name: "kimi-key",
     ok: true,
-    present: keyPresent,
-    source: keyPresent ? "env" : "opencode-auth-or-missing",
+    present: Boolean(secrets.KIMI_API_KEY),
+  });
+  checks.push({
+    name: "search-keys",
+    ok: true,
+    present: {
+      doubao: Boolean(secrets.DOUBAO_SEARCH_API_KEY),
+      tavily: Boolean(secrets.TAVILY_API_KEY),
+      exa: Boolean(secrets.EXA_API_KEY),
+    },
   });
   checks.push({
     name: "sandbox",
@@ -98,7 +107,7 @@ async function doctor({
   });
   const configuredRoot = defaultDshRoot();
   return {
-    ok: checks.filter((item) => item.name !== "deepseek-key").every((item) => item.ok),
+    ok: checks.filter((item) => !["kimi-key", "search-keys"].includes(item.name)).every((item) => item.ok),
     runtime: process.env.SYNO_COGNITIVE_RUNTIME || "deepseek-harness",
     dshRootConfigured: Boolean(configuredRoot),
     ...(configuredRoot ? { dshRoot: configuredRoot } : {}),

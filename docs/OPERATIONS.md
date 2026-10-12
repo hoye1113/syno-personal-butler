@@ -140,23 +140,23 @@ node …/tsx …/apps/cli/src/bin.ts --profile syno --host 127.0.0.1 --port 3088
 - `dsh --profile syno web` 里的 `web` 会变成 syno profile 的内部参数，不要当启动方式。
 - 手工 `dsh --profile syno` 若没有 Host 注入的 `SYNO_BRIDGE_ORIGIN` / `SYNO_BRIDGE_TOKEN`，`@syno/dsh-plugin` 会直接拒绝加载。
 
-**本机 clone 必须构建**
+**Harness 根必须构建（子模块或外部克隆）**
 
-`SYNO_DSH_ROOT` 指向的 `deepseek-harness` checkout 需要：
+DSH 根缺省是本仓 Git Submodule `vendor/deepseek-harness`；也可是 `SYNO_DSH_ROOT` 指向的外部 checkout。无论哪种，都必须：
 
 ```powershell
-cd $env:SYNO_DSH_ROOT
+cd vendor\deepseek-harness   # 或 cd $env:SYNO_DSH_ROOT
 pnpm install
 pnpm run build
 ```
 
 只 `pnpm install` 不够。CLI 可用 tsx 跑源码，但 typert 与 `dsh.client` 包的 `exports` 指向 `lib/*.js`。未 build 时典型失败：`Cannot find module …/typert.host.js`、`MissingClientBundleError`、从 `%LOCALAPPDATA%\Syno\harness\home\profiles\node_modules` 解析到空 `lib/`。
 
-`pnpm harness:doctor` 检查 DSH CLI、官方 `sdk` / `sdk-minimal` profile bundle 和 JSON-RPC server runtime closure，并返回 `runtimeClosure.ok/cliEntry/required/missing/source`；closure 不完整时返回 `HARNESS_RUNTIME_CLOSURE_UNAVAILABLE`，不会仅凭 `node_modules` 报告 sidecar 可启动。doctor 仍不能代替真实 sidecar 初始化、模型回合或 `web_search` 验收。
+`pnpm harness:doctor` 检查 DSH CLI、官方 `sdk` / `sdk-minimal` profile bundle 和 JSON-RPC server runtime closure，并返回 `runtimeClosure.ok/cliEntry/required/missing/source`；closure 不完整时返回 `HARNESS_RUNTIME_CLOSURE_UNAVAILABLE`，不会仅凭 `node_modules` 报告 sidecar 可启动。doctor 仍不能代替真实 sidecar 初始化、模型回合或 Owner 真机验收。
 
 旧版曾通过 `packages/examples/jsonrpc-demo/src/runner.ts` 启动 sidecar；该 demo runner 已从 DSH 0.1.7 移除。当前 Supervisor 直接运行已构建的 `apps/cli/lib/bin.js`，capture 使用官方 `sdk-minimal`，JSON-RPC chat 回退使用官方 `sdk`。不得恢复 demo runner 或退回旧 Agent；缺少 CLI、bundle 或 server runtime entry 时，确定性返回 `HARNESS_RUNTIME_CLOSURE_UNAVAILABLE`。
 
-Windows 计划任务 `start-syno.ps1` **不会**写入 `SYNO_DSH_ROOT`。用户/机器环境变量里没有它时，`pnpm windows:restart` 起的 Host 会 `waiting_provider`。`pnpm start` 必须在该进程环境里设置。
+Windows 计划任务 `start-syno.ps1` **不会**写入 `SYNO_DSH_ROOT`。未设置用户/机器环境变量时，Host 缺省使用本仓子模块 `vendor/deepseek-harness`；若要用外部克隆，须在用户级环境变量设置 `SYNO_DSH_ROOT`（且该克隆已 build），否则 `pnpm windows:restart` 起的 Host 会在起模型前就缺少可用的 Harness 根。
 
 **事件通道是 WebSocket mux，不是 SSE（0.1.7 起需先换 cookie）**
 
@@ -245,11 +245,11 @@ pnpm start
 
 运行时 clone 必须执行 `pnpm run build`，否则 8888 会起来但 3088 起不来（可直接运行 `pnpm harness:setup` 自动编译并检查）。完整踩坑见上文「DeepSeek Harness 生产 chat」。
 
-`harness:doctor` 不把密钥写进输出。协议冒烟用 `pnpm probe:harness`（假 sidecar + 中文 UTF-8）；`pnpm probe:harness -- --real` 验证真实 Harness runtime closure 可发现并报告缺失项。显式设置 `SYNO_RUN_REAL_DSH=1` 的测试文件才允许执行真实模型验收；API key 只从宿主环境读取，不写入测试参数、日志、仓库文件或验收产物。
+`harness:doctor` 不把密钥写进输出。协议冒烟用 `pnpm probe:harness`（假 sidecar + 中文 UTF-8）；`pnpm probe:harness -- --real` 验证真实 Harness runtime closure 可发现并报告缺失项。显式设置 `SYNO_RUN_REAL_DSH=1` 的测试文件才允许执行真实模型验收；模型 key 只从宿主环境 `KIMI_API_KEY` 或仓库根 `.env` 读取，不写入测试参数、日志、仓库文件或验收产物。
 
 生产 chat 由 Host 监督 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（可用 `SYNO_DSH_WEB_PORT` 覆盖），与微信注入同一 Harness Session。Host 会把 `@syno/dsh-plugin` junction/symlink 进 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\node_modules`，不必再跑 `dsh plugin install`。该对话页是特权壳（`approval: never`，permission 表只有 `workspace-write`），不是普通聊天 UI。普通聊天只显示 Bridge core 工具：`workflow.context`、`knowledge.search`、`knowledge.read_snippet`、`knowledge.fetch_url`、`today.read`、`learning.due`、`learning.teach_back`、`learning.submit`、`capture.start`、`capture.status`、`capture.list_pending`、`jobs.list`、`jobs.submit`、`image.read`。其中 `knowledge.fetch_url` 受安全抓取策略约束，`learning.submit` 只创建待审批的 `learning.evidence.record` Job，不直接改变知识或掌握度；隐藏工具的直接调用仍由 Host 拒绝。Capture Session 继续使用 Workflow 签发的浏览器 allowlist。`http://127.0.0.1:8888` 是控制面。收录分析仍是无 bash/fs/web 的 jsonrpc 第二进程。自动测试 / `SYNO_DSH_FAKE_AGENT` 仍走 jsonrpc fake。紧急回切 chat jsonrpc：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。不要把 jsonrpc sidecar 与生产 DSH Web 同时接到同一 session。不要执行 `dsh web`（那是库存 `--profile web`）。
 
-Chat 的 `web_search` 走官方 `@deepseek-ai/dsh-web-search-deepseek`（复用已注入的 `DEEPSEEK_API_KEY`）；Web session 使用 Host 生成并显式绑定的 `syno` agent preset，compaction 与普通 schedule 由当前生产 profile 的官方 DSH 层接管（Web preset 使用官方 compaction-basic/tool-result-pruner/compact command，JSON-RPC 使用同一 stack，普通 schedule 由 `@deepseek-ai/dsh-schedule` function plugin 提供），Syno 的 SignalEngine / PriorityEngine / ChannelDeliveryOutbox 仍负责业务主动运营，不与普通 schedule 混用。不要对生产 `syno` profile 执行 `dsh plugin add`，也不要从 [dsh-plugin.org](https://dsh-plugin.org/plugins?q=search) 装社区搜索或记忆插件；实验 UI 只用 Host 生成的 `syno-lab` profile（无 Bridge、无 vault 写、无微信）。收录分析 profile 仍然没有 web。
+Chat 的 `web_search` 由自研 `syno-search` 链提供（ADR 0009）：豆包搜索（500 次/月免费）→ Tavily（1000 credit/月）→ Exa（每月 $10 额度），按查询语言路由（中文优先豆包、英文优先 Tavily），失败/限流/空结果自动回退；key 走仓库根 `.env`（`DOUBAO_SEARCH_API_KEY` / `TAVILY_API_KEY` / `EXA_API_KEY`）经 Host 注入，`harness:doctor` 的 `search-keys` 检查报告就位情况；可用 `SYNO_WEB_SEARCH_CHAIN=exa,tavily` 覆盖链前缀。JSON-RPC chat 回退面在 `syno-chat.cordis.yml` 挂载同一接缝（该面以相对路径加载插件，没有 bundle linked-root 的 peer 拦截，插件内对 `@deepseek-ai/dsh-web` 采用可选解析，见 `plugins/web-search/index.mjs`）。`web_fetch` 仍为匿名 HTTP(S)。Web session 使用 Host 生成并显式绑定的 `syno` agent preset，compaction 与普通 schedule 由当前生产 profile 的官方 DSH 层接管（Web preset 使用官方 compaction-basic/tool-result-pruner/compact command，JSON-RPC 使用同一 stack，普通 schedule 由 `@deepseek-ai/dsh-schedule` function plugin 提供），Syno 的 SignalEngine / PriorityEngine / ChannelDeliveryOutbox 仍负责业务主动运营，不与普通 schedule 混用。不要对生产 `syno` profile 执行 `dsh plugin add`，也不要从 [dsh-plugin.org](https://dsh-plugin.org/plugins?q=search) 装社区搜索或记忆插件；实验 UI 只用 Host 生成的 `syno-lab` profile（无 Bridge、无 vault 写、无微信）。收录分析 profile 仍然没有 web。
 
 微信图片默认走聊天识图（Host `syno_image_read` → Zen HTTP `mimo-v2.5-free`）；PDF/文本附件仍收录。明确说「收录」时，识图 JSON 作为 `kind: text` 进入现有 Intake / Proposal。本地知识搜索仍是 `syno_knowledge_search`。识图失败对微信可见，禁止猜图。
 

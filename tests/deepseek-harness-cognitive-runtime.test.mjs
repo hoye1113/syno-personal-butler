@@ -68,13 +68,13 @@ function bridgeTools() {
   };
 }
 
-test("parseHarnessModel maps deepseek/* onto the official Harness route", () => {
-  assert.deepEqual(parseHarnessModel("deepseek/deepseek-v4-flash-vision-exp"), {
-    provider: "deepseek-official",
-    model: "deepseek-v4-flash-vision-exp",
-    qualified: "deepseek/deepseek-v4-flash-vision-exp",
+test("parseHarnessModel maps kimi-coding/* onto the pi-ai Harness route", () => {
+  assert.deepEqual(parseHarnessModel("kimi-coding/kimi-for-coding"), {
+    provider: "kimi-coding",
+    model: "kimi-for-coding",
+    qualified: "kimi-coding/kimi-for-coding",
   });
-  assert.throws(() => parseHarnessModel("opencode/mimo-v2.5-free"), /只允许 DeepSeek/);
+  assert.throws(() => parseHarnessModel("opencode/mimo-v2.5-free"), /只允许 Kimi Code/);
 });
 
 test("DeepSeekHarnessCognitiveRuntime declares locked v3 capabilities", () => {
@@ -102,8 +102,8 @@ test("v3 still rejects OpenCode-style free-tier models", () => {
     version: 3,
     adapter: HARNESS_ADAPTER,
     agentCount: 1,
-    provider: "deepseek",
-    models: ["deepseek/deepseek-v4-flash-vision-exp", "opencode/mimo-v2.5-free"],
+    provider: "kimi-coding",
+    models: ["kimi-coding/kimi-for-coding", "opencode/mimo-v2.5-free"],
     agentSelectableModel: false,
     providerFallback: false,
     dynamicMcp: false,
@@ -173,7 +173,7 @@ test("chat tool requests cannot expand the core set while capture keeps its brow
   assert.deepEqual(tools.calls[2].allowedTools, ["syno_browser_snapshot"]);
 });
 
-test("retryable failure shuts down the sidecar then falls back to deepseek-v4-flash", async (t) => {
+test("retryable failure shuts down the sidecar then falls back to k3-256k", async (t) => {
   const file = await temporaryFile(t);
   const supervisor = fakeSupervisor({
     failCodes: ["HARNESS_RPC_ERROR"],
@@ -188,8 +188,8 @@ test("retryable failure shuts down the sidecar then falls back to deepseek-v4-fl
   assert.equal(result.text, "fallback-ok");
   assert.deepEqual(result.attempts.map((item) => item.status), ["failed", "completed"]);
   assert.deepEqual(result.attempts.map((item) => item.modelId), [
-    "deepseek/deepseek-v4-flash-vision-exp",
-    "deepseek/deepseek-v4-flash",
+    "kimi-coding/kimi-for-coding",
+    "kimi-coding/k3-256k",
   ]);
   assert.equal(supervisor.stops.includes("chat"), true);
   assert.equal(retryableFailure({ code: "HARNESS_EMPTY_RESPONSE" }), true);

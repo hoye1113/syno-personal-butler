@@ -1,8 +1,9 @@
 # Syno production overlay over the current DSH base/web bundles.
 # dsh-base owns the official compaction backend; schedule is an official
 # function plugin and is mounted here because it is not a profile bundle.
-# Pin official DeepSeek search, re-enable web_search (web-app disables tool-web),
-# mount the Host Tool Bridge, and keep the sandbox on DSH_CWD.
+# Route the LLM seam to Kimi Code through the pi-ai twin, serve web_search from
+# the Syno search chain (doubao → tavily → exa, keys in the child env), mount
+# the Host Tool Bridge, and keep the sandbox on DSH_CWD.
 # Do not add dsh-plugin.org marketplace packages here.
 
 - insert:
@@ -75,7 +76,8 @@
           - id: tool-web
             name: '@deepseek-ai/dsh-tool-web'
             config:
-              fetch: false
+              fetch: true
+              search: true
               searchTimeoutMs: 60000
 
     - id: schedule
@@ -90,22 +92,41 @@
       name: './plugins/capabilities/index.mjs'
     - id: syno-channel-weixin
       name: './plugins/channel-weixin/index.mjs'
-    - id: web-fetch-http
-      name: '@deepseek-ai/dsh-web-fetch-http'
+    # Syno 组合搜索 provider（豆包 → Tavily → Exa，按查询语言路由）。
+    - id: syno-web-search
+      name: './plugins/web-search/index.mjs'
+- id: web-fetch-http
+  name: '@deepseek-ai/dsh-web-fetch-http'
+
+# web_search 由此链提供；未配置 key 的 provider 自动跳过。
+- id: web
+  config:
+    searchProvider: syno-search
+    fetchProvider: http
+
+# Kimi Code route through the pi-ai twin's installed catalog provider. Image
+# budgets stay under Kimi's ~2 MB per-request cap with text headroom.
+- id: llm-pi-ai
+  config:
+    providers:
+      kimi-coding:
+        apiKeyEnv: KIMI_API_KEY
+        requestImagePixelBudget: 1048576
+        requestImageMaxBytes: 786432
+        maxRequestImageBytes: 1400000
+
+# Entry-point agents (session titles and similar) default to the same route.
+- id: agent-default-model
+  config:
+    provider: kimi-coding
+    model: kimi-for-coding
 
 - id: tool-web
   disabled: false
   config:
+    fetch: true
     search: true
     searchTimeoutMs: 60000
-
-- id: web
-  config:
-    searchProvider: deepseek-official
-
-- id: web-search-deepseek
-  config:
-    apiKeyEnv: DEEPSEEK_API_KEY
 
 - id: system-prompt
   config:
