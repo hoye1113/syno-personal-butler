@@ -24,6 +24,12 @@
   4. 可选：如需恢复微信主动卡，清理/解冻 outbox 中 9 条 09-29～10-09 的 `PROACTIVE_DELIVERY_EXHAUSTED` 记录或把 home 切回微信（`channels/home`）。
 - **边界**：不改 `vendor/`；不内联 key；不新增高频自动调用（Kimi 社区规则禁止非交互批量自动化）。
 
+## 启动自愈加固：Host 崩溃循环自动桌面告警（2026-10-12）
+
+- **稳定性复查结论**：at_logon 冷启动已实测 4 次（10/8 09:06、10/8 17:52、10/9 09:20、10/9 11:46，开机后 ~40 秒内拉起，之后稳定运行数天）；但历史上有 09-30 15:45～10-01 13:13 一次连续 ~21.5 小时的 `exit=1` 启动崩溃循环（~239 次、每 62 秒重试），当时无任何主动告警——管家不在线主人无从知晓。
+- **修复 `4a133ab`**：新模块 `scripts/syno-launcher-crash-alert.ps1` + `start-syno.ps1` 接线——Host 连续 3 次在启动后 60 秒内崩溃 → 桌面弹窗（WScript Popup，120 秒自动关闭；投递失败不中断 60 秒退避重启）+ `launcher.crash_loop` JSONL 事件（含 `popupDelivered`）；每小时重告一次，一次正常存活 ≥60 秒即重置计数；`host_crashed` 事件新增 `uptimeSeconds`。
+- **验证**：`pnpm test` **819/819**（+2：告警状态机行为 / launcher 接线断言）；`pnpm verify` 通过；弹窗通道真机烟测通过（result=1）；`pnpm windows:restart` 后 `running=true`、health `ready`、`deliveryOk=true`（新 launcher 已装载）。
+
 ## 知识库维护巡检优化与孤岛笔记双链闭环（2026-10-12 完成）
 
 - **背景与根因**：飞书周报此前误报 54 篇孤岛笔记（`99-System` 41 篇、`03-Archive` 2 篇、`02-Resources` 10 篇）。排查发现：
