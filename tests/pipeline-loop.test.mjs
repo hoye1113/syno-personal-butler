@@ -3,8 +3,12 @@ import test from 'node:test';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { parseReviewDecision, runGh } from '../scripts/review-with-claude.mjs';
-import { getOpenIssues, getOpenPRs } from '../scripts/agent-loop.mjs';
+import {
+  parseReviewDecision,
+  runGh,
+  assertHeadConsistency,
+  chunksToText
+} from '../scripts/review-with-claude.mjs';
 import { ProcessFileLock } from '../packages/syno-core/process-lock.mjs';
 
 test('parseReviewDecision: 严格首行解析与抗正文误导', () => {
@@ -42,7 +46,7 @@ RESULT: [APPROVED]
   assert.throws(() => parseReviewDecision('RESULT: [UNKNOWN_STATE]'), /判定结构无效或含歧义/);
 });
 
-test('UTF-8 多字节分片拼接保真性（中文、Emoji、环境变量引用）', () => {
+test('chunksToText: UTF-8 多字节分片拼接保真性（中文、Emoji、环境变量引用）', () => {
   const original = '这是包含特殊变量 %PIPELINE_SENTINEL% 以及 Emoji 🚀 和换行\n的多字节测试文本。';
   const fullBuf = Buffer.from(original, 'utf8');
 
@@ -51,11 +55,34 @@ test('UTF-8 多字节分片拼接保真性（中文、Emoji、环境变量引用
   const chunk2 = fullBuf.subarray(5, 12);
   const chunk3 = fullBuf.subarray(12);
 
-  const accumulated = [chunk1, chunk2, chunk3];
-  const decoded = Buffer.concat(accumulated).toString('utf8');
+  const decoded = chunksToText([chunk1, chunk2, chunk3]);
 
   assert.equal(decoded, original, '分片拼接后的字符串必须与原始多字节内容完全一致');
   assert.ok(!decoded.includes('\uFFFD'), '不得产生 UTF-8 乱码替换符');
+});
+
+test('assertHeadConsistency: 真实版本一致性校验纯函数断言', () => {
+  const headA = '903621e55041db496f09ff268c5ae402756576e5';
+  const headB = 'ce1d1bc55e14c36a5d1255f289a896d8b2abb50f';
+
+  // 相同 SHA 必须无报错通过
+  assert.doesNotThrow(() => assertHeadConsistency(headA, headA));
+
+  // 不同 SHA 必须抛出 HEAD_SHA_MISMATCH 异常
+  assert.throws(
+    () => assertHeadConsistency(headA, headB),
+    (err) => err.code === 'HEAD_SHA_MISMATCH' && err.message.includes('PR head SHA 在审查期间发生变更')
+  );
+
+  // 缺失任一 SHA 必须抛出异常
+  assert.throws(
+    () => assertHeadConsistency(headA, null),
+    (err) => err.code === 'HEAD_SHA_MISMATCH' && err.message.includes('PR head SHA 在审查期间发生变更')
+  );
+  assert.throws(
+    () => assertHeadConsistency('', headA),
+    (err) => err.code === 'HEAD_SHA_MISMATCH' && err.message.includes('PR head SHA 在审查期间发生变更')
+  );
 });
 
 test('审查工具只读边界：白名单仅允许 Read,Glob,Grep，严格剔除 Bash,Edit,Write', async () => {
@@ -91,21 +118,9 @@ test('调度与审查锁：failFast 机制防止并发重叠', async (t) => {
   await lease2.release();
 });
 
-test('runGh 错误传播：非零退出必须抛出带诊断的 GH_COMMAND_FAILED 异常，不得静默吞掉', () => {
+test('runGh 错误传播与超时控制：非零退出抛出异常，支持显式 timeout', () => {
   assert.throws(
     () => runGh(['invalid-subcommand-definitely-fails-xyz']),
     (err) => err.code === 'GH_COMMAND_FAILED' && err.message.includes('gh invalid-subcommand-definitely-fails-xyz 失败')
   );
-});
-
-test('版本绑定一致性校验逻辑', () => {
-  const initialHeadOid = 'abc1234';
-  const modifiedHeadOid = 'def5678';
-
-  assert.notEqual(initialHeadOid, modifiedHeadOid);
-  assert.throws(() => {
-    if (modifiedHeadOid !== initialHeadOid) {
-      throw new Error(`PR head SHA 在审查期间发生变更: ${initialHeadOid} -> ${modifiedHeadOid}`);
-    }
-  }, /PR head SHA 在审查期间发生变更/);
 });

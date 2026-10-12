@@ -8,7 +8,7 @@
  * 2. 挂载指定审查 Skill（默认 /code-review，支持追加其他 skill）
  * 3. 严格限制 Claude Code 仅使用只读工具（Read, Glob, Grep），杜绝擅自修改文件
  * 4. 严格解析首行判决，非零退出与非法结构一律失败关闭
- * 5. 校验 headRefOid 版本一致性，防止陈旧审查批准新代码
+ * 5. 校验 headRefOid 版本一致性（含 TOCTOU 关闭），防止陈旧审查批准新代码
  * 6. 使用 --body-file 避免 Windows shell 字符篡改与环境变量展开
  * 7. 确认标签更新成功后才触发终态桌面通知
  */
@@ -27,6 +27,7 @@ export function runGh(args) {
     return execFileSync('gh', args, {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 60000,
       maxBuffer: 10 * 1024 * 1024,
       env: { ...process.env, LANG: 'zh_CN.UTF-8' }
     }).trim();
@@ -36,6 +37,19 @@ export function runGh(args) {
     error.code = 'GH_COMMAND_FAILED';
     throw error;
   }
+}
+
+export function assertHeadConsistency(initialOid, currentOid) {
+  if (!initialOid || !currentOid || initialOid !== currentOid) {
+    const err = new Error(`PR head SHA 在审查期间发生变更（审查开始: ${initialOid}，当前: ${currentOid}），放弃发布陈旧版本的审查结果。`);
+    err.code = 'HEAD_SHA_MISMATCH';
+    throw err;
+  }
+}
+
+export function chunksToText(chunks) {
+  if (!Array.isArray(chunks)) return '';
+  return Buffer.concat(chunks).toString('utf8');
 }
 
 export function parseReviewDecision(output) {
@@ -76,6 +90,10 @@ export function sendToast(title, body) {
       tB64,
       bB64
     ], { windowsHide: true, stdio: 'ignore' });
+
+    child.on('error', err => {
+      console.warn(`[Toast Warning] 通知子进程启动失败: ${err.message}`);
+    });
     child.unref();
   } catch (e) {
     console.warn(`[Toast Warning] 桌面通知发送失败: ${e.message}`);
@@ -123,8 +141,8 @@ export async function runClaudeReview(prompt, options = {}) {
       clearTimeout(timer);
       if (timedOut) return;
 
-      const stderrText = Buffer.concat(stderrChunks).toString('utf8');
-      const stdoutText = Buffer.concat(stdoutChunks).toString('utf8').trim();
+      const stderrText = chunksToText(stderrChunks);
+      const stdoutText = chunksToText(stdoutChunks).trim();
 
       if (code !== 0) {
         reject(new Error(`Claude Code 退出异常 (code ${code}): ${stderrText}`));
@@ -253,9 +271,7 @@ RESULT: [CHANGES_REQUESTED]
   // 版本一致性校验：在发布前确认 head SHA 未被改写
   const currentPrRaw = runGh(['pr', 'view', String(num), '--json', 'headRefOid,state']);
   const currentPr = JSON.parse(currentPrRaw);
-  if (currentPr.headRefOid !== initialHeadOid) {
-    throw new Error(`PR #${num} 版本已变更（审查开始版本: ${initialHeadOid}，当前版本: ${currentPr.headRefOid}），放弃发布陈旧版本的审查结果。`);
-  }
+  assertHeadConsistency(initialHeadOid, currentPr.headRefOid);
 
   // 持久化审查报告（绑定已审查 headRefOid）
   const runtimeDir = resolve(process.cwd(), '.runtime', 'reviews');
@@ -290,6 +306,11 @@ RESULT: [CHANGES_REQUESTED]
       try { unlinkSync(tmpReviewFile); } catch {}
     }
   }
+
+  // 关闭 TOCTOU 窗口：在打标前再次复核 headRefOid
+  const preEditPrRaw = runGh(['pr', 'view', String(num), '--json', 'headRefOid']);
+  const preEditPr = JSON.parse(preEditPrRaw);
+  assertHeadConsistency(initialHeadOid, preEditPr.headRefOid);
 
   if (isApproved) {
     console.log(`✅ 审查结论: [APPROVED] 通过！正在更新标签并触发通知...`);
@@ -349,8 +370,8 @@ async function main() {
       const prJson = runGh(['pr', 'view', '--json', 'number']);
       const parsed = JSON.parse(prJson);
       prNumber = parsed.number;
-    } catch {
-      console.error('错误: 请通过 --pr <PR_NUMBER> 指定审查的 PR，或在关联 PR 的分支下执行。');
+    } catch (e) {
+      console.error('错误: 请通过 --pr <PR_NUMBER> 指定审查的 PR，或在关联 PR 的分支下执行。原始错误: ' + e.message);
       process.exit(1);
     }
   }
@@ -376,7 +397,6 @@ async function main() {
   }
 }
 
-// 仅在直接执行时运行 main
 if (process.argv[1] && resolve(process.argv[1]) === resolve(__filename)) {
   main().catch(err => {
     console.error('[Fatal Error]', err.message);
