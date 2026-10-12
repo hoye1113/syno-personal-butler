@@ -21,6 +21,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ProcessFileLock } from '../packages/syno-core/process-lock.mjs';
 import { sendFeishuNotification } from './notify-feishu.mjs';
+import { sendToast, EXIT_BUSY } from './review-with-claude.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -65,9 +66,10 @@ export function hasLabel(item, labelName) {
   return (item.labels || []).some(l => l.name === labelName);
 }
 
-export function trackApprovedTimeout(pr) {
+export function trackApprovedTimeout(pr, options = {}) {
+  const persist = options.persist ?? true;
   const reviewsDir = resolve(REPO_ROOT, '.runtime', 'reviews');
-  mkdirSync(reviewsDir, { recursive: true });
+  try { mkdirSync(reviewsDir, { recursive: true }); } catch {}
   const stateFile = resolve(reviewsDir, `pr-${pr.number}-approved-since.json`);
 
   let data = { firstSeenAt: new Date().toISOString(), notified: false };
@@ -75,7 +77,7 @@ export function trackApprovedTimeout(pr) {
     try {
       data = JSON.parse(readFileSync(stateFile, 'utf8'));
     } catch {}
-  } else {
+  } else if (persist) {
     try {
       writeFileSync(stateFile, JSON.stringify(data, null, 2), 'utf8');
     } catch {}
@@ -84,13 +86,19 @@ export function trackApprovedTimeout(pr) {
   const waitingMs = Date.now() - new Date(data.firstSeenAt).getTime();
   const waitingHours = (waitingMs / (1000 * 60 * 60)).toFixed(1);
   const isStale = Number(waitingHours) > 2;
+  const shouldNotify = isStale && !data.notified;
 
-  if (isStale && !data.notified) {
-    data.notified = true;
-    try { writeFileSync(stateFile, JSON.stringify(data, null, 2), 'utf8'); } catch {}
-    return { isStale: true, waitingHours, shouldNotify: true };
-  }
-  return { isStale, waitingHours, shouldNotify: false };
+  return {
+    isStale,
+    waitingHours,
+    shouldNotify,
+    markNotified: () => {
+      data.notified = true;
+      try {
+        writeFileSync(stateFile, JSON.stringify(data, null, 2), 'utf8');
+      } catch {}
+    }
+  };
 }
 
 export function printStatus() {
@@ -124,7 +132,7 @@ export function printStatus() {
   } else {
     approvedPRs.forEach(p => {
       const mode = p.isDraft ? '[Draft]' : '[Ready]';
-      const timeoutStatus = trackApprovedTimeout(p);
+      const timeoutStatus = trackApprovedTimeout(p, { persist: false });
       const staleNotice = timeoutStatus.isStale ? ` ⚠️ approved 已等待 ${timeoutStatus.waitingHours}h` : '';
       console.log(`   - PR #${p.number}: ${p.title} ${mode} (分支: ${p.headRefName})${staleNotice}`);
     });
@@ -149,7 +157,7 @@ export function printStatus() {
   console.log('\n====================================================');
 }
 
-export function handleNext() {
+export async function handleNext() {
   const prs = getOpenPRs();
   const issues = getOpenIssues();
 
@@ -213,12 +221,19 @@ export function handleNext() {
     console.log(`正在触发 Claude Code 审查脚本 (加载 /code-review 技能)...\n`);
 
     // 显式执行审查，外层设置 25 分钟安全超时，大于内层 20 分钟以保留内层清晰诊断
-    execFileSync(process.execPath, [resolve(__dirname, 'review-with-claude.mjs'), '--pr', String(reviewPR.number)], {
-      stdio: 'inherit',
-      timeout: 25 * 60 * 1000
-    });
-
-    return { action: 'REVIEW_TRIGGERED', prNumber: reviewPR.number };
+    try {
+      execFileSync(process.execPath, [resolve(__dirname, 'review-with-claude.mjs'), '--pr', String(reviewPR.number)], {
+        stdio: 'inherit',
+        timeout: 25 * 60 * 1000
+      });
+      return { action: 'REVIEW_TRIGGERED', prNumber: reviewPR.number };
+    } catch (reviewErr) {
+      if (reviewErr.status === EXIT_BUSY) {
+        console.warn(`[BUSY] 审查任务正在并发执行中 (PR #${reviewPR.number})，本轮调度保持等待。`);
+        return { action: 'BUSY', prNumber: reviewPR.number };
+      }
+      throw reviewErr;
+    }
   }
 
   // 3. 进行中保护：如果已有正在进行的 Issue，且当前没有返修阻塞，继续该 Issue
@@ -254,7 +269,18 @@ export function handleNext() {
       branchCreated = true;
     } catch (gitErr) {
       const msg = gitErr.stderr ? gitErr.stderr.toString('utf8').trim() : gitErr.message;
-      throw new Error(`准备特性分支 ${branchName} 失败: ${msg}`);
+      if (msg.includes('already exists')) {
+        console.warn(`[Warning] 本地分支 ${branchName} 已存在，尝试安全复用并检出...`);
+        try {
+          execFileSync('git', ['checkout', branchName], { stdio: 'pipe', timeout: 30000 });
+          branchCreated = true;
+        } catch (coErr) {
+          console.error(`[BLOCKED] 无法切换到已有分支 ${branchName}: ${coErr.message}`);
+          return { action: 'BLOCKED', issueNumber: newIssue.number, reason: `Branch ${branchName} checkout failed` };
+        }
+      } else {
+        throw new Error(`准备特性分支 ${branchName} 失败: ${msg}`);
+      }
     }
 
     try {
@@ -279,16 +305,38 @@ export function handleNext() {
   // 5. 检查是否有已核准但尚未合并的 PR
   const approvedPR = prs.find(p => hasLabel(p, 'approved'));
   if (approvedPR) {
-    const timeoutStatus = trackApprovedTimeout(approvedPR);
+    const timeoutStatus = trackApprovedTimeout(approvedPR, { persist: true });
     console.log(`[DISPATCH] 所有研发任务已完成！当前 PR #${approvedPR.number} 已通过审查，等待 Codex 或主人合并。(已核准等待 ${timeoutStatus.waitingHours}h)`);
 
     if (timeoutStatus.shouldNotify) {
-      sendFeishuNotification({
-        title: `PR #${approvedPR.number} 待合超时提醒 (${timeoutStatus.waitingHours}h) ⚠️`,
-        content: `**PR 标题**: ${approvedPR.title}\n**分支**: \`${approvedPR.headRefName}\`\n**核准后已等待**: ${timeoutStatus.waitingHours} 小时\n\n该 PR 已通过 Claude Code 审查，等待 Codex 巡检或主人合入。`,
-        url: `https://github.com/hoye1113/syno-personal-butler/pull/${approvedPR.number}`,
-        status: 'warning'
-      }).catch(() => {});
+      let toastOk = false;
+      let feishuOk = false;
+
+      try {
+        sendToast(
+          `PR #${approvedPR.number} 待合超时提醒 (${timeoutStatus.waitingHours}h) ⚠️`,
+          `该 PR 已通过 Claude Code 审查并就绪超过 ${timeoutStatus.waitingHours} 小时，等待 Codex 巡检或主人合入。`
+        );
+        toastOk = true;
+      } catch (toastErr) {
+        console.warn(`[Warning] 桌面 Toast 发送失败: ${toastErr.message}`);
+      }
+
+      try {
+        feishuOk = await sendFeishuNotification({
+          title: `PR #${approvedPR.number} 待合超时提醒 (${timeoutStatus.waitingHours}h) ⚠️`,
+          content: `**PR 标题**: ${approvedPR.title}\n**分支**: \`${approvedPR.headRefName}\`\n**核准后已等待**: ${timeoutStatus.waitingHours} 小时\n\n该 PR 已通过 Claude Code 审查，等待 Codex 巡检或主人合入。`,
+          url: `https://github.com/hoye1113/syno-personal-butler/pull/${approvedPR.number}`,
+          status: 'warning'
+        });
+      } catch (feishuErr) {
+        console.warn(`[Warning] 飞书卡片发送异常: ${feishuErr.message}`);
+      }
+
+      // 仅当至少有一个通知渠道成功交付时，才将 notified=true 写入持久化状态，防止静默抑制
+      if (toastOk || feishuOk) {
+        timeoutStatus.markNotified();
+      }
     }
 
     return { action: 'WAITING_MERGE', prNumber: approvedPR.number };
@@ -313,7 +361,7 @@ async function main() {
       if (command === 'status') {
         printStatus();
       } else if (command === 'next') {
-        handleNext();
+        await handleNext();
       } else {
         console.error(`未知命令: ${command}。支持的命令: status, next`);
         process.exitCode = 1;

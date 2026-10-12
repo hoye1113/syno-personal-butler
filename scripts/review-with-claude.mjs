@@ -25,6 +25,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const REPO_ROOT = resolve(__dirname, '..');
 
+export const EXIT_BUSY = 75;
+
 export function runGh(args) {
   try {
     return execFileSync('gh', args, {
@@ -142,7 +144,9 @@ export async function runClaudeReview(prompt, options = {}) {
       } else {
         try { child.kill('SIGTERM'); } catch {}
       }
-      reject(new Error(`Claude Code 审查执行超时 (${timeoutMs / 1000}s)`));
+      const stderrTail = chunksToText(stderrChunks).slice(-500).trim();
+      const detail = stderrTail ? `\n子进程 stderr 摘要:\n${stderrTail}` : '';
+      reject(new Error(`Claude Code 审查执行超时 (${timeoutMs / 1000}s)${detail}`));
     }, timeoutMs);
 
     child.stdout.on('data', chunk => stdoutChunks.push(chunk));
@@ -436,7 +440,7 @@ async function main() {
   } catch (err) {
     if (err.code === 'PROCESS_LOCK_HELD') {
       console.warn(`[BUSY] 另一项审查任务正在进行中 (持有者 PID: ${err.owner?.pid})，跳过本次执行。`);
-      process.exit(0);
+      process.exit(EXIT_BUSY);
     }
     console.error('[Fatal Error]', err.message);
     process.exit(1);

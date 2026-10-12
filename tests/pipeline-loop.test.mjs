@@ -8,8 +8,10 @@ import {
   runGh,
   assertHeadConsistency,
   chunksToText,
-  extractLinkedIssueNumber
+  extractLinkedIssueNumber,
+  EXIT_BUSY
 } from '../scripts/review-with-claude.mjs';
+import { trackApprovedTimeout } from '../scripts/agent-loop.mjs';
 import { ProcessFileLock } from '../packages/syno-core/process-lock.mjs';
 
 test('parseReviewDecision: 严格首行解析与抗正文误导', () => {
@@ -141,6 +143,54 @@ test('extractLinkedIssueNumber: 严格识别显式关联关键字，忽略偶发
   assert.equal(extractLinkedIssueNumber(undefined), null);
 });
 
+test('EXIT_BUSY 常量与进程锁忙退出契约', () => {
+  assert.equal(EXIT_BUSY, 75);
+});
+
+test('trackApprovedTimeout: persist 开关与延迟 markNotified 落盘逻辑', async (t) => {
+  const tmpPR = { number: 99999, title: 'Test PR', headRefName: 'test-branch' };
+  const reviewsDir = path.resolve('.runtime', 'reviews');
+  const stateFile = path.resolve(reviewsDir, `pr-${tmpPR.number}-approved-since.json`);
+  t.after(async () => {
+    try { await fs.unlink(stateFile); } catch {}
+  });
+
+  // 1. persist: false 不写盘
+  const res1 = trackApprovedTimeout(tmpPR, { persist: false });
+  assert.equal(typeof res1.waitingHours, 'string');
+  assert.equal(res1.isStale, false);
+  assert.equal(res1.shouldNotify, false);
+  const existsAfterNoPersist = await fs.access(stateFile).then(() => true).catch(() => false);
+  assert.equal(existsAfterNoPersist, false, 'persist: false 时不得向磁盘写入状态文件');
+
+  // 2. persist: true 首次写盘
+  const res2 = trackApprovedTimeout(tmpPR, { persist: true });
+  const existsAfterPersist = await fs.access(stateFile).then(() => true).catch(() => false);
+  assert.equal(existsAfterPersist, true, 'persist: true 时必须初始化状态文件');
+
+  // 3. 模拟超时但未通知
+  const pastDate = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
+  await fs.writeFile(stateFile, JSON.stringify({ firstSeenAt: pastDate, notified: false }, null, 2), 'utf8');
+
+  const res3 = trackApprovedTimeout(tmpPR, { persist: true });
+  assert.equal(res3.isStale, true);
+  assert.equal(res3.shouldNotify, true);
+
+  // 确认在调用 markNotified() 之前，文件内的 notified 依然为 false
+  const stateBeforeMark = JSON.parse(await fs.readFile(stateFile, 'utf8'));
+  assert.equal(stateBeforeMark.notified, false, '在实际通知交付前，notified 状态不得被提前置为 true');
+
+  // 4. 调用 markNotified() 后才真正落盘
+  res3.markNotified();
+  const stateAfterMark = JSON.parse(await fs.readFile(stateFile, 'utf8'));
+  assert.equal(stateAfterMark.notified, true, 'markNotified() 执行后，notified 状态必须落盘');
+
+  // 5. 再次查询时 shouldNotify 变为 false
+  const res4 = trackApprovedTimeout(tmpPR, { persist: true });
+  assert.equal(res4.isStale, true);
+  assert.equal(res4.shouldNotify, false, '已通知过的 PR 不得重复触发通知');
+});
+
 test('审查与调度脚本安全加固契约断言', async () => {
   const reviewScript = await fs.readFile(path.resolve('scripts/review-with-claude.mjs'), 'utf8');
   const loopScript = await fs.readFile(path.resolve('scripts/agent-loop.mjs'), 'utf8');
@@ -151,11 +201,12 @@ test('审查与调度脚本安全加固契约断言', async () => {
   // 2. 审查报告与版本校验必须显式绑定 headRefOid
   assert.match(reviewScript, /headRefOid/);
 
-  // 3. Windows 超时必须调用 taskkill /PID /T /F 清理进程树
+  // 3. Windows 超时必须调用 taskkill /PID /T /F 清理进程树，且输出包含 stderr 摘要
   assert.match(reviewScript, /taskkill/);
   assert.match(reviewScript, /\/PID/);
   assert.match(reviewScript, /\/T/);
   assert.match(reviewScript, /\/F/);
+  assert.match(reviewScript, /stderrTail/);
 
   // 4. 路径必须统一锚定 REPO_ROOT 而非不可靠的 process.cwd()
   assert.match(reviewScript, /REPO_ROOT = resolve\(__dirname, '\.\.'\)/);
@@ -164,4 +215,11 @@ test('审查与调度脚本安全加固契约断言', async () => {
   // 5. 调度层外层超时 (25m) 必须严格大于审查层内层超时 (20m)
   assert.match(reviewScript, /20\s*\*\s*60\s*\*\s*1000/); // 20m
   assert.match(loopScript, /25\s*\*\s*60\s*\*\s*1000/); // 25m
+
+  // 6. 进程锁忙时专属退出码 75 (EXIT_BUSY) 契约绑定
+  assert.match(reviewScript, /process\.exit\(EXIT_BUSY\)/);
+  assert.match(loopScript, /reviewErr\.status === EXIT_BUSY/);
+
+  // 7. 调度器超时提醒必须导入并触发 sendToast 桌面提醒
+  assert.match(loopScript, /sendToast/);
 });
