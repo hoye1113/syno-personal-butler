@@ -30,6 +30,7 @@ const REPO_ROOT = resolve(__dirname, '..');
 export function runGh(args) {
   try {
     return execFileSync('gh', args, {
+      cwd: REPO_ROOT,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: 60000,
@@ -161,6 +162,35 @@ export async function handleNext() {
   const prs = getOpenPRs();
   const issues = getOpenIssues();
 
+  // 0. 超时兜底无条件评估：对所有 approved PR 进行检查并触发超时通知
+  const approvedPRs = prs.filter(p => hasLabel(p, 'approved'));
+  for (const appPR of approvedPRs) {
+    const timeoutStatus = trackApprovedTimeout(appPR, { persist: true });
+    if (timeoutStatus.shouldNotify) {
+      const toastOk = sendToast(
+        `PR #${appPR.number} 待合超时提醒 (${timeoutStatus.waitingHours}h) ⚠️`,
+        `该 PR 已通过 Claude Code 审查并就绪超过 ${timeoutStatus.waitingHours} 小时，等待 Codex 巡检或主人合入。`
+      );
+
+      let feishuOk = false;
+      try {
+        feishuOk = await sendFeishuNotification({
+          title: `PR #${appPR.number} 待合超时提醒 (${timeoutStatus.waitingHours}h) ⚠️`,
+          content: `**PR 标题**: ${appPR.title}\n**分支**: \`${appPR.headRefName}\`\n**核准后已等待**: ${timeoutStatus.waitingHours} 小时\n\n该 PR 已通过 Claude Code 审查，等待 Codex 巡检或主人合入。`,
+          url: `https://github.com/hoye1113/syno-personal-butler/pull/${appPR.number}`,
+          status: 'warning'
+        });
+      } catch (feishuErr) {
+        console.warn(`[Warning] 飞书卡片发送异常: ${feishuErr.message}`);
+      }
+
+      // 仅当至少有一个通知渠道成功交付时，才将 notified=true 写入持久化状态，防止静默抑制
+      if (toastOk || feishuOk) {
+        timeoutStatus.markNotified();
+      }
+    }
+  }
+
   // 1. 返修优先：检查是否有被 Claude Code 打回的 PR
   const fixPR = prs.find(p => hasLabel(p, 'changes-requested'));
   if (fixPR) {
@@ -223,6 +253,7 @@ export async function handleNext() {
     // 显式执行审查，外层设置 25 分钟安全超时，大于内层 20 分钟以保留内层清晰诊断
     try {
       execFileSync(process.execPath, [resolve(__dirname, 'review-with-claude.mjs'), '--pr', String(reviewPR.number)], {
+        cwd: REPO_ROOT,
         stdio: 'inherit',
         timeout: 25 * 60 * 1000
       });
@@ -252,28 +283,29 @@ export async function handleNext() {
     console.log(`- 标题: ${newIssue.title}`);
 
     // 工作区整洁度检查：忽略子模块内部脏构建产物，仅检测当前仓库真实未暂存变更
-    const statusOutput = execFileSync('git', ['status', '--porcelain', '--ignore-submodules=dirty'], { encoding: 'utf8', timeout: 30000 }).trim();
+    const statusOutput = execFileSync('git', ['status', '--porcelain', '--ignore-submodules=dirty'], { cwd: REPO_ROOT, encoding: 'utf8', timeout: 30000 }).trim();
     if (statusOutput.length > 0) {
       console.warn(`[工作区保护] 当前工作区存在未提交改动：\n${statusOutput}\n已暂停自动切换分支与认领，请先提交或清理工作区。`);
       return { action: 'DIRTY_WORKTREE_BLOCKED', issueNumber: newIssue.number };
     }
 
-    const currentBranch = execFileSync('git', ['branch', '--show-current'], { encoding: 'utf8', timeout: 30000 }).trim() || 'main';
+    const currentBranch = execFileSync('git', ['branch', '--show-current'], { cwd: REPO_ROOT, encoding: 'utf8', timeout: 30000 }).trim() || 'main';
     const branchName = `feat/issue-${newIssue.number}`;
     console.log(`正在安全建立特性分支 ${branchName} 并标记 in-progress...`);
 
-    let branchCreated = false;
+    let createdNew = false;
+    let reusedExisting = false;
     try {
-      execFileSync('git', ['fetch', 'origin', 'main', '--quiet'], { timeout: 60000 });
-      execFileSync('git', ['checkout', '-b', branchName, 'origin/main'], { stdio: 'pipe', timeout: 30000 });
-      branchCreated = true;
+      execFileSync('git', ['fetch', 'origin', 'main', '--quiet'], { cwd: REPO_ROOT, timeout: 60000 });
+      execFileSync('git', ['checkout', '-b', branchName, 'origin/main'], { cwd: REPO_ROOT, stdio: 'pipe', timeout: 30000 });
+      createdNew = true;
     } catch (gitErr) {
       const msg = gitErr.stderr ? gitErr.stderr.toString('utf8').trim() : gitErr.message;
       if (msg.includes('already exists')) {
         console.warn(`[Warning] 本地分支 ${branchName} 已存在，尝试安全复用并检出...`);
         try {
-          execFileSync('git', ['checkout', branchName], { stdio: 'pipe', timeout: 30000 });
-          branchCreated = true;
+          execFileSync('git', ['checkout', branchName], { cwd: REPO_ROOT, stdio: 'pipe', timeout: 30000 });
+          reusedExisting = true;
         } catch (coErr) {
           console.error(`[BLOCKED] 无法切换到已有分支 ${branchName}: ${coErr.message}`);
           return { action: 'BLOCKED', issueNumber: newIssue.number, reason: `Branch ${branchName} checkout failed` };
@@ -287,13 +319,19 @@ export async function handleNext() {
       runGh(['issue', 'edit', String(newIssue.number), '--add-label', 'in-progress']);
       console.log(`\n✅ 分支 ${branchName} 已就绪，已打标 in-progress，请 Gemini 开始编写实现代码与测试。`);
     } catch (tagErr) {
-      // 标签更新失败回滚本地分支到原分支
-      if (branchCreated) {
+      // 标签更新失败回滚本地分支到原分支：仅全新建的分支才删除，复用的分支绝不删除！
+      if (createdNew) {
         try {
-          execFileSync('git', ['checkout', currentBranch], { timeout: 30000 });
-          execFileSync('git', ['branch', '-D', branchName], { timeout: 30000 });
+          execFileSync('git', ['checkout', currentBranch], { cwd: REPO_ROOT, timeout: 30000 });
+          execFileSync('git', ['branch', '-D', branchName], { cwd: REPO_ROOT, timeout: 30000 });
         } catch (rbErr) {
-          console.warn(`[Warning] 回滚分支 ${branchName} 失败: ${rbErr.message}`);
+          console.warn(`[Warning] 回滚并删除分支 ${branchName} 失败: ${rbErr.message}`);
+        }
+      } else if (reusedExisting) {
+        try {
+          execFileSync('git', ['checkout', currentBranch], { cwd: REPO_ROOT, timeout: 30000 });
+        } catch (rbErr) {
+          console.warn(`[Warning] 切回原分支 ${currentBranch} 失败: ${rbErr.message}`);
         }
       }
       throw new Error(`给 Issue #${newIssue.number} 添加 in-progress 标签失败: ${tagErr.message}`);
@@ -305,40 +343,8 @@ export async function handleNext() {
   // 5. 检查是否有已核准但尚未合并的 PR
   const approvedPR = prs.find(p => hasLabel(p, 'approved'));
   if (approvedPR) {
-    const timeoutStatus = trackApprovedTimeout(approvedPR, { persist: true });
+    const timeoutStatus = trackApprovedTimeout(approvedPR, { persist: false });
     console.log(`[DISPATCH] 所有研发任务已完成！当前 PR #${approvedPR.number} 已通过审查，等待 Codex 或主人合并。(已核准等待 ${timeoutStatus.waitingHours}h)`);
-
-    if (timeoutStatus.shouldNotify) {
-      let toastOk = false;
-      let feishuOk = false;
-
-      try {
-        sendToast(
-          `PR #${approvedPR.number} 待合超时提醒 (${timeoutStatus.waitingHours}h) ⚠️`,
-          `该 PR 已通过 Claude Code 审查并就绪超过 ${timeoutStatus.waitingHours} 小时，等待 Codex 巡检或主人合入。`
-        );
-        toastOk = true;
-      } catch (toastErr) {
-        console.warn(`[Warning] 桌面 Toast 发送失败: ${toastErr.message}`);
-      }
-
-      try {
-        feishuOk = await sendFeishuNotification({
-          title: `PR #${approvedPR.number} 待合超时提醒 (${timeoutStatus.waitingHours}h) ⚠️`,
-          content: `**PR 标题**: ${approvedPR.title}\n**分支**: \`${approvedPR.headRefName}\`\n**核准后已等待**: ${timeoutStatus.waitingHours} 小时\n\n该 PR 已通过 Claude Code 审查，等待 Codex 巡检或主人合入。`,
-          url: `https://github.com/hoye1113/syno-personal-butler/pull/${approvedPR.number}`,
-          status: 'warning'
-        });
-      } catch (feishuErr) {
-        console.warn(`[Warning] 飞书卡片发送异常: ${feishuErr.message}`);
-      }
-
-      // 仅当至少有一个通知渠道成功交付时，才将 notified=true 写入持久化状态，防止静默抑制
-      if (toastOk || feishuOk) {
-        timeoutStatus.markNotified();
-      }
-    }
-
     return { action: 'WAITING_MERGE', prNumber: approvedPR.number };
   }
 

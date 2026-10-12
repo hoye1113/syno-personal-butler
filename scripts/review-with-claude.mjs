@@ -30,6 +30,7 @@ export const EXIT_BUSY = 75;
 export function runGh(args) {
   try {
     return execFileSync('gh', args, {
+      cwd: REPO_ROOT,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: 60000,
@@ -82,7 +83,7 @@ export function parseReviewDecision(output) {
 export function sendToast(title, body) {
   try {
     const toastScriptPath = resolve(__dirname, 'show-toast.ps1').replace(/\\/g, '/');
-    if (!existsSync(toastScriptPath)) return;
+    if (!existsSync(toastScriptPath)) return false;
 
     const tB64 = Buffer.from(title, 'utf8').toString('base64');
     const bB64 = Buffer.from(body, 'utf8').toString('base64');
@@ -100,14 +101,16 @@ export function sendToast(title, body) {
       '-Command', psCommand,
       tB64,
       bB64
-    ], { windowsHide: true, stdio: 'ignore' });
+    ], { cwd: REPO_ROOT, windowsHide: true, stdio: 'ignore' });
 
     child.on('error', err => {
       console.warn(`[Toast Warning] 通知子进程启动失败: ${err.message}`);
     });
     child.unref();
+    return true;
   } catch (e) {
     console.warn(`[Toast Warning] 桌面通知发送失败: ${e.message}`);
+    return false;
   }
 }
 
@@ -126,6 +129,7 @@ export async function runClaudeReview(prompt, options = {}) {
       '--dangerously-skip-permissions',
       '--tools', 'Read,Glob,Grep'
     ], {
+      cwd: REPO_ROOT,
       shell: true,
       stdio: ['pipe', 'pipe', 'pipe']
     });
@@ -384,6 +388,12 @@ RESULT: [CHANGES_REQUESTED]
     if (!hasChangesReq || hasApproved) {
       throw new Error(`PR #${num} 标签状态校验失败：未成功打上 changes-requested 或未移除 approved`);
     }
+
+    // 清理可能遗留的已核准计时状态文件，确保若再次获批时从最新时刻重新计时
+    const staleApprovedFile = resolve(runtimeDir, `pr-${num}-approved-since.json`);
+    try {
+      if (existsSync(staleApprovedFile)) unlinkSync(staleApprovedFile);
+    } catch {}
 
     sendFeishuNotification({
       title: `PR #${num} 审查提出修改建议 ⚠️`,

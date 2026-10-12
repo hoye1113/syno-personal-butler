@@ -9,7 +9,8 @@ import {
   assertHeadConsistency,
   chunksToText,
   extractLinkedIssueNumber,
-  EXIT_BUSY
+  EXIT_BUSY,
+  sendToast
 } from '../scripts/review-with-claude.mjs';
 import { trackApprovedTimeout } from '../scripts/agent-loop.mjs';
 import { ProcessFileLock } from '../packages/syno-core/process-lock.mjs';
@@ -222,4 +223,42 @@ test('审查与调度脚本安全加固契约断言', async () => {
 
   // 7. 调度器超时提醒必须导入并触发 sendToast 桌面提醒
   assert.match(loopScript, /sendToast/);
+});
+
+test('sendToast: 正常返回布尔值且不抛出异常', () => {
+  const res = sendToast('Test Title', 'Test Body');
+  assert.equal(typeof res, 'boolean');
+});
+
+test('安全分支认领与回滚契约：仅全新分支允许 branch -D，复用分支绝不强删', async () => {
+  const loopScript = await fs.readFile(path.resolve('scripts/agent-loop.mjs'), 'utf8');
+
+  // 必须分别跟踪 createdNew 与 reusedExisting
+  assert.match(loopScript, /let createdNew = false/);
+  assert.match(loopScript, /let reusedExisting = false/);
+
+  // branch -D 必须且只能受 createdNew 保护
+  assert.match(loopScript, /if\s*\(createdNew\)\s*\{[\s\S]*?branch', '-D'/);
+  assert.doesNotMatch(loopScript, /if\s*\(reusedExisting\)\s*\{[\s\S]*?branch', '-D'/);
+});
+
+test('子进程调用安全隔离：全部 gh, git 与 claude 派生进程显式指定 cwd: REPO_ROOT', async () => {
+  const reviewScript = await fs.readFile(path.resolve('scripts/review-with-claude.mjs'), 'utf8');
+  const loopScript = await fs.readFile(path.resolve('scripts/agent-loop.mjs'), 'utf8');
+
+  // runGh 必须包含 cwd: REPO_ROOT
+  assert.match(reviewScript, /runGh[\s\S]*?cwd:\s*REPO_ROOT/);
+  assert.match(loopScript, /runGh[\s\S]*?cwd:\s*REPO_ROOT/);
+
+  // review-with-claude 派生 claude 进程必须包含 cwd: REPO_ROOT
+  assert.match(reviewScript, /spawn\('claude'[\s\S]*?cwd:\s*REPO_ROOT/);
+
+  // agent-loop 派生 review 脚本必须包含 cwd: REPO_ROOT
+  assert.match(loopScript, /review-with-claude\.mjs'[\s\S]*?cwd:\s*REPO_ROOT/);
+});
+
+test('notify-feishu: 动态懒加载 @larksuiteoapi/node-sdk 契约断言', async () => {
+  const feishuScript = await fs.readFile(path.resolve('scripts/notify-feishu.mjs'), 'utf8');
+  assert.match(feishuScript, /import\('@larksuiteoapi\/node-sdk'\)/);
+  assert.doesNotMatch(feishuScript, /import\s+\*\s+as\s+lark\s+from\s+'@larksuiteoapi\/node-sdk'/);
 });

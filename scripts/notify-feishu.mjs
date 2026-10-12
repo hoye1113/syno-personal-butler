@@ -7,7 +7,6 @@
  * 复用 Syno 管家已绑定的飞书机器人与 Owner 凭据，向主人推送研发流水线动态。
  */
 
-import * as lark from '@larksuiteoapi/node-sdk';
 import { FeishuCredentialStore } from '../packages/syno-core/feishu-channel.mjs';
 
 let cachedClient = null;
@@ -20,6 +19,13 @@ async function getLarkContext() {
   const store = new FeishuCredentialStore();
   const cred = await store.load();
   if (!cred?.appId || !cred?.appSecret || !cred?.ownerOpenId) {
+    return null;
+  }
+  let lark;
+  try {
+    lark = await import('@larksuiteoapi/node-sdk');
+  } catch (err) {
+    console.warn(`[Feishu Warning] 无法加载 @larksuiteoapi/node-sdk: ${err.message}`);
     return null;
   }
   const client = new lark.Client({

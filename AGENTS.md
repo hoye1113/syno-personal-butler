@@ -80,4 +80,4 @@
      3. 当前最新 Commit SHA（`headRefOid`）拥有匹配的 Claude Code 审查通过记录与 `approved` 标签；
      4. 关联 Issue 中的【验收标准 Checklist】逐项核对完毕；
      5. 采用 `gh pr merge --squash --delete-branch` 合并，保持主分支历史整洁并自动关闭对应 Issue。
-   - **超时兜底**：若 Ready PR 处于 `approved` 状态超过 2 小时仍未被合并，触发桌面 Toast 提醒主人介入。
+   - **超时兜底**：若 Ready PR 处于 `approved` 状态超过 2 小时仍未被合并，触发桌面 Toast 及飞书卡片提醒主人介入。
