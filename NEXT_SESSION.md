@@ -5,6 +5,7 @@
 ## 认知层 Provider 切换 + 搜索链恢复（已提交、已重启，待 Owner 真机验收）
 
 - **分支/远端**：`main`，本轮已提交两个提交：`e424250`（切换 + 搜索链）与 `65e964f`（投递失败种子时序修复）；**未 Push**。
+- **首轮真机验收发现并修复（2026-10-12，`fix(chat)` 提交）**：主人发「搜一下今天的 AI 新闻」暴露两处用户可见缺陷——① 系统提示从未注入当前时间（Harness 的 `@deepseek-ai/dsh-time-context` 存在但无 bundle 挂载），模型把「今天」猜成 2026-09-24，检索与摘要整段过期；② 回复把英文过程叙述（"The user asked…"）与草稿备注写进正文。修复：生产 overlay 与 JSON-RPC chat overlay 均挂载 `time-context`（Asia/Shanghai），`syno-agent.md` 增加「正文只给结果、不给过程叙述、以 time-context 快照为准」规约；重启后待复验。
 - **生产运行态（2026-10-12 11:35 重启后实测）**：Host `ready`、`deliveryOk=true`（failures 0）、微信/飞书均 `running + ownerBound`、3088 DSH chat 子进程已按 `kimi-for-coding` 路由启动；current home channel = **feishu**（微信 proactive 目标因 09-29～10-09 的 9 条 `PROACTIVE_DELIVERY_EXHAUSTED` 旧记录处于冻结态，主动卡自 10-09 起投往飞书）。真机验收（微信发消息）仍待 Owner 执行。
 - **决策**：产品认知层改用 Kimi Code 订阅（ADR 0008）。模型链 `kimi-coding/kimi-for-coding` → `kimi-coding/k3-256k`，经 DSH 内置 pi-ai 适配器的 `kimi-coding` 目录路由（`https://api.kimi.com/coding`，Anthropic Messages 协议）。`llm-deepseek` 保留惰性挂载作为回滚面。
 - **密钥链路**：仓库根 `.env`（gitignored，Owner 已填 `KIMI_API_KEY` + 三把搜索 key）→ supervisor 统一读出后按进程环境变量注入三个 DSH 子进程（chat web / chat JSON-RPC / capture）；`syno-key-loader.mjs` 取代旧 deepseek loader（删除 opencode `auth.json` 兜底）；`.env.example` 入库。

@@ -61,6 +61,7 @@ test("Host-generated syno profile pins bundles and forbids marketplace add", asy
   assert.doesNotMatch(synoPatch, /sk-[A-Za-z0-9]/);
   assert.match(pluginPatch, /id: llm-pi-ai[\s\S]*kimi-coding[\s\S]*apiKeyEnv: KIMI_API_KEY/);
   assert.match(pluginPatch, /id: syno-web-search[\s\S]*name: '\.\/plugins\/web-search\/index\.mjs'/);
+  assert.match(pluginPatch, /id: time-context[\s\S]*name: '@deepseek-ai\/dsh-time-context'/);
   assert.match(pluginPatch, /searchProvider: syno-search/);
   assert.match(pluginPatch, /name: '@deepseek-ai\/dsh-schedule'/);
   assert.match(pluginPatch, /defaultPreset: workspace-write/);

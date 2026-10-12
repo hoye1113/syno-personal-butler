@@ -95,6 +95,11 @@
     # Syno 组合搜索 provider（豆包 → Tavily → Exa，按查询语言路由）。
     - id: syno-web-search
       name: './plugins/web-search/index.mjs'
+    # 运行时时间上下文：模型拿不到当前日期时会把「今天」猜成旧日期（2026-10-12 实测）。
+    - id: time-context
+      name: '@deepseek-ai/dsh-time-context'
+      config:
+        timeZone: Asia/Shanghai
 - id: web-fetch-http
   name: '@deepseek-ai/dsh-web-fetch-http'
 

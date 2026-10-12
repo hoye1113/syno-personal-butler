@@ -46,6 +46,10 @@
 - insert:
     - id: syno-web-search
       name: ../../packages/syno-dsh-plugin/plugins/web-search/index.mjs
+    - id: time-context
+      name: '@deepseek-ai/dsh-time-context'
+      config:
+        timeZone: Asia/Shanghai
     - id: syno-tool-bridge
       name: ./syno-tool-bridge-plugin.mjs
       config:
