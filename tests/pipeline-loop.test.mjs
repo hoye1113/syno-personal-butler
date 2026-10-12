@@ -10,7 +10,8 @@ import {
   chunksToText,
   extractLinkedIssueNumber,
   EXIT_BUSY,
-  sendToast
+  sendToast,
+  formatReviewSummaryForCard
 } from '../scripts/review-with-claude.mjs';
 import { trackApprovedTimeout } from '../scripts/agent-loop.mjs';
 import { ProcessFileLock } from '../packages/syno-core/process-lock.mjs';
@@ -261,4 +262,57 @@ test('notify-feishu: 动态懒加载 @larksuiteoapi/node-sdk 契约断言', asyn
   const feishuScript = await fs.readFile(path.resolve('scripts/notify-feishu.mjs'), 'utf8');
   assert.match(feishuScript, /import\('@larksuiteoapi\/node-sdk'\)/);
   assert.doesNotMatch(feishuScript, /import\s+\*\s+as\s+lark\s+from\s+'@larksuiteoapi\/node-sdk'/);
+});
+
+test('notify-feishu: FEISHU_SEND_TIMEOUT_MS 上限与 Promise.race 超时熔断契约', async () => {
+  const feishuScript = await fs.readFile(path.resolve('scripts/notify-feishu.mjs'), 'utf8');
+  assert.match(feishuScript, /FEISHU_SEND_TIMEOUT_MS/);
+  assert.match(feishuScript, /Promise\.race/);
+});
+
+test('formatReviewSummaryForCard: 审查报告精炼提取为飞书卡片可读摘要', () => {
+  // 1. CHANGES_REQUESTED 场景：提取缺陷条目与结论概述
+  const changesRequestedReport = `RESULT: [CHANGES_REQUESTED]
+
+### 1. 评审结论概述
+本次审查发现 2 项高风险缺陷，需由 Gemini 修复后方可合入。
+
+### 2. 验收标准逐条核对
+- [x] 验收点 1
+- [ ] 验收点 2
+
+### 3. 详细缺陷清单与修改指导 (供 Gemini 修复使用)
+- **[缺陷级别: 阻断] scripts/agent-loop.mjs:276**
+  - **问题分析**: 回滚误删分支
+  - **修复建议**: 区分 createdNew 与 reusedExisting
+- **[缺陷级别： 高] scripts/notify-feishu.mjs:85**
+  - **问题分析**: 发送无超时保护
+  - **修复建议**: 增加 Promise.race 20s 限时
+
+### 4. 总结
+返修优先级按阻断->高。
+`;
+
+  const crCardSummary = formatReviewSummaryForCard(changesRequestedReport, false);
+  assert.match(crCardSummary, /待修复缺陷 \(2 项\)/);
+  assert.match(crCardSummary, /1\. \*\*\[缺陷级别: 阻断\] scripts\/agent-loop\.mjs:276\*\*/);
+  assert.match(crCardSummary, /2\. \*\*\[缺陷级别： 高\] scripts\/notify-feishu\.mjs:85\*\*/);
+  assert.match(crCardSummary, /评审概述/);
+
+  // 2. APPROVED 场景：提取核准概述
+  const approvedReport = `RESULT: [APPROVED]
+
+### 1. 评审结论概述
+全部 16 项回归测试与静态契约核验通过，代码设计符合 SOLID 原则。
+
+### 4. 总结
+核准合并。
+`;
+
+  const appCardSummary = formatReviewSummaryForCard(approvedReport, true);
+  assert.match(appCardSummary, /全部 16 项回归测试/);
+
+  // 3. 边界空值测试
+  assert.equal(formatReviewSummaryForCard('', false), '');
+  assert.equal(formatReviewSummaryForCard(null, true), '');
 });

@@ -80,6 +80,54 @@ export function parseReviewDecision(output) {
   throw new Error(`Claude Code 审查输出判定结构无效或含歧义。首行必须严格为 'RESULT: [APPROVED]' 或 'RESULT: [CHANGES_REQUESTED]'，实际首行: '${firstLine}'`);
 }
 
+/**
+ * 将 Claude Code 审查报告精炼为飞书卡片展示摘要（便于移动端/无环境直读要点）
+ */
+export function formatReviewSummaryForCard(reviewResult, isApproved) {
+  if (!reviewResult || typeof reviewResult !== 'string') return '';
+
+  if (isApproved) {
+    const match = reviewResult.match(/###\s*1\.\s*评审结论概述\s*\n([\s\S]*?)(?=\n###|\n---|$)/i);
+    const summary = match ? match[1].trim() : '全部验收标准均已通过，代码质量符合合并标准。';
+    return summary.length > 250 ? summary.slice(0, 250) + '...' : summary;
+  }
+
+  // 1. 提取所有缺陷清单的条目头（如 - **[缺陷级别: 阻断] ...**）
+  const defectItems = [];
+  const defectLines = reviewResult.match(/(?:^|\r?\n)[ \t]*- (?:\*\*)?\[(?:缺陷级别|级别)[：:][^\r\n]+/g);
+  if (defectLines && defectLines.length > 0) {
+    for (const line of defectLines) {
+      const trimmed = line.trim().replace(/^-\s*/, '');
+      defectItems.push(trimmed);
+    }
+  }
+
+  // 2. 提取结论概述第一段
+  const overviewMatch = reviewResult.match(/###\s*1\.\s*评审结论概述\s*\n([\s\S]*?)(?=\n###|\n---|$)/i);
+  const overviewText = overviewMatch ? overviewMatch[1].trim().split('\n\n')[0].replace(/\r?\n/g, ' ') : '';
+
+  let cardBody = '';
+  if (overviewText) {
+    const briefOverview = overviewText.length > 150 ? overviewText.slice(0, 150) + '...' : overviewText;
+    cardBody += `**评审概述**: ${briefOverview}\n\n`;
+  }
+
+  if (defectItems.length > 0) {
+    cardBody += `**待修复缺陷 (${defectItems.length} 项)**:\n` + defectItems.map((item, idx) => `${idx + 1}. ${item}`).join('\n');
+  } else {
+    // 兜底：提取详细缺陷清单或正文的前 300 字符
+    const section3Match = reviewResult.match(/###\s*3\.\s*详细缺陷清单[^\n]*\n([\s\S]*?)(?=\n###|\n---|$)/i);
+    if (section3Match) {
+      const s3 = section3Match[1].trim();
+      cardBody += `**审查要点**:\n${s3.slice(0, 300)}${s3.length > 300 ? '...' : ''}`;
+    } else {
+      cardBody += `**审查要点**:\n${reviewResult.replace(/^RESULT:[^\n]*\n*/i, '').slice(0, 300)}...`;
+    }
+  }
+
+  return cardBody.trim();
+}
+
 export function sendToast(title, body) {
   try {
     const toastScriptPath = resolve(__dirname, 'show-toast.ps1').replace(/\\/g, '/');
@@ -370,12 +418,15 @@ RESULT: [CHANGES_REQUESTED]
     );
 
     const draftNote = readyFlipped ? '' : '\n\n⚠️ **提示**：Draft 转 Ready 自动翻转未完成，请在 GitHub PR 页面手动点击 "Ready for review"。';
-    sendFeishuNotification({
+    const approvedSummary = formatReviewSummaryForCard(reviewResult, true);
+    const approvedSummaryBlock = approvedSummary ? `\n\n**评审结论**:\n${approvedSummary}` : '';
+
+    await sendFeishuNotification({
       title: `PR #${num} 审查通过，就绪待合并 🎉`,
-      content: `**PR 标题**: ${pr.title}\n**分支**: \`${pr.headRefName}\`\n**版本**: \`${initialHeadOid}\`\n\n已通过 Claude Code 严格审查，符合全部验收标准，请通知 Codex 巡检或您亲自验收合并。${draftNote}`,
+      content: `**PR 标题**: ${pr.title}\n**分支**: \`${pr.headRefName}\`\n**版本**: \`${initialHeadOid}\`${approvedSummaryBlock}\n\n已通过 Claude Code 严格审查，符合全部验收标准，请通知 Codex 巡检或您亲自验收合并。${draftNote}`,
       url: `https://github.com/hoye1113/syno-personal-butler/pull/${num}`,
       status: 'success'
-    }).catch(() => {});
+    });
   } else {
     console.log(`❌ 审查结论: [CHANGES_REQUESTED] 需要修改！已转入返修队列，由 Gemini 进行修复。`);
     runGh(['pr', 'edit', String(num), '--add-label', 'changes-requested', '--remove-label', 'needs-review,approved']);
@@ -395,12 +446,15 @@ RESULT: [CHANGES_REQUESTED]
       if (existsSync(staleApprovedFile)) unlinkSync(staleApprovedFile);
     } catch {}
 
-    sendFeishuNotification({
+    const changesSummary = formatReviewSummaryForCard(reviewResult, false);
+    const changesSummaryBlock = changesSummary ? `\n\n${changesSummary}` : '';
+
+    await sendFeishuNotification({
       title: `PR #${num} 审查提出修改建议 ⚠️`,
-      content: `**PR 标题**: ${pr.title}\n**分支**: \`${pr.headRefName}\`\n\nClaude Code 提出了修改建议，Gemini 已接手进入全量返修队列。`,
+      content: `**PR 标题**: ${pr.title}\n**分支**: \`${pr.headRefName}\`${changesSummaryBlock}\n\nGemini 已自动认领并进入全量返修流程。`,
       url: `https://github.com/hoye1113/syno-personal-butler/pull/${num}`,
       status: 'warning'
-    }).catch(() => {});
+    });
   }
 
   console.log(`完成！PR #${num} 当前流转状态已同步。`);

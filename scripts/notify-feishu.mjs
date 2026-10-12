@@ -38,8 +38,10 @@ async function getLarkContext() {
   return { client, ownerOpenId: cred.ownerOpenId };
 }
 
+export const FEISHU_SEND_TIMEOUT_MS = 20_000;
+
 /**
- * 发送飞书富文本/卡片通知
+ * 发送飞书富文本/卡片通知（受控 20s 超时保护，杜绝无界等待）
  */
 export async function sendFeishuNotification({ title, content, url, status = 'info' }) {
   try {
@@ -82,16 +84,29 @@ export async function sendFeishuNotification({ title, content, url, status = 'in
       });
     }
 
-    await client.im.v1.message.create({
-      params: { receive_id_type: 'open_id' },
-      data: {
-        receive_id: ownerOpenId,
-        msg_type: 'interactive',
-        content: JSON.stringify(card)
-      }
+    let timer;
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new Error(`飞书通知发送超时 (${FEISHU_SEND_TIMEOUT_MS / 1000}s)`));
+      }, FEISHU_SEND_TIMEOUT_MS);
     });
 
-    return true;
+    try {
+      await Promise.race([
+        client.im.v1.message.create({
+          params: { receive_id_type: 'open_id' },
+          data: {
+            receive_id: ownerOpenId,
+            msg_type: 'interactive',
+            content: JSON.stringify(card)
+          }
+        }),
+        timeoutPromise
+      ]);
+      return true;
+    } finally {
+      clearTimeout(timer);
+    }
   } catch (err) {
     console.warn(`[Feishu Warning] 飞书通知发送失败: ${err.message}`);
     return false;
