@@ -7,7 +7,8 @@ import {
   parseReviewDecision,
   runGh,
   assertHeadConsistency,
-  chunksToText
+  chunksToText,
+  extractLinkedIssueNumber
 } from '../scripts/review-with-claude.mjs';
 import { ProcessFileLock } from '../packages/syno-core/process-lock.mjs';
 
@@ -123,4 +124,44 @@ test('runGh 错误传播与超时控制：非零退出抛出异常，支持显�
     () => runGh(['invalid-subcommand-definitely-fails-xyz']),
     (err) => err.code === 'GH_COMMAND_FAILED' && err.message.includes('gh invalid-subcommand-definitely-fails-xyz 失败')
   );
+});
+
+test('extractLinkedIssueNumber: 严格识别显式关联关键字，忽略偶发哈希', () => {
+  assert.equal(extractLinkedIssueNumber('Fixes #2'), '2');
+  assert.equal(extractLinkedIssueNumber('Closes #10\nSome details'), '10');
+  assert.equal(extractLinkedIssueNumber('This PR Resolves #42.'), '42');
+  assert.equal(extractLinkedIssueNumber('Issue #99: test description'), '99');
+  assert.equal(extractLinkedIssueNumber('fixes #123'), '123');
+
+  // 偶发哈希或无关联词不应被当作关联 issue
+  assert.equal(extractLinkedIssueNumber('PR 描述中提到 #42 但没有关联动作词'), null);
+  assert.equal(extractLinkedIssueNumber('commit #abcdef123'), null);
+  assert.equal(extractLinkedIssueNumber(''), null);
+  assert.equal(extractLinkedIssueNumber(null), null);
+  assert.equal(extractLinkedIssueNumber(undefined), null);
+});
+
+test('审查与调度脚本安全加固契约断言', async () => {
+  const reviewScript = await fs.readFile(path.resolve('scripts/review-with-claude.mjs'), 'utf8');
+  const loopScript = await fs.readFile(path.resolve('scripts/agent-loop.mjs'), 'utf8');
+
+  // 1. 必须使用 --body-file 避免 Windows shell 转义与参数泄漏
+  assert.match(reviewScript, /'--body-file'/);
+
+  // 2. 审查报告与版本校验必须显式绑定 headRefOid
+  assert.match(reviewScript, /headRefOid/);
+
+  // 3. Windows 超时必须调用 taskkill /PID /T /F 清理进程树
+  assert.match(reviewScript, /taskkill/);
+  assert.match(reviewScript, /\/PID/);
+  assert.match(reviewScript, /\/T/);
+  assert.match(reviewScript, /\/F/);
+
+  // 4. 路径必须统一锚定 REPO_ROOT 而非不可靠的 process.cwd()
+  assert.match(reviewScript, /REPO_ROOT = resolve\(__dirname, '\.\.'\)/);
+  assert.match(loopScript, /REPO_ROOT = resolve\(__dirname, '\.\.'\)/);
+
+  // 5. 调度层外层超时 (25m) 必须严格大于审查层内层超时 (20m)
+  assert.match(reviewScript, /20\s*\*\s*60\s*\*\s*1000/); // 20m
+  assert.match(loopScript, /25\s*\*\s*60\s*\*\s*1000/); // 25m
 });

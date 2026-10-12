@@ -10,7 +10,8 @@
  * 4. 严格解析首行判决，非零退出与非法结构一律失败关闭
  * 5. 校验 headRefOid 版本一致性（含 TOCTOU 关闭），防止陈旧审查批准新代码
  * 6. 使用 --body-file 避免 Windows shell 字符篡改与环境变量展开
- * 7. 确认标签更新成功后才触发终态桌面通知
+ * 7. 确认标签更新成功后才触发终态通知（Toast + 飞书卡片）
+ * 8. 超时支持 Windows taskkill 进程树回收，路径统一锚定 REPO_ROOT
  */
 
 import { spawn, execFileSync } from 'node:child_process';
@@ -22,6 +23,7 @@ import { sendFeishuNotification } from './notify-feishu.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const REPO_ROOT = resolve(__dirname, '..');
 
 export function runGh(args) {
   try {
@@ -38,6 +40,12 @@ export function runGh(args) {
     error.code = 'GH_COMMAND_FAILED';
     throw error;
   }
+}
+
+export function extractLinkedIssueNumber(prBody) {
+  if (!prBody || typeof prBody !== 'string') return null;
+  const match = prBody.match(/(?:^|\b)(?:Fixes|Closes|Resolves|Issue)\s+#(\d+)/im);
+  return match ? match[1] : null;
 }
 
 export function assertHeadConsistency(initialOid, currentOid) {
@@ -124,9 +132,16 @@ export async function runClaudeReview(prompt, options = {}) {
     const stderrChunks = [];
     let timedOut = false;
 
+    // 防止子进程过早退出导致写入 stdin 时抛出未捕获的 EPIPE 异常
+    child.stdin.on('error', () => {});
+
     const timer = setTimeout(() => {
       timedOut = true;
-      try { child.kill('SIGTERM'); } catch {}
+      if (process.platform === 'win32') {
+        try { spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' }); } catch {}
+      } else {
+        try { child.kill('SIGTERM'); } catch {}
+      }
       reject(new Error(`Claude Code 审查执行超时 (${timeoutMs / 1000}s)`));
     }, timeoutMs);
 
@@ -186,11 +201,12 @@ export async function reviewPR(prNumber, options = {}) {
     throw new Error(`PR #${num} 没有代码变更 (Diff 为空)`);
   }
 
-  // 解析关联 Issue，若有关联则必须可读，不可读时不得降级放行
+  // 解析关联 Issue，若显式声明关联则必须可读，不可读时不得降级放行
   let issueContext = '';
-  const issueMatch = pr.body.match(/(?:Fixes|Closes|Resolves|Refs|Issue)?\s*#(\d+)/i);
-  if (issueMatch) {
-    const relatedIssueNum = issueMatch[1];
+  const bodyText = pr.body || '';
+  const relatedIssueNum = extractLinkedIssueNumber(bodyText);
+
+  if (relatedIssueNum) {
     console.log(`[1/4] 读取关联 Issue #${relatedIssueNum}...`);
     try {
       const issueRaw = runGh(['issue', 'view', relatedIssueNum, '--json', 'number,title,body']);
@@ -228,7 +244,7 @@ Pull Request #${pr.number} ("${pr.title}")
 PR 版本 (head SHA): ${initialHeadOid}
 PR 分支: ${pr.headRefName} -> ${pr.baseRefName}
 PR 说明:
-${pr.body}
+${bodyText}
 
 关联需求与验收标准:
 ${issueContext}
@@ -274,8 +290,8 @@ RESULT: [CHANGES_REQUESTED]
   const currentPr = JSON.parse(currentPrRaw);
   assertHeadConsistency(initialHeadOid, currentPr.headRefOid);
 
-  // 持久化审查报告（绑定已审查 headRefOid）
-  const runtimeDir = resolve(process.cwd(), '.runtime', 'reviews');
+  // 持久化审查报告（绑定已审查 headRefOid，锚定 REPO_ROOT）
+  const runtimeDir = resolve(REPO_ROOT, '.runtime', 'reviews');
   mkdirSync(runtimeDir, { recursive: true });
   const artifactFile = resolve(runtimeDir, `pr-${num}-${initialHeadOid}.json`);
   const artifactData = {
@@ -327,6 +343,7 @@ RESULT: [CHANGES_REQUESTED]
     }
 
     // 若原 PR 处于 Draft 状态，审查通过后自动翻转为 Ready for review，供 Codex 巡检认领合并
+    let readyFlipped = true;
     try {
       const currentPrDraftCheck = JSON.parse(runGh(['pr', 'view', String(num), '--json', 'isDraft']));
       if (currentPrDraftCheck.isDraft) {
@@ -334,17 +351,20 @@ RESULT: [CHANGES_REQUESTED]
         runGh(['pr', 'ready', String(num)]);
       }
     } catch (readyErr) {
+      readyFlipped = false;
       console.warn(`[Warning] 翻转 Ready PR 提示: ${readyErr.message}`);
     }
 
+    const toastExtra = readyFlipped ? '' : ' (注意: Ready 翻转需手动处理)';
     sendToast(
       `PR #${num} 审查通过 🎉`,
-      `Claude Code 评审已通过全部验收标准，请通知 Codex 或您亲自验收合并。`
+      `Claude Code 评审已通过全部验收标准，请通知 Codex 或您亲自验收合并。${toastExtra}`
     );
 
+    const draftNote = readyFlipped ? '' : '\n\n⚠️ **提示**：Draft 转 Ready 自动翻转未完成，请在 GitHub PR 页面手动点击 "Ready for review"。';
     sendFeishuNotification({
       title: `PR #${num} 审查通过，就绪待合并 🎉`,
-      content: `**PR 标题**: ${pr.title}\n**分支**: \`${pr.headRefName}\`\n**版本**: \`${initialHeadOid}\`\n\n已通过 Claude Code 严格审查，符合全部验收标准，请通知 Codex 巡检或您亲自验收合并。`,
+      content: `**PR 标题**: ${pr.title}\n**分支**: \`${pr.headRefName}\`\n**版本**: \`${initialHeadOid}\`\n\n已通过 Claude Code 严格审查，符合全部验收标准，请通知 Codex 巡检或您亲自验收合并。${draftNote}`,
       url: `https://github.com/hoye1113/syno-personal-butler/pull/${num}`,
       status: 'success'
     }).catch(() => {});
@@ -402,7 +422,7 @@ async function main() {
     }
   }
 
-  const lockFile = resolve(process.cwd(), '.runtime', 'locks', 'review-with-claude.lock');
+  const lockFile = resolve(REPO_ROOT, '.runtime', 'locks', 'review-with-claude.lock');
   const lock = new ProcessFileLock({
     file: lockFile,
     failFast: true,

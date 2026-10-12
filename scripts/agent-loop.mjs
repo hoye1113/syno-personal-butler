@@ -7,16 +7,16 @@
  * 践行核心原则：“一次只做一件，返修优先”
  *
  * 架构特性：
- * 1. 跨进程互斥锁（ProcessFileLock）与忙状态保护
+ * 1. 跨进程互斥锁（ProcessFileLock）与忙状态保护，路径锚定 REPO_ROOT
  * 2. 严密的错误传播机制：非零退出与 JSON 解析失败拒绝误报 IDLE
  * 3. 完整候选集扫描（--limit 1000），防止分页截断优先级任务
- * 4. 保护脏工作区，禁止未受控切换分支；采用可回滚的安全分支检出
- * 5. 审查子进程异常显式暴露，不吞掉失败
- * 6. 所有子进程调用设显式超时，消灭无界等待
+ * 4. 保护脏工作区（忽略子模块内部构建产物脏改动），安全可回滚分支检出
+ * 5. 审查子进程异常显式暴露，外层设置 25 分钟安全超时
+ * 6. 首见 approved 时间戳去重告警，契约对齐
  */
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ProcessFileLock } from '../packages/syno-core/process-lock.mjs';
@@ -24,6 +24,7 @@ import { sendFeishuNotification } from './notify-feishu.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const REPO_ROOT = resolve(__dirname, '..');
 
 export function runGh(args) {
   try {
@@ -64,6 +65,34 @@ export function hasLabel(item, labelName) {
   return (item.labels || []).some(l => l.name === labelName);
 }
 
+export function trackApprovedTimeout(pr) {
+  const reviewsDir = resolve(REPO_ROOT, '.runtime', 'reviews');
+  mkdirSync(reviewsDir, { recursive: true });
+  const stateFile = resolve(reviewsDir, `pr-${pr.number}-approved-since.json`);
+
+  let data = { firstSeenAt: new Date().toISOString(), notified: false };
+  if (existsSync(stateFile)) {
+    try {
+      data = JSON.parse(readFileSync(stateFile, 'utf8'));
+    } catch {}
+  } else {
+    try {
+      writeFileSync(stateFile, JSON.stringify(data, null, 2), 'utf8');
+    } catch {}
+  }
+
+  const waitingMs = Date.now() - new Date(data.firstSeenAt).getTime();
+  const waitingHours = (waitingMs / (1000 * 60 * 60)).toFixed(1);
+  const isStale = Number(waitingHours) > 2;
+
+  if (isStale && !data.notified) {
+    data.notified = true;
+    try { writeFileSync(stateFile, JSON.stringify(data, null, 2), 'utf8'); } catch {}
+    return { isStale: true, waitingHours, shouldNotify: true };
+  }
+  return { isStale, waitingHours, shouldNotify: false };
+}
+
 export function printStatus() {
   const issues = getOpenIssues();
   const prs = getOpenPRs();
@@ -95,9 +124,8 @@ export function printStatus() {
   } else {
     approvedPRs.forEach(p => {
       const mode = p.isDraft ? '[Draft]' : '[Ready]';
-      const createdDate = new Date(p.createdAt);
-      const hoursWaiting = ((Date.now() - createdDate.getTime()) / (1000 * 60 * 60)).toFixed(1);
-      const staleNotice = Number(hoursWaiting) > 2 ? ` ⚠️ 等待已超时 (${hoursWaiting}h)` : '';
+      const timeoutStatus = trackApprovedTimeout(p);
+      const staleNotice = timeoutStatus.isStale ? ` ⚠️ approved 已等待 ${timeoutStatus.waitingHours}h` : '';
       console.log(`   - PR #${p.number}: ${p.title} ${mode} (分支: ${p.headRefName})${staleNotice}`);
     });
   }
@@ -135,7 +163,7 @@ export function handleNext() {
 
     // 读取本地持久化的审查报告（校验是否绑定当前 head SHA）
     let reportContent = '';
-    const versionedArtifactPath = resolve(process.cwd(), '.runtime', 'reviews', `pr-${fixPR.number}-${fixPR.headRefOid}.json`);
+    const versionedArtifactPath = resolve(REPO_ROOT, '.runtime', 'reviews', `pr-${fixPR.number}-${fixPR.headRefOid}.json`);
     if (existsSync(versionedArtifactPath)) {
       try {
         const artifact = JSON.parse(readFileSync(versionedArtifactPath, 'utf8'));
@@ -184,10 +212,10 @@ export function handleNext() {
     console.log(`[DISPATCH] 发现待审查 PR: PR #${reviewPR.number}`);
     console.log(`正在触发 Claude Code 审查脚本 (加载 /code-review 技能)...\n`);
 
-    // 显式执行审查，非零退出与异常向外传播，不吞掉失败
+    // 显式执行审查，外层设置 25 分钟安全超时，大于内层 20 分钟以保留内层清晰诊断
     execFileSync(process.execPath, [resolve(__dirname, 'review-with-claude.mjs'), '--pr', String(reviewPR.number)], {
       stdio: 'inherit',
-      timeout: 15 * 60 * 1000
+      timeout: 25 * 60 * 1000
     });
 
     return { action: 'REVIEW_TRIGGERED', prNumber: reviewPR.number };
@@ -208,8 +236,8 @@ export function handleNext() {
     console.log(`[DISPATCH] 发现新就绪需求: Issue #${newIssue.number}`);
     console.log(`- 标题: ${newIssue.title}`);
 
-    // 工作区整洁度检查：如果当前工作区存在未暂存脏改动，绝不擅自切换分支或破坏工作区
-    const statusOutput = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8', timeout: 30000 }).trim();
+    // 工作区整洁度检查：忽略子模块内部脏构建产物，仅检测当前仓库真实未暂存变更
+    const statusOutput = execFileSync('git', ['status', '--porcelain', '--ignore-submodules=dirty'], { encoding: 'utf8', timeout: 30000 }).trim();
     if (statusOutput.length > 0) {
       console.warn(`[工作区保护] 当前工作区存在未提交改动：\n${statusOutput}\n已暂停自动切换分支与认领，请先提交或清理工作区。`);
       return { action: 'DIRTY_WORKTREE_BLOCKED', issueNumber: newIssue.number };
@@ -251,14 +279,13 @@ export function handleNext() {
   // 5. 检查是否有已核准但尚未合并的 PR
   const approvedPR = prs.find(p => hasLabel(p, 'approved'));
   if (approvedPR) {
-    const createdDate = new Date(approvedPR.createdAt);
-    const hoursWaiting = ((Date.now() - createdDate.getTime()) / (1000 * 60 * 60)).toFixed(1);
-    console.log(`[DISPATCH] 所有研发任务已完成！当前 PR #${approvedPR.number} 已通过审查，等待 Codex 或主人合并。(已等待 ${hoursWaiting}h)`);
+    const timeoutStatus = trackApprovedTimeout(approvedPR);
+    console.log(`[DISPATCH] 所有研发任务已完成！当前 PR #${approvedPR.number} 已通过审查，等待 Codex 或主人合并。(已核准等待 ${timeoutStatus.waitingHours}h)`);
 
-    if (Number(hoursWaiting) > 2) {
+    if (timeoutStatus.shouldNotify) {
       sendFeishuNotification({
-        title: `PR #${approvedPR.number} 待合超时提醒 (${hoursWaiting}h) ⚠️`,
-        content: `**PR 标题**: ${approvedPR.title}\n**分支**: \`${approvedPR.headRefName}\`\n**已就绪等待**: ${hoursWaiting} 小时\n\n该 PR 已通过 Claude Code 审查，等待 Codex 巡检或主人合入。`,
+        title: `PR #${approvedPR.number} 待合超时提醒 (${timeoutStatus.waitingHours}h) ⚠️`,
+        content: `**PR 标题**: ${approvedPR.title}\n**分支**: \`${approvedPR.headRefName}\`\n**核准后已等待**: ${timeoutStatus.waitingHours} 小时\n\n该 PR 已通过 Claude Code 审查，等待 Codex 巡检或主人合入。`,
         url: `https://github.com/hoye1113/syno-personal-butler/pull/${approvedPR.number}`,
         status: 'warning'
       }).catch(() => {});
@@ -274,7 +301,7 @@ export function handleNext() {
 async function main() {
   const command = process.argv[2] || 'status';
 
-  const lockFile = resolve(process.cwd(), '.runtime', 'locks', 'agent-loop.lock');
+  const lockFile = resolve(REPO_ROOT, '.runtime', 'locks', 'agent-loop.lock');
   const lock = new ProcessFileLock({
     file: lockFile,
     failFast: true,

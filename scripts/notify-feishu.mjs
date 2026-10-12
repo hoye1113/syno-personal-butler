@@ -2,7 +2,7 @@
 
 /**
  * scripts/notify-feishu.mjs
- * 
+ *
  * 飞书通知集成助手：
  * 复用 Syno 管家已绑定的飞书机器人与 Owner 凭据，向主人推送研发流水线动态。
  */
