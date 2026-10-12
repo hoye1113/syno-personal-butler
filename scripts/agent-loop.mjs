@@ -2,64 +2,66 @@
 
 /**
  * scripts/agent-loop.mjs
- * 
+ *
  * 任务调度与状态扫描引擎（Dispatcher）：
  * 践行核心原则：“一次只做一件，返修优先”
- * 
- * 命令支持：
- * - status : 查看当前整个流水线（Issue / PR）的健康度与阶段分布
- * - next   : 按优先级计算并执行/分派下一个动作：
- *            1. [最高优先级] 返修 PR (changes-requested) -> 展示 Claude 审查报告供 Gemini 修复
- *            2. [次高优先级] 审查 PR (needs-review -> 自动调用 review-with-claude.mjs)
- *            3. [常规优先级] 认领新 Issue (spec -> 创建分支并标为 in-progress)
- *            4. [就绪待合] 审查已通过 PR (approved -> 提示 Codex/主人验收)
- *            5. [空闲状态] 结束
+ *
+ * 架构特性：
+ * 1. 跨进程互斥锁（ProcessFileLock）与忙状态保护
+ * 2. 严密的错误传播机制：非零退出与 JSON 解析失败拒绝误报 IDLE
+ * 3. 完整候选集扫描（--limit 1000），防止分页截断优先级任务
+ * 4. 保护脏工作区，禁止未受控切换分支；采用可回滚的安全分支检出
+ * 5. 审查子进程异常显式暴露，不吞掉失败
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ProcessFileLock } from '../packages/syno-core/process-lock.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-function runGh(cmd) {
+export function runGh(args) {
   try {
-    return execSync(`gh ${cmd}`, {
+    return execFileSync('gh', args, {
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: ['ignore', 'pipe', 'pipe'],
+      maxBuffer: 10 * 1024 * 1024,
+      env: { ...process.env, LANG: 'zh_CN.UTF-8' }
     }).trim();
   } catch (err) {
-    return '';
+    const stderr = err.stderr ? err.stderr.toString('utf8').trim() : err.message;
+    const error = new Error(`gh ${args.join(' ')} 失败: ${stderr}`);
+    error.code = 'GH_COMMAND_FAILED';
+    throw error;
   }
 }
 
-function getOpenIssues() {
-  const raw = runGh('issue list --state open --json number,title,labels,createdAt');
-  if (!raw) return [];
+export function getOpenIssues() {
+  const raw = runGh(['issue', 'list', '--state', 'open', '--limit', '1000', '--json', 'number,title,labels,createdAt']);
   try {
     return JSON.parse(raw);
-  } catch {
-    return [];
+  } catch (e) {
+    throw new Error(`解析 GitHub Issue 列表 JSON 失败: ${e.message}。原始数据:\n${raw}`);
   }
 }
 
-function getOpenPRs() {
-  const raw = runGh('pr list --state open --json number,title,labels,headRefName,createdAt');
-  if (!raw) return [];
+export function getOpenPRs() {
+  const raw = runGh(['pr', 'list', '--state', 'open', '--limit', '1000', '--json', 'number,title,labels,headRefName,headRefOid,createdAt']);
   try {
     return JSON.parse(raw);
-  } catch {
-    return [];
+  } catch (e) {
+    throw new Error(`解析 GitHub PR 列表 JSON 失败: ${e.message}。原始数据:\n${raw}`);
   }
 }
 
-function hasLabel(item, labelName) {
+export function hasLabel(item, labelName) {
   return (item.labels || []).some(l => l.name === labelName);
 }
 
-function printStatus() {
+export function printStatus() {
   const issues = getOpenIssues();
   const prs = getOpenPRs();
 
@@ -72,7 +74,7 @@ function printStatus() {
   if (fixPRs.length === 0) {
     console.log('   (暂无待返修 PR)');
   } else {
-    fixPRs.forEach(p => console.log(`   - PR #${p.number}: ${p.title} (分支: ${p.headRefName})`));
+    fixPRs.forEach(p => console.log(`   - PR #${p.number}: ${p.title} (分支: ${p.headRefName}, SHA: ${p.headRefOid})`));
   }
 
   console.log('\n【2. 待审查队列 (PR with needs-review) - 优先级: 次高】');
@@ -80,7 +82,7 @@ function printStatus() {
   if (reviewPRs.length === 0) {
     console.log('   (暂无待审查 PR)');
   } else {
-    reviewPRs.forEach(p => console.log(`   - PR #${p.number}: ${p.title} (分支: ${p.headRefName})`));
+    reviewPRs.forEach(p => console.log(`   - PR #${p.number}: ${p.title} (分支: ${p.headRefName}, SHA: ${p.headRefOid})`));
   }
 
   console.log('\n【3. 待合并队列 (PR with approved) - 等待 Codex/主人合入】');
@@ -110,7 +112,7 @@ function printStatus() {
   console.log('\n====================================================');
 }
 
-function handleNext() {
+export function handleNext(options = {}) {
   const prs = getOpenPRs();
   const issues = getOpenIssues();
 
@@ -119,16 +121,23 @@ function handleNext() {
   if (fixPR) {
     console.log(`[DISPATCH] 发现待返修任务: PR #${fixPR.number}`);
     console.log(`- 目标分支: ${fixPR.headRefName}`);
+    console.log(`- 当前版本 head SHA: ${fixPR.headRefOid}`);
     console.log(`- PR 标题: ${fixPR.title}`);
 
-    // 读取本地持久化的审查报告或从 GitHub 提取
-    const reviewFilePath = resolve(process.cwd(), '.runtime', 'reviews', `pr-${fixPR.number}-review.md`);
+    // 读取本地持久化的审查报告（校验是否绑定当前 head SHA）
     let reportContent = '';
-    if (existsSync(reviewFilePath)) {
-      reportContent = readFileSync(reviewFilePath, 'utf8');
-    } else {
+    const versionedArtifactPath = resolve(process.cwd(), '.runtime', 'reviews', `pr-${fixPR.number}-${fixPR.headRefOid}.json`);
+    if (existsSync(versionedArtifactPath)) {
       try {
-        const commentsRaw = runGh(`pr view ${fixPR.number} --json comments`);
+        const artifact = JSON.parse(readFileSync(versionedArtifactPath, 'utf8'));
+        reportContent = artifact.report;
+        console.log(`[本地审查证据] 成功匹配当前版本 (${fixPR.headRefOid}) 归档报告`);
+      } catch {}
+    }
+
+    if (!reportContent) {
+      try {
+        const commentsRaw = runGh(['pr', 'view', String(fixPR.number), '--json', 'comments']);
         const parsed = JSON.parse(commentsRaw);
         const lastComment = parsed.comments && parsed.comments[parsed.comments.length - 1];
         if (lastComment) reportContent = lastComment.body;
@@ -152,6 +161,7 @@ function handleNext() {
       action: 'FIX_PR',
       prNumber: fixPR.number,
       branch: fixPR.headRefName,
+      headRefOid: fixPR.headRefOid,
       title: fixPR.title,
       reviewReport: reportContent
     };
@@ -161,14 +171,17 @@ function handleNext() {
   const reviewPR = prs.find(p => hasLabel(p, 'needs-review'));
   if (reviewPR) {
     console.log(`[DISPATCH] 发现待审查 PR: PR #${reviewPR.number}`);
-    console.log(`正在自动触发 Claude Code 审查脚本 (加载 /code-review 技能)...\n`);
-    try {
-      execSync(`node "${resolve(__dirname, 'review-with-claude.mjs')}" --pr ${reviewPR.number}`, {
-        stdio: 'inherit'
-      });
-    } catch (e) {
-      console.error(`审查脚本执行失败: ${e.message}`);
+    console.log(`正在触发 Claude Code 审查脚本 (加载 /code-review 技能)...\n`);
+
+    if (options.skipExecuteReview) {
+      return { action: 'REVIEW_TRIGGERED', prNumber: reviewPR.number };
     }
+
+    // 显式执行审查，非零退出与异常向外传播，不吞掉失败
+    execFileSync(process.execPath, [resolve(__dirname, 'review-with-claude.mjs'), '--pr', String(reviewPR.number)], {
+      stdio: 'inherit'
+    });
+
     return { action: 'REVIEW_TRIGGERED', prNumber: reviewPR.number };
   }
 
@@ -178,7 +191,7 @@ function handleNext() {
     console.log(`[DISPATCH] 发现已有正在进行中的任务: Issue #${activeIssue.number}`);
     console.log(`- 标题: ${activeIssue.title}`);
     console.log(`\n建议行动：继续在对应特性分支上实现该任务并自测，完毕后提 PR 并打上 needs-review。`);
-    return { action: 'CONTINUE_ISSUE', issueNumber: activeIssue.number };
+    return { action: 'CONTINUE_ISSUE', issueNumber: activeIssue.number, title: activeIssue.title };
   }
 
   // 4. 新需求认领：从 spec 标签认领新需求
@@ -186,17 +199,41 @@ function handleNext() {
   if (newIssue) {
     console.log(`[DISPATCH] 发现新就绪需求: Issue #${newIssue.number}`);
     console.log(`- 标题: ${newIssue.title}`);
-    const branchName = `feat/issue-${newIssue.number}`;
-    console.log(`正在标记为 in-progress 并建立特性分支 ${branchName}...`);
-    try {
-      runGh(`issue edit ${newIssue.number} --add-label "in-progress"`);
-      execSync(`git checkout main && git pull origin main && git checkout -b ${branchName}`, {
-        stdio: 'inherit'
-      });
-      console.log(`\n✅ 分支 ${branchName} 已就绪，请 Gemini 开始编写实现代码与测试。`);
-    } catch (e) {
-      console.warn(`准备分支遇到提示: ${e.message}`);
+
+    // 工作区整洁度检查：如果当前工作区存在未暂存脏改动，绝不擅自切换分支或破坏工作区
+    const statusOutput = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim();
+    if (statusOutput.length > 0) {
+      console.warn(`[工作区保护] 当前工作区存在未提交改动：\n${statusOutput}\n已暂停自动切换分支与认领，请先提交或清理工作区。`);
+      return { action: 'DIRTY_WORKTREE_BLOCKED', issueNumber: newIssue.number };
     }
+
+    const branchName = `feat/issue-${newIssue.number}`;
+    console.log(`正在安全建立特性分支 ${branchName} 并标记 in-progress...`);
+
+    let branchCreated = false;
+    try {
+      execFileSync('git', ['fetch', 'origin', 'main', '--quiet']);
+      execFileSync('git', ['checkout', '-b', branchName, 'origin/main'], { stdio: 'pipe' });
+      branchCreated = true;
+    } catch (gitErr) {
+      const msg = gitErr.stderr ? gitErr.stderr.toString('utf8').trim() : gitErr.message;
+      throw new Error(`准备特性分支 ${branchName} 失败: ${msg}`);
+    }
+
+    try {
+      runGh(['issue', 'edit', String(newIssue.number), '--add-label', 'in-progress']);
+      console.log(`\n✅ 分支 ${branchName} 已就绪，已打标 in-progress，请 Gemini 开始编写实现代码与测试。`);
+    } catch (tagErr) {
+      // 标签更新失败回滚本地分支
+      if (branchCreated) {
+        try {
+          execFileSync('git', ['checkout', 'main']);
+          execFileSync('git', ['branch', '-D', branchName]);
+        } catch {}
+      }
+      throw new Error(`给 Issue #${newIssue.number} 添加 in-progress 标签失败: ${tagErr.message}`);
+    }
+
     return { action: 'START_ISSUE', issueNumber: newIssue.number, branch: branchName };
   }
 
@@ -211,11 +248,40 @@ function handleNext() {
   return { action: 'IDLE' };
 }
 
-const command = process.argv[2] || 'status';
-if (command === 'status') {
-  printStatus();
-} else if (command === 'next') {
-  handleNext();
-} else {
-  console.log(`未知命令: ${command}。支持的命令: status, next`);
+async function main() {
+  const command = process.argv[2] || 'status';
+
+  const lockFile = resolve(process.cwd(), '.runtime', 'locks', 'agent-loop.lock');
+  const lock = new ProcessFileLock({
+    file: lockFile,
+    failFast: true,
+    metadata: { entrypoint: 'agent-loop', command }
+  });
+
+  try {
+    await lock.run(async () => {
+      if (command === 'status') {
+        printStatus();
+      } else if (command === 'next') {
+        handleNext();
+      } else {
+        console.error(`未知命令: ${command}。支持的命令: status, next`);
+        process.exit(1);
+      }
+    });
+  } catch (err) {
+    if (err.code === 'PROCESS_LOCK_HELD') {
+      console.warn(`[BUSY] 调度任务已在运行中 (持有者 PID: ${err.owner?.pid})，跳过本次执行。`);
+      process.exit(0);
+    }
+    console.error('[Fatal Error]', err.message);
+    process.exit(1);
+  }
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === resolve(__filename)) {
+  main().catch(err => {
+    console.error('[Fatal Error]', err.message);
+    process.exit(1);
+  });
 }
