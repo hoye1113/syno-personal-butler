@@ -18,6 +18,7 @@ import { existsSync, writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ProcessFileLock } from '../packages/syno-core/process-lock.mjs';
+import { sendFeishuNotification } from './notify-feishu.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -107,7 +108,7 @@ export function sendToast(title, body) {
  * - --tools Read,Glob,Grep: 绝对禁止 Edit, Write, Bash，确保物理只读！
  */
 export async function runClaudeReview(prompt, options = {}) {
-  const timeoutMs = options.timeoutMs || 10 * 60 * 1000;
+  const timeoutMs = options.timeoutMs || 20 * 60 * 1000;
 
   return new Promise((resolvePromise, reject) => {
     const child = spawn('claude', [
@@ -167,7 +168,7 @@ export async function reviewPR(prNumber, options = {}) {
   const extraSkills = options.extraSkills || [];
 
   console.log(`[1/4] 获取 PR #${num} 详情与变更 Diff...`);
-  const prDataRaw = runGh(['pr', 'view', String(num), '--json', 'number,title,body,headRefName,baseRefName,headRefOid,labels,state']);
+  const prDataRaw = runGh(['pr', 'view', String(num), '--json', 'number,title,body,headRefName,baseRefName,headRefOid,labels,state,isDraft']);
   const pr = JSON.parse(prDataRaw);
 
   if (pr.state !== 'OPEN') {
@@ -325,10 +326,28 @@ RESULT: [CHANGES_REQUESTED]
       throw new Error(`PR #${num} 标签状态校验失败：未成功添加 approved 或仍存在 changes-requested`);
     }
 
+    // 若原 PR 处于 Draft 状态，审查通过后自动翻转为 Ready for review，供 Codex 巡检认领合并
+    try {
+      const currentPrDraftCheck = JSON.parse(runGh(['pr', 'view', String(num), '--json', 'isDraft']));
+      if (currentPrDraftCheck.isDraft) {
+        console.log(`[Draft -> Ready] 自动将 PR #${num} 翻转为 Ready for review...`);
+        runGh(['pr', 'ready', String(num)]);
+      }
+    } catch (readyErr) {
+      console.warn(`[Warning] 翻转 Ready PR 提示: ${readyErr.message}`);
+    }
+
     sendToast(
       `PR #${num} 审查通过 🎉`,
       `Claude Code 评审已通过全部验收标准，请通知 Codex 或您亲自验收合并。`
     );
+
+    sendFeishuNotification({
+      title: `PR #${num} 审查通过，就绪待合并 🎉`,
+      content: `**PR 标题**: ${pr.title}\n**分支**: \`${pr.headRefName}\`\n**版本**: \`${initialHeadOid}\`\n\n已通过 Claude Code 严格审查，符合全部验收标准，请通知 Codex 巡检或您亲自验收合并。`,
+      url: `https://github.com/hoye1113/syno-personal-butler/pull/${num}`,
+      status: 'success'
+    }).catch(() => {});
   } else {
     console.log(`❌ 审查结论: [CHANGES_REQUESTED] 需要修改！已转入返修队列，由 Gemini 进行修复。`);
     runGh(['pr', 'edit', String(num), '--add-label', 'changes-requested', '--remove-label', 'needs-review,approved']);
@@ -341,6 +360,13 @@ RESULT: [CHANGES_REQUESTED]
     if (!hasChangesReq || hasApproved) {
       throw new Error(`PR #${num} 标签状态校验失败：未成功打上 changes-requested 或未移除 approved`);
     }
+
+    sendFeishuNotification({
+      title: `PR #${num} 审查提出修改建议 ⚠️`,
+      content: `**PR 标题**: ${pr.title}\n**分支**: \`${pr.headRefName}\`\n\nClaude Code 提出了修改建议，Gemini 已接手进入全量返修队列。`,
+      url: `https://github.com/hoye1113/syno-personal-butler/pull/${num}`,
+      status: 'warning'
+    }).catch(() => {});
   }
 
   console.log(`完成！PR #${num} 当前流转状态已同步。`);

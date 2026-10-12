@@ -20,6 +20,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ProcessFileLock } from '../packages/syno-core/process-lock.mjs';
+import { sendFeishuNotification } from './notify-feishu.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -51,7 +52,7 @@ export function getOpenIssues() {
 }
 
 export function getOpenPRs() {
-  const raw = runGh(['pr', 'list', '--state', 'open', '--limit', '1000', '--json', 'number,title,labels,headRefName,headRefOid,createdAt']);
+  const raw = runGh(['pr', 'list', '--state', 'open', '--limit', '1000', '--json', 'number,title,labels,headRefName,headRefOid,isDraft,createdAt']);
   try {
     return JSON.parse(raw);
   } catch (e) {
@@ -92,7 +93,13 @@ export function printStatus() {
   if (approvedPRs.length === 0) {
     console.log('   (暂无已核准待合并 PR)');
   } else {
-    approvedPRs.forEach(p => console.log(`   - PR #${p.number}: ${p.title} (分支: ${p.headRefName})`));
+    approvedPRs.forEach(p => {
+      const mode = p.isDraft ? '[Draft]' : '[Ready]';
+      const createdDate = new Date(p.createdAt);
+      const hoursWaiting = ((Date.now() - createdDate.getTime()) / (1000 * 60 * 60)).toFixed(1);
+      const staleNotice = Number(hoursWaiting) > 2 ? ` ⚠️ 等待已超时 (${hoursWaiting}h)` : '';
+      console.log(`   - PR #${p.number}: ${p.title} ${mode} (分支: ${p.headRefName})${staleNotice}`);
+    });
   }
 
   console.log('\n【4. 进行中任务 (Issue with in-progress)】');
@@ -244,7 +251,19 @@ export function handleNext() {
   // 5. 检查是否有已核准但尚未合并的 PR
   const approvedPR = prs.find(p => hasLabel(p, 'approved'));
   if (approvedPR) {
-    console.log(`[DISPATCH] 所有研发任务已完成！当前 PR #${approvedPR.number} 已通过审查，等待 Codex 或主人合并。`);
+    const createdDate = new Date(approvedPR.createdAt);
+    const hoursWaiting = ((Date.now() - createdDate.getTime()) / (1000 * 60 * 60)).toFixed(1);
+    console.log(`[DISPATCH] 所有研发任务已完成！当前 PR #${approvedPR.number} 已通过审查，等待 Codex 或主人合并。(已等待 ${hoursWaiting}h)`);
+
+    if (Number(hoursWaiting) > 2) {
+      sendFeishuNotification({
+        title: `PR #${approvedPR.number} 待合超时提醒 (${hoursWaiting}h) ⚠️`,
+        content: `**PR 标题**: ${approvedPR.title}\n**分支**: \`${approvedPR.headRefName}\`\n**已就绪等待**: ${hoursWaiting} 小时\n\n该 PR 已通过 Claude Code 审查，等待 Codex 巡检或主人合入。`,
+        url: `https://github.com/hoye1113/syno-personal-butler/pull/${approvedPR.number}`,
+        status: 'warning'
+      }).catch(() => {});
+    }
+
     return { action: 'WAITING_MERGE', prNumber: approvedPR.number };
   }
 

@@ -71,3 +71,13 @@
    - **严禁自审**：PR 提交后必须且只能调用 `node scripts/review-with-claude.mjs --pr <PR_NUMBER>` 触发 Claude Code 审查。
    - **返修优先**：调度遵循“一次只做一件，返修优先”，处于 `changes-requested` 的 PR 拥有最高处理优先级。
    - **终态通知**：只有当 Claude 审查打出 `[APPROVED]` 且 GitHub 标签变为 `approved` 时，才触发桌面通知让 Codex/主人验收合并。
+3. **PR 生命周期与 Codex 合并门禁 (Draft vs Ready)**：
+   - **Draft PR**：Gemini 开发与返修期间标记为 Draft。Codex 巡检直接跳过所有 Draft PR，静待其他 Agent 完成工作。
+   - **Ready PR**：当 Gemini 自测通过、Claude Code 审查打出 `[APPROVED]` 且完成版本绑定后，脚本自动将 Draft 翻转为 Ready for review（`gh pr ready`）。
+   - **Codex 每小时合并门禁（必须同时满足以下条件方可合并）**：
+     1. 非 Draft 状态（`isDraft == false`）；
+     2. 可合并状态（`mergeable == 'MERGEABLE'`，遇异步计算中 `UNKNOWN` 需缓冲重试）；
+     3. 当前最新 Commit SHA（`headRefOid`）拥有匹配的 Claude Code 审查通过记录与 `approved` 标签；
+     4. 关联 Issue 中的【验收标准 Checklist】逐项核对完毕；
+     5. 采用 `gh pr merge --squash --delete-branch` 合并，保持主分支历史整洁并自动关闭对应 Issue。
+   - **超时兜底**：若 Ready PR 处于 `approved` 状态超过 2 小时仍未被合并，触发桌面 Toast 提醒主人介入。
