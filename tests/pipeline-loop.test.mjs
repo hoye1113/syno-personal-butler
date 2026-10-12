@@ -226,8 +226,8 @@ test('审查与调度脚本安全加固契约断言', async () => {
   assert.match(loopScript, /sendToast/);
 });
 
-test('sendToast: 正常返回布尔值且不抛出异常', () => {
-  const res = sendToast('Test Title', 'Test Body');
+test('sendToast: 正常返回布尔值且不抛出异常', async () => {
+  const res = await sendToast('Test Title', 'Test Body');
   assert.equal(typeof res, 'boolean');
 });
 
@@ -258,10 +258,13 @@ test('子进程调用安全隔离：全部 gh, git 与 claude 派生进程显式
   assert.match(loopScript, /review-with-claude\.mjs'[\s\S]*?cwd:\s*REPO_ROOT/);
 });
 
-test('notify-feishu: 动态懒加载 @larksuiteoapi/node-sdk 契约断言', async () => {
+test('notify-feishu: 复用 officialSdk 动态懒加载 @larksuiteoapi/node-sdk 契约断言', async () => {
   const feishuScript = await fs.readFile(path.resolve('scripts/notify-feishu.mjs'), 'utf8');
-  assert.match(feishuScript, /import\('@larksuiteoapi\/node-sdk'\)/);
+  assert.match(feishuScript, /officialSdk/);
   assert.doesNotMatch(feishuScript, /import\s+\*\s+as\s+lark\s+from\s+'@larksuiteoapi\/node-sdk'/);
+
+  const feishuChannel = await fs.readFile(path.resolve('packages/syno-core/feishu-channel.mjs'), 'utf8');
+  assert.match(feishuChannel, /import\("@larksuiteoapi\/node-sdk"\)/);
 });
 
 test('notify-feishu: FEISHU_SEND_TIMEOUT_MS 上限与 Promise.race 超时熔断契约', async () => {

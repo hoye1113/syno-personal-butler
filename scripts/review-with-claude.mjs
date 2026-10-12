@@ -128,7 +128,7 @@ export function formatReviewSummaryForCard(reviewResult, isApproved) {
   return cardBody.trim();
 }
 
-export function sendToast(title, body) {
+export async function sendToast(title, body) {
   try {
     const toastScriptPath = resolve(__dirname, 'show-toast.ps1').replace(/\\/g, '/');
     if (!existsSync(toastScriptPath)) return false;
@@ -143,19 +143,41 @@ export function sendToast(title, body) {
       & "${toastScriptPath}" -Title $title -Body $body
     `;
 
-    const child = spawn('powershell.exe', [
-      '-NoProfile',
-      '-ExecutionPolicy', 'Bypass',
-      '-Command', psCommand,
-      tB64,
-      bB64
-    ], { cwd: REPO_ROOT, windowsHide: true, stdio: 'ignore' });
+    return new Promise((resolveToast) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          try { child.kill(); } catch {}
+          resolveToast(false);
+        }
+      }, 10000);
 
-    child.on('error', err => {
-      console.warn(`[Toast Warning] 通知子进程启动失败: ${err.message}`);
+      const child = spawn('powershell.exe', [
+        '-NoProfile',
+        '-ExecutionPolicy', 'Bypass',
+        '-Command', psCommand,
+        tB64,
+        bB64
+      ], { cwd: REPO_ROOT, windowsHide: true, stdio: 'ignore' });
+
+      child.on('error', err => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          console.warn(`[Toast Warning] 通知子进程启动失败: ${err.message}`);
+          resolveToast(false);
+        }
+      });
+
+      child.on('close', code => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolveToast(code === 0);
+        }
+      });
     });
-    child.unref();
-    return true;
   } catch (e) {
     console.warn(`[Toast Warning] 桌面通知发送失败: ${e.message}`);
     return false;
@@ -310,11 +332,14 @@ ${issueContext}
 ${diff}
 \`\`\`
 
-【输出格式强制规范】
-你的回答首行必须明确判定结果，且只能是以下两种格式之一：
+【输出格式强制规范（硬性语法，严禁违反）】
+⚠️ 机器解析器硬性约束：你的回答第 1 行、第 1 个字符必须直接是判定标识，绝对不得在第一行前面或同一行包含任何前言、开场白、总结、过渡句或问候语！
+回复第一行必须严格为以下两行之一（不得有任何前置文本）：
 RESULT: [APPROVED]
 或
 RESULT: [CHANGES_REQUESTED]
+
+（注意：任何在第一行前输出前置说明文字的行为都会触发自动化门禁判定失败中断！）
 
 紧接着按照以下结构输出详细分析，确保给 Gemini 留下明确可执行的修复指引：
 ### 1. 评审结论概述
@@ -393,9 +418,10 @@ RESULT: [CHANGES_REQUESTED]
     const verifyPr = JSON.parse(runGh(['pr', 'view', String(num), '--json', 'labels']));
     const hasApproved = (verifyPr.labels || []).some(l => l.name === 'approved');
     const hasChangesReq = (verifyPr.labels || []).some(l => l.name === 'changes-requested');
+    const hasNeedsReview = (verifyPr.labels || []).some(l => l.name === 'needs-review');
 
-    if (!hasApproved || hasChangesReq) {
-      throw new Error(`PR #${num} 标签状态校验失败：未成功添加 approved 或仍存在 changes-requested`);
+    if (!hasApproved || hasChangesReq || hasNeedsReview) {
+      throw new Error(`PR #${num} 标签状态校验失败：未成功添加 approved，或仍存在 changes-requested / needs-review`);
     }
 
     // 若原 PR 处于 Draft 状态，审查通过后自动翻转为 Ready for review，供 Codex 巡检认领合并
@@ -412,10 +438,13 @@ RESULT: [CHANGES_REQUESTED]
     }
 
     const toastExtra = readyFlipped ? '' : ' (注意: Ready 翻转需手动处理)';
-    sendToast(
+    const toastOk = await sendToast(
       `PR #${num} 审查通过 🎉`,
       `Claude Code 评审已通过全部验收标准，请通知 Codex 或您亲自验收合并。${toastExtra}`
     );
+    if (!toastOk) {
+      console.warn(`[Warning] PR #${num} 桌面 Toast 通知发送未成功，请依赖飞书通知`);
+    }
 
     const draftNote = readyFlipped ? '' : '\n\n⚠️ **提示**：Draft 转 Ready 自动翻转未完成，请在 GitHub PR 页面手动点击 "Ready for review"。';
     const approvedSummary = formatReviewSummaryForCard(reviewResult, true);
@@ -431,13 +460,14 @@ RESULT: [CHANGES_REQUESTED]
     console.log(`❌ 审查结论: [CHANGES_REQUESTED] 需要修改！已转入返修队列，由 Gemini 进行修复。`);
     runGh(['pr', 'edit', String(num), '--add-label', 'changes-requested', '--remove-label', 'needs-review,approved']);
 
-    // 确认标签状态已剥离 approved 并打上 changes-requested
+    // 确认标签状态已剥离 approved 与 needs-review，并打上 changes-requested
     const verifyPr = JSON.parse(runGh(['pr', 'view', String(num), '--json', 'labels']));
     const hasChangesReq = (verifyPr.labels || []).some(l => l.name === 'changes-requested');
     const hasApproved = (verifyPr.labels || []).some(l => l.name === 'approved');
+    const hasNeedsReview = (verifyPr.labels || []).some(l => l.name === 'needs-review');
 
-    if (!hasChangesReq || hasApproved) {
-      throw new Error(`PR #${num} 标签状态校验失败：未成功打上 changes-requested 或未移除 approved`);
+    if (!hasChangesReq || hasApproved || hasNeedsReview) {
+      throw new Error(`PR #${num} 标签状态校验失败：未成功打上 changes-requested，或未移除 approved / needs-review`);
     }
 
     // 清理可能遗留的已核准计时状态文件，确保若再次获批时从最新时刻重新计时

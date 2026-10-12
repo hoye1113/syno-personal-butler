@@ -167,7 +167,7 @@ export async function handleNext() {
   for (const appPR of approvedPRs) {
     const timeoutStatus = trackApprovedTimeout(appPR, { persist: true });
     if (timeoutStatus.shouldNotify) {
-      const toastOk = sendToast(
+      const toastOk = await sendToast(
         `PR #${appPR.number} 待合超时提醒 (${timeoutStatus.waitingHours}h) ⚠️`,
         `该 PR 已通过 Claude Code 审查并就绪超过 ${timeoutStatus.waitingHours} 小时，等待 Codex 巡检或主人合入。`
       );
