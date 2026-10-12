@@ -295,3 +295,13 @@ Lakshya A. Agrawal（嘉宾）：所以，在技术领域，不要害怕进行�
 Lakshya A. Agrawal（嘉宾）：因此，请提供可执行的辅助信息，并尽可能向优化器提供领域特定信息，未来的优化器将能够利用这些信息。
 
 Lakshya A. Agrawal（嘉宾）：所以，请去了解一下。非常感谢。
+
+---
+
+## 🔗 双向链接与引用
+
+- [[MOC - Harness Engineering|Harness Engineering MOC]]
+- [[Restate CEO-每一步每次调用都可靠的Agent系统|Restate CEO: 可靠Agent系统]]
+- [[原位自演化智能体 In-situ Self-evolving Agent 架构|原位自演化智能体架构]]
+- [[李继刚商业模式神图提示词|李继刚商业模式神图提示词]]
+- [[Box CEO-AI下一次突破或将来自大实验室之外|Box CEO: 大实验室之外的突破]]

@@ -97,6 +97,9 @@ source: vault_initiative - moc - ai_agent - harness_engineering
 - [[openai团队-openai的-harness工程实践-哔哩哔哩-0145f85f|OpenAI团队：OpenAI的 Harness工程实践 - 哔哩哔哩]]
 - [[为什么-harness-比模型更重要-3a8f81a0|为什么 Harness 比模型更重要]]
 - [[微软专家-agent可观测性-生产实践-哔哩哔哩-2ac0f227|微软专家：Agent可观测性 生产实践 - 哔哩哔哩]]
+- [[GEPA项目负责人-文本反思优化胜过强化学习|GEPA项目负责人-文本反思优化胜过强化学习]]
+- [[Restate CEO-每一步每次调用都可靠的Agent系统|Restate CEO-每一步每次调用都可靠的Agent系统]]
+- [[OpenAI研究员Noam Brown-多智能体协作能否递归自我改进|OpenAI研究员Noam Brown-多智能体协作能否递归自我改进]]
 
 - **总笔记数**：42 核心 + 3 跨 MOC 链接
 - **最后更新**：2026-07-09（新增 S-tier 8 篇视频转录：ClawdBot、OpenClaw 教程/Every/养虾/配置、Hermes、AI 编程工具、Brex CEO）

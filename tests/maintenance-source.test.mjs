@@ -134,3 +134,18 @@ test("weeklySummary reuses the orphan cache warmed by inspect", async (t) => {
   assert.equal(maintenance._cache, warmedCache, "weeklySummary must reuse the same cache instance, not recompute");
   assert.equal(summary.totalOrphans, warmedCache.length, "summary total matches cached orphans");
 });
+
+test("excludes 99-System, 03-Archive, and recognizes pipe aliases and MOC references", async (t) => {
+  const { maintenance } = await setup(t, {
+    "99-System/audit.md": "# System Audit\n\n孤立但属于系统。",
+    "03-Archive/old.md": "# Archived Issue\n\n孤立但属于归档。",
+    "CLAUDE.md": "# Repo Guide\n\n根目录说明。",
+    "MOC - Topic.md": "# Topic MOC\n\n[[item-in-moc|Item Alias]]",
+    "item-in-moc.md": "# Item In MOC\n\n被 MOC 别名引用。",
+    "real-orphan.md": "# Real Orphan\n\n真正孤立。",
+  });
+  const findings = await maintenance.inspect({ limit: 10 });
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].path, "vault/real-orphan.md");
+});
+

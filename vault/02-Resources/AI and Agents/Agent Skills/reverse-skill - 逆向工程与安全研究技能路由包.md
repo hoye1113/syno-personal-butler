@@ -93,6 +93,7 @@ summary: 面向二进制、APK、前端 JS 加密、抓包与 CTF 任务的逆�
 ## 五、关联卡片
 
 - [[MOC - Agent Skills 武器库]]
+- [[rea-reverse - 智能体逆向工程与反编译中间件]]
 - [[reality-check - 代码诚实度无情审计]]
 - [[ponytail - 最懒资深架构师心智]]
 - [[Harness Engineering]]

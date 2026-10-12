@@ -71,3 +71,11 @@ Motion: Charming 12fps stop-motion rhythm with subtle cardboard jitter.
 
 1. **家庭纪念日与孩子生日惊喜**：在重要的家庭节点，管家自动根据孩子的喜好定制一条温馨的折纸动画祝福短片；
 2. **童话绘本与睡前故事插图制作**：将日常给孩子讲的睡前故事，一键生成配套的手工折纸风插图。
+
+---
+
+## 🔗 双向链接与引用
+
+- [[MOC - Agent Skills 武器库|Agent Skills 武器库 MOC]]
+- [[ljg-card - 思想铸卡与老宋体视觉排版|李继刚思想铸卡]]
+- [[open-design - 本地优先全能设计引擎|Open Design 引擎]]

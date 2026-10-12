@@ -15,7 +15,7 @@ await fs.mkdir(path.join(knowledgeRoot, "ops"), { recursive: true });
 await fs.mkdir(path.join(contractRoot, "config"), { recursive: true });
 process.env.SYNO_KNOWLEDGE_ROOT = knowledgeRoot;
 
-const { PATHS, relativeToKnowledge, relativeToRepo, relativeToRoot } = await import("../packages/syno-core/paths.mjs");
+const { PATHS, localDataRoot, relativeToKnowledge, relativeToRepo, relativeToRoot } = await import("../packages/syno-core/paths.mjs");
 const { GitGuard } = await import("../packages/syno-core/git-guard.mjs");
 const { validateVaultContract } = await import("../packages/syno-core/validator.mjs");
 
@@ -111,3 +111,27 @@ test("validator 双根：vault/HEAD 取自知识仓，vault-contract 取自代�
     /beta|tag/i,
   );
 });
+
+test("localDataRoot 相对路径与 .env 解析", async () => {
+  const fakeRepo = path.join(scratch, "fake-repo");
+  await fs.mkdir(fakeRepo, { recursive: true });
+
+  // 1. 相对路径 SYNO_LOCAL_DATA 对 repoRoot 求解（非 cwd）
+  const rel = localDataRoot({ SYNO_LOCAL_DATA: "./.local-data" }, fakeRepo);
+  assert.equal(rel, path.join(fakeRepo, ".local-data"));
+
+  // 2. 绝对路径 SYNO_LOCAL_DATA 原样保留
+  const absExpected = path.resolve(scratch, "custom-data");
+  const abs = localDataRoot({ SYNO_LOCAL_DATA: absExpected }, fakeRepo);
+  assert.equal(abs, absExpected);
+
+  // 3. 从 .env 读取 SYNO_LOCAL_DATA
+  await fs.writeFile(path.join(fakeRepo, ".env"), "SYNO_LOCAL_DATA=./env-data\n", "utf8");
+  const fromEnvFile = localDataRoot({ NODE_ENV: "production" }, fakeRepo);
+  assert.equal(fromEnvFile, path.join(fakeRepo, "env-data"));
+
+  // 4. 无配置时回退到 LOCALAPPDATA / HOME
+  const fallback = localDataRoot({ LOCALAPPDATA: "C:\\FakeApp", NODE_ENV: "production" }, path.join(scratch, "empty-repo"));
+  assert.equal(fallback, path.join("C:\\FakeApp", "Syno"));
+});
+

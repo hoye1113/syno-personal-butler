@@ -657,3 +657,12 @@ AI再快，也快不过现实世界。
 
 ![配图 22](../../99-System/Attachments/WeChat Articles/kazuk-ai-math/fig-22.jpg)
 
+---
+
+## 🔗 双向链接与引用
+
+- [[MOC - AI 时代个人发展与组织|AI 时代个人发展与组织 MOC]]
+- [[OpenAI研究员Noam Brown-多智能体协作能否递归自我改进|Noam Brown: 多智能体与数学千禧年难题]]
+- [[Tobi Lütke-AI让哪些技能更值钱|Tobi Lütke: 技能、审美与人类判断]]
+- [[数字生命卡兹克-聊聊A16Z这两份AI报告以及一些反常识的真相|数字生命卡兹克: A16Z报告与反常识]]
+

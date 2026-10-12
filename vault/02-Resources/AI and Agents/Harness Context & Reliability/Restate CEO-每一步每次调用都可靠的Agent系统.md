@@ -223,3 +223,12 @@ Giselle van Dongen（嘉宾）：以上就是我主要想展示的内容。如�
 Giselle van Dongen（嘉宾）：我们目前正在招聘各种职位，涵盖工程、市场营销等领域，尤其是在湾区。如果你对此感兴趣，欢迎查看我们的招聘页面。
 
 Giselle van Dongen（嘉宾）：如果你想提问或进一步了解 Restate，我会在这里会议厅外面等着。非常感谢。
+
+---
+
+## 🔗 双向链接与引用
+
+- [[MOC - Harness Engineering|Harness Engineering MOC]]
+- [[GEPA项目负责人-文本反思优化胜过强化学习|GEPA: 反思式优化]]
+- [[Brex CEO-别再构建Agent改做AI Employee|Brex CEO: AI Employee]]
+- [[原位自演化智能体 In-situ Self-evolving Agent 架构|原位自演化智能体架构]]

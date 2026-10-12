@@ -58,18 +58,33 @@ class KnowledgeMaintenanceSource {
     return orphans;
   }
 
-  // 全量读盘并计算孤岛（排除 README/MOC）。orphan.title 保留笔记原标题，由调用方决定是否加前缀。
+  // 全量读盘并计算孤岛（排除 README/MOC、99-System、03-Archive 及根目录配置）。orphan.title 保留笔记原标题，由调用方决定是否加前缀。
   async #collectOrphans(files) {
-    const notes = [];
+    const candidates = [];
+    const corpusTargets = new Set();
+
     for (const file of files) {
       const markdown = await fs.readFile(file, "utf8");
       const relative = path.relative(this.vaultRoot, file).replace(/\\/g, "/");
-      if (/(?:^|\/)README\.md$|(?:^|\/)MOC\s*-/i.test(relative)) continue;
-      notes.push({ file, relative, markdown, title: titleOf(markdown, file), basename: path.basename(file, ".md") });
+
+      // 收集全库（含 MOC 及系统文件）中所有有效的 WikiLink 目标，支持 [[target|alias]]、[[target#heading]] 及带路径链接
+      for (const match of markdown.matchAll(/\[\[([^\]|#]+)/g)) {
+        const raw = match[1].trim();
+        if (raw) {
+          corpusTargets.add(raw);
+          corpusTargets.add(path.basename(raw, ".md"));
+        }
+      }
+
+      // 孤岛候选排除：MOC 导航、README/AGENTS/CLAUDE、系统内部文件与历史归档
+      if (/(?:^|\/)(?:README\.md|AGENTS\.md|CLAUDE\.md)$|(?:^|\/)MOC\s*-/i.test(relative)) continue;
+      if (/^(?:99-System|03-Archive)\//i.test(relative)) continue;
+
+      candidates.push({ file, relative, markdown, title: titleOf(markdown, file), basename: path.basename(file, ".md") });
     }
-    const corpus = notes.map((note) => note.markdown).join("\n");
-    return notes
-      .filter((note) => !/\[\[[^\]]+\]\]/.test(note.markdown) && !corpus.includes(`[[${note.basename}]]`))
+
+    return candidates
+      .filter((note) => !/\[\[[^\]]+\]\]/.test(note.markdown) && !corpusTargets.has(note.basename) && !corpusTargets.has(note.relative.replace(/\.md$/, "")))
       .map((note) => ({
         id: `orphan:${note.relative}`,
         kind: "orphan",

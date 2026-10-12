@@ -761,3 +761,13 @@ Steven Sinofsky（嘉宾）：所以我觉得，这说明人们已经意识到�
 Erik Torenberg（主持人）：这次聊得很棒。
 
 Aaron Levie（嘉宾）：好的，太棒了。
+
+---
+
+## 🔗 双向链接与引用
+
+- [[MOC - AI 时代个人发展与组织|AI 时代个人发展与组织 MOC]]
+- [[Brex CEO-别再构建Agent改做AI Employee|Brex CEO: 别再构建 Agent 改做 AI Employee]]
+- [[2026 年 Agent 最重要的工程概念 Harness Engineering|Harness Engineering 核心概念]]
+- [[MOC - Harness Engineering|Harness Engineering MOC]]
+

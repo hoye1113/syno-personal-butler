@@ -13,6 +13,7 @@ apps/syno/topic-planner.config.json
 .env
 .env.*
 !.env.example
+.local-data/
 
 # Agent worktrees and generated state
 .worktrees/

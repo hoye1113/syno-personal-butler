@@ -151,6 +151,11 @@ source: vault_initiative - moc - ai_agent - ai_career - ai_philosophy
 - [[wispr增长负责人-用ai打造一台1亿美元增长引擎-a4b9750d|Wispr增长负责人：用AI打造一台1亿美元增长引擎]]
 - [[代理时代的设计方法-6b140cee|代理时代的设计方法]]
 - [[黄仁勋-成就英伟达的心态|黄仁勋-成就英伟达的心态]]
+- [[Box CEO-AI下一次突破或将来自大实验室之外|Box CEO-AI下一次突破或将来自大实验室之外]]
+- [[Brex CEO-别再构建Agent改做AI Employee|Brex CEO-别再构建Agent改做AI Employee]]
+- [[数字生命卡兹克-聊聊A16Z这两份AI报告以及一些反常识的真相|数字生命卡兹克-聊聊A16Z这两份AI报告以及一些反常识的真相]]
+- [[Tobi Lütke-AI让哪些技能更值钱|Tobi Lütke-AI让哪些技能更值钱]]
+- [[数字生命卡兹克-AI让数学再也回不去那个旧世界了|数字生命卡兹克-AI让数学再也回不去那个旧世界了]]
 
 - **总笔记数**：9 核心 + 79 行业观点/访谈（2026-07-15 从原 Agent Theory 总览 S-tier 迁入）
 - **最后更新**：2026-07-15（从原 Agent Theory 总览迁入行业观点/访谈 S-tier，dedup 后 +N 篇）

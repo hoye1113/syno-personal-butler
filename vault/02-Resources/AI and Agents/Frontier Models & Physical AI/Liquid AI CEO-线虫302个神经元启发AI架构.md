@@ -615,3 +615,13 @@ Ramin Hasani（嘉宾）：我的意思是，系统能够不断演化，比如�
 Ramin Hasani（嘉宾）：没有，我觉得这次交流非常棒，真的很棒。谢谢你。
 
 非常感谢。
+
+---
+
+## 🔗 双向链接与引用
+
+- [[MOC - 具身智能与脑机接口|具身智能与脑机接口 MOC]]
+- [[OpenAI研究员Noam Brown-多智能体协作能否递归自我改进|Noam Brown: 多智能体协作与自我改进]]
+- [[原位自演化智能体 In-situ Self-evolving Agent 架构|原位自演化智能体架构]]
+- [[seeed-ceo-开源硬件与物理ai-cdf7cbd4|开源硬件与物理 AI]]
+

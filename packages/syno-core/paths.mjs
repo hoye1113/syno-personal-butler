@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -6,9 +7,38 @@ const REPO_ROOT = process.env.NODE_ENV === "test" && process.env.SYNO_REPO_ROOT
   ? path.resolve(process.env.SYNO_REPO_ROOT)
   : path.resolve(MODULE_DIR, "..", "..");
 
-function localDataRoot() {
-  if (process.env.SYNO_LOCAL_DATA) return path.resolve(process.env.SYNO_LOCAL_DATA);
-  const base = process.env.LOCALAPPDATA || process.env.HOME || REPO_ROOT;
+function readDotenvLocalData(repoRoot) {
+  try {
+    const envFile = path.join(repoRoot, ".env");
+    if (!existsSync(envFile)) return "";
+    const text = readFileSync(envFile, "utf8");
+    for (const rawLine of text.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) continue;
+      const normalized = line.startsWith("export ") ? line.slice("export ".length).trim() : line;
+      const eq = normalized.indexOf("=");
+      if (eq <= 0) continue;
+      if (normalized.slice(0, eq).trim() !== "SYNO_LOCAL_DATA") continue;
+      let value = normalized.slice(eq + 1).trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      return value.trim();
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+function localDataRoot(env = process.env, repoRoot = REPO_ROOT) {
+  const envVal = env.SYNO_LOCAL_DATA || (env.NODE_ENV !== "test" ? readDotenvLocalData(repoRoot) : "");
+  if (envVal) {
+    return path.isAbsolute(envVal)
+      ? path.resolve(envVal)
+      : path.resolve(repoRoot, envVal);
+  }
+  const base = env.LOCALAPPDATA || env.HOME || repoRoot;
   return path.resolve(base, "Syno");
 }
 
@@ -65,4 +95,4 @@ const PATHS = Object.freeze({
   stateRoot: path.join(localDataRoot(), "state"),
 });
 
-export { DEFAULT_WEB_PORT, PATHS, relativeToKnowledge, relativeToRepo, relativeToRoot, resolveInside };
+export { DEFAULT_WEB_PORT, PATHS, localDataRoot, readDotenvLocalData, relativeToKnowledge, relativeToRepo, relativeToRoot, resolveInside };

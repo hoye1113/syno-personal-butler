@@ -19,8 +19,33 @@ if (-not (Test-Path -LiteralPath $server -PathType Leaf)) { throw "Syno Host ent
 $runtimeRoot = Join-Path $resolvedRoot ".runtime"
 $pidFile = Join-Path $runtimeRoot "syno-host.pid"
 New-Item -ItemType Directory -Path $runtimeRoot -Force | Out-Null
-$logBase = if ([string]::IsNullOrWhiteSpace([string]$env:LOCALAPPDATA)) { $runtimeRoot } else { $env:LOCALAPPDATA }
-$logRoot = Join-Path $logBase "Syno\logs"
+$localDataCandidate = $env:SYNO_LOCAL_DATA
+if ([string]::IsNullOrWhiteSpace($localDataCandidate)) {
+  $envFile = Join-Path $resolvedRoot ".env"
+  if (Test-Path -LiteralPath $envFile -PathType Leaf) {
+    $envLines = Get-Content -LiteralPath $envFile -ErrorAction SilentlyContinue
+    foreach ($line in $envLines) {
+      $trimmed = $line.Trim()
+      if ($trimmed -and -not $trimmed.StartsWith("#") -and $trimmed -match '^(?:export\s+)?SYNO_LOCAL_DATA\s*=\s*(.*)$') {
+        $val = $matches[1].Trim().Trim('"').Trim("'")
+        if ($val) { $localDataCandidate = $val; break }
+      }
+    }
+  }
+}
+$localDataRoot = if (-not [string]::IsNullOrWhiteSpace($localDataCandidate)) {
+  if ([System.IO.Path]::IsPathRooted($localDataCandidate)) {
+    [System.IO.Path]::GetFullPath($localDataCandidate)
+  } else {
+    [System.IO.Path]::GetFullPath((Join-Path $resolvedRoot $localDataCandidate))
+  }
+} elseif (-not [string]::IsNullOrWhiteSpace([string]$env:LOCALAPPDATA)) {
+  Join-Path $env:LOCALAPPDATA "Syno"
+} else {
+  Join-Path $runtimeRoot "Syno"
+}
+$env:SYNO_LOCAL_DATA = $localDataRoot
+$logRoot = Join-Path $localDataRoot "logs"
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
 $logPath = Join-Path $logRoot ("windows-task-{0}.jsonl" -f (Get-Date -Format "yyyy-MM-dd"))
 $script:synoLogPath = $logPath

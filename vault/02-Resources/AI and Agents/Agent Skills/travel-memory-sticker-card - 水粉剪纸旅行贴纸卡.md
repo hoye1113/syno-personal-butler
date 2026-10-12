@@ -64,3 +64,11 @@ Create one 3:2 horizontal collectible memory card from the supplied photo on war
 
 1. **旅行归来一键生成纪念手帐套卡**：主人旅行结束后，将当天随手拍发给管家，管家自动产出成套贴纸卡；
 2. **朋友圈与个人博客视觉配图**：用极具个人辨识度的水粉剪纸卡片替代千篇一律的风景照分享。
+
+---
+
+## 🔗 双向链接与引用
+
+- [[MOC - Agent Skills 武器库|Agent Skills 武器库 MOC]]
+- [[ljg-card - 思想铸卡与老宋体视觉排版|李继刚思想铸卡]]
+- [[open-design - 本地优先全能设计引擎|Open Design 引擎]]

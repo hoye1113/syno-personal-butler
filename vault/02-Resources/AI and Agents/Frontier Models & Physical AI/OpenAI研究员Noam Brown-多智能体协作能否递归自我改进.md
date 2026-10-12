@@ -753,3 +753,13 @@ Noam Brown（嘉宾）：而这……这正逐渐成为一种越来越常见的�
 Dwarkesh Patel（主持人）：是的。诺姆，非常感谢你参加这次节目。
 
 Noam Brown（嘉宾）：很高兴来到这里。
+
+---
+
+## 🔗 双向链接与引用
+
+- [[MOC - Harness Engineering|Harness Engineering MOC]]
+- [[MOC - 具身智能与脑机接口|具身智能与脑机接口 MOC]]
+- [[Liquid AI CEO-线虫302个神经元启发AI架构|Liquid AI: 神经架构与端侧部署]]
+- [[原位自演化智能体 In-situ Self-evolving Agent 架构|原位自演化智能体架构]]
+- [[数字生命卡兹克-AI让数学再也回不去那个旧世界了|数字生命卡兹克: AI 让数学回不去旧世界]]

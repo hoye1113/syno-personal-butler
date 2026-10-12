@@ -81,3 +81,4 @@ flowchart TD
 - [[grilling - 交互式需求深度拷问与反向对齐]]
 - [[design-it-twice - 深度模块设计与强制双对立方案裁决]]
 - [[writing-for-agents - 高确定性高密度 Agent 契约指令写作法]]
+- [[search-history - 跨会话历史记忆回溯检索]]

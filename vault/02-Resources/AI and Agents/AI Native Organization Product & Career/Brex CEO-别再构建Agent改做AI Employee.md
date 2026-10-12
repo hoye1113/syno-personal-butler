@@ -445,3 +445,13 @@ Peter Yang（主持人）：把代币用到极致，同时保持负责。这就�
 Pedro Franceschi（嘉宾）：没错，非常负责地使用。
 
 Peter Yang（主持人）：酷，谢谢。
+
+---
+
+## 🔗 双向链接与引用
+
+- [[MOC - AI 时代个人发展与组织|AI 时代个人发展与组织 MOC]]
+- [[Box CEO-AI下一次突破或将来自大实验室之外|Box CEO: AI 下一次突破或将来自大实验室之外]]
+- [[2026 年 Agent 最重要的工程概念 Harness Engineering|Harness Engineering 核心概念]]
+- [[所谓的agent开发到底是个啥岗位|蜂群组织与 Agent 岗位演进]]
+
