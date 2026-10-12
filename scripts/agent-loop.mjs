@@ -21,7 +21,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ProcessFileLock } from '../packages/syno-core/process-lock.mjs';
 import { sendFeishuNotification } from './notify-feishu.mjs';
-import { sendToast, EXIT_BUSY } from './review-with-claude.mjs';
+import { sendToast, EXIT_BUSY, extractLinkedIssueNumber } from './review-with-claude.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -267,10 +267,18 @@ export async function handleNext() {
     }
   }
 
-  // 3. 进行中保护：如果已有正在进行的 Issue，且当前没有返修阻塞，继续该 Issue
-  const activeIssue = issues.find(i => hasLabel(i, 'in-progress'));
+  // 3. 进行中保护：如果已有正在进行的 Issue，且尚未创建 PR，继续该 Issue
+  const activeIssue = issues.find(i => {
+    if (!hasLabel(i, 'in-progress')) return false;
+    const hasExistingPR = prs.some(p =>
+      p.headRefName === `feat/issue-${i.number}` ||
+      extractLinkedIssueNumber(p.body) === String(i.number) ||
+      extractLinkedIssueNumber(p.title) === String(i.number)
+    );
+    return !hasExistingPR;
+  });
   if (activeIssue) {
-    console.log(`[DISPATCH] 发现已有正在进行中的任务: Issue #${activeIssue.number}`);
+    console.log(`[DISPATCH] 发现已有正在进行中（尚未提交 PR）的任务: Issue #${activeIssue.number}`);
     console.log(`- 标题: ${activeIssue.title}`);
     console.log(`\n建议行动：继续在对应特性分支上实现该任务并自测，完毕后提 PR 并打上 needs-review。`);
     return { action: 'CONTINUE_ISSUE', issueNumber: activeIssue.number, title: activeIssue.title };
