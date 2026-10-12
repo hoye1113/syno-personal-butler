@@ -223,14 +223,17 @@ export async function sendToast(title, body) {
  * - --tools Read,Glob,Grep: 绝对禁止 Edit, Write, Bash，确保物理只读！
  */
 export async function runClaudeReview(prompt, options = {}) {
-  const timeoutMs = options.timeoutMs || (options.mode === 'deep' ? 20 * 60 * 1000 : 12 * 60 * 1000);
+  const mode = options.mode || 'fast';
+  const timeoutMs = options.timeoutMs || (mode === 'deep' ? 20 * 60 * 1000 : 12 * 60 * 1000);
+
+  // 在 fast 极速审查模式下禁用工具 (--tools "")，杜绝 Claude 陷入耗时长达十几分钟的多轮全仓文件遍历；
+  // 在 deep 深度审查模式下仅放行只读工具 (--tools Read,Glob,Grep)，杜绝 Bash, Edit, Write
+  const claudeArgs = mode === 'deep'
+    ? ['-p', '--dangerously-skip-permissions', '--tools', 'Read,Glob,Grep']
+    : ['-p', '--dangerously-skip-permissions', '--tools', '""'];
 
   return new Promise((resolvePromise, reject) => {
-    const child = spawn('claude', [
-      '-p',
-      '--dangerously-skip-permissions',
-      '--tools', 'Read,Glob,Grep'
-    ], {
+    const child = spawn('claude', claudeArgs, {
       cwd: REPO_ROOT,
       shell: true,
       stdio: ['pipe', 'pipe', 'pipe']
