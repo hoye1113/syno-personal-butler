@@ -16,7 +16,7 @@ import {
 import { trackApprovedTimeout } from '../scripts/agent-loop.mjs';
 import { ProcessFileLock } from '../packages/syno-core/process-lock.mjs';
 
-test('parseReviewDecision: 严格首行解析与抗正文误导', () => {
+test('parseReviewDecision: 独立判定行提取、开场白兼容与抗正文误导', () => {
   // 1. 标准 APPROVED
   const approvedText = `RESULT: [APPROVED]
 
@@ -27,7 +27,7 @@ test('parseReviewDecision: 严格首行解析与抗正文误导', () => {
   assert.equal(res1.isApproved, true);
   assert.equal(res1.decision, 'APPROVED');
 
-  // 2. 首行 CHANGES_REQUESTED，但正文中引用了 RESULT: [APPROVED]
+  // 2. CHANGES_REQUESTED，且正文中引用了 RESULT: [APPROVED]（抗正文误导）
   const changesReqText = `RESULT: [CHANGES_REQUESTED]
 
 ### 1. 评审结论概述
@@ -37,18 +37,34 @@ test('parseReviewDecision: 严格首行解析与抗正文误导', () => {
   assert.equal(res2.isApproved, false);
   assert.equal(res2.decision, 'CHANGES_REQUESTED');
 
-  // 3. 首行包含前置无关字符，必须失败关闭
-  const invalidLeadingText = `好的，我来做审查。
+  // 3. 兼容 LLM 开场白前言，只要独立判定标头唯一明确即可通过
+  const preambleText = `静态核验完成。我已读取全部变更文件磁盘实态，准备输出结论。
+
 RESULT: [APPROVED]
+
+### 1. 评审结论概述
+通过。
 `;
-  assert.throws(() => parseReviewDecision(invalidLeadingText), /判定结构无效或含歧义/);
+  const res3 = parseReviewDecision(preambleText);
+  assert.equal(res3.isApproved, true);
+  assert.equal(res3.decision, 'APPROVED');
 
-  // 4. 空文本必须失败关闭
+  // 4. 出现冲突的独立判定标头，必须失败关闭
+  const conflictText = `RESULT: [APPROVED]
+部分正文...
+RESULT: [CHANGES_REQUESTED]
+`;
+  assert.throws(() => parseReviewDecision(conflictText), /相互冲突/);
+
+  // 5. 空文本必须失败关闭
   assert.throws(() => parseReviewDecision(''), /审查输出为空/);
-  assert.throws(() => parseReviewDecision('   \n  \n'), /判定结构无效或含歧义/);
+  assert.throws(() => parseReviewDecision('   \n  \n'), /审查输出为空/);
 
-  // 5. 非法结果标头
-  assert.throws(() => parseReviewDecision('RESULT: [UNKNOWN_STATE]'), /判定结构无效或含歧义/);
+  // 6. 无独立判定标头必须失败关闭
+  assert.throws(() => parseReviewDecision('这是一段没有任何结果标头的审查输出'), /未找到独立成行的判定标头/);
+
+  // 7. 非法结果标头
+  assert.throws(() => parseReviewDecision('RESULT: [UNKNOWN_STATE]'), /非法的判定状态/);
 });
 
 test('chunksToText: UTF-8 多字节分片拼接保真性（中文、Emoji、环境变量引用）', () => {

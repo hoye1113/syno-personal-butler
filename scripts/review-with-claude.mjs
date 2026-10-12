@@ -65,19 +65,40 @@ export function chunksToText(chunks) {
 }
 
 export function parseReviewDecision(output) {
-  if (!output || typeof output !== 'string') {
+  if (!output || typeof output !== 'string' || !output.trim()) {
     throw new Error('Claude Code 审查输出为空');
   }
-  const lines = output.trim().split(/\r?\n/);
-  const firstLine = lines.find(l => l.trim().length > 0)?.trim();
 
-  if (firstLine === 'RESULT: [APPROVED]') {
+  // 提取所有独立成行的判定标头（既支持首行判定，也兼容开场白过渡段，同时杜绝正文提及引发误导）
+  const lines = output.trim().split(/\r?\n/);
+  const standaloneVerdicts = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const match = trimmed.match(/^RESULT:\s*\[([A-Z_]+)\]$/);
+    if (match) {
+      standaloneVerdicts.push(match[1]);
+    }
+  }
+
+  if (standaloneVerdicts.length === 0) {
+    throw new Error('Claude Code 审查输出判定结构无效或含歧义：未找到独立成行的判定标头 RESULT: [APPROVED] 或 RESULT: [CHANGES_REQUESTED]');
+  }
+
+  const uniqueVerdicts = [...new Set(standaloneVerdicts)];
+  if (uniqueVerdicts.length > 1) {
+    throw new Error(`Claude Code 审查输出包含相互冲突的判定标头: ${uniqueVerdicts.join(', ')}`);
+  }
+
+  const verdict = uniqueVerdicts[0];
+  if (verdict === 'APPROVED') {
     return { decision: 'APPROVED', isApproved: true };
   }
-  if (firstLine === 'RESULT: [CHANGES_REQUESTED]') {
+  if (verdict === 'CHANGES_REQUESTED') {
     return { decision: 'CHANGES_REQUESTED', isApproved: false };
   }
-  throw new Error(`Claude Code 审查输出判定结构无效或含歧义。首行必须严格为 'RESULT: [APPROVED]' 或 'RESULT: [CHANGES_REQUESTED]'，实际首行: '${firstLine}'`);
+
+  throw new Error(`Claude Code 审查输出包含非法的判定状态: ${verdict}`);
 }
 
 /**
