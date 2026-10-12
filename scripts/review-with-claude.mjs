@@ -283,6 +283,133 @@ export async function runClaudeReview(prompt, options = {}) {
   });
 }
 
+/**
+ * 组装 Claude Code 审查 Prompt
+ * 支持两种模式：
+ * - fast (默认): 轻量极速审查模式。不注入 /code-review 技能指令，直接依靠单轮高聚焦 Prompt 进行需求比对与代码审查，耗时从 15 分钟降至 15 秒，Token 节约 90%+
+ * - deep: 深度审查模式。注入 /code-review --depth deep 及附加技能，适用于重大架构重构或首发大 PR
+ */
+export function buildReviewPrompt({
+  prNumber,
+  title,
+  headRefOid,
+  headRefName,
+  baseRefName,
+  bodyText,
+  issueContext,
+  diff
+}, options = {}) {
+  const mode = options.mode || 'fast';
+  const extraSkills = options.extraSkills || [];
+
+  if (mode === 'deep') {
+    const skillsToInvoke = ['/code-review --depth deep', ...extraSkills];
+    const skillsAnnouncement = skillsToInvoke.map(s => `- 执行技能: ${s}`).join('\n');
+
+    return `${skillsToInvoke[0]}
+
+【审查角色与铁律】
+你是严格的代码质量守护者与架构审查员。
+你【绝对严禁】修改任何文件，【绝对严禁】调用 Edit/Write 工具，你仅负责指出问题并提供修改指导！所有后续修复由 Gemini 承担。
+
+【审查技能管道要求】
+本次审查必须同时满足以下技能的审查标准与深度核验：
+${skillsAnnouncement}
+
+【审查目标】
+Pull Request #${prNumber} ("${title}")
+PR 版本 (head SHA): ${headRefOid}
+PR 分支: ${headRefName} -> ${baseRefName}
+PR 说明:
+${bodyText}
+
+关联需求与验收标准:
+${issueContext}
+
+代码变更 (Git Diff):
+\`\`\`diff
+${diff}
+\`\`\`
+
+【输出格式规范（硬性语法，严禁违反）】
+你的判定标头必须独立成行，且必须严格为以下两行之一：
+RESULT: [APPROVED]
+或
+RESULT: [CHANGES_REQUESTED]
+
+（注意：该判定标头必须独立成行且在全文唯一明确，任何模糊或冲突标头都会触发自动化门禁失败关闭！）
+
+紧接着按照以下结构输出详细分析，确保给 Gemini 留下明确可执行的修复指引：
+### 1. 评审结论概述
+(说明是否达到合并标准，总体评价)
+
+### 2. 验收标准逐条核对
+- [x] 或 [ ] 验收点 1: 说明
+- [x] 或 [ ] 验收点 2: 说明
+
+### 3. 详细缺陷清单与修改指导 (供 Gemini 修复使用)
+- **[缺陷级别: 阻断/高/中/低] 文件路径:行号**
+  - **问题分析**: 说明根本原因或违背规范之处
+  - **修复建议**: 给出具体的代码改法或方案建议
+
+### 4. 总结
+(若通过说明合格；若未通过则列出 Gemini 返修优先级顺序)
+`;
+  }
+
+  // fast 模式：不注入 /code-review 技能指令，直接依靠单轮高聚焦 Prompt 进行需求比对与代码审查
+  return `【审查角色与铁律】
+你是严格的代码质量守护者与需求验收员。
+你【绝对严禁】修改任何文件，【绝对严禁】调用 Edit/Write 工具，你仅负责指出问题并提供修改指导！所有后续修复由 Gemini 承担。
+
+【审查目标】
+Pull Request #${prNumber} ("${title}")
+PR 版本 (head SHA): ${headRefOid}
+PR 分支: ${headRefName} -> ${baseRefName}
+PR 说明:
+${bodyText}
+
+关联需求与验收标准:
+${issueContext}
+
+代码变更 (Git Diff):
+\`\`\`diff
+${diff}
+\`\`\`
+
+【审查模式与要求】
+本次采用快速聚焦审查模式（Fast Review），无需遍历全仓。
+请直接比对上述代码变更（Git Diff）与关联 Issue 的需求及【验收标准 Checklist】：
+1. 需求与验收项是否逐条达成，是否存在遗漏或未完成项；
+2. 代码改动是否存在明显的逻辑缺陷、边界异常、死循环、并发竞争或破坏现有契约的隐患；
+3. 测试用例与改动是否匹配完备。
+
+【输出格式规范（硬性语法，严禁违反）】
+你的判定标头必须独立成行，且必须严格为以下两行之一：
+RESULT: [APPROVED]
+或
+RESULT: [CHANGES_REQUESTED]
+
+（注意：该判定标头必须独立成行且在全文唯一明确，任何模糊或冲突标头都会触发自动化门禁失败关闭！）
+
+紧接着按照以下结构输出详细分析，确保给 Gemini 留下明确可执行的修复指引：
+### 1. 评审结论概述
+(说明是否达到合并标准，总体评价)
+
+### 2. 验收标准逐条核对
+- [x] 或 [ ] 验收点 1: 说明
+- [x] 或 [ ] 验收点 2: 说明
+
+### 3. 详细缺陷清单与修改指导 (供 Gemini 修复使用)
+- **[缺陷级别: 阻断/高/中/低] 文件路径:行号**
+  - **问题分析**: 说明根本原因或违背规范之处
+  - **修复建议**: 给出具体的代码改法或方案建议
+
+### 4. 总结
+(若通过说明合格；若未通过则列出 Gemini 返修优先级顺序)
+`;
+}
+
 export async function reviewPR(prNumber, options = {}) {
   const num = Number(prNumber);
   if (!Number.isInteger(num) || num <= 0) {
@@ -290,6 +417,7 @@ export async function reviewPR(prNumber, options = {}) {
   }
 
   const dryRun = options.dryRun || false;
+  const mode = options.mode || 'fast';
   const extraSkills = options.extraSkills || [];
 
   console.log(`[1/4] 获取 PR #${num} 详情与变更 Diff...`);
@@ -332,64 +460,28 @@ export async function reviewPR(prNumber, options = {}) {
     issueContext = '（未明确关联 Issue，请严格核验 PR 描述中的验收条件与通用工程稳健性）';
   }
 
-  // 组装审查 Skill 管道
-  const skillsToInvoke = ['/code-review --depth deep', ...extraSkills];
-  const skillsAnnouncement = skillsToInvoke.map(s => `- 执行技能: ${s}`).join('\n');
+  if (mode === 'deep') {
+    const skillsToInvoke = ['/code-review --depth deep', ...extraSkills];
+    const skillsAnnouncement = skillsToInvoke.map(s => `- 执行技能: ${s}`).join('\n');
+    console.log(`[2/4] 组装深度审查上下文 (Deep Review 模式)，挂载技能管道并唤起 Claude Code...`);
+    console.log(`已加载审查技能:\n${skillsAnnouncement}\n`);
+  } else {
+    console.log(`[2/4] 组装轻量审查上下文 (Fast Review 极速模式，聚焦 Diff 与 Issue 验收项)...`);
+  }
 
-  console.log(`[2/4] 组装审查上下文，挂载技能管道并唤起 Claude Code...`);
-  console.log(`已加载审查技能:\n${skillsAnnouncement}\n`);
+  const reviewPrompt = buildReviewPrompt({
+    prNumber: pr.number,
+    title: pr.title,
+    headRefOid: initialHeadOid,
+    headRefName: pr.headRefName,
+    baseRefName: pr.baseRefName,
+    bodyText,
+    issueContext,
+    diff
+  }, { mode, extraSkills });
 
-  const reviewPrompt = `${skillsToInvoke[0]}
-
-【审查角色与铁律】
-你是严格的代码质量守护者与架构审查员。
-你【绝对严禁】修改任何文件，【绝对严禁】调用 Edit/Write 工具，你仅负责指出问题并提供修改指导！所有后续修复由 Gemini 承担。
-
-【审查技能管道要求】
-本次审查必须同时满足以下技能的审查标准与深度核验：
-${skillsAnnouncement}
-
-【审查目标】
-Pull Request #${pr.number} ("${pr.title}")
-PR 版本 (head SHA): ${initialHeadOid}
-PR 分支: ${pr.headRefName} -> ${pr.baseRefName}
-PR 说明:
-${bodyText}
-
-关联需求与验收标准:
-${issueContext}
-
-代码变更 (Git Diff):
-\`\`\`diff
-${diff}
-\`\`\`
-
-【输出格式规范（硬性语法，严禁违反）】
-你的判定标头必须独立成行，且必须严格为以下两行之一：
-RESULT: [APPROVED]
-或
-RESULT: [CHANGES_REQUESTED]
-
-（注意：该判定标头必须独立成行且在全文唯一明确，任何模糊或冲突标头都会触发自动化门禁失败关闭！）
-
-紧接着按照以下结构输出详细分析，确保给 Gemini 留下明确可执行的修复指引：
-### 1. 评审结论概述
-(说明是否达到合并标准，总体评价)
-
-### 2. 验收标准逐条核对
-- [x] 或 [ ] 验收点 1: 说明
-- [x] 或 [ ] 验收点 2: 说明
-
-### 3. 详细缺陷清单与修改指导 (供 Gemini 修复使用)
-- **[缺陷级别: 阻断/高/中/低] 文件路径:行号**
-  - **问题分析**: 说明根本原因或违背规范之处
-  - **修复建议**: 给出具体的代码改法或方案建议
-
-### 4. 总结
-(若通过说明合格；若未通过则列出 Gemini 返修优先级顺序)
-`;
-
-  const reviewResult = await runClaudeReview(reviewPrompt);
+  const timeoutMs = options.timeoutMs || (mode === 'deep' ? 20 * 60 * 1000 : 5 * 60 * 1000);
+  const reviewResult = await runClaudeReview(reviewPrompt, { timeoutMs, mode });
   console.log(`[3/4] Claude Code 审查完成，分析审查结论...\n`);
   console.log('----------------------------------------------------');
   console.log(reviewResult);
@@ -526,6 +618,7 @@ async function main() {
   const args = process.argv.slice(2);
   let prNumber = null;
   let dryRun = false;
+  let mode = 'fast'; // 默认 fast 极速轻量审查模式
   const extraSkills = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -537,6 +630,13 @@ async function main() {
       i++;
     } else if (args[i] === '--dry-run') {
       dryRun = true;
+    } else if (args[i] === '--fast') {
+      mode = 'fast';
+    } else if (args[i] === '--deep') {
+      mode = 'deep';
+    } else if (args[i] === '--mode' && args[i + 1]) {
+      mode = args[i + 1];
+      i++;
     }
   }
 
@@ -555,12 +655,12 @@ async function main() {
   const lock = new ProcessFileLock({
     file: lockFile,
     failFast: true,
-    metadata: { entrypoint: 'review-with-claude', pr: prNumber }
+    metadata: { entrypoint: 'review-with-claude', pr: prNumber, mode }
   });
 
   try {
     await lock.run(async () => {
-      await reviewPR(prNumber, { dryRun, extraSkills });
+      await reviewPR(prNumber, { dryRun, mode, extraSkills });
     });
   } catch (err) {
     if (err.code === 'PROCESS_LOCK_HELD') {

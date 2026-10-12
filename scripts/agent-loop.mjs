@@ -346,7 +346,7 @@ export async function handleNext(options = {}) {
   const reviewPR = prs.find(p => hasLabel(p, 'needs-review'));
   if (reviewPR) {
     console.log(`[DISPATCH] 发现待审查 PR: PR #${reviewPR.number}`);
-    console.log(`正在触发 Claude Code 审查脚本 (加载 /code-review 技能)...\n`);
+    console.log(`正在触发 Claude Code 审查脚本 (Fast Review 极速轻量模式)...\n`);
 
     // 显式执行审查，外层设置 25 分钟安全超时，大于内层 20 分钟以保留内层清晰诊断
     try {

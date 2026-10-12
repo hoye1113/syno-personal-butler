@@ -11,7 +11,8 @@ import {
   extractLinkedIssueNumber,
   EXIT_BUSY,
   sendToast,
-  formatReviewSummaryForCard
+  formatReviewSummaryForCard,
+  buildReviewPrompt
 } from '../scripts/review-with-claude.mjs';
 import {
   trackApprovedTimeout,
@@ -405,4 +406,60 @@ test('formatReviewSummaryForCard: 审查报告精炼提取为飞书卡片可读�
   // 3. 边界空值测试
   assert.equal(formatReviewSummaryForCard('', false), '');
   assert.equal(formatReviewSummaryForCard(null, true), '');
+});
+
+test('buildReviewPrompt: 极速轻量审查模式 (fast review mode) 契约断言', () => {
+  const sampleContext = {
+    prNumber: 42,
+    title: 'fix(pipeline): support fast review mode',
+    headRefOid: 'abcdef1234567890abcdef1234567890abcdef12',
+    headRefName: 'feat/fast-review',
+    baseRefName: 'main',
+    bodyText: 'Fixes #10\nThis PR introduces fast review mode.',
+    issueContext: 'Issue #10: 支持快速审查\n验收标准:\n- [ ] 消除沉重全仓遍历',
+    diff: 'diff --git a/test.txt b/test.txt\n+fast mode'
+  };
+
+  // 1. 默认或显式 fast 模式：绝不包含 /code-review 指令前缀，杜绝触发 Claude CLI 多轮全仓漫游
+  const fastPromptDefault = buildReviewPrompt(sampleContext);
+  const fastPromptExplicit = buildReviewPrompt(sampleContext, { mode: 'fast' });
+
+  for (const prompt of [fastPromptDefault, fastPromptExplicit]) {
+    assert.doesNotMatch(prompt, /\/code-review/, 'fast 模式绝不能包含 /code-review 技能前缀');
+    assert.match(prompt, /快速聚焦审查模式（Fast Review）/);
+    assert.match(prompt, /Pull Request #42/);
+    assert.match(prompt, /abcdef1234567890abcdef1234567890abcdef12/);
+    assert.match(prompt, /feat\/fast-review -> main/);
+    assert.match(prompt, /Issue #10: 支持快速审查/);
+    assert.match(prompt, /diff --git a\/test\.txt b\/test\.txt/);
+    assert.match(prompt, /RESULT: \[APPROVED\]/);
+    assert.match(prompt, /RESULT: \[CHANGES_REQUESTED\]/);
+  }
+
+  // 2. deep 模式：必须包含 /code-review --depth deep 及技能管道声明
+  const deepPrompt = buildReviewPrompt(sampleContext, {
+    mode: 'deep',
+    extraSkills: ['/perf-audit']
+  });
+
+  assert.match(deepPrompt, /^\/code-review --depth deep/, 'deep 模式首行必须包含 /code-review --depth deep 指令');
+  assert.match(deepPrompt, /执行技能: \/code-review --depth deep/);
+  assert.match(deepPrompt, /执行技能: \/perf-audit/);
+  assert.match(deepPrompt, /Pull Request #42/);
+});
+
+test('审查脚本与调度器模式契约：默认 fast 极速审查，支持 --fast, --deep 与 --mode 参数', async () => {
+  const reviewScript = await fs.readFile(path.resolve('scripts/review-with-claude.mjs'), 'utf8');
+
+  // 1. 默认 mode 必须为 fast
+  assert.match(reviewScript, /let mode = 'fast'/);
+
+  // 2. 支持命令行参数切换
+  assert.match(reviewScript, /args\[i\] === '--fast'/);
+  assert.match(reviewScript, /args\[i\] === '--deep'/);
+  assert.match(reviewScript, /args\[i\] === '--mode'/);
+
+  // 3. 调度脚本日常审查优先走 Fast Review 极速模式
+  const loopScript = await fs.readFile(path.resolve('scripts/agent-loop.mjs'), 'utf8');
+  assert.match(loopScript, /Fast Review 极速轻量模式/);
 });
