@@ -9,7 +9,7 @@
  * 架构特性：
  * 1. 跨进程互斥锁（ProcessFileLock）与忙状态保护，路径锚定 REPO_ROOT
  * 2. 严密的错误传播机制：非零退出与 JSON 解析失败拒绝误报 IDLE
- * 3. 完整候选集扫描（--limit 1000），防止分页截断优先级任务
+ * 3. 完整 GraphQL 全量分页扫描（--paginate --slurp），消除固定上限，防止分页截断优先级任务
  * 4. 保护脏工作区（忽略子模块内部构建产物脏改动），安全可回滚分支检出
  * 5. 审查子进程异常显式暴露，外层设置 25 分钟安全超时
  * 6. 首见 approved 时间戳去重告警，契约对齐
@@ -45,21 +45,119 @@ export function runGh(args) {
   }
 }
 
-export function getOpenIssues() {
-  const raw = runGh(['issue', 'list', '--state', 'open', '--limit', '1000', '--json', 'number,title,labels,createdAt']);
+export const ISSUES_PAGINATED_QUERY = `query($owner: String!, $repo: String!, $endCursor: String) {
+  repository(owner: $owner, name: $repo) {
+    issues(states: OPEN, first: 100, after: $endCursor) {
+      nodes {
+        number
+        title
+        body
+        createdAt
+        labels(first: 50) {
+          nodes { name }
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}`;
+
+export const PRS_PAGINATED_QUERY = `query($owner: String!, $repo: String!, $endCursor: String) {
+  repository(owner: $owner, name: $repo) {
+    pullRequests(states: OPEN, first: 100, after: $endCursor) {
+      nodes {
+        number
+        title
+        body
+        headRefName
+        headRefOid
+        isDraft
+        createdAt
+        labels(first: 50) {
+          nodes { name }
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}`;
+
+export function parseGraphQLIssuesPages(pagesRaw) {
+  const pages = typeof pagesRaw === 'string' ? JSON.parse(pagesRaw) : pagesRaw;
+  if (!Array.isArray(pages)) throw new Error('GraphQL 分页数据必须为数组格式');
+  const issues = [];
+  for (const page of pages) {
+    const nodes = page?.data?.repository?.issues?.nodes || [];
+    for (const node of nodes) {
+      issues.push({
+        number: node.number,
+        title: node.title,
+        body: node.body || '',
+        createdAt: node.createdAt,
+        labels: (node.labels?.nodes || []).map(l => ({ name: l.name }))
+      });
+    }
+  }
+  return issues;
+}
+
+export function parseGraphQLPRsPages(pagesRaw) {
+  const pages = typeof pagesRaw === 'string' ? JSON.parse(pagesRaw) : pagesRaw;
+  if (!Array.isArray(pages)) throw new Error('GraphQL 分页数据必须为数组格式');
+  const prs = [];
+  for (const page of pages) {
+    const nodes = page?.data?.repository?.pullRequests?.nodes || [];
+    for (const node of nodes) {
+      prs.push({
+        number: node.number,
+        title: node.title,
+        body: node.body || '',
+        headRefName: node.headRefName,
+        headRefOid: node.headRefOid,
+        isDraft: Boolean(node.isDraft),
+        createdAt: node.createdAt,
+        labels: (node.labels?.nodes || []).map(l => ({ name: l.name }))
+      });
+    }
+  }
+  return prs;
+}
+
+export function getOpenIssues(options = {}) {
+  const runner = options.runner || runGh;
+  const raw = runner([
+    'api', 'graphql',
+    '--paginate', '--slurp',
+    '-F', 'owner=:owner',
+    '-F', 'repo=:repo',
+    '-f', `query=${ISSUES_PAGINATED_QUERY}`
+  ]);
   try {
-    return JSON.parse(raw);
+    return parseGraphQLIssuesPages(raw);
   } catch (e) {
-    throw new Error(`解析 GitHub Issue 列表 JSON 失败: ${e.message}。原始数据:\n${raw}`);
+    throw new Error(`解析 GitHub Issue 分页数据失败: ${e.message}。原始数据:\n${raw}`);
   }
 }
 
-export function getOpenPRs() {
-  const raw = runGh(['pr', 'list', '--state', 'open', '--limit', '1000', '--json', 'number,title,labels,headRefName,headRefOid,isDraft,createdAt']);
+export function getOpenPRs(options = {}) {
+  const runner = options.runner || runGh;
+  const raw = runner([
+    'api', 'graphql',
+    '--paginate', '--slurp',
+    '-F', 'owner=:owner',
+    '-F', 'repo=:repo',
+    '-f', `query=${PRS_PAGINATED_QUERY}`
+  ]);
   try {
-    return JSON.parse(raw);
+    return parseGraphQLPRsPages(raw);
   } catch (e) {
-    throw new Error(`解析 GitHub PR 列表 JSON 失败: ${e.message}。原始数据:\n${raw}`);
+    throw new Error(`解析 GitHub PR 分页数据失败: ${e.message}。原始数据:\n${raw}`);
   }
 }
 
@@ -158,9 +256,9 @@ export function printStatus() {
   console.log('\n====================================================');
 }
 
-export async function handleNext() {
-  const prs = getOpenPRs();
-  const issues = getOpenIssues();
+export async function handleNext(options = {}) {
+  const prs = options.prs || getOpenPRs();
+  const issues = options.issues || getOpenIssues();
 
   // 0. 超时兜底无条件评估：对所有 approved PR 进行检查并触发超时通知
   const approvedPRs = prs.filter(p => hasLabel(p, 'approved'));

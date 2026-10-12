@@ -174,13 +174,24 @@ export async function sendToast(title, body) {
         }
       }, 10000);
 
-      const child = spawn('powershell.exe', [
-        '-NoProfile',
-        '-ExecutionPolicy', 'Bypass',
-        '-Command', psCommand,
-        tB64,
-        bB64
-      ], { cwd: REPO_ROOT, windowsHide: true, stdio: 'ignore' });
+      let child;
+      try {
+        child = spawn('powershell.exe', [
+          '-NoProfile',
+          '-ExecutionPolicy', 'Bypass',
+          '-Command', psCommand,
+          tB64,
+          bB64
+        ], { cwd: REPO_ROOT, windowsHide: true, stdio: 'ignore' });
+      } catch (spawnErr) {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          console.warn(`[Toast Warning] 派生通知子进程同步失败: ${spawnErr.message}`);
+          resolveToast(false);
+        }
+        return;
+      }
 
       child.on('error', err => {
         if (!settled) {
@@ -353,14 +364,13 @@ ${issueContext}
 ${diff}
 \`\`\`
 
-【输出格式强制规范（硬性语法，严禁违反）】
-⚠️ 机器解析器硬性约束：你的回答第 1 行、第 1 个字符必须直接是判定标识，绝对不得在第一行前面或同一行包含任何前言、开场白、总结、过渡句或问候语！
-回复第一行必须严格为以下两行之一（不得有任何前置文本）：
+【输出格式规范（硬性语法，严禁违反）】
+你的判定标头必须独立成行，且必须严格为以下两行之一：
 RESULT: [APPROVED]
 或
 RESULT: [CHANGES_REQUESTED]
 
-（注意：任何在第一行前输出前置说明文字的行为都会触发自动化门禁判定失败中断！）
+（注意：该判定标头必须独立成行且在全文唯一明确，任何模糊或冲突标头都会触发自动化门禁失败关闭！）
 
 紧接着按照以下结构输出详细分析，确保给 Gemini 留下明确可执行的修复指引：
 ### 1. 评审结论概述

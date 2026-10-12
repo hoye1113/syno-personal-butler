@@ -13,7 +13,12 @@ import {
   sendToast,
   formatReviewSummaryForCard
 } from '../scripts/review-with-claude.mjs';
-import { trackApprovedTimeout } from '../scripts/agent-loop.mjs';
+import {
+  trackApprovedTimeout,
+  parseGraphQLPRsPages,
+  parseGraphQLIssuesPages,
+  handleNext
+} from '../scripts/agent-loop.mjs';
 import { ProcessFileLock } from '../packages/syno-core/process-lock.mjs';
 
 test('parseReviewDecision: 独立判定行提取、开场白兼容与抗正文误导', () => {
@@ -115,9 +120,75 @@ test('审查工具只读边界：白名单仅允许 Read,Glob,Grep，严格剔�
   assert.doesNotMatch(scriptContent, /'--tools',\s*'.*Write.*'/);
 });
 
-test('调度器与审查脚本：查询全量包含 --limit 1000 避免分页截断', async () => {
+test('调度器与审查脚本：GraphQL 全量分页扫描（--paginate --slurp）消除固定上限', async () => {
   const loopScript = await fs.readFile(path.resolve('scripts/agent-loop.mjs'), 'utf8');
-  assert.match(loopScript, /'--limit',\s*'1000'/);
+  assert.match(loopScript, /'--paginate',\s*'--slurp'/);
+  assert.doesNotMatch(loopScript, /'--limit'/);
+  assert.match(loopScript, /ISSUES_PAGINATED_QUERY/);
+  assert.match(loopScript, /PRS_PAGINATED_QUERY/);
+});
+
+test('分页回归验证：超过单页上限（>100 条）仍能完整获取多页数据，且深页中较旧的返修任务保持最高优先级', async () => {
+  // 1. 模拟多页 GraphQL 响应（第一页 100 条普通 PR，第二页包含 1 条较旧的 changes-requested PR）
+  const page1PRs = Array.from({ length: 100 }, (_, i) => ({
+    number: i + 1,
+    title: `PR #${i + 1}`,
+    body: `Body #${i + 1}`,
+    headRefName: `feat/branch-${i + 1}`,
+    headRefOid: `sha-${i + 1}`,
+    isDraft: false,
+    createdAt: new Date(Date.now() - (100 - i) * 60000).toISOString(),
+    labels: { nodes: [] }
+  }));
+
+  const olderFixPR = {
+    number: 999,
+    title: 'PR #999 需要返修',
+    body: 'Fixes #42',
+    headRefName: 'feat/branch-older-fix',
+    headRefOid: 'sha-older-fix-999',
+    isDraft: false,
+    createdAt: new Date(Date.now() - 3600000).toISOString(),
+    labels: { nodes: [{ name: 'changes-requested' }] }
+  };
+
+  const simulatedPages = [
+    {
+      data: {
+        repository: {
+          pullRequests: {
+            nodes: page1PRs,
+            pageInfo: { hasNextPage: true, endCursor: 'cursor-page-1' }
+          }
+        }
+      }
+    },
+    {
+      data: {
+        repository: {
+          pullRequests: {
+            nodes: [olderFixPR],
+            pageInfo: { hasNextPage: false, endCursor: 'cursor-page-2' }
+          }
+        }
+      }
+    }
+  ];
+
+  // 2. 验证 parseGraphQLPRsPages 能够穿透多页全部提取（总数 101 条，突破单页上限）
+  const allParsedPRs = parseGraphQLPRsPages(simulatedPages);
+  assert.equal(allParsedPRs.length, 101, '解析结果必须包含多页全部 101 条数据');
+  assert.equal(allParsedPRs[100].number, 999);
+  assert.equal(allParsedPRs[100].body, 'Fixes #42');
+
+  // 3. 验证调度器 handleNext 在 100+ 候选集中，精准找到位于第二页较旧的 changes-requested PR 并优先分发
+  const dispatchRes = await handleNext({
+    prs: allParsedPRs,
+    issues: []
+  });
+
+  assert.equal(dispatchRes.action, 'FIX_PR', '深页中的待返修任务必须获得最高分发优先级');
+  assert.equal(dispatchRes.prNumber, 999, '必须命中深页中的 PR #999');
 });
 
 test('调度与审查锁：failFast 机制防止并发重叠', async (t) => {
