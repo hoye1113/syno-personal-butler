@@ -223,7 +223,7 @@ export async function sendToast(title, body) {
  * - --tools Read,Glob,Grep: 绝对禁止 Edit, Write, Bash，确保物理只读！
  */
 export async function runClaudeReview(prompt, options = {}) {
-  const timeoutMs = options.timeoutMs || 20 * 60 * 1000;
+  const timeoutMs = options.timeoutMs || (options.mode === 'deep' ? 20 * 60 * 1000 : 12 * 60 * 1000);
 
   return new Promise((resolvePromise, reject) => {
     const child = spawn('claude', [
@@ -480,7 +480,7 @@ export async function reviewPR(prNumber, options = {}) {
     diff
   }, { mode, extraSkills });
 
-  const timeoutMs = options.timeoutMs || (mode === 'deep' ? 20 * 60 * 1000 : 5 * 60 * 1000);
+  const timeoutMs = options.timeoutMs || (mode === 'deep' ? 20 * 60 * 1000 : 12 * 60 * 1000);
   const reviewResult = await runClaudeReview(reviewPrompt, { timeoutMs, mode });
   console.log(`[3/4] Claude Code 审查完成，分析审查结论...\n`);
   console.log('----------------------------------------------------');
