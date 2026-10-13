@@ -12,6 +12,7 @@ import {
   resolveWebLaunch,
 } from "../apps/syno/syno/deepseek-harness-supervisor.mjs";
 import { DEFAULT_WEB_PORT } from "../packages/syno-core/paths.mjs";
+import { locateCommand } from "../packages/syno-core/process-runner.mjs";
 import { defaultSynoSecretLoader } from "../apps/syno/syno/syno-key-loader.mjs";
 
 async function fileExists(file) {
@@ -105,9 +106,13 @@ async function doctor({
     dangerFullAccess: false,
     dynamicMcp: false,
   });
+  for (const [name, variable] of [["bsk", "SYNO_BSK_COMMAND"], ["lark-cli", "LARK_CLI_PATH"]]) {
+    const command = locateCommand(name, variable);
+    checks.push({ name, required: false, ok: path.isAbsolute(command) && await fileExists(command) });
+  }
   const configuredRoot = defaultDshRoot();
   return {
-    ok: checks.filter((item) => !["kimi-key", "search-keys"].includes(item.name)).every((item) => item.ok),
+    ok: checks.filter((item) => item.required !== false && !["kimi-key", "search-keys"].includes(item.name)).every((item) => item.ok),
     runtime: process.env.SYNO_COGNITIVE_RUNTIME || "deepseek-harness",
     dshRootConfigured: Boolean(configuredRoot),
     ...(configuredRoot ? { dshRoot: configuredRoot } : {}),

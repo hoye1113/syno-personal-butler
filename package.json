@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node apps/syno/server.mjs",
     "start:test": "node scripts/start-test-host.mjs",
-    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
+    "test": "node scripts/run-tests.mjs",
     "verify": "node scripts/verify-repository.mjs && node scripts/check-active-docs.mjs",
     "check:docs": "node scripts/check-active-docs.mjs",
     "state:archive": "node scripts/state-archive.mjs",
@@ -23,7 +23,7 @@
     "probe:provider-real": "node scripts/probe-provider-real.mjs",
     "harness:doctor": "node scripts/deepseek-harness-runtime.mjs doctor",
     "harness:status": "node scripts/deepseek-harness-runtime.mjs status",
-    "harness:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-harness.ps1",
+    "harness:setup": "node scripts/setup-harness.mjs",
     "harness:build": "pnpm --dir vendor/deepseek-harness run build",
     "probe:harness": "node scripts/probe-harness.mjs",
     "spike:capabilities": "node scripts/spike-capabilities.mjs",

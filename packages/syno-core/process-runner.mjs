@@ -1,9 +1,16 @@
 import { spawn, execFile, execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, accessSync, statSync, constants } from "node:fs";
 import path from "node:path";
 
-function locateCommand(name, envName) {
-  if (process.env[envName]) return process.env[envName];
+function locateCommand(name, envName, { env = process.env, platform = process.platform } = {}) {
+  if (env[envName]) return env[envName];
+  if (platform !== "win32") {
+    for (const directory of String(env.PATH || "").split(path.delimiter).filter(Boolean)) {
+      const candidate = path.resolve(directory, name);
+      try { accessSync(candidate, constants.X_OK); if (statSync(candidate).isFile()) return candidate; } catch {}
+    }
+    return name;
+  }
   try {
     const matches = execFileSync("where.exe", [name], { encoding: "utf8", windowsHide: true, stdio: ["ignore", "pipe", "ignore"] })
       .split(/\r?\n/)
