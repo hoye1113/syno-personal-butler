@@ -220,6 +220,7 @@ function harnessChildEnvironment(source = process.env) {
     "APPDATA", "COMSPEC", "HOMEDRIVE", "HOMEPATH", "LOCALAPPDATA", "NODE_EXTRA_CA_CERTS",
     "NO_PROXY", "PATH", "PATHEXT", "SYSTEMDRIVE", "SYSTEMROOT", "TEMP", "TMP", "USERPROFILE",
     "WINDIR", "HTTP_PROXY", "HTTPS_PROXY",
+    "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE", "LC_MESSAGES", "LC_TIME", "LC_NUMERIC", "LC_COLLATE", "LC_MONETARY",
     // B5 工具面/通道双轨开关：只控制插件行为，不含凭据，按需透传给 DSH 子进程。
     "SYNO_CAPABILITIES_TOOLS", "SYNO_CHANNEL_OWNER", "SYNO_CHAT_TOOLS",
   ]);
