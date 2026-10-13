@@ -79,7 +79,7 @@ function registerCoreTools(ctx) {
   }));
   ctx.tools.register(defineTool({
     name: canonicalToolName(FETCH_URL_TOOL_NAME),
-    description: "抓取并读取一个公网网页的正文（in-process 试用工具，直抓；浏览器升级与续办在通道迁移后接入）",
+    description: "受控直抓公网网页正文；没有浏览器升级或续办。blocked 非空表示未取得正文，不得把验证页当文章；可搜索公开替代来源，不请求接管",
     parameters: {
       url: { type: "string", required: true, description: "公网 URL" },
       maxChars: { type: "integer", description: "正文上限（1000-100000）" },

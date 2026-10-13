@@ -13,7 +13,7 @@ async function fetchKnowledgeUrl({ url, maxChars, fetcher = null } = {}) {
   } catch (error) {
     if (error?.code === "SOURCE_URL_RESERVED_ADDRESS") {
       throw Object.assign(
-        new Error("当前本机网络把该网址解析为受保护地址，读取被拒绝；续办重试随通道迁移接入。"),
+        new Error("该网址指向受保护地址，读取已拒绝；本次未保存续办，稍后可重新发送链接重试。"),
         { code: error.code, retryable: true },
       );
     }

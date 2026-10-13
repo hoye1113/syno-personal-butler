@@ -32,3 +32,14 @@ test("capabilities fetch url surfaces fetch failures instead of inventing conten
       && /受保护地址/.test(error.message),
   );
 });
+
+test("direct verification pages return a blocker rather than apparent article content", async () => {
+  const result = JSON.parse(await fetchKnowledgeUrl({
+    url: "https://mp.weixin.qq.com/s/example",
+    fetcher: async (url) => ({ url, contentType: "text/html", text: "当前环境异常，完成验证后即可继续访问。去验证 ORIGINAL_WALL", truncated: false }),
+  }));
+  assert.equal(result.via, "direct");
+  assert.equal(result.blocked, "verification_page");
+  assert.match(result.content, /未取得.*正文/);
+  assert.doesNotMatch(result.content, /ORIGINAL_WALL|回复.*继续/);
+});

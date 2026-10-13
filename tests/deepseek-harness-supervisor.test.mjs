@@ -162,6 +162,11 @@ test("Syno agent instructions match the shared core chat tool set", async () => 
   // 搜索恢复：web_search 指引与「不可信数据」防注入规约必须写在提示词里
   assert.match(instructions, /web_search/);
   assert.match(instructions, /不可信数据/);
+  assert.match(instructions, /具体 URL.*syno_knowledge_fetch_url/);
+  assert.match(instructions, /不得.*web_fetch.*绕过/);
+  assert.match(instructions, /blocked.*未取得正文/);
+  assert.match(instructions, /默认插件.*直抓/);
+  assert.doesNotMatch(instructions, /告知主人完成后回复|先.*web_search.*再.*web_fetch/);
 });
 
 test("cordis configs live in the Syno repo and never inline API keys", async () => {
