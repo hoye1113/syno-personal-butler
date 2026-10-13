@@ -124,13 +124,14 @@ function defaultKillTree(pid) {
 }
 
 function waitForExit(child, timeoutMs) {
-  if (!child || child.exitCode !== null) return Promise.resolve(child?.exitCode ?? 0);
+  // 被信号终止的子进程 exitCode 保持 null（记录在 signalCode），两个字段都要视为已退出。
+  if (!child || child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
   return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(null), timeoutMs);
+    const timer = setTimeout(() => resolve(false), timeoutMs);
     timer.unref?.();
-    child.once("exit", (code) => {
+    child.once("exit", () => {
       clearTimeout(timer);
-      resolve(code);
+      resolve(true);
     });
   });
 }
@@ -907,7 +908,7 @@ class DeepSeekHarnessSupervisor {
     };
     // 停止必须验证直系子进程确实退出；清理失败要显式报错，不能静默丢弃 slot。
     const assertStopped = async (timeoutMs) => {
-      if (await waitForExit(child, timeoutMs) !== null) return;
+      if (await waitForExit(child, timeoutMs)) return;
       throw runtimeError(
         "HARNESS_PROCESS_TREE_ALIVE",
         `DeepSeek Harness ${slot.profile} 停止失败：pid=${child?.pid ?? "unknown"} 仍在运行`,
@@ -935,12 +936,12 @@ class DeepSeekHarnessSupervisor {
     if (!child.killed && child.stdin && !child.stdin.destroyed) {
       try { child.stdin.end(); } catch {}
     }
-    if (await waitForExit(child, 6_000) !== null) {
+    if (await waitForExit(child, 6_000)) {
       await killOwnedTree();
       return;
     }
     try { child.kill(); } catch {}
-    if (await waitForExit(child, 3_000) !== null) {
+    if (await waitForExit(child, 3_000)) {
       await killOwnedTree();
       return;
     }
