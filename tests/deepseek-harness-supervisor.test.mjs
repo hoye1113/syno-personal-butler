@@ -232,6 +232,21 @@ test("launch discovery selects official DSH SDK profiles only with a complete ru
   assert.equal(launch.argsPrefix.at(-1), path.join(root, "apps", "cli", "lib", "bin.js"));
 });
 
+test("launch discovery follows installed external scoped dependencies and still rejects missing entries", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-external-closure-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const configDir = await writeDshLaunchFixture(root);
+  const importer = path.join(root, "packages", "bundle", "sdk-app");
+  const external = path.join(importer, "node_modules", "@deepseek-ai", "external-kit");
+  await writeRuntimePackage(importer, "@deepseek-ai/dsh-sdk-app", { dependencies: { "@deepseek-ai/external-kit": "1.0.0" } });
+  await writeRuntimePackage(external, "@deepseek-ai/external-kit");
+  assert.equal((await resolveHarnessLaunch({ dshRoot: root, configDir, fakeAgent: "" })).bootable, true);
+  await fs.rm(path.join(external, "lib", "index.js"));
+  const broken = await resolveHarnessLaunch({ dshRoot: root, configDir, fakeAgent: "" });
+  assert.equal(broken.bootable, false);
+  assert.ok(broken.runtimeClosure.missing.some((item) => item.includes("external-kit")));
+});
+
 test("launch discovery rejects a package manifest without a built runtime entry", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-harness-entry-missing-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));

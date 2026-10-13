@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
+import { createRequire } from "node:module";
 
 import { DeepSeekHarnessJsonRpcClient } from "./deepseek-harness-jsonrpc-client.mjs";
 import { DeepSeekHarnessWebClient } from "./deepseek-harness-web-client.mjs";
@@ -335,6 +336,20 @@ async function discoverDshPackageRoots(dshRoot) {
   return roots;
 }
 
+function installedPackageRoot(name, importer) {
+  const require = createRequire(path.join(importer, "package.json"));
+  try { return path.dirname(require.resolve(`${name}/package.json`)); } catch {}
+  try {
+    let directory = path.dirname(require.resolve(name));
+    while (path.dirname(directory) !== directory) {
+      const manifest = path.join(directory, "package.json");
+      try { if (JSON.parse(require("node:fs").readFileSync(manifest, "utf8")).name === name) return directory; } catch {}
+      directory = path.dirname(directory);
+    }
+  } catch {}
+  return null;
+}
+
 async function addDshPackageDependencies(required, discoveredRoots) {
   const inspected = new Set();
   const pending = [...required];
@@ -355,6 +370,10 @@ async function addDshPackageDependencies(required, discoveredRoots) {
       ...(manifest.peerDependencies || {}),
     };
     for (const dependencyName of Object.keys(dependencies)) {
+      if (dependencyName.startsWith("@deepseek-ai/") && !discoveredRoots.has(dependencyName)) {
+        const installed = installedPackageRoot(dependencyName, packageRoot);
+        if (installed) discoveredRoots.set(dependencyName, installed);
+      }
       if (dependencyName.startsWith("@deepseek-ai/") && !required.has(dependencyName)) {
         required.add(dependencyName);
         pending.push(dependencyName);
