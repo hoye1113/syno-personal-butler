@@ -140,6 +140,43 @@ test("snippet cursor schema accepts an integer or null and rejects other output 
   }
 });
 
+test("quoted privacy flags are denied consistently by search, plugin and Bridge at every offset", async (t) => {
+  const { knowledge, vaultRoot, indexFile } = await fixture(t);
+  const runtime = createSynoRuntime({ knowledge });
+  for (const flag of ['sensitive: "true"', "private: 'yes'", 'privacy: "private"', "privacy: 'sensitive'", 'sensitive: false\nprivate: "true"']) {
+    await fs.writeFile(path.join(vaultRoot, "01-Areas", "Quoted Private.md"), `---\ntitle: Quoted Private\n${flag}\n---\n${"文".repeat(500)}\nPRIVATE_FIXTURE`, "utf8");
+    knowledge.invalidate();
+    assert.deepEqual(await knowledge.search("Quoted", { includeSensitive: false }), []);
+    assert.deepEqual(JSON.parse(await searchKnowledgeNotes({ query: "Quoted", vaultRoot, indexFile })), []);
+    for (const offset of [0, 300, 10000]) {
+      const args = { path: "vault/01-Areas/Quoted Private.md", offset };
+      await assert.rejects(readKnowledgeSnippetJson(args, { knowledge }), { code: "KNOWLEDGE_SENSITIVE_DENIED" });
+      await assert.rejects(runtime.tools.execute("knowledge.read_snippet", args), { code: "KNOWLEDGE_SENSITIVE_DENIED" });
+    }
+  }
+});
+
+test("knowledge reads reject directory links outside vault and allow links contained in vault", async (t) => {
+  const { knowledge, vaultRoot } = await fixture(t);
+  const runtime = createSynoRuntime({ knowledge });
+  const outside = path.join(path.dirname(vaultRoot), "外部 资料 😀");
+  await fs.mkdir(outside);
+  await fs.writeFile(path.join(outside, "outside.md"), "OUTSIDE_VAULT_FIXTURE", "utf8");
+  const type = process.platform === "win32" ? "junction" : "dir";
+  await fs.symlink(outside, path.join(vaultRoot, "外部链接"), type);
+  const args = { path: "vault/外部链接/outside.md" };
+  await assert.rejects(knowledge.read(args.path), { code: "PATH_OUTSIDE_ROOT" });
+  await assert.rejects(readKnowledgeSnippetJson(args, { knowledge }), { code: "PATH_OUTSIDE_ROOT" });
+  await assert.rejects(runtime.tools.execute("knowledge.read_snippet", args), { code: "PATH_OUTSIDE_ROOT" });
+  await fs.symlink(path.join(vaultRoot, "01-Areas"), path.join(vaultRoot, "内部链接"), type);
+  const read = await knowledge.read("vault/内部链接/Agent Loop.md");
+  assert.match(read.markdown, /循环机制/);
+  assert.equal(read.path, "vault/内部链接/Agent Loop.md");
+  const linkedRoot = path.join(path.dirname(vaultRoot), "vault-alias");
+  await fs.symlink(vaultRoot, linkedRoot, type);
+  assert.match((await new KnowledgeStore({ vaultRoot: linkedRoot }).read("vault/01-Areas/Agent Loop.md")).markdown, /循环机制/);
+});
+
 test("snippet offsets inside a surrogate pair round back and reads remain bounded", async (t) => {
   const { knowledge, vaultRoot } = await fixture(t);
   await fs.writeFile(path.join(vaultRoot, "01-Areas", "Emoji.md"), `甲😀${"乙".repeat(9000)}`, "utf8");

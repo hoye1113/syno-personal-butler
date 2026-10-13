@@ -143,10 +143,7 @@ class AgentHost {
   }
 
   async retryWaitingProvider({ limit = 50, now = new Date() } = {}) {
-    const waiting = (await this.store.list({ limit: Math.max(limit, 100) }))
-      .filter((job) => job.status === "waiting_provider"
-        && (!job.nextRetryAt || new Date(job.nextRetryAt) <= now))
-      .slice(0, limit);
+    const waiting = await this.store.list({ status: "waiting_provider", retryBefore: now, limit });
     const results = [];
     for (const job of waiting) {
       try {

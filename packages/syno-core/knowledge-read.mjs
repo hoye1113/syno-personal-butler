@@ -1,7 +1,12 @@
 import { inspectRemoteContent } from "./sensitive-content.mjs";
+import { frontmatterData } from "./validator.mjs";
 
 function isSensitiveKnowledgeNote(markdown) {
-  return /^(?:sensitive|private):\s*(?:true|yes)$/imu.test(markdown)
+  const { values } = frontmatterData(markdown);
+  const normalized = (key) => String(values[key] || "").toLocaleLowerCase("en-US");
+  return ["sensitive", "private"].some((key) => ["true", "yes"].includes(normalized(key)))
+    || ["private", "sensitive"].includes(normalized("privacy"))
+    || /^(?:sensitive|private):\s*(?:true|yes)$/imu.test(markdown)
     || /^privacy:\s*(?:private|sensitive)$/imu.test(markdown)
     || !inspectRemoteContent(markdown, { maxChars: Number.MAX_SAFE_INTEGER }).safe;
 }

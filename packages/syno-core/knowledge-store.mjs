@@ -4,8 +4,7 @@ import path from "node:path";
 
 import { PATHS, relativeToRoot, resolveInside } from "./paths.mjs";
 import { frontmatterData } from "./validator.mjs";
-import { inspectRemoteContent } from "./sensitive-content.mjs";
-import { assertKnowledgeNotSensitive, sliceKnowledgeText } from "./knowledge-read.mjs";
+import { assertKnowledgeNotSensitive, isSensitiveKnowledgeNote, sliceKnowledgeText } from "./knowledge-read.mjs";
 
 function plainText(markdown) {
   return String(markdown).replace(/^---[\s\S]*?---\s*/m, "").replace(/!\[.*?\]\(.*?\)/g, "")
@@ -70,6 +69,11 @@ class KnowledgeStore {
   #logicalPath(file) {
     return relativeToRoot(path.dirname(this.vaultRoot), file);
   }
+  async #readMarkdown(file) {
+    const [root, target] = await Promise.all([fs.realpath(this.vaultRoot), fs.realpath(file)]);
+    resolveInside(root, target);
+    return fs.readFile(target, "utf8");
+  }
   async #inventory() {
     const files = await walkMarkdown(this.vaultRoot);
     const metadata = await Promise.all(files.map(async (file) => { const stat = await fs.stat(file); return { file, path: path.relative(this.vaultRoot, file).replace(/\\/g, "/"), size: stat.size, mtimeMs: stat.mtimeMs }; }));
@@ -78,17 +82,14 @@ class KnowledgeStore {
   async rebuild() {
     const { metadata, fingerprint } = await this.#inventory(); const notes = [];
     for (const entry of metadata) {
-      const markdown = await fs.readFile(entry.file, "utf8"); const text = plainText(markdown); const frontmatter = frontmatterData(markdown);
+      const markdown = await this.#readMarkdown(entry.file); const text = plainText(markdown); const frontmatter = frontmatterData(markdown);
       const title = titleOf(markdown, entry.file); const legacyTags = arrayValue(frontmatter.values.legacy_tags);
       const source = frontmatter.values.source_url || frontmatter.values.source || "";
       const sourceDigest = frontmatter.values.source_content_sha256 || "";
       const sourceFileDigest = frontmatter.values.source_file_sha256 || "";
       const stability = frontmatter.values.stability || frontmatter.values.stability_class || "";
       const date = frontmatter.values.updated || frontmatter.values.created || frontmatter.values.date || "";
-      const privacy = String(frontmatter.values.privacy || "").toLocaleLowerCase("en-US");
-      const sensitive = ["true", "yes"].includes(String(frontmatter.values.sensitive || frontmatter.values.private || "").toLocaleLowerCase("en-US"))
-        || ["private", "sensitive"].includes(privacy)
-        || !inspectRemoteContent(`${source}\n${markdown}`, { maxChars: Number.MAX_SAFE_INTEGER }).safe;
+      const sensitive = isSensitiveKnowledgeNote(markdown);
       // D13.6 修正：逻辑路径（vault/...）对本实例 vaultRoot 的父目录求相对——PATHS 只供默认值，
       // 显式根（测试夹具/非常规 vault）不得被进程级 KNOWLEDGE_ROOT 边界误杀。
       notes.push({ path: this.#logicalPath(entry.file), title, excerpt: sensitive ? "" : text.slice(0, 280), tags: frontmatter.tags, legacyTags, source, sourceDigest, sourceFileDigest, stability, date, searchable: isContentNote(this.vaultRoot, entry.file), sensitive,
@@ -131,7 +132,7 @@ class KnowledgeStore {
       let excerpt = {};
       if (!note.sensitive) {
         const relative = note.path.slice(note.path.indexOf("/") + 1);
-        const markdown = await fs.readFile(resolveInside(this.vaultRoot, relative), "utf8");
+        const markdown = await this.#readMarkdown(resolveInside(this.vaultRoot, relative));
         assertKnowledgeNotSensitive(markdown);
         excerpt = excerptFor(markdown, query, queryTokens);
       }
@@ -142,7 +143,7 @@ class KnowledgeStore {
     const relative = String(relativePath || "").replace(/\\/g, "/");
     if (!relative.startsWith("vault/") || !relative.endsWith(".md")) throw new Error("只允许读取 vault 内 Markdown");
     const candidate = resolveInside(this.vaultRoot, relative.slice("vault/".length));
-    const markdown = await fs.readFile(candidate, "utf8");
+    const markdown = await this.#readMarkdown(candidate);
     return { path: relative, title: titleOf(markdown, candidate), markdown };
   }
   async findBySource({ canonicalUrl = "", contentSha256 = "" } = {}) {

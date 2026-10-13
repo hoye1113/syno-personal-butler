@@ -248,6 +248,34 @@ test("retryable Provider failures stay durable without switching executors", asy
   assert.equal(attempts, 2);
 });
 
+test("Provider retry filters all stored jobs by status and due time before limiting the batch", async (t) => {
+  const opsRoot = path.join(PATHS.runtimeRoot, "tests", `provider-history-${Date.now()}`);
+  t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
+  const store = new JobStore({ opsRoot });
+  const now = new Date("2026-10-13T00:00:00Z");
+  const save = (job) => store.save({ intent: "search", profile: "syno-read", approval: "none", request: {}, ...job, id: `job-${job.id}` });
+  await save({ id: "old-waiting", status: "waiting_provider", created: "2020-01-01T00:00:00Z", nextRetryAt: "2020-01-01T00:01:00Z", ownerKey: "owner-a" });
+  await save({ id: "no-retry-date", status: "waiting_provider", created: "2020-01-02T00:00:00Z", ownerKey: "owner-b" });
+  for (let index = 0; index < 220; index += 1) {
+    await save({ id: `new-${index}`, status: "completed", created: "2026-10-01T00:00:00Z", ownerKey: "owner-a" });
+  }
+  for (let index = 0; index < 55; index += 1) {
+    await save({ id: `future-${index}`, status: "waiting_provider", created: "2026-10-02T00:00:00Z", nextRetryAt: "2027-01-01T00:00:00Z", ownerKey: "owner-a" });
+  }
+  await save({ id: "invalid-retry-date", status: "waiting_provider", created: "2026-10-03T00:00:00Z", nextRetryAt: "invalid" });
+  const defaultRecent = await store.list({ limit: 1 });
+  const host = new AgentHost({ store, executor: {}, gitGuard: {} });
+  const retried = [];
+  host.retry = async (id) => { retried.push(id); return { recovered: true }; };
+  assert.equal((await host.retryWaitingProvider({ limit: 1, now })).length, 1);
+  assert.deepEqual(retried, ["job-no-retry-date"]);
+  retried.length = 0;
+  assert.equal((await host.retryWaitingProvider({ now })).length, 2);
+  assert.deepEqual(retried, ["job-no-retry-date", "job-old-waiting"]);
+  assert.deepEqual(await store.list({ limit: 1 }), defaultRecent);
+  assert.deepEqual((await store.list({ status: "waiting_provider", retryBefore: now, ownerKey: "owner-a" })).map((job) => job.id), ["job-old-waiting"]);
+});
+
 test("concurrent Provider retries acquire one execution lease", async (t) => {
   const opsRoot = path.join(PATHS.runtimeRoot, "tests", `provider-retry-lock-${Date.now()}`);
   t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
