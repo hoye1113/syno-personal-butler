@@ -54,8 +54,8 @@ async function removePosixStaleLock(file) {
     return { ...current, status: "stale_removed", removed: true };
   } finally { await lease.release(); }
 }
-async function acquirePosixProcessLock({ file, owner, ...options }) {
-  const lease = await guard(file, options);
+async function acquirePosixProcessLock({ file, owner, lock = guard, ...options }) {
+  const lease = await lock(file, options);
   if (!lease) throw lockError("PROCESS_LOCK_HELD");
   const temporary = file + "." + randomUUID() + ".claim";
   try {
@@ -63,7 +63,12 @@ async function acquirePosixProcessLock({ file, owner, ...options }) {
     if (inspected.status === "identity_unknown") throw lockError("PROCESS_LOCK_IDENTITY_UNKNOWN");
     await fs.writeFile(temporary, JSON.stringify(owner) + "\n", { flag: "wx", mode: 0o600 });
     await fs.rename(temporary, file);
-  } catch (error) { await fs.rm(temporary, { force: true }); await lease.release(); throw error; }
+  } catch (error) {
+    try { await fs.rm(temporary, { force: true }); }
+    catch (cleanupError) { error.cleanupError = cleanupError; }
+    finally { await lease.release(); }
+    throw error;
+  }
   let released = false;
   return {
     owner,

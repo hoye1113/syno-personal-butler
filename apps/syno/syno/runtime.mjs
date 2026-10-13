@@ -1595,11 +1595,13 @@ function createSynoRuntime(options = {}) {
         await acceptedRecovery?.stop().catch(() => {});
         await reconciliationWorker?.stop().catch(() => {});
         await channels.stop().catch(() => {});
-        await harnessSupervisor.stop().catch((error) =>
-          recordEvent("syno.shutdown.harness_stop_failed", { error }, { level: "error" }).catch(() => {}),
-        );
+        try { await harnessSupervisor.stop(); }
+        catch (error) {
+          await recordEvent("syno.shutdown.harness_stop_failed", { error }, { level: "error" });
+          throw error;
+        }
         await recordEvent("syno.shutdown.completed");
-      })();
+      })().catch((error) => { closePromise = null; throw error; });
       return closePromise;
     },
   };

@@ -4,6 +4,8 @@
 
 测试时间夹具统一使用 Asia/Hong_Kong，与机器所在时区无关；每个测试最长 180 秒，超时直接失败，不缩小测试集合。
 
+停止仅清理所属进程组，不向已退出、可能被复用的正 PID 发信号。清理失败保留 Supervisor 实例，Runtime 关闭返回失败且可重试，不记录 shutdown.completed；Host 保持控制面与租约，主人可以重试停止。锁初始化中的临时文件清理失败也必须释放内核租约。Mac CI 额外覆盖忽略 SIGTERM 的孙进程、无关兄弟进程存活及跨进程竞争恢复。
+
 使用 Node 24；Mac 使用原生 arm64 Node 和 Xcode Command Line Tools。两端运行 `pnpm install --frozen-lockfile`、`pnpm run harness:setup`、`pnpm run harness:doctor`。Harness 使用已锁定的子模块与工具链，安装构建不启动第二个生产渠道连接。
 
 新机器在仓库 .env 配置 `SYNO_LOCAL_DATA=./.local-data`，不复制旧机器的凭据、会话或依赖目录。不设置 SYNO_KNOWLEDGE_ROOT。Knowledge 的事实源仍是当前仓库 vault/ 与 ops/。

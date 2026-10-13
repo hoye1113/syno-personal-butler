@@ -54,63 +54,63 @@ function defaultDshRoot(repoRoot = PATHS.repoRoot) {
   return "";
 }
 
-function processAlive(pid) {
+function childExited(child) {
+  return Boolean(child) && (child.exitCode !== null || child.signalCode != null);
+}
+
+function processAlive(pid, signal = process.kill) {
   try {
-    process.kill(pid, 0);
+    signal(pid, 0);
     return true;
   } catch (error) {
     return error.code === "EPERM";
   }
 }
 
-function processGroupAlive(pid) {
+function processGroupAlive(pid, signal = process.kill) {
   try {
-    process.kill(-pid, 0);
+    signal(-pid, 0);
     return true;
   } catch (error) {
     return error.code === "EPERM";
   }
 }
 
-async function killUnixProcessGroup(pid) {
+async function killUnixProcessGroup(pid, { child, signal = process.kill } = {}) {
+  const groupAlive = () => processGroupAlive(pid, signal);
   const signalGroup = (signal) => {
+    if (childExited(child) && processAlive(pid, sendSignal)) {
+      throw runtimeError("HARNESS_PROCESS_IDENTITY_UNKNOWN", `Harness PID ${pid} 已退出并被复用，拒绝清理未知进程组`, { pid });
+    }
     try {
-      process.kill(-pid, signal);
+      sendSignal(-pid, signal);
     } catch (error) {
       if (error.code !== "ESRCH") throw error;
     }
   };
-  const signalLeader = (signal) => {
-    try {
-      process.kill(pid, signal);
-    } catch {}
-  };
-  const graceful = () => {
-    if (processGroupAlive(pid)) signalGroup("SIGTERM");
-    else if (processAlive(pid)) signalLeader("SIGTERM");
-    else return false;
-    return true;
-  };
-  if (!graceful()) return;
+  const sendSignal = signal;
+  // Spawn creates this group; a positive PID is never sufficient ownership evidence.
+  if (!groupAlive()) return;
+  signalGroup("SIGTERM");
   const termDeadline = Date.now() + PROCESS_TREE_TERM_GRACE_MS;
-  while ((processGroupAlive(pid) || processAlive(pid)) && Date.now() < termDeadline) {
+  while (groupAlive() && Date.now() < termDeadline) {
     await new Promise((resolve) => setTimeout(resolve, PROCESS_TREE_POLL_MS));
   }
-  if (!processGroupAlive(pid) && !processAlive(pid)) return;
-  if (processGroupAlive(pid)) signalGroup("SIGKILL");
-  else signalLeader("SIGKILL");
+  if (!groupAlive()) return;
+  signalGroup("SIGKILL");
   const killDeadline = Date.now() + PROCESS_TREE_KILL_GRACE_MS;
-  while ((processGroupAlive(pid) || processAlive(pid)) && Date.now() < killDeadline) {
+  while (groupAlive() && Date.now() < killDeadline) {
     await new Promise((resolve) => setTimeout(resolve, PROCESS_TREE_POLL_MS));
   }
-  if (processGroupAlive(pid) || processAlive(pid)) {
+  if (groupAlive()) {
     throw runtimeError("HARNESS_PROCESS_TREE_ALIVE", `DeepSeek Harness 子进程组 ${pid} 在 SIGKILL 后仍未退出`, { pid });
   }
 }
 
-function defaultKillTree(pid) {
+function defaultKillTree(pid, child) {
   if (!pid) return Promise.resolve();
   if (process.platform === "win32") {
+    if (childExited(child)) return Promise.resolve();
     return execFileAsync("taskkill.exe", ["/PID", String(pid), "/T", "/F"], {
       windowsHide: true,
       timeout: PROCESS_TREE_KILL_TIMEOUT_MS,
@@ -120,12 +120,12 @@ function defaultKillTree(pid) {
       throw error;
     });
   }
-  return killUnixProcessGroup(pid);
+  return killUnixProcessGroup(pid, { child });
 }
 
 function waitForExit(child, timeoutMs) {
   // 被信号终止的子进程 exitCode 保持 null（记录在 signalCode），两个字段都要视为已退出。
-  if (!child || child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
+  if (!child || childExited(child)) return Promise.resolve(true);
   return new Promise((resolve) => {
     const timer = setTimeout(() => resolve(false), timeoutMs);
     timer.unref?.();
@@ -634,7 +634,7 @@ class DeepSeekHarnessSupervisor {
   status(profile) {
     if (profile) {
       const slot = this.slots.get(profile);
-      const running = Boolean(slot?.child && slot.child.exitCode === null);
+      const running = Boolean(slot?.child && !childExited(slot.child));
       const launchable = profile === "chat" && this.chatSurface === "web"
         ? this.webLaunch?.bootable
         : this.launch?.bootable;
@@ -654,7 +654,7 @@ class DeepSeekHarnessSupervisor {
     }
     const launchable = this.chatSurface === "web" ? this.webLaunch?.bootable : this.launch?.bootable;
     return {
-      state: [...this.slots.values()].some((slot) => slot.child && slot.child.exitCode === null) ? "running" : this.launch ? "stopped" : "setup_required",
+      state: [...this.slots.values()].some((slot) => slot.child && !childExited(slot.child)) ? "running" : this.launch ? "stopped" : "setup_required",
       ready: HARNESS_PROFILES.some((name) => this.status(name).ready),
       bootable: launchable === true,
       kind: this.chatSurface === "web" ? this.webLaunch?.kind || this.launch?.kind : this.launch?.kind || null,
@@ -681,7 +681,7 @@ class DeepSeekHarnessSupervisor {
 
   client(profile = "chat") {
     const slot = this.slots.get(profile);
-    if (!slot?.client || slot.child?.exitCode !== null) {
+    if (!slot?.client || !slot.child || childExited(slot.child)) {
       throw runtimeError("HARNESS_NOT_RUNNING", `DeepSeek Harness ${profile} 尚未运行`);
     }
     return slot.client;
@@ -690,14 +690,16 @@ class DeepSeekHarnessSupervisor {
   async ensure(profile, { provider = "kimi-coding", model = "kimi-for-coding" } = {}) {
     if (!HARNESS_PROFILES.includes(profile)) throw runtimeError("HARNESS_PROFILE_INVALID", `未知 Harness profile：${profile}`);
     const slot = this.slots.get(profile);
-    if (slot?.client?.initialized && slot.child?.exitCode === null && slot.provider === provider && slot.model === model) {
+    if (slot?.client?.initialized && slot.child && !childExited(slot.child) && slot.provider === provider && slot.model === model) {
       return slot.client;
     }
-    if (slot?.child && slot.child.exitCode === null) await this.stop(profile);
+    if (slot?.child) await this.stop(profile);
     return this.start(profile, { provider, model });
   }
 
   async start(profile, { provider = "kimi-coding", model = "kimi-for-coding" } = {}) {
+    const stopping = this.slots.get(profile)?.stopPromise;
+    if (stopping) await stopping;
     if (!this.launch) await this.discover();
     if (profile === "chat" && this.chatSurface === "web") {
       if (this.webLaunch?.bootable === false) {
@@ -786,7 +788,7 @@ class DeepSeekHarnessSupervisor {
       stdout: child.stdout,
       stderr: child.stderr,
       pid: child.pid,
-      kill: () => this.killTree(child.pid),
+      kill: () => this.killTree(child.pid, child),
       initializeTimeoutMs: this.initializeTimeoutMs,
     });
     const slot = { child, client, provider, model, configPath, profile, surface: "jsonrpc", kind: this.launch.kind, origin: null };
@@ -852,7 +854,7 @@ class DeepSeekHarnessSupervisor {
         token: ready.token,
         cwd: workspaceRoot,
         pid: child.pid,
-        kill: () => this.killTree(child.pid),
+        kill: () => this.killTree(child.pid, child),
         initializeTimeoutMs: this.initializeTimeoutMs,
         onNotice: ({ event, data, options }) => {
           void this.#record(event, data, options);
@@ -876,7 +878,7 @@ class DeepSeekHarnessSupervisor {
     } catch (error) {
       this.lastError = error;
       await this.#record("harness.start.failed", { profile, error }, { level: "error" });
-      if (child?.pid) await this.killTree(child.pid).catch(() => {});
+      if (child?.pid) await this.killTree(child.pid, child).catch(() => {});
       await this.stop(profile).catch(() => {});
       throw error;
     }
@@ -885,13 +887,18 @@ class DeepSeekHarnessSupervisor {
   async stop(profile) {
     if (profile) {
       const slot = this.slots.get(profile);
-      this.slots.delete(profile);
-      await this.#disposeSlot(slot);
-      return this.status(profile);
+      if (!slot) return this.status(profile);
+      if (!slot.stopPromise) {
+        slot.stopPromise = this.#disposeSlot(slot).then(() => {
+          if (this.slots.get(profile) === slot) this.slots.delete(profile);
+          return this.status(profile);
+        }).catch((error) => { this.lastError = error; throw error; }).finally(() => { delete slot.stopPromise; });
+      }
+      return slot.stopPromise;
     }
-    const slots = [...this.slots.values()];
-    this.slots.clear();
-    await Promise.all(slots.map((slot) => this.#disposeSlot(slot)));
+    const results = await Promise.allSettled([...this.slots.keys()].map((name) => this.stop(name)));
+    const failure = results.find((result) => result.status === "rejected");
+    if (failure) throw failure.reason;
     return this.status();
   }
 
@@ -904,7 +911,7 @@ class DeepSeekHarnessSupervisor {
     if (!slot) return;
     const child = slot.child;
     const killOwnedTree = async () => {
-      if (child?.pid) await this.killTree(child.pid);
+      if (child?.pid) await this.killTree(child.pid, child);
     };
     // 停止必须验证直系子进程确实退出；清理失败要显式报错，不能静默丢弃 slot。
     const assertStopped = async (timeoutMs) => {
@@ -929,7 +936,7 @@ class DeepSeekHarnessSupervisor {
       await slot.client?.close?.();
     } catch {}
     if (!child) return;
-    if (child.exitCode !== null) {
+    if (childExited(child)) {
       await killOwnedTree();
       return;
     }
@@ -962,6 +969,7 @@ export {
   defaultDshRoot,
   dshWebPort,
   harnessChildEnvironment,
+  killUnixProcessGroup,
   isLoopbackHttpOrigin,
   resolveDshRuntimeClosure,
   resolveChatSurface,

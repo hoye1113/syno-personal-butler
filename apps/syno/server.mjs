@@ -76,7 +76,8 @@ const server = createServer(async (req, res) => {
 await new Promise((resolve, reject) => { server.once("error", reject); server.listen(PORT, "127.0.0.1", resolve); }).catch(async (error) => { await runtime.close().catch(() => {}); await hostLease.release(); throw error; });
 console.log(`Syno headless Host listening on 127.0.0.1:${PORT}`);
 const ready = runtime.initialize({ worker: true });
-ready.catch(async (error) => { console.error("[syno] Runtime 初始化失败:", String(error?.message || error)); await shutdown(); process.exitCode = 1; });
+ready.catch(async (error) => { console.error("[syno] Runtime 初始化失败:", String(error?.message || error)); try { await shutdown(); process.exitCode = 1; } catch (shutdownError) { console.error("[syno] shutdown failed:", shutdownError.code || "HOST_SHUTDOWN_FAILED"); } });
 let closing = null;
-async function shutdown() { if (closing) return closing; closing = (async () => { await new Promise((resolve) => server.close(resolve)); await runtime.close(); await hostLease.release(); })(); return closing; }
-process.once("SIGINT", shutdown); process.once("SIGTERM", shutdown);
+async function shutdown() { if (closing) return closing; closing = (async () => { await runtime.close(); await new Promise((resolve) => server.close(resolve)); await hostLease.release(); })().catch((error) => { closing = null; throw error; }); return closing; }
+const shutdownOnSignal = () => { void shutdown().catch((error) => { console.error("[syno] shutdown failed:", error.code || "HOST_SHUTDOWN_FAILED"); }); };
+process.on("SIGINT", shutdownOnSignal); process.on("SIGTERM", shutdownOnSignal);
