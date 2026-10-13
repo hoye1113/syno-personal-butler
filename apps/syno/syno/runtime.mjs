@@ -1605,6 +1605,8 @@ function createSynoRuntime(options = {}) {
 
 async function routeSynoApi(runtime, req, url, readBody) {
   const method = req.method || "GET";
+  // 诊断 GET 不创建会话，也不经过生成、投递或控制面修改路径。
+  if (method === "GET" && url.pathname === "/api/syno/proactive/status") return runtime.proactive.preview();
   const webContext = {
     channel: "web", senderId: "local-user", ownerKey: "local-user", developmentMode: runtime.developmentMode,
     conversationId: runtime.conversationRouter ? await runtime.conversationRouter.resolve({ ownerKey: "local-user" }) : undefined,
@@ -1663,7 +1665,6 @@ async function routeSynoApi(runtime, req, url, readBody) {
     return runControlMutation(runtime, async () => runtime.notifications.archive(await readBody(req)));
   }
   if (method === "GET" && url.pathname === "/api/syno/channels") return { channels: runtime.channels.status() };
-  if (method === "GET" && url.pathname === "/api/syno/proactive/preview") return runtime.proactive.preview();
   if (method === "POST" && url.pathname === "/api/syno/proactive/migrate") {
     const body = await readBody(req);
     if (body?.confirmed !== true) {
