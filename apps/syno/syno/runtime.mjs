@@ -1595,7 +1595,9 @@ function createSynoRuntime(options = {}) {
         await acceptedRecovery?.stop().catch(() => {});
         await reconciliationWorker?.stop().catch(() => {});
         await channels.stop().catch(() => {});
-        await harnessSupervisor.stop().catch(() => {});
+        await harnessSupervisor.stop().catch((error) =>
+          recordEvent("syno.shutdown.harness_stop_failed", { error }, { level: "error" }).catch(() => {}),
+        );
         await recordEvent("syno.shutdown.completed");
       })();
       return closePromise;

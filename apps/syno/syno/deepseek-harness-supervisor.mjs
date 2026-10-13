@@ -37,6 +37,10 @@ const JSONRPC_BOOTSTRAP_PACKAGES = Object.freeze([
   "@deepseek-ai/dsh-sdk-minimal",
 ]);
 const PROCESS_TREE_KILL_TIMEOUT_MS = 30_000;
+// POSIX 停止阶梯：整组先 SIGTERM，最多等 10 秒，再对仍存活的组 SIGKILL；无法确认退出时显式失败。
+const PROCESS_TREE_TERM_GRACE_MS = 10_000;
+const PROCESS_TREE_KILL_GRACE_MS = 5_000;
+const PROCESS_TREE_POLL_MS = 50;
 
 function runtimeError(code, message, details) {
   return Object.assign(new Error(message), { code, ...(details ? { details } : {}) });
@@ -48,6 +52,60 @@ function defaultDshRoot(repoRoot = PATHS.repoRoot) {
   const localVendor = path.join(repoRoot, "vendor", "deepseek-harness");
   if (existsSync(localVendor)) return localVendor;
   return "";
+}
+
+function processAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM";
+  }
+}
+
+function processGroupAlive(pid) {
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM";
+  }
+}
+
+async function killUnixProcessGroup(pid) {
+  const signalGroup = (signal) => {
+    try {
+      process.kill(-pid, signal);
+    } catch (error) {
+      if (error.code !== "ESRCH") throw error;
+    }
+  };
+  const signalLeader = (signal) => {
+    try {
+      process.kill(pid, signal);
+    } catch {}
+  };
+  const graceful = () => {
+    if (processGroupAlive(pid)) signalGroup("SIGTERM");
+    else if (processAlive(pid)) signalLeader("SIGTERM");
+    else return false;
+    return true;
+  };
+  if (!graceful()) return;
+  const termDeadline = Date.now() + PROCESS_TREE_TERM_GRACE_MS;
+  while ((processGroupAlive(pid) || processAlive(pid)) && Date.now() < termDeadline) {
+    await new Promise((resolve) => setTimeout(resolve, PROCESS_TREE_POLL_MS));
+  }
+  if (!processGroupAlive(pid) && !processAlive(pid)) return;
+  if (processGroupAlive(pid)) signalGroup("SIGKILL");
+  else signalLeader("SIGKILL");
+  const killDeadline = Date.now() + PROCESS_TREE_KILL_GRACE_MS;
+  while ((processGroupAlive(pid) || processAlive(pid)) && Date.now() < killDeadline) {
+    await new Promise((resolve) => setTimeout(resolve, PROCESS_TREE_POLL_MS));
+  }
+  if (processGroupAlive(pid) || processAlive(pid)) {
+    throw runtimeError("HARNESS_PROCESS_TREE_ALIVE", `DeepSeek Harness 子进程组 ${pid} 在 SIGKILL 后仍未退出`, { pid });
+  }
 }
 
 function defaultKillTree(pid) {
@@ -62,8 +120,7 @@ function defaultKillTree(pid) {
       throw error;
     });
   }
-  try { process.kill(-pid, "SIGTERM"); } catch {}
-  return Promise.resolve();
+  return killUnixProcessGroup(pid);
 }
 
 function waitForExit(child, timeoutMs) {
@@ -715,6 +772,8 @@ class DeepSeekHarnessSupervisor {
         env,
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
+        // POSIX 下让 sidecar 成为自身进程组长，停止阶梯才能按组清理 SDK 的运行时子孙进程。
+        detached: process.platform !== "win32",
       });
     } catch (error) {
       this.lastError = error;
@@ -768,6 +827,8 @@ class DeepSeekHarnessSupervisor {
         env,
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
+        // 与 JSON-RPC sidecar 相同：dsh web 独占进程组，便于按组停止。
+        detached: process.platform !== "win32",
       });
     } catch (error) {
       this.lastError = error;
@@ -842,13 +903,22 @@ class DeepSeekHarnessSupervisor {
     if (!slot) return;
     const child = slot.child;
     const killOwnedTree = async () => {
-      if (child?.pid) await this.killTree(child.pid).catch(() => {});
+      if (child?.pid) await this.killTree(child.pid);
+    };
+    // 停止必须验证直系子进程确实退出；清理失败要显式报错，不能静默丢弃 slot。
+    const assertStopped = async (timeoutMs) => {
+      if (await waitForExit(child, timeoutMs) !== null) return;
+      throw runtimeError(
+        "HARNESS_PROCESS_TREE_ALIVE",
+        `DeepSeek Harness ${slot.profile} 停止失败：pid=${child?.pid ?? "unknown"} 仍在运行`,
+        { profile: slot.profile, pid: child?.pid ?? null },
+      );
     };
     if (slot.surface === "jsonrpc") {
       // The SDK profile may own runtime descendants; terminate the complete
       // process tree rooted at the CLI PID instead of racing protocol shutdown.
       await killOwnedTree();
-      await waitForExit(child, 3_000);
+      await assertStopped(3_000);
       return;
     }
     try {
@@ -875,7 +945,7 @@ class DeepSeekHarnessSupervisor {
       return;
     }
     await killOwnedTree();
-    await waitForExit(child, 3_000);
+    await assertStopped(3_000);
   }
 }
 

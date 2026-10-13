@@ -22,6 +22,27 @@ const testKillTree = async (pid) => {
   if (!pid) return;
   try { process.kill(pid); } catch {}
 };
+function pidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM";
+  }
+}
+function processGroupAlive(pid) {
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM";
+  }
+}
+async function waitUntilGone(alive, timeoutMs = 2_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (alive() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 25));
+  return !alive();
+}
 
 async function writeRuntimePackage(packageDir, packageName, { runtime = true, dependencies = {} } = {}) {
   await fs.mkdir(packageDir, { recursive: true });
@@ -411,6 +432,20 @@ test("JSON-RPC sidecar shutdown terminates the owned process tree instead of rac
   client.shutdown = async () => { protocolShutdownCalled = true; };
   await supervisor.stop("chat");
   assert.equal(protocolShutdownCalled, false);
+});
+
+test("POSIX supervisor stop cleans the owned process group with the real kill path", { skip: process.platform === "win32", timeout: 30_000 }, async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-harness-group-stop-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const supervisor = new DeepSeekHarnessSupervisor({ fakeAgent, localRoot: root });
+  t.after(() => supervisor.stop().catch(() => {}));
+  await supervisor.start("chat", { model: "kimi-for-coding" });
+  const pid = supervisor.status("chat").pid;
+  assert.ok(Number.isInteger(pid) && pid > 0);
+  await supervisor.stop("chat");
+  // 修复前 POSIX 负 PID 组信号被吞掉，sidecar 存活导致隔离 Host 无法退出。
+  assert.equal(await waitUntilGone(() => pidAlive(pid)), true, `sidecar ${pid} 必须在 stop 后退出`);
+  assert.equal(await waitUntilGone(() => processGroupAlive(pid)), true, `sidecar ${pid} 所属进程组必须清理干净`);
 });
 
 test("Syno SDK profile discovery keeps the external DSH checkout read-only", async (t) => {
