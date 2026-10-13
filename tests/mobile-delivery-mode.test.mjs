@@ -129,7 +129,7 @@ test("mobile delivery diagnostics expose only aggregate AcceptedRequest, Outbox 
   });
 });
 
-test("proactive preview API is read-only and returns only the redacted release summary", async () => {
+test("proactive status API is read-only and returns only the redacted release summary", async () => {
   let calls = 0;
   const expected = {
     enabled: false,
@@ -139,14 +139,15 @@ test("proactive preview API is read-only and returns only the redacted release s
     bundle: { bundleId: "proactive-redacted", signalCount: 2, remainingCount: 0 },
   };
   const result = await routeSynoApi({
+    conversationRouter: { async resolve() { throw new Error("status must not create or update a conversation"); } },
     proactive: {
       async preview() {
         calls += 1;
         return expected;
       },
     },
-  }, { method: "GET" }, new URL("http://localhost/api/syno/proactive/preview"), async () => {
-    throw new Error("GET preview must not read a request body");
+  }, { method: "GET" }, new URL("http://localhost/api/syno/proactive/status"), async () => {
+    throw new Error("GET status must not read a request body");
   });
 
   assert.equal(calls, 1);

@@ -792,6 +792,35 @@ test("proactive preview reports a redacted Bundle without mutating Ledger or Out
   await assert.rejects(fs.access(stateFile), { code: "ENOENT" });
 });
 
+test("proactive diagnostics cover disabled, quiet and missing targets without persisting migration", async (t) => {
+  for (const scenario of ["disabled", "quiet", "missing-target"]) await t.test(scenario, async (subtest) => {
+    const stateFile = await tempState(subtest, "syno-proactive-status-state-");
+    const original = JSON.stringify({ date: "2026-07-30", notificationsToday: 0, lastRuns: {}, pending: {} });
+    await fs.writeFile(stateFile, original, "utf8");
+    const fail = async () => { throw new Error("diagnostics must not generate, send or change settings"); };
+    const proactive = new ProactiveOrchestrator({
+      host: { receive: fail }, today: { snapshot: fail },
+      channels: { homeChannel: "weixin", send: fail },
+      ownerChannelTargets: { async get() { return scenario === "missing-target" ? null : { contextToken: "private-target-canary" }; } },
+      settingsRegistry: {
+        async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? scenario !== "disabled" : undefined; },
+        set: fail,
+      },
+      signalSources: { async collect() { assert.notEqual(scenario, "quiet"); return []; } },
+      signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
+      stateFile,
+    });
+    const result = await proactive.preview({ now: new Date(scenario === "quiet" ? "2026-07-30T23:30:00" : "2026-07-30T12:00:00") });
+    assert.equal(result.enabled, scenario !== "disabled");
+    assert.equal(result.homeTargetAvailable, scenario !== "missing-target");
+    assert.equal(result.eligibleSignals, 0);
+    assert.equal(result.bundle, null);
+    assert.doesNotMatch(JSON.stringify(result), /private-target-canary/);
+    assert.equal(await fs.readFile(stateFile, "utf8"), original);
+    assert.deepEqual((await fs.readdir(path.dirname(stateFile))).sort(), ["proactive.json"]);
+  });
+});
+
 test("Ledger migration is an explicit no-delivery step before any production tick", async (t) => {
   const stateFile = await tempState(t, "syno-proactive-explicit-migration-");
   const root = path.dirname(stateFile);
@@ -1383,4 +1412,12 @@ test("preview deliveryHealth sums consecutive failed attempts and surfaces the n
   assert.equal(preview.deliveryHealth.homeChannel, "weixin");
   assert.equal(preview.deliveryHealth.consecutiveFailures, 3);
   assert.equal(preview.deliveryHealth.lastDeliveryError, "provider_rejected");
+  const before = await outbox.list({ limit: 10 });
+  await proactive.preview({ now: clockState.now, highValueEvents: [] });
+  assert.deepEqual(await outbox.list({ limit: 10 }), before, "status must not retry a failed delivery");
+  await outbox.deliverDue(async () => ({ delivered: true }));
+  const recovered = await proactive.preview({ now: clockState.now, highValueEvents: [] });
+  assert.equal(recovered.deliveryHealth.consecutiveFailures, 0);
+  assert.equal(recovered.deliveryHealth.lastDeliveryError, null);
+  await assert.rejects(fs.access(stateFile), { code: "ENOENT" });
 });
