@@ -40,7 +40,7 @@ pnpm state:archive -- restore D:\Backups\syno-state-20260717
 
 ## 恢复与回滚
 
-- 源码回滚只由 Codex 在独立开发流程执行；Syno 本身无源码修改能力。
+- 源码回滚只由开发 Agent 在独立开发流程执行；Syno 本身无源码修改能力。
 - 回滚前保存未提交差异，不使用 `git reset --hard` 丢弃用户修改。
 - 数据契约升级必须先备份，再运行迁移；迁移失败时保持旧数据不变并输出报告。
 - 恢复命令 `pnpm state:archive -- restore <绝对归档目录>` 只接受空的状态目标，拒绝覆盖现有状态；先验证清单再复制。
@@ -214,7 +214,7 @@ lark-cli version
 
 ## 主人实测验收
 
-Codex 完成 `docs/TODO-EXECUTION-PLAN.md` 的 P1–P3，并明确交付“自动门禁通过”证据后，再由主人执行本节。自动测试未通过时不要开始真实数据验收。
+开发 Agent 完成 `docs/TODO-EXECUTION-PLAN.md` 的 P1–P3，并明确交付“自动门禁通过”证据后，再由主人执行本节。自动测试未通过时不要开始真实数据验收。
 
 ### 当前交付状态（2026-07-28）
 
