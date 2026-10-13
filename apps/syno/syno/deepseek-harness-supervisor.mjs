@@ -641,7 +641,7 @@ class DeepSeekHarnessSupervisor {
       return {
         profile,
         state: running ? "running" : this.launch ? "stopped" : "setup_required",
-        ready: running && slot?.client?.initialized === true && !this.lastError,
+        ready: running && !slot.stopPromise && !slot.stopError && slot?.client?.initialized === true && !this.lastError,
         pid: running ? slot.child.pid : null,
         model: slot?.model || null,
         surface: slot?.surface || (profile === "chat" ? this.chatSurface : "jsonrpc"),
@@ -810,7 +810,8 @@ class DeepSeekHarnessSupervisor {
     } catch (error) {
       this.lastError = error;
       await this.#record("harness.start.failed", { profile, error }, { level: "error" });
-      await this.stop(profile).catch(() => {});
+      try { await this.stop(profile); }
+      catch (cleanupError) { cleanupError.cause ||= error; throw cleanupError; }
       throw error;
     }
   }
@@ -841,6 +842,8 @@ class DeepSeekHarnessSupervisor {
       await this.#record("harness.spawn.failed", { profile, error }, { level: "error" });
       throw error;
     }
+    const pendingSlot = { child, client: null, provider, model, profile, surface: "web", kind: this.webLaunch.kind, origin };
+    this.slots.set(profile, pendingSlot);
     child.once("exit", (code, signalName) => {
       if (this.slots.get(profile)?.child === child) {
         this.lastError ||= code === 0 ? null : runtimeError("HARNESS_EXITED", `DeepSeek Harness ${profile} 已退出（code=${code}, signal=${signalName || "none"}）`);
@@ -863,26 +866,16 @@ class DeepSeekHarnessSupervisor {
           void this.#record(event, data, options);
         },
       });
-      const slot = {
-        child,
-        client,
-        provider,
-        model,
-        profile,
-        surface: "web",
-        kind: this.webLaunch.kind,
-        origin,
-      };
-      this.slots.set(profile, slot);
+      pendingSlot.client = client;
       this.lastError = null;
       await client.initialize({ cwd: workspaceRoot, provider, model, agentPreset: SYNO_AGENT_PRESET_NAME });
-      await this.#record("harness.start.completed", { profile, pid: child.pid, model, surface: "web", origin: slot.origin });
+      await this.#record("harness.start.completed", { profile, pid: child.pid, model, surface: "web", origin: pendingSlot.origin });
       return client;
     } catch (error) {
       this.lastError = error;
       await this.#record("harness.start.failed", { profile, error }, { level: "error" });
-      if (child?.pid) await this.killTree(child.pid, child).catch(() => {});
-      await this.stop(profile).catch(() => {});
+      try { await this.stop(profile); }
+      catch (cleanupError) { cleanupError.cause ||= error; throw cleanupError; }
       throw error;
     }
   }
@@ -925,7 +918,7 @@ class DeepSeekHarnessSupervisor {
         { profile: slot.profile, pid: child?.pid ?? null },
       );
     };
-    if (slot.surface === "jsonrpc") {
+    if (slot.surface === "jsonrpc" || !slot.client) {
       // The SDK profile may own runtime descendants; terminate the complete
       // process tree rooted at the CLI PID instead of racing protocol shutdown.
       await killOwnedTree();

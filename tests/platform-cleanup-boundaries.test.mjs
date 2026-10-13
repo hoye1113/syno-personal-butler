@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { fork } from "node:child_process";
 import { once } from "node:events";
+import { EventEmitter } from "node:events";
 import { DeepSeekHarnessSupervisor, killUnixProcessGroup } from "../apps/syno/syno/deepseek-harness-supervisor.mjs";
 import { acquirePosixProcessLock } from "../packages/syno-core/posix-process-lock.mjs";
 
@@ -33,6 +34,7 @@ test("signal-terminated children are stopped and cannot be handed out as live cl
   assert.equal(supervisor.status("capture").state, "stopped");
   assert.equal(supervisor.status("capture").ready, false);
   assert.throws(() => supervisor.client("capture"), { code: "HARNESS_NOT_RUNNING" });
+  assert.equal(supervisor.status("capture").ready, false);
 });
 
 test("failed cleanup retains its slot, reports failure, and permits a later retry", async () => {
@@ -71,6 +73,31 @@ test("concurrent stop callers share a cleanup and start cannot overtake it", asy
   release(); await Promise.all(checks);
   assert.equal(kills, 1);
   assert.equal(supervisor.slots.size, 1);
+});
+
+test("pre-ready Web startup cleanup failure retains the spawned child for retry", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-start-cleanup-"));
+  let fail = true;
+  const child = new EventEmitter();
+  Object.assign(child, { pid: 424242, exitCode: null, signalCode: null, stdin: { destroyed: true }, stdout: new EventEmitter(), stderr: new EventEmitter() });
+  const supervisor = new DeepSeekHarnessSupervisor({ localRoot: root, fakeAgent: "", journal: { record: async () => null }, spawnImpl: () => {
+    queueMicrotask(() => child.stdout.emit("data", "dsh web: http://attacker.example:3088\n"));
+    return child;
+  }, killTree: async () => {
+    if (fail) throw Object.assign(new Error("fixture cleanup failed"), { code: "HARNESS_PROCESS_TREE_ALIVE" });
+    child.exitCode = 0;
+  } });
+  supervisor.launch = { bootable: true };
+  supervisor.chatSurface = "web";
+  supervisor.webLaunch = { bootable: true, command: process.execPath, argsPrefix: [], cwd: root, kind: "fixture" };
+  t.after(async () => { fail = false; await supervisor.stop(); await fs.rm(root, { recursive: true, force: true }); });
+  await assert.rejects(supervisor.start("chat"), error => error.code === "HARNESS_PROCESS_TREE_ALIVE" && error.cause?.code === "HARNESS_ORIGIN_INVALID");
+  assert.equal(supervisor.slots.size, 1);
+  assert.equal(supervisor.status("chat").pid, child.pid);
+  assert.equal(supervisor.status("chat").ready, false);
+  fail = false;
+  await supervisor.stop("chat");
+  assert.equal(supervisor.slots.size, 0);
 });
 
 test("POSIX publish and temporary cleanup failures still release the kernel lease", async (t) => {
