@@ -38,4 +38,3 @@ test("portable setup initializes the pinned submodule and builds before doctor",
   assert.equal(calls[3].args[0], path.join(repoRoot, "scripts", "deepseek-harness-runtime.mjs"));
   await assert.rejects(setupHarness({ repoRoot, platform: "darwin", arch: "x64", run: async () => {} }), /arm64/);
 });
-
