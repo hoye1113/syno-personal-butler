@@ -1,9 +1,11 @@
-// Syno 搜索 provider 适配器：豆包搜索（火山引擎）/ Tavily / Exa。
+// Syno 搜索 provider 适配器：豆包搜索（火山引擎）/ Tavily / Exa / Parallel。
 // 纯数据层，无 DSH 依赖，便于单元测试；错误分类通过注入的 errors 工厂完成
 // （生产由 index.mjs 注入 WebError，测试注入本地错误类）。
 //
 // 路由：查询含 CJK 字符时优先豆包（中文/国内），否则优先 Tavily；失败或空结果
 // 按链顺序确定性回退，全部失败抛 provider error，全部空结果返回空 sources。
+
+import { createParallelAdapter } from "./parallel.mjs";
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_RESULTS = 8;
@@ -14,8 +16,8 @@ const DOUBAO_BASE_URL = "https://open.feedcoopapi.com";
 const TAVILY_BASE_URL = "https://api.tavily.com";
 const EXA_BASE_URL = "https://api.exa.ai";
 
-const CN_FIRST_ORDER = Object.freeze(["doubao", "tavily", "exa"]);
-const EN_FIRST_ORDER = Object.freeze(["tavily", "exa", "doubao"]);
+const CN_FIRST_ORDER = Object.freeze(["doubao", "tavily", "exa", "parallel"]);
+const EN_FIRST_ORDER = Object.freeze(["tavily", "exa", "doubao", "parallel"]);
 
 class SearchProviderError extends Error {
   constructor(message, code, options) {
@@ -147,6 +149,25 @@ function normalizeExa(json) {
   return { sources, truncated: false };
 }
 
+function normalizeParallel(json, maxResults) {
+  const sources = [];
+  for (const item of json.results) {
+    let url;
+    if (typeof item?.url !== "string" || item.url.length > 2048) continue;
+    try { url = new URL(item.url); } catch { continue; }
+    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) continue;
+    const snippet = snippetOf(Array.isArray(item.excerpts) ? item.excerpts.filter(text => typeof text === "string").join(" ") : undefined);
+    if (snippet === undefined) continue;
+    const titleText = firstText(item.title);
+    const title = titleText === undefined ? undefined : truncateSafely(titleText, 280);
+    const publishedAt = firstText(item.publish_date);
+    sources.push({ url: url.href, ...title === undefined ? {} : { title }, snippet, ...publishedAt === undefined ? {} : { publishedAt } });
+  }
+  if (json.results.length > 0 && sources.length === 0) throw new Error("Invalid Parallel sources");
+  const count = clampCount(maxResults, DEFAULT_RESULTS, 20);
+  return { sources: sources.slice(0, count), truncated: sources.length > count };
+}
+
 function createDoubaoAdapter({ apiKey, fetchImpl, baseURL = DOUBAO_BASE_URL, timeoutMs, errors }) {
   return {
     id: "doubao",
@@ -238,7 +259,7 @@ function resolveOrder({ query, configuredIds, customChain }) {
 /**
  * 创建 Syno 组合搜索 provider（id `syno-search`）。
  * @param {object} options
- * @param {Record<string, string|undefined>} [options.env] - 读取三个 key 与可选自定义链的环境变量表。
+ * @param {Record<string, string|undefined>} [options.env] - 读取三个 key；Parallel 固定匿名，无需 key。
  * @param {Function} [options.fetchImpl] - 注入的 fetch（测试用）。
  * @param {string} [options.chain] - 自定义链（如 "exa,tavily"）；缺省按语言路由。
  * @param {object} [options.errors] - 错误工厂 `{ providerError, aborted }`。
@@ -249,6 +270,7 @@ function createSynoSearchProvider({ env = process.env, fetchImpl = fetch, chain,
     createDoubaoAdapter({ apiKey: String(env.DOUBAO_SEARCH_API_KEY ?? "").trim(), fetchImpl, timeoutMs, errors }),
     createTavilyAdapter({ apiKey: String(env.TAVILY_API_KEY ?? "").trim(), fetchImpl, timeoutMs, errors }),
     createExaAdapter({ apiKey: String(env.EXA_API_KEY ?? "").trim(), fetchImpl, timeoutMs, errors }),
+    createParallelAdapter({ fetchImpl, timeoutMs, errors, normalize: normalizeParallel }),
   ].filter((adapter) => adapter.available());
   const configuredIds = new Set(adapters.map((adapter) => adapter.id));
   const customChain = firstText(chain)?.split(",").map((id) => id.trim()).filter(Boolean);
