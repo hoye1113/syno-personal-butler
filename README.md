@@ -42,10 +42,16 @@ pnpm start
 - 08:30 晨报、22:00 晚间复盘、周日 20:00 周报；单一 Syno Host 独立于浏览器运行。
 - 可选微信 iLink 私聊渠道。二维码兼容探针与完整限制见 [docs/WEIXIN-ANDROID-PROBE.md](docs/WEIXIN-ANDROID-PROBE.md)。
 
-Windows 登录启动 Syno Host：
+登录自启 Syno Host：
 
 ```powershell
 pnpm windows:install
+```
+
+macOS（LaunchAgent，登录自动拉起 + 崩溃退避重启与桌面告警）：
+
+```sh
+pnpm macos:install   # 其余命令：macos:status / macos:restart / macos:uninstall
 ```
 
 完整设计见 [架构](docs/ARCHITECTURE.md)、[权限策略](docs/POLICY.md)、[执行语义 ADR](docs/adr/0003-execution-semantics.md)、[移动交付 ADR](docs/adr/0004-mobile-delivery-contract.md)、[运维与恢复](docs/OPERATIONS.md)、[切换清单](docs/CUTOVER-CHECKLIST.md) 和 [已知限制](docs/KNOWN-LIMITATIONS.md)。

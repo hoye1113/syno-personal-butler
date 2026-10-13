@@ -1,15 +1,16 @@
 import { createServer } from "node:http";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 
 import { createSynoRuntime, routeSynoApi } from "./syno/runtime.mjs";
 import { isAllowedSynoApiPath } from "./syno/server-api-allowlist.mjs";
 import { DEFAULT_WEB_PORT, PATHS } from "../../packages/syno-core/paths.mjs";
 import { ProcessFileLock } from "../../packages/syno-core/process-lock.mjs";
+import { repoFingerprintFor } from "../../packages/syno-core/repo-fingerprint.mjs";
 import { readinessHttpStatus } from "./syno/server-readiness.mjs";
 
 const PORT = Number(process.env.PORT || DEFAULT_WEB_PORT);
-const fingerprint = createHash("sha256").update(path.resolve(PATHS.repoRoot).toLocaleLowerCase("en-US"), "utf8").digest("hex").slice(0, 16);
+const fingerprint = repoFingerprintFor(PATHS.repoRoot);
 const hostLease = await new ProcessFileLock({
   file: path.join(PATHS.stateRoot, "locks", "syno-host.lock"), failFast: true,
   metadata: { instanceId: randomUUID(), repoFingerprint: fingerprint, entrypoint: "apps/syno/server.mjs" },
