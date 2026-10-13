@@ -131,7 +131,10 @@ test("localDataRoot 相对路径与 .env 解析", async () => {
   assert.equal(fromEnvFile, path.join(fakeRepo, "env-data"));
 
   // 4. 无配置时回退到 LOCALAPPDATA / HOME
-  const fallback = localDataRoot({ LOCALAPPDATA: "C:\\FakeApp", NODE_ENV: "production" }, path.join(scratch, "empty-repo"));
-  assert.equal(fallback, path.join("C:\\FakeApp", "Syno"));
+  const localBase = path.join(scratch, "platform-local");
+  const emptyRepo = path.join(scratch, "empty-repo");
+  const fallback = localDataRoot({ LOCALAPPDATA: localBase, NODE_ENV: "production" }, emptyRepo);
+  assert.equal(fallback, path.join(localBase, "Syno"));
+  assert.equal(localDataRoot({ HOME: localBase, NODE_ENV: "production" }, emptyRepo), path.join(localBase, "Syno"));
 });
 

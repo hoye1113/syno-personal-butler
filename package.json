@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node apps/syno/server.mjs",
     "start:test": "node scripts/start-test-host.mjs",
-    "test": "node --import ./tests/support/test-environment.mjs --test --test-timeout=180000 --test-concurrency=1 tests/*.test.mjs",
+    "test": "node scripts/run-tests.mjs",
     "verify": "node scripts/verify-repository.mjs && node scripts/check-active-docs.mjs",
     "check:docs": "node scripts/check-active-docs.mjs",
     "state:archive": "node scripts/state-archive.mjs",
