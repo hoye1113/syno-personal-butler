@@ -159,3 +159,24 @@ test("search excerpts fall back to token matches or the opening without changing
   const [metadata] = JSON.parse(await searchKnowledgeNotes({ query: "tag_only", vaultRoot, indexFile }));
   assert.equal(metadata.excerptOffset, 0);
 });
+
+test("public search fills its limit after removing higher-ranked sensitive notes in both tool surfaces", async (t) => {
+  const { knowledge, vaultRoot, indexFile } = await fixture(t);
+  for (let index = 0; index < 4; index += 1) {
+    await fs.writeFile(path.join(vaultRoot, "01-Areas", `Private-${index}.md`), `---\ntitle: Private Target ${index}\nsensitive: true\n---\n私密夹具\n`, "utf8");
+  }
+  await fs.writeFile(path.join(vaultRoot, "01-Areas", "Public.md"), "---\ntitle: Public Guide\n---\nTarget 正文\n", "utf8");
+  await fs.writeFile(path.join(vaultRoot, "01-Areas", "Manual.md"), "---\ntitle: Public Manual\n---\nTarget 用法\n", "utf8");
+  const runtime = createSynoRuntime({ knowledge });
+  for (const limit of [1, 2, 20]) {
+    const plugin = JSON.parse(await searchKnowledgeNotes({ query: "Target", limit, vaultRoot, indexFile }));
+    const bridge = await runtime.tools.execute("knowledge.search", { query: "Target", limit });
+    assert.deepEqual(JSON.parse(JSON.stringify(bridge)), plugin);
+    assert.deepEqual(plugin.map((item) => item.title), limit === 1 ? ["Public Guide"] : ["Public Guide", "Public Manual"]);
+    assert.equal(Object.hasOwn(plugin[0], "sensitive"), false);
+  }
+  assert.equal((await knowledge.search("Target", { limit: 1 }))[0].sensitive, true);
+  assert.deepEqual(await knowledge.search("Private", { includeSensitive: false }), []);
+  assert.equal((await knowledge.search("Private")).length, 4);
+  assert.deepEqual(JSON.parse(await searchKnowledgeNotes({ query: "Private", vaultRoot, indexFile })), []);
+});

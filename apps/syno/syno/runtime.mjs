@@ -339,7 +339,7 @@ function createSynoRuntime(options = {}) {
       inputSchema: { type: "object", required: ["query"], properties: { query: { type: "string", minLength: 1 }, limit: { type: "integer", minimum: 1, maximum: 20 } }, additionalProperties: false },
       outputSchema: { type: "array", items: { type: "object" } },
       execute: async ({ query, limit }, context = {}) => {
-        return (await knowledge.search(query, { limit: limit || 8 }))
+        return (await knowledge.search(query, { limit: limit || 8, includeSensitive: false }))
           .filter((item) => item.sensitive !== true)
           .map(({ sensitive, ...item }) => item);
       },
