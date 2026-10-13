@@ -18,4 +18,5 @@ try {
   [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Syno').Show($toast)
 } catch {
   Write-Warning "Windows notification failed: $($_.Exception.Message)"
+  exit 1
 }
