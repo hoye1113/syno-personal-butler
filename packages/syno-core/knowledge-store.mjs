@@ -113,7 +113,7 @@ class KnowledgeStore {
     if (!this.cache || inventory.fingerprint !== this.fingerprint) await this.rebuild();
   }
   invalidate() { this.cache = null; this.fingerprint = ""; }
-  async search(query, { limit = 30, tags = [], source = "", stability = "", from = "", to = "" } = {}) {
+  async search(query, { limit = 30, tags = [], source = "", stability = "", from = "", to = "", includeSensitive = true } = {}) {
     await this.#ensureCurrent(); const queryTokens = tokens(query);
     const ranked = this.cache.map((note) => {
       const reasons = []; let score = 0;
@@ -122,7 +122,7 @@ class KnowledgeStore {
         const matches = count(field); if (matches) { score += matches * weight; reasons.push(reason); }
       }
       return { note, score, reasons };
-    }).filter(({ note, score }) => note.searchable && (!queryTokens.length || score > 0)
+    }).filter(({ note, score }) => note.searchable && (includeSensitive || !note.sensitive) && (!queryTokens.length || score > 0)
       && (!tags.length || tags.every((tag) => [...note.tags, ...note.legacyTags].some((value) => value.toLocaleLowerCase("zh-CN") === tag.toLocaleLowerCase("zh-CN"))))
       && (!source || note.source.toLocaleLowerCase("zh-CN").includes(source.toLocaleLowerCase("zh-CN")))
       && (!stability || note.stability === stability) && (!from || (note.date && note.date >= from)) && (!to || (note.date && note.date <= `${to}T23:59:59`)));

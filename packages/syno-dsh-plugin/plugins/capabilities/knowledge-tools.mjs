@@ -19,7 +19,7 @@ function storeFor({ vaultRoot, indexFile } = {}) {
 
 async function searchKnowledgeNotes({ query, limit, vaultRoot, indexFile } = {}) {
   const bounded = Math.min(20, Math.max(1, Number(limit) || 8));
-  const results = (await storeFor({ vaultRoot, indexFile }).search(String(query || ""), { limit: bounded }))
+  const results = (await storeFor({ vaultRoot, indexFile }).search(String(query || ""), { limit: bounded, includeSensitive: false }))
     .filter((item) => item.sensitive !== true)
     .map(({ sensitive, ...item }) => item);
   return JSON.stringify(results);
