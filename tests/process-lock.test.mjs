@@ -12,6 +12,22 @@ import {
   removeConfirmedStaleProcessLock,
 } from "../packages/syno-core/process-lock.mjs";
 
+test("ProcessFileLock fail-fast excludes a concurrent lease and permits acquisition after release", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-lock-contention-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const file = path.join(root, "shared.lock");
+  const first = new ProcessFileLock({ file, failFast: true, metadata: { id: "proc1" } });
+  const second = new ProcessFileLock({ file, failFast: true, metadata: { id: "proc2" } });
+  const lease = await first.acquire();
+  try {
+    await assert.rejects(second.acquire(), { code: "PROCESS_LOCK_HELD" });
+  } finally {
+    await lease.release();
+  }
+  const next = await second.acquire();
+  await next.release();
+});
+
 test("ProcessFileLock persists instance identity and only its owner can release it", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-process-lock-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));

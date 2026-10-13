@@ -61,23 +61,10 @@
 
 知识仓 `vault/AGENTS.md` 及 `vault/99-System/Agent/` 中的 canonical Skill 继续约束知识收录、关联、写作和 MOC。平台入口只负责转发，不复制业务规则。
 
-## 多智能体自主研发流水线 (Codex -> Gemini -> Claude Code)
+## 开发与交付
 
-1. **角色分工**：
-   - **Codex (架构师 / 需求端)**：负责需求拆解、编写带验收标准的 Issue（标为 `spec`），并在 PR 最终合格后由 Codex 客户端完成验收与合并。
-   - **Gemini (反重力 / 核心研发)**：负责认领任务、拉分支编码、自测提 PR；若审查被打回，**由 Gemini 自己获取审查意见并完成全部代码修复**。
-   - **Claude Code (Kimi / 资深审查员)**：担任只读审查员（禁止使用写工具修改文件），挂载 `/code-review --depth deep` 等审查技能，严格对照验收标准指出缺陷。
-2. **门禁与执行铁律**：
-   - **严禁自审**：PR 提交后必须且只能调用 `node scripts/review-with-claude.mjs --pr <PR_NUMBER>` 触发 Claude Code 审查。
-   - **返修优先**：调度遵循“一次只做一件，返修优先”，处于 `changes-requested` 的 PR 拥有最高处理优先级。
-   - **终态通知**：只有当 Claude 审查打出 `[APPROVED]` 且 GitHub 标签变为 `approved` 时，才触发桌面通知让 Codex/主人验收合并。
-3. **PR 生命周期与 Codex 合并门禁 (Draft vs Ready)**：
-   - **Draft PR**：Gemini 开发与返修期间标记为 Draft。Codex 巡检直接跳过所有 Draft PR，静待其他 Agent 完成工作。
-   - **Ready PR**：当 Gemini 自测通过、Claude Code 审查打出 `[APPROVED]` 且完成版本绑定后，脚本自动将 Draft 翻转为 Ready for review（`gh pr ready`）。
-   - **Codex 每小时合并门禁（必须同时满足以下条件方可合并）**：
-     1. 非 Draft 状态（`isDraft == false`）；
-     2. 可合并状态（`mergeable == 'MERGEABLE'`，遇异步计算中 `UNKNOWN` 需缓冲重试）；
-     3. 当前最新 Commit SHA（`headRefOid`）拥有匹配的 Claude Code 审查通过记录与 `approved` 标签；
-     4. 关联 Issue 中的【验收标准 Checklist】逐项核对完毕；
-     5. 采用 `gh pr merge --squash --delete-branch` 合并，保持主分支历史整洁并自动关闭对应 Issue。
-   - **超时兜底**：若 Ready PR 处于 `approved` 状态超过 2 小时仍未被合并，触发桌面 Toast 及飞书卡片提醒主人介入。
+当前开发 Agent 负责需求理解、实现、自测、差异复核与修复，按主人指令完成交付。开发不要求先创建 Issue、跨 Agent 交接、指定外部审查员或专用标签。
+
+在独立分支实施并保留已有文件和进程；PR 合并前核对最新提交的验收结果、必要 CI 与可合并状态，采用 squash 合并。发布、合并及生产重启按主人的授权执行。
+
+只有主人明确要求时，才安排多 Agent 协作或定时研发巡检。
