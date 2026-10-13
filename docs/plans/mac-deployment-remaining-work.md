@@ -17,10 +17,10 @@
 
 - 步骤 1（已完成）：Home channel 切到 feishu。
 - 步骤 2（已完成）：受控测试卡已投递（`runId=mac-accept-1`，`eventId=outbox-20261013151926881-ce410297`，`proactive.bundle.delivered`）。
-- 步骤 3（待 Owner）：在飞书确认只收到这一条测试卡。
-- 步骤 4（待执行）：`POST /api/syno/proactive/confirm-test`（`confirmed=true`，携带上述 eventId/runId，`visibleCount=1`、`order=single`、`result=passed`）写入发布证据。
-- 步骤 5（待执行）：`POST /api/syno/settings`（`key=notifications.proactiveDeliveryEnabled`、`value=true`、`evidenceEventId=outbox-20261013151926881-ce410297`）打开真实投递。
-- 验收：连续 3 日晨报/晚间复盘按点投递且 `deliveryHealth.consecutiveFailures=0`；灵感卡 12:30 出卡；期间 `waiting_provider`、失败码分布可查。
+- 步骤 3（已完成）：Owner 在飞书确认只收到一条测试卡。
+- 步骤 4（已完成）：`/api/syno/proactive/confirm-test` 写入发布证据（`confirmedAt=2026-10-13T15:38:35Z`）。
+- 步骤 5（已完成）：`notifications.proactiveDeliveryEnabled=true`（`confirmed=true` 必需），`proactive/status` 显示 `enabled=true, homeTargetAvailable=true, 连续失败 0`。
+- 验收（进行中）：Observe 首日投递——08:30 晨报、22:00 晚间复盘、12:30 灵感卡按点到达飞书，连续 3 日 `deliveryHealth.consecutiveFailures=0`。
 - 回滚：将 `notifications.proactiveDeliveryEnabled` 置回 `false`；无需回退 home（如需可再切回）。
 - 注意：受控测试期间必须保持真实投递暂停；证据只能由确认入口写入。
 
