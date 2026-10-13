@@ -117,14 +117,18 @@ class JobStore {
     return job;
   }
 
-  async list({ limit = 100, ownerKey } = {}) {
+  async list({ limit = 100, ownerKey, status, retryBefore } = {}) {
     const files = await this.#jobFiles();
     const jobs = [];
-    const candidates = ownerKey !== undefined ? files : files.slice(-limit * 2);
+    // Filtered recovery queries must inspect the entire history before taking a batch.
+    const candidates = ownerKey !== undefined || status !== undefined || retryBefore !== undefined ? files : files.slice(-limit * 2);
+    const retryCutoff = retryBefore === undefined ? null : new Date(retryBefore).getTime();
     for (const file of candidates) {
       try {
         const job = await readRecord(file);
         if (ownerKey !== undefined && String(job.ownerKey || "local-user") !== String(ownerKey || "local-user")) continue;
+        if (status !== undefined && job.status !== status) continue;
+        if (retryCutoff !== null && job.nextRetryAt && !(new Date(job.nextRetryAt).getTime() <= retryCutoff)) continue;
         job.recordPath = this.#logicalPath(file);
         jobs.push(job);
       } catch {
