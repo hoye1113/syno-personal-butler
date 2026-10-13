@@ -5,6 +5,7 @@ import path from "node:path";
 import { PATHS, relativeToRoot, resolveInside } from "./paths.mjs";
 import { frontmatterData } from "./validator.mjs";
 import { inspectRemoteContent } from "./sensitive-content.mjs";
+import { assertKnowledgeNotSensitive, sliceKnowledgeText } from "./knowledge-read.mjs";
 
 function plainText(markdown) {
   return String(markdown).replace(/^---[\s\S]*?---\s*/m, "").replace(/!\[.*?\]\(.*?\)/g, "")
@@ -24,6 +25,16 @@ function tokens(value) {
     for (let index = 0; index < group.length - 1; index += 1) output.add(group.slice(index, index + 2));
   }
   return [...output];
+}
+function excerptFor(markdown, query, queryTokens) {
+  const positionOf = (term) => term ? new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu").exec(markdown)?.index ?? -1 : -1;
+  let position = positionOf(String(query || "").trim());
+  if (position < 0) {
+    const matches = queryTokens.map(positionOf).filter((index) => index >= 0);
+    position = matches.length ? matches.reduce((first, index) => Math.min(first, index)) : 0;
+  }
+  const window = sliceKnowledgeText(markdown, Math.max(0, position - 80), 280);
+  return { excerpt: plainText(window.snippet), excerptOffset: window.offset };
 }
 function isContentNote(vaultRoot, file) {
   const relative = path.relative(vaultRoot, file).replace(/\\/g, "/");
@@ -116,7 +127,16 @@ class KnowledgeStore {
       && (!source || note.source.toLocaleLowerCase("zh-CN").includes(source.toLocaleLowerCase("zh-CN")))
       && (!stability || note.stability === stability) && (!from || (note.date && note.date >= from)) && (!to || (note.date && note.date <= `${to}T23:59:59`)));
     ranked.sort((a, b) => b.score - a.score || a.note.title.localeCompare(b.note.title, "zh-CN"));
-    return ranked.slice(0, Math.min(100, Number(limit) || 30)).map(({ note, score, reasons }) => ({ ...note, index: undefined, score, matchReasons: reasons }));
+    return Promise.all(ranked.slice(0, Math.min(100, Number(limit) || 30)).map(async ({ note, score, reasons }) => {
+      let excerpt = {};
+      if (!note.sensitive) {
+        const relative = note.path.slice(note.path.indexOf("/") + 1);
+        const markdown = await fs.readFile(resolveInside(this.vaultRoot, relative), "utf8");
+        assertKnowledgeNotSensitive(markdown);
+        excerpt = excerptFor(markdown, query, queryTokens);
+      }
+      return { ...note, ...excerpt, index: undefined, score, matchReasons: reasons };
+    }));
   }
   async read(relativePath) {
     const relative = String(relativePath || "").replace(/\\/g, "/");
