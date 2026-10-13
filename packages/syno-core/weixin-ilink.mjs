@@ -5,8 +5,8 @@ import QRCode from "qrcode";
 
 import { PATHS, resolveInside } from "./paths.mjs";
 import { ProcessFileLock } from "./process-lock.mjs";
-import { runDpapi } from "./provider-credential-store.mjs";
 import { redactString } from "./runtime-journal.mjs";
+import { protectSecret, unprotectSecret } from "./secret-protector.mjs";
 import { stripMarkdown, wxBreaks } from "./weixin-text-format.mjs";
 
 const DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com/";
@@ -193,7 +193,7 @@ async function readJson(file, fallback = null) {
 }
 
 class LocalCredentialStore {
-  constructor({ file, root = PATHS.credentialsRoot, stateFile = path.join(PATHS.stateRoot, "weixin-runtime.json"), protect = (value) => runDpapi("protect", value), unprotect = (value) => runDpapi("unprotect", value) } = {}) {
+  constructor({ file, root = PATHS.credentialsRoot, stateFile = path.join(PATHS.stateRoot, "weixin-runtime.json"), protect = protectSecret, unprotect = unprotectSecret } = {}) {
     this.metadataFile = file || path.join(root, "weixin-ilink.json");
     this.secretFile = path.join(path.dirname(this.metadataFile), "weixin-ilink.dpapi");
     this.stateFile = stateFile;

@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { PATHS } from "./paths.mjs";
 import { ProcessFileLock } from "./process-lock.mjs";
-import { runDpapi } from "./provider-credential-store.mjs";
+import { protectSecret, unprotectSecret } from "./secret-protector.mjs";
 
 const PROACTIVE_STATE_VERSION = 2;
 const PROACTIVE_RESPONSE_KIND = "proactive";
@@ -140,7 +140,7 @@ function payloadFile(root, ref) {
 function metadataFile(root, ownerKey, channel) { return path.join(root, `${digest({ ownerKey, channel })}.json`); }
 
 class OwnerChannelTargetStore {
-  constructor({ root = path.join(PATHS.stateRoot, "owner-channel-targets"), payloadRoot = path.join(PATHS.stateRoot, "owner-channel-target-payloads"), protect = (value) => runDpapi("protect", value), unprotect = (value) => runDpapi("unprotect", value), processLock, clock = () => new Date() } = {}) {
+  constructor({ root = path.join(PATHS.stateRoot, "owner-channel-targets"), payloadRoot = path.join(PATHS.stateRoot, "owner-channel-target-payloads"), protect = protectSecret, unprotect = unprotectSecret, processLock, clock = () => new Date() } = {}) {
     this.root = path.resolve(root);
     this.payloadRoot = path.resolve(payloadRoot);
     this.protect = protect;

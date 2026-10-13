@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { ProcessFileLock } from "./process-lock.mjs";
 import { PATHS } from "./paths.mjs";
-import { runDpapi } from "./provider-credential-store.mjs";
+import { protectSecret, unprotectSecret } from "./secret-protector.mjs";
 
 const CHANNEL_DELIVERY_OUTBOX_VERSION = 2;
 const DELIVERY_STATUSES = new Set(["pending", "claimed", "delivered", "failed_retryable", "failed_terminal", "delivery_unknown", "superseded"]);
@@ -68,8 +68,8 @@ class ChannelDeliveryOutbox {
     leaseMs = 5 * 60_000,
     retryBaseMs = 30_000,
     clock = () => new Date(),
-    protect = (value) => runDpapi("protect", value),
-    unprotect = (value) => runDpapi("unprotect", value),
+    protect = protectSecret,
+    unprotect = unprotectSecret,
     processLock,
     beforeClaimCommit,
   } = {}) {

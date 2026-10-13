@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { PATHS } from "./paths.mjs";
 import { ProcessFileLock } from "./process-lock.mjs";
-import { runDpapi } from "./provider-credential-store.mjs";
+import { protectSecret, unprotectSecret } from "./secret-protector.mjs";
 
 // Only "open" records may be picked up by resolve().  Every outcome of a continuation —
 // resolved (feedback recorded), completed (link re-read succeeded), settled (generic close)
@@ -30,8 +30,8 @@ class ChannelContinuationStore {
     payloadRoot = path.join(PATHS.stateRoot, "channel-continuation-payloads"),
     lockFile = path.join(PATHS.stateRoot, "locks", "channel-continuations.lock"),
     clock = () => new Date(),
-    protect = (value) => runDpapi("protect", value),
-    unprotect = (value) => runDpapi("unprotect", value),
+    protect = protectSecret,
+    unprotect = unprotectSecret,
     processLock,
   } = {}) {
     this.root = path.resolve(root);

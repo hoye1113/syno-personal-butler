@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { ProcessFileLock } from "./process-lock.mjs";
 import { PATHS } from "./paths.mjs";
-import { runDpapi } from "./provider-credential-store.mjs";
+import { protectSecret, unprotectSecret } from "./secret-protector.mjs";
 
 const ACCEPTED_REQUEST_VERSION = 1;
 const TERMINAL_STATUSES = new Set(["delivered", "canceled", "failed_terminal"]);
@@ -52,8 +52,8 @@ class AcceptedRequestStore {
     lockFile = path.join(PATHS.stateRoot, "locks", "accepted-requests.lock"),
     leaseMs = 5 * 60 * 1_000,
     clock = () => new Date(),
-    protect = (value) => runDpapi("protect", value),
-    unprotect = (value) => runDpapi("unprotect", value),
+    protect = protectSecret,
+    unprotect = unprotectSecret,
     processLock,
   } = {}) {
     this.root = path.resolve(root);
