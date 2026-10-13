@@ -40,7 +40,8 @@
   - 安装后 Agent `jobState=running`，自动收养端口上的会话 Host（`launcher.adopted`）；
   - 终止 Host → 60 秒退避后自动拉起（16:26:30 / 16:27:46 / 16:29:01 三次实测）；
   - 连续 3 次快速崩溃（uptime 51.1s→15.6s→11.6s）→ `launcher.crash_loop streak=3 popupDelivered=true`，桌面告警实际弹出；
-  - 验收发现并修复：Host 以 detached 独立进程组孵化 DSH，Host 被 SIGKILL 硬杀后 DSH 成孤儿占住 3088，新 Host 绑定失败进入 `HARNESS_EXITED` 恢复循环。监督器现在在孵化新 Host 前回收命令行指向本仓 DSH 根的孤儿监听者（SIGTERM → 宽限 → SIGKILL，陌生服务不碰），`launcher.orphan_reaped` 事件留痕；
+  - 验收发现并修复（其一）：Host 以 detached 独立进程组孵化 DSH，Host 被 SIGKILL 硬杀后 DSH 成孤儿占住 3088，新 Host 绑定失败进入 `HARNESS_EXITED` 恢复循环。监督器现在在孵化新 Host 前回收命令行指向本仓 DSH 根的孤儿监听者（SIGTERM → 宽限 → SIGKILL，陌生服务不碰），`launcher.orphan_reaped` 事件留痕；
+  - 验收发现并修复（其二）：macOS 的 `p_comm` 被截断为 16 字符（绝对路径启动的 node 显示为 `/usr/local/bin/n`），采用校验按 comm 匹配 node 会误判并把监督器停掉。监听者解析改为从 `ps -o args=` 首个 token 取可执行路径；采用校验失败改为有界重试（15 秒间隔，连续 3 次才安静停下），旧 Host 优雅退出中的瞬态不再导致停机；
   - 修复：日志函数曾因 `fs.promises` 上误调 `appendFileSync` 而静默失败（已修复 + 日志落盘单元测试 + stderr 兜底）。
 - 待主人验收：注销/重启后的登录冷启动（登录后 60 秒内自动拉起、`health=ready`）。
 - 停用/回滚：`pnpm macos:uninstall`（bootout + 删除 plist）。

@@ -12,6 +12,7 @@ import {
   crashLoopAlertBody,
   createCrashAlertState,
   handleHostCrash,
+  inspectListener,
   launcherLogDue,
   listenerMatchesHost,
   launchdTaskLogFile,
@@ -153,6 +154,20 @@ test("日志写入：真实落盘为 JSONL，节流事件每小时一条（回�
   assert.equal(events[0].repoFingerprint, "deadbeefdeadbeef");
   assert.equal(events[1].event, "launcher.health_ok");
   assert.equal(events[1].listenerPid, 1);
+});
+
+test("监听进程解析：从 ps args 取可执行路径，避开 macOS comm 16 字符截断", async () => {
+  const run = async (command, args) => {
+    if (command === "lsof") return { stdout: "516\n" };
+    if (command === "ps") {
+      assert.deepEqual(args, ["-p", "516", "-o", "args="], "必须只取 args（comm 列会被系统截断）");
+      return { stdout: "/usr/local/bin/node /repo/apps/syno/server.mjs\n" };
+    }
+    throw new Error(`unexpected ${command}`);
+  };
+  const listener = await inspectListener(8888, run);
+  assert.equal(listener.comm, "/usr/local/bin/node");
+  assert.equal(listenerMatchesHost(listener, { serverPath: "/repo/apps/syno/server.mjs", repoRoot: "/repo" }), true);
 });
 
 test("孤儿 DSH 回收：只清理命令行指向本仓 DSH 的监听者，陌生服务不碰", async () => {
