@@ -2,7 +2,7 @@
 title: MOC - AI Coding 与工具
 description: AI 编码工具实战横切 MOC——Claude Code / Codex / OpenClaw / Cursor / Vibe Code，从原 Agent Theory MOC B·C·E·L编程段迁入。
 created: 2026-07-15
-updated: 2026-07-15
+updated: 2026-10-13
 tags:
   - ai_agent
   - ai_coding
@@ -61,6 +61,7 @@ source: vault_initiative - moc - split from Agent Theory and Design
 
 | 笔记 | 核心主题 |
 |------|---------|
+| [[红绿灯进度提示语与 Agent 任务边界 - 卡尔]] | 固定原始目标，区分继续执行、下一轮计划与存档停止；交付状态须有证据 |
 | [[ACP集成问题与踩坑经验]] | ACP（Hermes × FlowyClaw/AI_Router）协议集成踩坑：通信、责任边界、Agent Server 问题、连接排障 |
 | [[季白羽-Codex 与 Remotion 纸片分层动画流水线]] | Codex 当指挥家串 Imagegen/F5-TTS/Remotion/FFmpeg 的纸片分层动画流水线：先定镜头、拆四层、独立 PNG、错峰入场、遮挡造纵深 |
 | [[拾语隅-给Hermes装个状态灯]] | 用 Hermes Agent 当个人助手时，通过 macOS 菜单栏状态灯实时显示 Agent 工作状态（工作中/待机/掉线）；迭代方案：CPU 监测→标记文件→日志监控 |
