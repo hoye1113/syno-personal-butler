@@ -221,7 +221,7 @@ function harnessChildEnvironment(source = process.env) {
     "NO_PROXY", "PATH", "PATHEXT", "SYSTEMDRIVE", "SYSTEMROOT", "TEMP", "TMP", "USERPROFILE",
     "WINDIR", "HTTP_PROXY", "HTTPS_PROXY",
     // B5 工具面/通道双轨开关：只控制插件行为，不含凭据，按需透传给 DSH 子进程。
-    "SYNO_CAPABILITIES_TOOLS", "SYNO_CHANNEL_OWNER", "SYNO_CHAT_TOOLS",
+    "SYNO_CAPABILITIES_TOOLS", "SYNO_CHANNEL_OWNER", "SYNO_CHAT_TOOLS", "SYNO_WEB_SEARCH_CHAIN",
   ]);
   return Object.fromEntries(Object.entries(source).filter(([key, value]) => {
     const upper = key.toUpperCase();
