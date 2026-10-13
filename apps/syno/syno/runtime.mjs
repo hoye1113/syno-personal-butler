@@ -377,10 +377,10 @@ function createSynoRuntime(options = {}) {
       },
     },
     {
-      name: "knowledge.read_snippet", description: "读取单篇非敏感知识笔记的限长必要片段", risk: "read", permission: "syno-read", retry: "safe", version: "1",
-      inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string", minLength: 1 }, maxChars: { type: "integer", minimum: 200, maximum: 8000 } }, additionalProperties: false },
-      outputSchema: { type: "object", required: ["path", "title", "snippet", "truncated"], properties: { path: { type: "string" }, title: { type: "string" }, snippet: { type: "string" }, truncated: { type: "boolean" } } },
-      execute: ({ path: notePath, maxChars }) => readKnowledgeSnippet(knowledge, notePath, maxChars),
+      name: "knowledge.read_snippet", description: "按搜索结果 excerptOffset 定位读取非敏感笔记；必要时用 nextOffset 续读，null 表示文末", risk: "read", permission: "syno-read", retry: "safe", version: "1",
+      inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string", minLength: 1 }, maxChars: { type: "integer", minimum: 200, maximum: 8000 }, offset: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER } }, additionalProperties: false },
+      outputSchema: { type: "object", required: ["path", "title", "snippet", "truncated", "offset", "nextOffset"], properties: { path: { type: "string" }, title: { type: "string" }, snippet: { type: "string" }, truncated: { type: "boolean" }, offset: { type: "integer" }, nextOffset: { type: ["integer", "null"] } } },
+      execute: ({ path: notePath, maxChars, offset }) => readKnowledgeSnippet(knowledge, notePath, maxChars, offset),
     },
     {
       name: "today.read", description: "读取按目标、承诺和到期复习排序的今日工作台", risk: "read", permission: "syno-read", retry: "safe", version: "1",

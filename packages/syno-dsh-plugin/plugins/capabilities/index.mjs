@@ -42,10 +42,11 @@ function registerCoreTools(ctx) {
   }));
   ctx.tools.register(defineTool({
     name: canonicalToolName(KNOWLEDGE_READ_SNIPPET_TOOL_NAME),
-    description: "读取单篇非敏感知识笔记的限长必要片段（in-process 试用工具）",
+    description: "按搜索结果 excerptOffset 定位读取非敏感笔记；必要时用 nextOffset 续读，null 表示文末",
     parameters: {
       path: { type: "string", required: true, description: "vault/... 逻辑路径" },
       maxChars: { type: "integer", description: "片段字符上限（200-8000，默认 6000）" },
+      offset: { type: "integer", description: "起始字符偏移（默认 0）；使用 excerptOffset 或上次 nextOffset" },
     },
     output: {
       schema: { type: "string" },
@@ -53,7 +54,7 @@ function registerCoreTools(ctx) {
     },
     execute: (args) => {
       assertIntegerRange(args.maxChars, 200, 8000, "maxChars");
-      return readKnowledgeSnippetJson({ path: args.path, maxChars: args.maxChars });
+      return readKnowledgeSnippetJson({ path: args.path, maxChars: args.maxChars, offset: args.offset });
     },
   }));
   ctx.tools.register(defineTool({

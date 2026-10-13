@@ -25,9 +25,9 @@ async function searchKnowledgeNotes({ query, limit, vaultRoot, indexFile } = {})
   return JSON.stringify(results);
 }
 
-async function readKnowledgeSnippetJson({ path: notePath, maxChars } = {}, { knowledge = null } = {}) {
+async function readKnowledgeSnippetJson({ path: notePath, maxChars, offset } = {}, { knowledge = null } = {}) {
   const store = knowledge || storeFor({});
-  return JSON.stringify(await readKnowledgeSnippet(store, notePath, maxChars));
+  return JSON.stringify(await readKnowledgeSnippet(store, notePath, maxChars, offset));
 }
 
 export {
