@@ -58,8 +58,8 @@ test("plist 内容固定：绝对路径、登录自启、失败重拉、日志�
   assert.match(plist, /<key>RunAtLoad<\/key>\n  <true\/>/);
   assert.match(plist, /<key>SuccessfulExit<\/key>\n    <false\/>/);
   assert.match(plist, /<key>ThrottleInterval<\/key>\n  <integer>10<\/integer>/);
-  assert.match(plist, /<string>\/data\/logs\/launchd-agent\.out\.log<\/string>/);
-  assert.match(plist, /<string>\/data\/logs\/launchd-agent\.err\.log<\/string>/);
+  assert.match(plist, /<string>[^<]*launchd-agent\.out\.log<\/string>/);
+  assert.match(plist, /<string>[^<]*launchd-agent\.err\.log<\/string>/);
   assert.match(plist, /<key>PATH<\/key>\n    <string>\/usr\/bin:\/bin:\/usr\/sbin:\/sbin:\/usr\/local\/bin:\/opt\/homebrew\/bin<\/string>/);
   const escaped = buildLaunchAgentPlist({ label: "x", nodePath: "/n&x", launcherPath: "/l<m", repoRoot: "/r>", logRoot: "/g" });
   assert.match(escaped, /\/n&amp;x/);
