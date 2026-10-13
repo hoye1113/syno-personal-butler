@@ -31,14 +31,18 @@
 - 验收：平台工作流 Windows + macOS 双绿；PR 用 squash 合并；合并后本机 `git pull` 同步。
 - 合并后动作：本机即生产，重启 Host 后用 `pnpm run verify` 与 `/api/syno/health` 复核。
 
-## P2 macOS 登录自启（开发任务，对齐 Windows 计划任务）
+## P2 macOS 登录自启（开发完成，待主人登录冷启动验收）
 
 目标：登录自动拉起 Host；崩溃循环有主动告警；安装/卸载由主人手动执行（不进入管家能力面）。
 
-- 交付物：`launchd` LaunchAgent 安装脚本（install/status/restart/uninstall），plist 固定仓库路径、Node 绝对路径、单实例；崩溃退避重启与 `launcher.crash_loop` 同类告警（对齐 `scripts/syno-launcher-crash-alert.ps1` 的行为契约）。
-- 幂等与契约测试：安装后重复安装不改语义；卸载干净；非法路径/缺 Node 时快速失败。
-- 验收：注销/重启后 60 秒内自动拉起、`health=ready`；人为杀死进程连续 3 次后出现桌面告警；一次正常存活 ≥60 秒重置计数。
-- 现状风险：当前 Host 由交互会话启动，会话退出即停止。
+- 交付物（分支 `codex/macos-launchd`）：`scripts/syno-launchd.mjs`（Node 监督循环：收养已健康 Host、60 秒退避重启、快速崩溃连击桌面告警、JSONL 日志与 14 天保留，行为契约对齐 `scripts/start-syno.ps1`）；`apps/syno/syno/mac-service-manager.mjs`（LaunchAgent `com.syno.butler.host` 的安装/状态/重启/卸载）；`scripts/manage-macos-agent.mjs` + `pnpm macos:*`；测试 `tests/macos-launcher.test.mjs`、`tests/macos-service.test.mjs`（20 例）；`packages/syno-core/repo-fingerprint.mjs`（与 server 共用指纹公式）。
+- 真机验收（2026-10-14，本机）：
+  - 安装后 Agent `jobState=running`，自动收养端口上的会话 Host（`launcher.adopted`）；
+  - 终止 Host → 60 秒退避后自动拉起（16:26:30 / 16:27:46 / 16:29:01 三次实测）；
+  - 连续 3 次快速崩溃（uptime 51.1s→15.6s→11.6s）→ `launcher.crash_loop streak=3 popupDelivered=true`，桌面告警实际弹出；
+  - 修复：日志函数曾因 `fs.promises` 上误调 `appendFileSync` 而静默失败（已修复 + 日志落盘单元测试 + stderr 兜底）。
+- 待主人验收：注销/重启后的登录冷启动（登录后 60 秒内自动拉起、`health=ready`）。
+- 停用/回滚：`pnpm macos:uninstall`（bootout + 删除 plist）。
 
 ## P3 对话页入口（可选，低优先级）
 
