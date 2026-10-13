@@ -3,6 +3,7 @@ import test from 'node:test';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { EventEmitter } from 'node:events';
 import {
   parseReviewDecision,
   runGh,
@@ -21,6 +22,64 @@ import {
   handleNext
 } from '../scripts/agent-loop.mjs';
 import { ProcessFileLock } from '../packages/syno-core/process-lock.mjs';
+
+test('分页响应缺失或带 GraphQL 错误必须失败关闭；真实空列表可以返回空队列', () => {
+  for (const [parser, field] of [[parseGraphQLPRsPages, 'pullRequests'], [parseGraphQLIssuesPages, 'issues']]) {
+    for (const response of [[null], [{}], [{ data: { repository: null } }], [{ errors: [{ message: 'denied' }], data: { repository: { [field]: { nodes: [] } } } }]]) {
+      assert.throws(() => parser(response), /分页响应失败/);
+    }
+    assert.deepEqual(parser([{ data: { repository: { [field]: { nodes: [] } } } }]), []);
+    assert.throws(() => parser([]), /非空数组/);
+  }
+});
+
+test('认领行为：脏工作区不切换分支、不修改标签', async () => {
+  const calls = [];
+  const result = await handleNext({
+    prs: [], issues: [{ number: 42, labels: [{ name: 'spec' }] }],
+    gitRunner: (command, args) => { calls.push(args); return ' M AGENTS.md'; },
+    githubRunner: () => assert.fail('脏工作区不得写入 GitHub')
+  });
+  assert.equal(result.action, 'DIRTY_WORKTREE_BLOCKED');
+  assert.equal(calls.length, 1);
+});
+
+test('认领行为：打标失败或回读未确认均回滚；复用分支绝不删除；脱离 HEAD 返回原提交', async () => {
+  for (const reused of [false, true]) {
+    for (const tagFails of [false, true]) {
+      const calls = [];
+      const gitRunner = (command, args) => {
+        calls.push(args);
+        if (args[0] === 'status') return '';
+        if (args[0] === 'branch' && args[1] === '--show-current') return '';
+        if (args[0] === 'rev-parse') return 'original-sha';
+        if (args[0] === 'checkout' && args[1] === '-b' && reused) throw new Error('already exists');
+        return '';
+      };
+      await assert.rejects(handleNext({
+        prs: [], issues: [{ number: 42, labels: [{ name: 'spec' }] }], gitRunner,
+        githubRunner: () => { if (tagFails) throw new Error('denied'); return JSON.stringify({ labels: [] }); }
+      }), /添加 in-progress 标签失败/);
+      assert.ok(calls.some(args => args[0] === 'checkout' && args[1] === 'original-sha'));
+      assert.equal(calls.some(args => args[0] === 'branch' && args[1] === '-D'), !reused);
+    }
+  }
+});
+
+test('认领行为：分支失败不写标签；正常认领必须完成标签回读', async () => {
+  const issue = { number: 42, labels: [{ name: 'spec' }] };
+  await assert.rejects(handleNext({ prs: [], issues: [issue],
+    gitRunner: (command, args) => { if (args[0] === 'fetch') throw new Error('fetch failed'); return args[0] === 'branch' ? 'original' : ''; },
+    githubRunner: () => assert.fail('分支准备失败不得打标')
+  }), /准备特性分支/);
+  const githubCalls = [];
+  const result = await handleNext({ prs: [], issues: [issue],
+    gitRunner: (command, args) => args[0] === 'branch' ? 'original' : '',
+    githubRunner: args => { githubCalls.push(args); return JSON.stringify({ labels: [{ name: 'in-progress' }] }); }
+  });
+  assert.equal(result.action, 'START_ISSUE');
+  assert.deepEqual(githubCalls.map(args => args[1]), ['edit', 'view']);
+});
 
 test('parseReviewDecision: 独立判定行提取、开场白兼容与抗正文误导', () => {
   // 1. 标准 APPROVED
@@ -185,11 +244,25 @@ test('分页回归验证：超过单页上限（>100 条）仍能完整获取多
   // 3. 验证调度器 handleNext 在 100+ 候选集中，精准找到位于第二页较旧的 changes-requested PR 并优先分发
   const dispatchRes = await handleNext({
     prs: allParsedPRs,
-    issues: []
+    issues: [],
+    githubRunner: () => JSON.stringify({ reviews: [{ commit: { oid: 'sha-older-fix-999' }, body: '返修说明' }] })
   });
 
   assert.equal(dispatchRes.action, 'FIX_PR', '深页中的待返修任务必须获得最高分发优先级');
   assert.equal(dispatchRes.prNumber, 999, '必须命中深页中的 PR #999');
+  assert.equal(dispatchRes.reviewReport, '返修说明');
+});
+
+test('返修报告不得使用其他 SHA 的审查或评论', async () => {
+  const result = await handleNext({ prs: [{ number: 999, headRefOid: 'current-sha', labels: [{ name: 'changes-requested' }] }], issues: [],
+    githubRunner: () => JSON.stringify({ reviews: [{ commit: { oid: 'old-sha' }, body: '旧审查' }], comments: [{ body: 'old-sha 旧评论' }] })
+  });
+  assert.equal(result.reviewReport, '');
+});
+
+test('Draft approved 不创建超时提醒状态', async () => {
+  await handleNext({ prs: [{ number: 99998, isDraft: true, labels: [{ name: 'approved' }] }], issues: [] });
+  await assert.rejects(fs.access(path.resolve('.runtime/reviews/pr-99998-approved-since.json')), { code: 'ENOENT' });
 });
 
 test('调度与审查锁：failFast 机制防止并发重叠', async (t) => {
@@ -315,8 +388,18 @@ test('审查与调度脚本安全加固契约断言', async () => {
 });
 
 test('sendToast: 正常返回布尔值且不抛出异常', async () => {
-  const res = await sendToast('Test Title', 'Test Body');
-  assert.equal(typeof res, 'boolean');
+  const res = await sendToast('中文标题😀', '中文正文\n%PATH%', {
+    spawn: (command, args) => {
+      assert.equal(command, 'powershell.exe');
+      assert.equal(Buffer.from(args.at(-2), 'base64').toString('utf8'), '中文标题😀');
+      assert.equal(Buffer.from(args.at(-1), 'base64').toString('utf8'), '中文正文\n%PATH%');
+      const child = new EventEmitter();
+      queueMicrotask(() => child.emit('close', 0));
+      return child;
+    }
+  });
+  assert.equal(res, true);
+  assert.equal(await sendToast('title', 'body', { spawn: () => { throw new Error('模拟失败'); } }), false);
 });
 
 test('安全分支认领与回滚契约：仅全新分支允许 branch -D，复用分支绝不强删', async () => {

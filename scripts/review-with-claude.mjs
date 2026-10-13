@@ -149,7 +149,7 @@ export function formatReviewSummaryForCard(reviewResult, isApproved) {
   return cardBody.trim();
 }
 
-export async function sendToast(title, body) {
+export async function sendToast(title, body, options = {}) {
   try {
     const toastScriptPath = resolve(__dirname, 'show-toast.ps1').replace(/\\/g, '/');
     if (!existsSync(toastScriptPath)) return false;
@@ -176,7 +176,7 @@ export async function sendToast(title, body) {
 
       let child;
       try {
-        child = spawn('powershell.exe', [
+        child = (options.spawn || spawn)('powershell.exe', [
           '-NoProfile',
           '-ExecutionPolicy', 'Bypass',
           '-Command', psCommand,

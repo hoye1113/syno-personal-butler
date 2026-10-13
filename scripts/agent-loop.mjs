@@ -90,10 +90,11 @@ export const PRS_PAGINATED_QUERY = `query($owner: String!, $repo: String!, $endC
 
 export function parseGraphQLIssuesPages(pagesRaw) {
   const pages = typeof pagesRaw === 'string' ? JSON.parse(pagesRaw) : pagesRaw;
-  if (!Array.isArray(pages)) throw new Error('GraphQL 分页数据必须为数组格式');
+  if (!Array.isArray(pages) || pages.length === 0) throw new Error('GraphQL 分页数据必须为非空数组格式');
   const issues = [];
   for (const page of pages) {
-    const nodes = page?.data?.repository?.issues?.nodes || [];
+    const nodes = page?.data?.repository?.issues?.nodes;
+    if (page?.errors?.length || !Array.isArray(nodes)) throw new Error('GitHub Issue 分页响应失败或缺少 nodes');
     for (const node of nodes) {
       issues.push({
         number: node.number,
@@ -109,10 +110,11 @@ export function parseGraphQLIssuesPages(pagesRaw) {
 
 export function parseGraphQLPRsPages(pagesRaw) {
   const pages = typeof pagesRaw === 'string' ? JSON.parse(pagesRaw) : pagesRaw;
-  if (!Array.isArray(pages)) throw new Error('GraphQL 分页数据必须为数组格式');
+  if (!Array.isArray(pages) || pages.length === 0) throw new Error('GraphQL 分页数据必须为非空数组格式');
   const prs = [];
   for (const page of pages) {
-    const nodes = page?.data?.repository?.pullRequests?.nodes || [];
+    const nodes = page?.data?.repository?.pullRequests?.nodes;
+    if (page?.errors?.length || !Array.isArray(nodes)) throw new Error('GitHub PR 分页响应失败或缺少 nodes');
     for (const node of nodes) {
       prs.push({
         number: node.number,
@@ -259,9 +261,11 @@ export function printStatus() {
 export async function handleNext(options = {}) {
   const prs = options.prs || getOpenPRs();
   const issues = options.issues || getOpenIssues();
+  const githubRunner = options.githubRunner || runGh;
+  const gitRunner = options.gitRunner || execFileSync;
 
-  // 0. 超时兜底无条件评估：对所有 approved PR 进行检查并触发超时通知
-  const approvedPRs = prs.filter(p => hasLabel(p, 'approved'));
+  // 0. 对所有 Ready approved PR 评估超时通知，Draft 仍由开发方处理
+  const approvedPRs = prs.filter(p => !p.isDraft && hasLabel(p, 'approved'));
   for (const appPR of approvedPRs) {
     const timeoutStatus = trackApprovedTimeout(appPR, { persist: true });
     if (timeoutStatus.shouldNotify) {
@@ -303,17 +307,18 @@ export async function handleNext(options = {}) {
     if (existsSync(versionedArtifactPath)) {
       try {
         const artifact = JSON.parse(readFileSync(versionedArtifactPath, 'utf8'));
-        reportContent = artifact.report;
+        if (artifact.headRefOid === fixPR.headRefOid) reportContent = artifact.report;
         console.log(`[本地审查证据] 成功匹配当前版本 (${fixPR.headRefOid}) 归档报告`);
       } catch {}
     }
 
     if (!reportContent) {
       try {
-        const commentsRaw = runGh(['pr', 'view', String(fixPR.number), '--json', 'comments']);
+        const commentsRaw = githubRunner(['pr', 'view', String(fixPR.number), '--json', 'reviews,comments']);
         const parsed = JSON.parse(commentsRaw);
-        const lastComment = parsed.comments && parsed.comments[parsed.comments.length - 1];
-        if (lastComment) reportContent = lastComment.body;
+        const matchingReview = (parsed.reviews || []).filter(r => r.commit?.oid === fixPR.headRefOid).at(-1);
+        const matchingComment = (parsed.comments || []).filter(c => c.body?.includes(fixPR.headRefOid)).at(-1);
+        reportContent = matchingReview?.body || matchingComment?.body || '';
       } catch (e) {
         console.warn(`[Warning] 从 PR #${fixPR.number} 拉取评论失败: ${e.message}`);
       }
@@ -389,28 +394,29 @@ export async function handleNext(options = {}) {
     console.log(`- 标题: ${newIssue.title}`);
 
     // 工作区整洁度检查：忽略子模块内部脏构建产物，仅检测当前仓库真实未暂存变更
-    const statusOutput = execFileSync('git', ['status', '--porcelain', '--ignore-submodules=dirty'], { cwd: REPO_ROOT, encoding: 'utf8', timeout: 30000 }).trim();
+    const statusOutput = gitRunner('git', ['status', '--porcelain', '--ignore-submodules=dirty'], { cwd: REPO_ROOT, encoding: 'utf8', timeout: 30000 }).trim();
     if (statusOutput.length > 0) {
       console.warn(`[工作区保护] 当前工作区存在未提交改动：\n${statusOutput}\n已暂停自动切换分支与认领，请先提交或清理工作区。`);
       return { action: 'DIRTY_WORKTREE_BLOCKED', issueNumber: newIssue.number };
     }
 
-    const currentBranch = execFileSync('git', ['branch', '--show-current'], { cwd: REPO_ROOT, encoding: 'utf8', timeout: 30000 }).trim() || 'main';
+    const currentBranch = gitRunner('git', ['branch', '--show-current'], { cwd: REPO_ROOT, encoding: 'utf8', timeout: 30000 }).trim()
+      || gitRunner('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT, encoding: 'utf8', timeout: 30000 }).trim();
     const branchName = `feat/issue-${newIssue.number}`;
     console.log(`正在安全建立特性分支 ${branchName} 并标记 in-progress...`);
 
     let createdNew = false;
     let reusedExisting = false;
     try {
-      execFileSync('git', ['fetch', 'origin', 'main', '--quiet'], { cwd: REPO_ROOT, timeout: 60000 });
-      execFileSync('git', ['checkout', '-b', branchName, 'origin/main'], { cwd: REPO_ROOT, stdio: 'pipe', timeout: 30000 });
+      gitRunner('git', ['fetch', 'origin', 'main', '--quiet'], { cwd: REPO_ROOT, timeout: 60000 });
+      gitRunner('git', ['checkout', '-b', branchName, 'origin/main'], { cwd: REPO_ROOT, stdio: 'pipe', timeout: 30000 });
       createdNew = true;
     } catch (gitErr) {
       const msg = gitErr.stderr ? gitErr.stderr.toString('utf8').trim() : gitErr.message;
       if (msg.includes('already exists')) {
         console.warn(`[Warning] 本地分支 ${branchName} 已存在，尝试安全复用并检出...`);
         try {
-          execFileSync('git', ['checkout', branchName], { cwd: REPO_ROOT, stdio: 'pipe', timeout: 30000 });
+          gitRunner('git', ['checkout', branchName], { cwd: REPO_ROOT, stdio: 'pipe', timeout: 30000 });
           reusedExisting = true;
         } catch (coErr) {
           console.error(`[BLOCKED] 无法切换到已有分支 ${branchName}: ${coErr.message}`);
@@ -422,20 +428,22 @@ export async function handleNext(options = {}) {
     }
 
     try {
-      runGh(['issue', 'edit', String(newIssue.number), '--add-label', 'in-progress']);
+      githubRunner(['issue', 'edit', String(newIssue.number), '--add-label', 'in-progress']);
+      const claimed = JSON.parse(githubRunner(['issue', 'view', String(newIssue.number), '--json', 'labels']));
+      if (!hasLabel(claimed, 'in-progress')) throw new Error('in-progress 标签回读核验失败');
       console.log(`\n✅ 分支 ${branchName} 已就绪，已打标 in-progress，请 Gemini 开始编写实现代码与测试。`);
     } catch (tagErr) {
       // 标签更新失败回滚本地分支到原分支：仅全新建的分支才删除，复用的分支绝不删除！
       if (createdNew) {
         try {
-          execFileSync('git', ['checkout', currentBranch], { cwd: REPO_ROOT, timeout: 30000 });
-          execFileSync('git', ['branch', '-D', branchName], { cwd: REPO_ROOT, timeout: 30000 });
+          gitRunner('git', ['checkout', currentBranch], { cwd: REPO_ROOT, timeout: 30000 });
+          gitRunner('git', ['branch', '-D', branchName], { cwd: REPO_ROOT, timeout: 30000 });
         } catch (rbErr) {
           console.warn(`[Warning] 回滚并删除分支 ${branchName} 失败: ${rbErr.message}`);
         }
       } else if (reusedExisting) {
         try {
-          execFileSync('git', ['checkout', currentBranch], { cwd: REPO_ROOT, timeout: 30000 });
+          gitRunner('git', ['checkout', currentBranch], { cwd: REPO_ROOT, timeout: 30000 });
         } catch (rbErr) {
           console.warn(`[Warning] 切回原分支 ${currentBranch} 失败: ${rbErr.message}`);
         }
