@@ -129,6 +129,7 @@ test("Harness child environment is an explicit whitelist and drops host secrets"
     SYNO_OPENCODE_API_KEY: "must-not-inherit",
     SYNO_CAPABILITIES_TOOLS: "1",
     SYNO_CHAT_TOOLS: "plugin",
+    SYNO_WEB_SEARCH_CHAIN: "parallel,exa",
     SYNO_CHANNEL_OWNER: "dsh",
   });
   assert.deepEqual(env, {
@@ -138,6 +139,7 @@ test("Harness child environment is an explicit whitelist and drops host secrets"
     HTTPS_PROXY: "http://127.0.0.1:7892",
     SYNO_CAPABILITIES_TOOLS: "1",
     SYNO_CHAT_TOOLS: "plugin",
+    SYNO_WEB_SEARCH_CHAIN: "parallel,exa",
     SYNO_CHANNEL_OWNER: "dsh",
   });
 });

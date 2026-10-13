@@ -107,9 +107,9 @@ test("plugin entry keeps its DSH import optional for relative-path loading", asy
   assert.match(source, /await import\("@deepseek-ai\/dsh-web"\)/);
 });
 
-test("provider reports unavailable without any key and throws a provider error", async () => {
+test("provider stays available without keys through its anonymous fallback", async () => {
   const provider = createSynoSearchProvider({ env: {}, fetchImpl: async () => jsonResponse({}) });
-  assert.equal(provider.available(), false);
+  assert.equal(provider.available(), true);
   await assert.rejects(() => provider.search({ query: "x" }), (error) => error.code === "WEB_PROVIDER_ERROR");
 });
 

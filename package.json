@@ -33,13 +33,13 @@
     "node": ">=22"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@larksuiteoapi/node-sdk": "1.64.0",
     "mammoth": "1.9.1",
     "pdf-parse": "2.4.5",
     "qrcode": "1.5.4"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
     "zod": "^4.4.3"
   }
 }
