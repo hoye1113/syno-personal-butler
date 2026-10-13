@@ -437,17 +437,23 @@ function createSynoRuntime(options = {}) {
           if (continuation?.payload?.url === String(url)) await channelContinuations.settle(continuation.id, { status: "completed" });
           return result;
         } catch (error) {
-          await channelContinuations.open({
+          const pendingRead = await channelContinuations.open({
             ownerKey: context.ownerId, channel: context.channel, threadKey: context.threadKey,
             type: "link_read", correlationId: context.conversationId || null,
             expiresAt: new Date(Date.now() + 30 * 60 * 1_000), payload: { url: String(url) },
-          }).catch((openError) => recordEvent("channel.continuation.open_failed", {
-            channel: context.channel || null,
-            error: { code: openError?.code || "CONTINUATION_OPEN_FAILED", message: String(openError?.message || openError).slice(0, 300) },
-          }, { level: "warning" }));
+          }).catch(async (openError) => {
+            await recordEvent("channel.continuation.open_failed", {
+              channel: context.channel || null,
+              error: { code: openError?.code || "CONTINUATION_OPEN_FAILED", message: String(openError?.message || openError).slice(0, 300) },
+            }, { level: "warning" });
+            return null;
+          });
           await recordEvent("knowledge.fetch_url.failed", { runId: context.runId || null, messageId: context.conversationId || null, channel: context.channel || null, code: error?.code || "FETCH_URL_FAILED" }, { level: "warning" });
           if (error?.code === "SOURCE_URL_RESERVED_ADDRESS") {
-            throw Object.assign(new Error("当前本机网络把该网址解析为受保护地址，已保留本次读取；稍后直接回复“继续”即可重试。"), { code: error.code, retryable: true });
+            const message = pendingRead?.id
+              ? "该网址指向受保护地址，读取已拒绝；已保存本次链接，稍后回复“继续”可重新尝试受控读取。"
+              : "该网址指向受保护地址，读取已拒绝；本次未保存续办，稍后可重新发送链接重试。";
+            throw Object.assign(new Error(message), { code: error.code, retryable: true });
           }
           throw error;
         }

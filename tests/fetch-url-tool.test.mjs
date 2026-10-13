@@ -329,7 +329,7 @@ test("runtime knowledge.fetch_url journals a failed continuation open without ma
   const runtime = createSynoRuntime({ channelContinuations, journal });
   await assert.rejects(
     runtime.tools.execute("knowledge.fetch_url", { url: "http://198.18.0.31/x" }, { ownerId: "owner", channel: "weixin", threadKey: "main" }),
-    (error) => error.code === "SOURCE_URL_RESERVED_ADDRESS",
+    (error) => error.code === "SOURCE_URL_RESERVED_ADDRESS" && !/已保留|已保存|回复.*继续/.test(error.message),
   );
   assert.equal(recorded.some((entry) => entry.event === "channel.continuation.open_failed" && entry.level === "warning"), true);
   assert.equal(recorded.some((entry) => entry.event === "knowledge.fetch_url.failed"), true);

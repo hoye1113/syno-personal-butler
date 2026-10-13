@@ -184,27 +184,27 @@ async function fetchUrlForChat({ url, maxChars = DEFAULT_MAX_CHARS, fetcher = fe
     try {
       return await escalateViaBrowser({ url: target, browserCapture, context, wall, maxText, recordEvent });
     } catch (error) {
-      // 升级路径自身故障不得吞掉直抓结果——降级为带 blocked 标记的直抓结果（或原 HTTP 错误）
+      // 升级故障不能把验证页当正文；HTTP 封锁继续抛原错误，其余只返回带 blocked 的说明。
       reportEscalation(recordEvent, { url: target, wall, outcome: "escalation_error" });
       if (httpBlocked) throw httpBlocked;
       return wrapUntrusted({
         sourceUrl: snapshot.url,
         contentType: snapshot.contentType,
-        text: snapshot.text,
+        text: "直抓得到登录或人机验证页面，尚未取得文章正文。可查找公开替代来源；不得请求主人接管或绕过验证。",
         truncated: snapshot.truncated,
         via: "direct",
         extra: { blocked: wall, browserError: String(error?.code || "BROWSER_ESCALATION_FAILED") },
       });
     }
   }
-  // 无墙：正常返回。有墙但不可升级（后台上下文/无浏览器通道）：直抓结果如实返回并标 blocked，
+  // 无墙：正常返回。有墙但不可升级（后台上下文/无浏览器通道）：只返回阻塞说明，避免验证页被当作正文，
   // HTTP 层封锁维持原样上抛（既有契约）。
   if (wall) reportEscalation(recordEvent, { url: target, wall, outcome: "not_escalated" });
   if (httpBlocked) throw httpBlocked;
   return wrapUntrusted({
     sourceUrl: snapshot.url,
     contentType: snapshot.contentType,
-    text: snapshot.text,
+    text: wall ? "直抓得到登录或人机验证页面，尚未取得文章正文。可查找公开替代来源；不得请求主人接管或绕过验证。" : snapshot.text,
     truncated: snapshot.truncated,
     via: "direct",
     ...(wall ? { extra: { blocked: wall } } : {}),
