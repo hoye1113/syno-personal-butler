@@ -3,6 +3,7 @@ import { execFile, spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import { promisify } from "node:util";
+import { acquirePosixProcessLock, inspectPosixLock, removePosixStaleLock } from "./posix-process-lock.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -192,6 +193,7 @@ async function readWindowsProcessStart(pid) {
 }
 
 async function inspectProcessLock(file, { verifyIdentity = false } = {}) {
+  if (process.platform === "darwin") return inspectPosixLock(path.resolve(file));
   const resolved = path.resolve(file);
   let owner;
   try {
@@ -263,6 +265,7 @@ async function inspectProcessLock(file, { verifyIdentity = false } = {}) {
 }
 
 async function removeConfirmedStaleProcessLock(file) {
+  if (process.platform === "darwin") return removePosixStaleLock(path.resolve(file));
   const inspection = await inspectProcessLock(file, { verifyIdentity: true });
   if (inspection.status !== "stale") return { ...inspection, removed: false };
   const result = await removeStaleProcessLockIfConfirmed(path.resolve(file), { failFast: true });
@@ -310,6 +313,10 @@ class ProcessFileLock {
     const deadline = Date.now() + this.timeoutMs;
     try {
       if (localLease) await waitForLocalLock(localLease, deadline, this.file);
+      if (process.platform === "darwin") {
+        const lease = await acquirePosixProcessLock({ file: this.file, owner: this.owner, timeoutMs: Math.max(0, deadline - Date.now()), pollMs: this.pollMs, failFast: this.failFast });
+        return { ...lease, release: async () => { try { await lease.release(); } finally { localLease?.release(); } } };
+      }
       let unknownRetries = 0;
       while (Date.now() <= deadline) {
         try {
