@@ -43,11 +43,14 @@ test("failed cleanup retains its slot, reports failure, and permits a later retr
   } });
   const child = { pid: 424242, exitCode: null, signalCode: null };
   supervisor.launch = { bootable: true };
-  supervisor.slots.set("capture", { profile: "capture", surface: "jsonrpc", child, client: { initialized: true } });
+  supervisor.slots.set("capture", { profile: "capture", surface: "jsonrpc", child, client: { initialized: true }, provider: "kimi-coding", model: "kimi-for-coding" });
   await assert.rejects(supervisor.stop("capture"), { code: "HARNESS_PROCESS_TREE_ALIVE" });
   assert.equal(supervisor.slots.size, 1);
   assert.equal(supervisor.status("capture").ready, false);
   assert.equal(supervisor.status("capture").pid, child.pid);
+  assert.throws(() => supervisor.client("capture"), { code: "HARNESS_NOT_RUNNING" });
+  await assert.rejects(supervisor.ensure("capture"), { code: "HARNESS_PROCESS_TREE_ALIVE" });
+  await assert.rejects(supervisor.start("capture"), { code: "HARNESS_PROCESS_TREE_ALIVE" });
   fail = false;
   await supervisor.stop("capture");
   assert.equal(supervisor.slots.size, 0);
@@ -63,7 +66,8 @@ test("concurrent stop callers share a cleanup and start cannot overtake it", asy
   } });
   supervisor.launch = { bootable: true };
   supervisor.slots.set("capture", { profile: "capture", surface: "jsonrpc", child, client: { initialized: true } });
-  const checks = [supervisor.stop("capture"), supervisor.stop("capture"), supervisor.start("capture")].map(promise => assert.rejects(promise, { code: "HARNESS_PROCESS_TREE_ALIVE" }));
+  const checks = [supervisor.stop("capture"), supervisor.stop("capture"), supervisor.start("capture"), supervisor.ensure("capture")].map(promise => assert.rejects(promise, { code: "HARNESS_PROCESS_TREE_ALIVE" }));
+  assert.throws(() => supervisor.client("capture"), { code: "HARNESS_NOT_RUNNING" });
   release(); await Promise.all(checks);
   assert.equal(kills, 1);
   assert.equal(supervisor.slots.size, 1);

@@ -681,7 +681,7 @@ class DeepSeekHarnessSupervisor {
 
   client(profile = "chat") {
     const slot = this.slots.get(profile);
-    if (!slot?.client || !slot.child || childExited(slot.child)) {
+    if (!slot?.client || !slot.child || childExited(slot.child) || slot.stopPromise || slot.stopError) {
       throw runtimeError("HARNESS_NOT_RUNNING", `DeepSeek Harness ${profile} 尚未运行`);
     }
     return slot.client;
@@ -689,8 +689,10 @@ class DeepSeekHarnessSupervisor {
 
   async ensure(profile, { provider = "kimi-coding", model = "kimi-for-coding" } = {}) {
     if (!HARNESS_PROFILES.includes(profile)) throw runtimeError("HARNESS_PROFILE_INVALID", `未知 Harness profile：${profile}`);
+    const stopping = this.slots.get(profile)?.stopPromise;
+    if (stopping) await stopping;
     const slot = this.slots.get(profile);
-    if (slot?.client?.initialized && slot.child && !childExited(slot.child) && slot.provider === provider && slot.model === model) {
+    if (slot?.client?.initialized && slot.child && !childExited(slot.child) && !slot.stopError && slot.provider === provider && slot.model === model) {
       return slot.client;
     }
     if (slot?.child) await this.stop(profile);
@@ -700,6 +702,7 @@ class DeepSeekHarnessSupervisor {
   async start(profile, { provider = "kimi-coding", model = "kimi-for-coding" } = {}) {
     const stopping = this.slots.get(profile)?.stopPromise;
     if (stopping) await stopping;
+    if (this.slots.has(profile)) await this.stop(profile);
     if (!this.launch) await this.discover();
     if (profile === "chat" && this.chatSurface === "web") {
       if (this.webLaunch?.bootable === false) {
@@ -892,7 +895,7 @@ class DeepSeekHarnessSupervisor {
         slot.stopPromise = this.#disposeSlot(slot).then(() => {
           if (this.slots.get(profile) === slot) this.slots.delete(profile);
           return this.status(profile);
-        }).catch((error) => { this.lastError = error; throw error; }).finally(() => { delete slot.stopPromise; });
+        }).catch((error) => { slot.stopError = error; this.lastError = error; throw error; }).finally(() => { delete slot.stopPromise; });
       }
       return slot.stopPromise;
     }
