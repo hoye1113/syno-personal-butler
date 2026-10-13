@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { serializeRecord } from "../packages/syno-core/markdown-record.mjs";
 
 import { ChannelDeliveryOutbox } from "../packages/syno-core/channel-delivery-outbox.mjs";
 import { ChannelConversationHandler } from "../packages/syno-core/channel-conversation-handler.mjs";
@@ -151,6 +152,93 @@ test("InspirationSampler treats recently sampled notes as visited and reports in
 
   const empty = await new InspirationSampler({ knowledge: fakeKnowledge([note("only", "2026-09-01")]), inspirations: store }).sample();
   assert.deepEqual(empty.notes, []);
+});
+
+test("InspirationSampler uses positive feedback while retaining recent notes and an exploration slot", async (t) => {
+  const root = await tempRoot(t, "syno-inspiration-preference-");
+  const now = new Date("2026-09-05T08:00:00.000Z");
+  const store = new InspirationStore({ opsRoot: root, clock: () => now });
+  const notes = [
+    note("new-1", "2026-09-04"), note("new-2", "2026-09-03"),
+    note("explore", "2026-01-01", { tags: ["music"] }),
+    note("older", "2026-02-01", { tags: ["music"] }),
+    note("preferred", "2026-06-01", { tags: ["ai"] }),
+    note("training-1", "2020-01-01", { tags: ["ＡＩ", "AI"] }),
+    note("training-2", "2020-01-02", { tags: ["ＡＩ"] }),
+  ];
+  const card = await store.create({ date: "2026-09-05", sampledRefs: notes.slice(-2).map((item) => item.path), text: "训练反馈" });
+  await store.markDelivered(card.id, "delivery-1", { ownerKey: "local-user" });
+  await store.recordFeedback(card.id, "useful");
+  const before = await store.list();
+  const sample = await new InspirationSampler({ knowledge: fakeKnowledge(notes), inspirations: store, clock: () => now }).sample();
+  assert.deepEqual(sample.notes.map((item) => item.title), ["new-1", "new-2", "explore", "preferred"]);
+  const restarted = await new InspirationSampler({ knowledge: fakeKnowledge(notes), inspirations: new InspirationStore({ opsRoot: root }), clock: () => now }).sample();
+  assert.deepEqual(restarted, sample);
+  assert.deepEqual(await store.list(), before, "偏好必须派生，不能改写历史或生成偏好状态");
+});
+
+test("InspirationSampler downranks negative feedback and ignores neutral, expired, unowned or unsafe history", async (t) => {
+  const now = new Date("2026-09-05T08:00:00.000Z");
+  for (const scenario of [
+    { name: "negative", feedback: "not_useful", opposed: true, expected: "preferred" },
+    { name: "neutral", feedback: "neutral", expected: "older" },
+    { name: "other-owner", ownerKey: "other", expected: "older" },
+    { name: "unknown-owner", ownerKey: "", expected: "older" },
+    { name: "expired", at: "2026-07-01T08:00:00.000Z", expected: "older" },
+    { name: "future", at: "2026-09-06T08:00:00.000Z", expected: "older" },
+    { name: "missing-source", missing: true, expected: "older" },
+    { name: "sensitive-source", sensitive: true, expected: "older" },
+    { name: "no-tags", noTags: true, expected: "older" },
+    { name: "invalid-time", invalidTime: true, expected: "older" },
+    { name: "invalid-delivery-time", patch: { deliveredAt: "invalid" }, expected: "older" },
+    { name: "invalid-feedback", patch: { feedback: "toString" }, expected: "older" },
+  ]) await t.test(scenario.name, async (subtest) => {
+    const root = await tempRoot(subtest, "syno-inspiration-history-");
+    const at = new Date(scenario.at || now);
+    const store = new InspirationStore({ opsRoot: root, clock: () => at });
+    const sources = [note("training-1", "2026-08-01", { tags: scenario.noTags ? [] : ["AI"] }), note("training-2", "2026-08-02", { tags: scenario.noTags ? [] : ["AI"], sensitive: Boolean(scenario.sensitive) })];
+    const card = await store.create({ date: "2026-09-05", sampledRefs: sources.map((item) => item.path), text: "反馈夹具" });
+    await store.markDelivered(card.id, "delivered", { ownerKey: scenario.ownerKey ?? "local-user" });
+    await store.recordFeedback(card.id, scenario.feedback || "useful");
+    if (scenario.invalidTime || scenario.patch) {
+      const file = path.join(root, "content", "inspirations", `${card.id}.md`);
+      const record = (await store.list()).find((item) => item.id === card.id);
+      await fs.writeFile(file, serializeRecord({ ...record, ...(scenario.invalidTime ? { feedbackAt: "invalid" } : scenario.patch) }), "utf8");
+    }
+    const notes = [note("new-1", "2026-09-04"), note("new-2", "2026-09-03"), note("explore", "2026-01-01", { tags: ["AI"] }), note("older", "2026-02-01", { tags: [scenario.opposed ? "AI" : "music"] }), note("preferred", "2026-06-01", { tags: [scenario.opposed ? "music" : "AI"] }), ...(scenario.missing ? sources.slice(0, 1) : sources)];
+    const result = await new InspirationSampler({ knowledge: fakeKnowledge(notes), inspirations: store, clock: () => now }).sample();
+    assert.deepEqual(result.notes.map((item) => item.title), ["new-1", "new-2", "explore", scenario.expected]);
+  });
+});
+
+test("a multi-theme feedback card contributes one shared vote and candidates use mean tag scores", async (t) => {
+  const root = await tempRoot(t, "syno-inspiration-theme-votes-");
+  const now = new Date("2026-09-05T08:00:00.000Z");
+  const store = new InspirationStore({ opsRoot: root, clock: () => now });
+  const notes = [note("new-1", "2026-09-04"), note("new-2", "2026-09-03"), note("explore", "2026-01-01"), note("older-music", "2026-02-01", { tags: ["music"] }), note("newer-mixed", "2026-03-01", { tags: ["ai", "music"] }), note("train-1", "2020-01-01", { tags: ["ＡＩ", "AI", "music"] }), note("train-2", "2020-01-02", { tags: ["MUSIC"] })];
+  const card = await store.create({ date: "2026-09-05", sampledRefs: notes.slice(-2).map((item) => item.path), text: "两个主题" });
+  await store.markDelivered(card.id, "delivered", { ownerKey: "local-user" });
+  await store.recordFeedback(card.id, "useful");
+  const result = await new InspirationSampler({ knowledge: fakeKnowledge(notes), inspirations: store, clock: () => now }).sample();
+  assert.deepEqual(result.notes.map((item) => item.title), ["new-1", "new-2", "explore", "older-music"]);
+});
+
+test("feedback weights saturate at both bounds instead of drowning out exploration or tied themes", async (t) => {
+  for (const feedback of ["useful", "not_useful"]) await t.test(feedback, async (subtest) => {
+    const root = await tempRoot(subtest, "syno-inspiration-bound-");
+    const now = new Date("2026-09-05T08:00:00.000Z");
+    const store = new InspirationStore({ opsRoot: root, clock: () => now });
+    const notes = [note("new-1", "2026-09-04"), note("new-2", "2026-09-03"), note("explore", "2026-01-01"), note("older", "2026-02-01", { tags: [feedback === "useful" ? "music" : "ai"] }), note("newer", "2026-03-01", { tags: [feedback === "useful" ? "ai" : "music"] }), ...["ai", "music"].flatMap((tag) => [note(`${tag}-train-1`, "2020-01-01", { tags: [tag] }), note(`${tag}-train-2`, "2020-01-02", { tags: [tag] })])];
+    for (const [tag, count] of [["ai", 4], ["music", 3]]) {
+      for (let index = 0; index < count; index += 1) {
+        const card = await store.create({ date: "2026-09-05", sampledRefs: notes.filter((item) => item.title.startsWith(`${tag}-train-`)).map((item) => item.path), text: "边界夹具" });
+        await store.markDelivered(card.id, `delivered-${tag}-${index}`, { ownerKey: "local-user" });
+        await store.recordFeedback(card.id, feedback);
+      }
+    }
+    const result = await new InspirationSampler({ knowledge: fakeKnowledge(notes), inspirations: store, clock: () => now }).sample();
+    assert.deepEqual(result.notes.map((item) => item.title), ["new-1", "new-2", "explore", "older"]);
+  });
 });
 
 // ---------- SignalEngine ----------
