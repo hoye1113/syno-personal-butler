@@ -5,7 +5,7 @@ import QRCode from "qrcode";
 
 import { PATHS } from "./paths.mjs";
 import { ProcessFileLock } from "./process-lock.mjs";
-import { runDpapi } from "./provider-credential-store.mjs";
+import { protectSecret, unprotectSecret } from "./secret-protector.mjs";
 
 async function atomicWrite(file, value) {
   await fs.mkdir(path.dirname(file), { recursive: true });
@@ -109,7 +109,7 @@ class FeishuStateStore {
 }
 
 class FeishuCredentialStore {
-  constructor({ root = PATHS.credentialsRoot, protect = (value) => runDpapi("protect", value), unprotect = (value) => runDpapi("unprotect", value) } = {}) {
+  constructor({ root = PATHS.credentialsRoot, protect = protectSecret, unprotect = unprotectSecret } = {}) {
     this.metadataFile = path.join(root, "feishu.json");
     this.secretFile = path.join(root, "feishu-secret.dpapi");
     this.protect = protect; this.unprotect = unprotect;

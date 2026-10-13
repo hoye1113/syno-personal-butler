@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { ProcessFileLock } from "../../../packages/syno-core/process-lock.mjs";
 import { PATHS } from "../../../packages/syno-core/paths.mjs";
-import { runDpapi } from "../../../packages/syno-core/provider-credential-store.mjs";
+import { protectSecret, unprotectSecret } from "../../../packages/syno-core/secret-protector.mjs";
 
 const EFFECT_RECEIPT_VERSION = 1;
 
@@ -39,8 +39,8 @@ class EffectReceiptStore {
     payloadRoot = path.join(PATHS.stateRoot, "effect-receipt-payloads"),
     lockFile = path.join(PATHS.stateRoot, "locks", "effect-receipts.lock"),
     clock = () => new Date(),
-    protect = (value) => runDpapi("protect", value),
-    unprotect = (value) => runDpapi("unprotect", value),
+    protect = protectSecret,
+    unprotect = unprotectSecret,
     processLock,
   } = {}) {
     this.root = path.resolve(root);
