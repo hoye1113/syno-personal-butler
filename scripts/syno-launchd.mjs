@@ -138,6 +138,45 @@ async function inspectListener(port, run = execFileAsync) {
   }
 }
 
+async function listListeners(port, run = execFileAsync) {
+  try {
+    const { stdout } = await run("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-t"], { timeout: 5_000 });
+    const pids = [...new Set(String(stdout).split(/\r?\n/).map((line) => Number(line.trim())).filter((pid) => Number.isInteger(pid) && pid > 0))];
+    const listeners = [];
+    for (const pid of pids) {
+      try {
+        const { stdout: psOut } = await run("ps", ["-p", String(pid), "-o", "comm=,args="], { timeout: 5_000 });
+        const text = String(psOut).trim();
+        listeners.push({ pid, comm: text.split(/\s+/)[0] || "", command: text });
+      } catch { /* 进程可能已退出 */ }
+    }
+    return listeners;
+  } catch {
+    return [];
+  }
+}
+
+// Host 以 detached 方式孵化 DSH（独立进程组）；Host 被 SIGKILL 类硬崩溃时 DSH 会成为孤儿并占住
+// DSH Web 端口，新 Host 永远绑不上（HARNESS_EXITED 恢复循环）。孵化新 Host 前回收命令行指向本仓
+// DSH 根的孤儿监听者；只认本仓 DSH，绝不碰陌生服务。
+async function reapOrphanDsh({ port, dshRoot, log, run = execFileAsync, kill = (pid, signal) => process.kill(pid, signal), sleepFn = sleep, graceMs = 5_000 }) {
+  const listeners = await listListeners(port, run);
+  const reaped = [];
+  for (const listener of listeners) {
+    if (!String(listener.command || "").includes(dshRoot)) continue;
+    try { kill(listener.pid, "SIGTERM"); } catch { /* 已退出 */ }
+    const deadline = Date.now() + graceMs;
+    while (Date.now() < deadline) {
+      try { kill(listener.pid, 0); } catch { break; }
+      await sleepFn(100);
+    }
+    try { kill(listener.pid, "SIGKILL"); } catch { /* 已退出 */ }
+    reaped.push(listener.pid);
+  }
+  if (reaped.length) log("launcher.orphan_reaped", { port, pids: reaped, dshRoot });
+  return reaped;
+}
+
 function listenerMatchesHost(listener, { serverPath, repoRoot }) {
   if (!listener) return false;
   const comm = String(listener.comm || "");
@@ -183,6 +222,8 @@ async function main() {
   const nodePath = process.execPath;
   const serverPath = path.join(repoRoot, "apps", "syno", "server.mjs");
   const port = Number(process.env.PORT || DEFAULT_WEB_PORT);
+  const dshWebPort = Number(process.env.SYNO_DSH_WEB_PORT || 3088);
+  const dshRoot = String(process.env.SYNO_DSH_ROOT || path.join(repoRoot, "vendor", "deepseek-harness"));
   const logRoot = path.join(PATHS.localDataRoot, "logs");
   const pidFile = path.join(PATHS.runtimeRoot, "syno-host.pid");
   const fingerprint = repoFingerprintFor(repoRoot);
@@ -234,6 +275,7 @@ async function main() {
   }
 
   while (!state.stopping) {
+    await reapOrphanDsh({ port: dshWebPort, dshRoot, log });
     const child = spawn(nodePath, [serverPath], { cwd: repoRoot, stdio: ["ignore", "pipe", "pipe"] });
     state.child = child;
     child.stdout.pipe(process.stdout);
@@ -283,8 +325,10 @@ export {
   launcherLogDue,
   listenerMatchesHost,
   launchdTaskLogFile,
+  listListeners,
   makeLauncherLogger,
   purgeExpiredLogs,
+  reapOrphanDsh,
   sendCrashLoopPopup,
   validateHealth,
 };

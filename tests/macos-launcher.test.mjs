@@ -15,8 +15,10 @@ import {
   launcherLogDue,
   listenerMatchesHost,
   launchdTaskLogFile,
+  listListeners,
   makeLauncherLogger,
   purgeExpiredLogs,
+  reapOrphanDsh,
   validateHealth,
 } from "../scripts/syno-launchd.mjs";
 
@@ -151,6 +153,60 @@ test("日志写入：真实落盘为 JSONL，节流事件每小时一条（回�
   assert.equal(events[0].repoFingerprint, "deadbeefdeadbeef");
   assert.equal(events[1].event, "launcher.health_ok");
   assert.equal(events[1].listenerPid, 1);
+});
+
+test("孤儿 DSH 回收：只清理命令行指向本仓 DSH 的监听者，陌生服务不碰", async () => {
+  const dshRoot = "/repo/vendor/deepseek-harness";
+  const run = async (command, args) => {
+    if (command === "lsof") return { stdout: "111\n999\n", stderr: "" };
+    if (command === "ps") {
+      return args[1] === "111"
+        ? { stdout: `/usr/local/bin/node ${dshRoot}/apps/cli/src/bin.ts --profile syno --port 3088\n`, stderr: "" }
+        : { stdout: "/usr/bin/other-service --listen 3088\n", stderr: "" };
+    }
+    throw new Error(`unexpected ${command}`);
+  };
+  const calls = [];
+  const alive = new Set([111, 999]);
+  const kill = (pid, signal) => {
+    calls.push([pid, signal]);
+    if (signal === "SIGTERM" || signal === "SIGKILL") alive.delete(pid);
+    if (signal === 0 && !alive.has(pid)) throw Object.assign(new Error("gone"), { code: "ESRCH" });
+  };
+  const events = [];
+  const reaped = await reapOrphanDsh({ port: 3088, dshRoot, log: (event, fields) => events.push([event, fields]), run, kill, sleepFn: async () => {} });
+  assert.deepEqual(reaped, [111]);
+  assert.deepEqual(calls.filter(([pid]) => pid === 999), [], "陌生服务不得触碰");
+  assert.deepEqual(calls[0], [111, "SIGTERM"]);
+  const record = events.find(([event]) => event === "launcher.orphan_reaped");
+  assert.ok(record);
+  assert.deepEqual(record[1].pids, [111]);
+  assert.equal(record[1].port, 3088);
+});
+
+test("孤儿 DSH 回收：SIGTERM 无效时升级 SIGKILL；无监听时零动作", async () => {
+  const calls = [];
+  const kill = (pid, signal) => { calls.push([pid, signal]); };
+  const run = async (command) => command === "lsof"
+    ? { stdout: "222\n" }
+    : { stdout: "/usr/local/bin/node /repo/vendor/deepseek-harness/apps/cli/src/bin.ts\n" };
+  const reaped = await reapOrphanDsh({ port: 3088, dshRoot: "/repo/vendor/deepseek-harness", log: () => {}, run, kill, sleepFn: async () => {}, graceMs: 0 });
+  assert.deepEqual(reaped, [222]);
+  assert.deepEqual(calls, [[222, "SIGTERM"], [222, "SIGKILL"]]);
+  const empty = await reapOrphanDsh({
+    port: 3088, dshRoot: "/repo/vendor/deepseek-harness", log: () => {},
+    run: async () => ({ stdout: "" }), kill: () => { throw new Error("must not kill"); }, sleepFn: async () => {},
+  });
+  assert.deepEqual(empty, []);
+});
+
+test("监督器接线：孵化前先回收孤儿 DSH 端口", async () => {
+  const launcher = await fs.readFile(path.join(root, "scripts", "syno-launchd.mjs"), "utf8");
+  assert.match(launcher, /reapOrphanDsh/);
+  assert.match(launcher, /SYNO_DSH_WEB_PORT/);
+  const reapCall = launcher.indexOf("await reapOrphanDsh(");
+  const spawnCall = launcher.indexOf("const child = spawn(");
+  assert.ok(reapCall >= 0 && spawnCall > reapCall, "回收必须发生在新 Host 孵化之前");
 });
 
 test("监督器接线：host_crashed → 告警判定 → 退避休眠 顺序固定（对齐 Windows 启动器）", async () => {
