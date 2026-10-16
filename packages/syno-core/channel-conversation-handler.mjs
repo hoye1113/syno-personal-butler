@@ -136,7 +136,8 @@ class ChannelConversationHandler {
       if (!this.attachmentToPayload) throw new Error("当前渠道没有附件安全转换器");
       for (const artifact of others) {
         try {
-          const payload = await this.attachmentToPayload(artifact);
+          // 通道随附：隔离区按通道分目录（weixin/feishu），转换器要用对应根做目录内校验
+          const payload = await this.attachmentToPayload(artifact, { channel: message.channel });
           if (localOnly) payload.analysisMode = "local-only";
           const receipt = await this.#receive(payload, { ...message, ownerKey });
           ingestReceipts.push(receipt);

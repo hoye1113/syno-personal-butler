@@ -214,6 +214,7 @@ function createSynoRuntime(options = {}) {
   const imageStore = options.imageStore || new IsolatedImageStore({
     quarantineRoots: [
       path.join(PATHS.runtimeRoot, "quarantine", "weixin"),
+      path.join(PATHS.runtimeRoot, "quarantine", "feishu"),
       path.join(PATHS.runtimeRoot, "quarantine"),
     ],
   });
@@ -698,7 +699,10 @@ function createSynoRuntime(options = {}) {
     ingest,
     ingestWorkflows,
     pendingDecisions,
-    attachmentToPayload: (artifact) => artifactToIntakePayload(artifact),
+    // 附件隔离区按通道分目录（weixin/feishu），转换器必须用对应根做目录内校验
+    attachmentToPayload: (artifact, { channel } = {}) => artifactToIntakePayload(artifact, {
+      quarantineRoot: path.join(PATHS.runtimeRoot, "quarantine", channel === "feishu" ? "feishu" : "weixin"),
+    }),
     journal,
     browserCapture,
     acceptedRequests,
@@ -996,24 +1000,31 @@ function createSynoRuntime(options = {}) {
       };
     },
   });
-  const weixin = options.weixin || new WeixinIlinkAdapter({
+  // 通道开关（2026-10-16）：SYNO_CHANNELS=feishu 只起飞书；缺省仍是 weixin,feishu（兼容 Windows 生产）。
+  const enabledChannels = new Set(String(process.env.SYNO_CHANNELS || "weixin,feishu")
+    .split(",").map((item) => item.trim().toLowerCase()).filter(Boolean));
+  const weixin = options.weixin || (enabledChannels.has("weixin") ? new WeixinIlinkAdapter({
     // typing 指示器默认开；SYNO_WEIXIN_TYPING=0|false 可关。
     typingIndicator: envToggle(process.env.SYNO_WEIXIN_TYPING, { defaultOn: true }),
     // ack 文本默认关：实测 typing「正在输入」可见（纯 UI 状态、不占聊天流、无存储），ack 是真实消息会在聊天流累积成噪音。
     // SYNO_WEIXIN_ACK=1|true 可开（typing 不可见的微信版本/场景保底）。
     ackOnReceive: envToggle(process.env.SYNO_WEIXIN_ACK, { defaultOn: false }),
     onMessage: (message) => channelConversationHandler.handle({ ...message, ownerKey: "local-user", threadKey: "main", channel: "weixin" }),
-  });
+  }) : null);
   // C5 前置：通道 owner 双轨。`SYNO_CHANNEL_OWNER=dsh` 时 Host 不再抢微信轮询，
   // 由 in-process 通道插件持有；Host 侧仅保留登录/发送代理与状态（delegated 标记）。
   const channelOwner = resolveChannelOwner(process.env);
-  const weixinChannel = channelOwner === "dsh" ? delegateChannel(weixin, channelOwner) : weixin;
-  const feishu = options.feishu || new FeishuChannelAdapter({
+  const weixinChannel = weixin && channelOwner === "dsh" ? delegateChannel(weixin, channelOwner) : weixin;
+  const feishu = options.feishu || (enabledChannels.has("feishu") ? new FeishuChannelAdapter({
     // 「正在回复中」占位卡默认开；SYNO_FEISHU_TYPING=0|false 可关（关闭后退回单条最终回复）。
     typingIndicator: envToggle(process.env.SYNO_FEISHU_TYPING, { defaultOn: true }),
     onMessage: (message) => channelConversationHandler.handle({ ...message, ownerKey: "local-user", threadKey: "main", channel: "feishu" }),
-  });
-  const channels = options.channels || new ChannelHub({ weixin: weixinChannel, feishu });
+    // 入站附件落到飞书专属隔离区（图片直传 / 文件收录共用同一条 artifact 契约）
+    quarantineRoot: path.join(PATHS.runtimeRoot, "quarantine", "feishu"),
+  }) : null);
+  const channels = options.channels || new ChannelHub(
+    Object.fromEntries(Object.entries({ weixin: weixinChannel, feishu }).filter(([, adapter]) => Boolean(adapter))),
+  );
   // proactive 主动通道连续投递失败计数（drain 回调增/重投成功清零）；health 探活 O(1) 读，避免每探活扫 outbox。
   let proactiveDeliveryConsecutiveFailures = 0;
   const systemAlertLastSentAt = new Map();
@@ -1057,7 +1068,8 @@ function createSynoRuntime(options = {}) {
     return harnessRecoveryPromise;
   }
   async function recoverChannels() {
-    const results = await Promise.allSettled([weixinChannel.start(), feishu.start()]);
+    // 按实际注册的适配器启动，不再硬编码通道名
+    const results = await Promise.allSettled([...channels.adapters.values()].map((adapter) => adapter.start()));
     componentState.channels = results.every((result) => result.status === "fulfilled") ? "ready" : "degraded";
     refreshLifecycleState();
   }
@@ -1796,14 +1808,19 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "GET" && url.pathname === "/api/syno/today") return runtime.today.snapshot();
   if (method === "POST" && url.pathname === "/api/syno/index/rebuild") return runtime.core.rebuildIndex();
   if (method === "POST" && url.pathname === "/api/syno/reports/run") return runtime.core.report((await readBody(req)).kind || "manual", webContext);
-  if (method === "POST" && url.pathname === "/api/syno/weixin/login/start") return runtime.weixin.beginLogin();
-  if (method === "POST" && url.pathname === "/api/syno/weixin/login/poll") return runtime.weixin.pollLogin();
-  if (method === "POST" && url.pathname === "/api/syno/weixin/connect") return runtime.weixin.start();
-  if (method === "POST" && url.pathname === "/api/syno/weixin/disconnect") return runtime.weixin.stop();
-  if (method === "POST" && url.pathname === "/api/syno/feishu/register/start") return runtime.feishu.beginRegistration();
-  if (method === "GET" && url.pathname === "/api/syno/feishu/register/status") return runtime.feishu.registrationStatus();
-  if (method === "POST" && url.pathname === "/api/syno/feishu/connect") return runtime.feishu.start();
-  if (method === "POST" && url.pathname === "/api/syno/feishu/disconnect") return runtime.feishu.stop();
+  // 通道可在 SYNO_CHANNELS 里停用；停用后端点给明确的 409，而不是碰 null。
+  const channelDisabled = (id) => Object.assign(
+    new Error(`${id} 通道未启用（SYNO_CHANNELS 未包含它）`),
+    { code: "CHANNEL_DISABLED", statusCode: 409 },
+  );
+  if (method === "POST" && url.pathname === "/api/syno/weixin/login/start") return runtime.weixin ? runtime.weixin.beginLogin() : Promise.reject(channelDisabled("weixin"));
+  if (method === "POST" && url.pathname === "/api/syno/weixin/login/poll") return runtime.weixin ? runtime.weixin.pollLogin() : Promise.reject(channelDisabled("weixin"));
+  if (method === "POST" && url.pathname === "/api/syno/weixin/connect") return runtime.weixin ? runtime.weixin.start() : Promise.reject(channelDisabled("weixin"));
+  if (method === "POST" && url.pathname === "/api/syno/weixin/disconnect") return runtime.weixin ? runtime.weixin.stop() : Promise.reject(channelDisabled("weixin"));
+  if (method === "POST" && url.pathname === "/api/syno/feishu/register/start") return runtime.feishu ? runtime.feishu.beginRegistration() : Promise.reject(channelDisabled("feishu"));
+  if (method === "GET" && url.pathname === "/api/syno/feishu/register/status") return runtime.feishu ? runtime.feishu.registrationStatus() : Promise.reject(channelDisabled("feishu"));
+  if (method === "POST" && url.pathname === "/api/syno/feishu/connect") return runtime.feishu ? runtime.feishu.start() : Promise.reject(channelDisabled("feishu"));
+  if (method === "POST" && url.pathname === "/api/syno/feishu/disconnect") return runtime.feishu ? runtime.feishu.stop() : Promise.reject(channelDisabled("feishu"));
   if (method === "POST" && url.pathname === "/api/syno/channels/home") {
     const body = await readBody(req);
     const nextHome = String(body.channel || "");

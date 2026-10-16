@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import QRCode from "qrcode";
 
+import { quarantineFeishuResources } from "./feishu-attachments.mjs";
 import { PATHS } from "./paths.mjs";
 import { ProcessFileLock } from "./process-lock.mjs";
 import { protectSecret, unprotectSecret } from "./secret-protector.mjs";
@@ -63,6 +64,13 @@ class FeishuStateStore {
         chatType: message.chatType,
         senderId: message.senderId,
         content: String(message.content || ""),
+        // 附件消息重试时要能重新下载，所以把资源描述一并留存（老状态缺这两个字段照常工作）
+        rawContentType: String(message.rawContentType || ""),
+        resources: Array.isArray(message.resources) ? message.resources.map((item) => ({
+          type: String(item?.type || ""),
+          fileKey: String(item?.fileKey || ""),
+          ...(item?.fileName ? { fileName: String(item.fileName) } : {}),
+        })) : [],
         createdAt: this.clock().toISOString(),
       });
       await this.#write(state);
@@ -140,9 +148,12 @@ class FeishuCredentialStore {
 
 async function officialSdk() { return import("@larksuiteoapi/node-sdk"); }
 
+const DEFAULT_FEISHU_QUARANTINE_ROOT = () => path.join(PATHS.runtimeRoot, "quarantine", "feishu");
+
 class FeishuChannelAdapter {
-  constructor({ credentials = new FeishuCredentialStore(), stateStore = new FeishuStateStore(), processLock = new ProcessFileLock({ file: `${stateStore.file || path.join(PATHS.runtimeRoot, "locks", "feishu-channel")}.lock`, failFast: true, metadata: { entrypoint: "feishu-channel" } }), sdkLoader = officialSdk, channelFactory, onMessage = async () => ({ text: "已收到" }), typingIndicator = true, retryDelayMs = 30_000 } = {}) {
+  constructor({ credentials = new FeishuCredentialStore(), stateStore = new FeishuStateStore(), processLock = new ProcessFileLock({ file: `${stateStore.file || path.join(PATHS.runtimeRoot, "locks", "feishu-channel")}.lock`, failFast: true, metadata: { entrypoint: "feishu-channel" } }), sdkLoader = officialSdk, channelFactory, onMessage = async () => ({ text: "已收到" }), typingIndicator = true, retryDelayMs = 30_000, quarantineRoot = DEFAULT_FEISHU_QUARANTINE_ROOT(), quarantineResources = quarantineFeishuResources } = {}) {
     this.credentials = credentials; this.sdkLoader = sdkLoader; this.channelFactory = channelFactory; this.onMessage = onMessage;
+    this.quarantineRoot = quarantineRoot; this.quarantineResources = quarantineResources;
     this.stateStore = stateStore; this.processLock = processLock; this.processLease = null; this.retryDelayMs = retryDelayMs;
     this.typingIndicator = typingIndicator !== false;
     this.channel = null; this.running = false; this.ownerBound = false; this.lastError = ""; this.queue = []; this.draining = false; this.drainPromise = null; this.seen = new Set(); this.inflight = new Set(); this.retryTimer = null;
@@ -369,6 +380,23 @@ class FeishuChannelAdapter {
     this.retryTimer.unref?.();
   }
 
+  // 把消息里的 image/file 资源落到隔离区。失败项以 { rejected } 记录，由 handler 如实回报，
+  // 绝不假装收到；文本消息（resources 为空）不产生任何 artifact。
+  async #collectArtifacts(message) {
+    const resources = Array.isArray(message?.resources) ? message.resources : [];
+    if (!resources.length) return [];
+    try {
+      return await this.quarantineResources({
+        rawClient: this.channel?.rawClient,
+        messageId: message.messageId,
+        resources,
+        quarantineRoot: this.quarantineRoot,
+      });
+    } catch (error) {
+      return [{ rejected: true, reason: String(error?.message || error) }];
+    }
+  }
+
   async #drain() {
     if (this.draining) return;
     this.draining = true;
@@ -378,6 +406,7 @@ class FeishuChannelAdapter {
         let typingCardId = null;
         try {
           typingCardId = await this.#openTypingCard(message);
+          const artifacts = await this.#collectArtifacts(message);
           const response = await this.onMessage({
             channel: "feishu",
             id: message.messageId,
@@ -385,6 +414,7 @@ class FeishuChannelAdapter {
             text: message.content,
             chatId: message.chatId,
             privateConversation: true,
+            ...(artifacts.length ? { artifacts } : {}),
           });
           if (response?.deferredDelivery === true) {
             await this.#clearTypingCard(typingCardId);

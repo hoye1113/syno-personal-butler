@@ -9,6 +9,7 @@ import { repoFingerprintFor } from "../packages/syno-core/repo-fingerprint.mjs";
 import {
   appleScriptString,
   crashAlertDue,
+  dotenvPassthrough,
   hasTcpListener,
   crashLoopAlertBody,
   createCrashAlertState,
@@ -291,6 +292,21 @@ test("命令行列举：只挑本仓 Host 入口，ps 失败时安全返回空",
   assert.equal(listener, false);
   assert.ok(seen[0].includes("-a"), "lsof 必须用 -a 取 -p 与 -i 的交集，否则任何进程都会被判为在监听");
   assert.equal(await hasTcpListener(1234, async () => ({ stdout: "1234\n" })), true);
+});
+
+// 2026-10-16：机器级通道开关放仓库根 .env，launcher 只透传白名单变量给 Host。
+test("dotenv 透传只放行白名单变量，且进程环境变量优先", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-dotenv-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.writeFile(path.join(root, ".env"), [
+    "# 注释行",
+    "SYNO_CHANNELS=feishu",
+    "KIMI_API_KEY=sk-should-not-leak",
+    'SYNO_OTHER="quoted-value"',
+  ].join("\n"), "utf8");
+  assert.deepEqual(dotenvPassthrough(root, {}), { SYNO_CHANNELS: "feishu" }, "只透传白名单");
+  assert.deepEqual(dotenvPassthrough(root, { SYNO_CHANNELS: "weixin" }), {}, "进程环境变量优先");
+  assert.deepEqual(dotenvPassthrough(path.join(root, "missing"), {}), {});
 });
 
 test("监督器接线：孵化前先回收孤儿 DSH 端口", async () => {

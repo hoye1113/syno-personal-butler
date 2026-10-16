@@ -339,7 +339,7 @@ class ProactiveOrchestrator {
   async #markInspirationDelivered(info, eventId) {
     const inspirationId = info?.inspirationId;
     if (!inspirationId || !this.inspirationStore) return;
-    const targetChannel = String(info?.targetChannel || "weixin");
+    const targetChannel = String(info?.targetChannel || this.channels.homeChannel || "feishu");
     try {
       await this.inspirationStore.markDelivered(inspirationId, eventId, { ownerKey: "local-user", channel: targetChannel, threadKey: "main" });
     } catch (error) {

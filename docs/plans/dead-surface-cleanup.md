@@ -4,6 +4,10 @@
 > 已执行（第一轮）：`image.read` 已摘除（commit `8cfc9d3`）。
 > 已执行（第二轮，2026-10-16，主人「按顺序执行下一轮推荐方案」）：B 隐藏工具面收缩、C 五个历史批次脚本删除、E `docs/plans/` 纳入索引分类并把无引用 devlog 移入 `docs/archive/`。
 > D 按结论保留（回滚面仍在用）。以下保留原始判定依据供追溯。
+> 第四轮（2026-10-16，主人「只用飞书」）：**A 微信通道停用**（`SYNO_CHANNELS` 开关 + 按注册通道启动 +
+> 默认 home/投递兜底改飞书 + 本机 `.env` 设 `SYNO_CHANNELS=feishu`；微信栈代码保留一版）；
+> **B 飞书附件接入**（资源下载 → `.runtime/quarantine/feishu` → 与微信同形状 artifact：图片直传模型、
+> 文件走收录；附件 MIME 嗅探抽到 `packages/syno-core/attachment-mime.mjs` 两条通道共用）。
 > 第三轮（2026-10-16，主人「零散待办都解决掉」）：A 图片改为直投模型（`contentBlocks` 支持 image 块 +
 > 通道侧读字节，单图 3MB 上限）；C 再删 6 个一次性脚本（inventory-all-skills / generate-knowledge-index-doc /
 > update-wiki-home / sync-vault-to-wiki / ingest-wechat-articles / ingest-bilibili-opus）；README 平台描述按

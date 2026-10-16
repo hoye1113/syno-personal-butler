@@ -121,6 +121,14 @@ Get-Content -LiteralPath $log.FullName -Tail 80
 
 根治约束：**只让 Base64（7-bit ASCII，所有常见代码页的公共子集）跨过 console/stdio 边界**——Node 侧 `Buffer.from(x,"utf8").toString("base64")` 写入 stdin，脚本内只用 `FromBase64String/ToBase64String`（Python 侧用 `io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")` 或注入 `PYTHONUTF8=1`），绝不调 `UTF8.GetString/GetBytes` 或依赖默认编码。`runDpapi`（`provider-credential-store.mjs`）与 Harness JSON-RPC sidecar 均遵循此约束；新增任何跨进程文本往返必须沿用，否则中文路径会静默损坏。
 
+### 通道开关（2026-10-16）
+
+- `SYNO_CHANNELS`（逗号分隔，默认 `weixin,feishu`）决定 Host 构造并启动哪些通道；停用的通道不出现在 `/api/syno/channels`，其端点返回 `409 CHANNEL_DISABLED`。
+- 机器级配置写在仓库根 `.env`（gitignored）；launcher 只把 `SYNO_CHANNELS` 这一白名单变量透传给 Host 子进程，不整体注入 `.env`。
+- 当前生产：`SYNO_CHANNELS=feishu`（主人只用飞书；微信栈代码保留一版，改回 `weixin,feishu` 即可恢复）。
+- 通道默认 home 随实际注册的通道走（多通道时优先飞书）；主动推送只投 home 通道。
+- 飞书入站附件：图片/文件走官方资源接口下载到 `.runtime/quarantine/feishu`，形状与微信 artifact 完全一致（图片直传模型、文件走收录）；单文件上限 25MB，超限或格式无法识别时如实拒绝。
+
 ### DeepSeek Harness 生产 chat（2026-08-21）
 
 产品 chat 已倒转：Web 是 DSH 壳，Syno 是 Cordis 插件 + 8888 控制面。改启动、协议或 permission 前先读本节；不要再起 jsonrpc chat sidecar，也不要把 `dsh web` 当成生产。
@@ -193,7 +201,7 @@ dsh plugin --profile syno-lab add dsh-mnemon@0.2.13
 
 **识图在 Host**
 
-微信图片：主人发的图直接作为 image 内容块投给模型（2026-10-16 起，模型链支持看图；单图原始上限 3MB，超限/未过隔离校验则如实说明）；明确「收录」才走 Host visionClient → Zen HTTP `mimo-v2.5-free`，识图 JSON 当 `kind: text` Intake。Zen key 留在 Host，不进 Harness 子进程。PDF/文本仍收录。
+图片（微信/飞书同一条链）：主人发的图直接作为 image 内容块投给模型（2026-10-16 起，模型链支持看图；单图原始上限 3MB，超限/未过隔离校验则如实说明）；明确「收录」才走 Host visionClient → Zen HTTP `mimo-v2.5-free`，识图 JSON 当 `kind: text` Intake。Zen key 留在 Host，不进 Harness 子进程。PDF/文本附件走收录。
 
 ### Windows 飞书日历 CLI
 
@@ -254,7 +262,7 @@ pnpm start
 
 Chat 的 `web_search` 由自研 `syno-search` 链提供（ADR 0009）：豆包搜索（500 次/月免费）→ Tavily（1000 credit/月）→ Exa（每月 $10 额度）→ Parallel 匿名 MCP 备用（免 Key、额度未公布），按查询语言路由（中文优先豆包、英文优先 Tavily），失败/限流/空结果自动回退；key 走仓库根 `.env`（`DOUBAO_SEARCH_API_KEY` / `TAVILY_API_KEY` / `EXA_API_KEY`）经 Host 注入，`harness:doctor` 的 `search-keys` 检查报告就位情况；可用 `SYNO_WEB_SEARCH_CHAIN=exa,tavily` 覆盖链前缀。JSON-RPC chat 回退面在 `syno-chat.cordis.yml` 挂载同一接缝（该面以相对路径加载插件，没有 bundle linked-root 的 peer 拦截，插件内对 `@deepseek-ai/dsh-web` 采用可选解析，见 `plugins/web-search/index.mjs`）。`web_fetch` 仍为匿名 HTTP(S)。Web session 使用 Host 生成并显式绑定的 `syno` agent preset，compaction 与普通 schedule 由当前生产 profile 的官方 DSH 层接管（Web preset 使用官方 compaction-basic/tool-result-pruner/compact command，JSON-RPC 使用同一 stack，普通 schedule 由 `@deepseek-ai/dsh-schedule` function plugin 提供），Syno 的 SignalEngine / PriorityEngine / ChannelDeliveryOutbox 仍负责业务主动运营，不与普通 schedule 混用。不要对生产 `syno` profile 执行 `dsh plugin add`，也不要从 [dsh-plugin.org](https://dsh-plugin.org/plugins?q=search) 装社区搜索或记忆插件；实验 UI 只用 Host 生成的 `syno-lab` profile（无 Bridge、无 vault 写、无微信）。收录分析 profile 仍然没有 web。
 
-微信图片：主人发的图直接投给模型看图（2026-10-16 起）；明确说「收录」时才走 Host visionClient → Zen HTTP `mimo-v2.5-free`，识图 JSON 作为 `kind: text` 进入现有 Intake / Proposal。PDF/文本附件仍收录。本地知识搜索仍是 `syno_knowledge_search`。识图失败对微信可见，禁止猜图。
+图片与附件（2026-10-16 起飞书同样支持）：主人发的图直接投给模型看图；文件（PDF/docx/md/txt/html）落隔离区后走收录。明确说「收录」时图片才走 Host visionClient → Zen HTTP `mimo-v2.5-free`，识图 JSON 作为 `kind: text` 进入现有 Intake / Proposal。飞书资源下载走官方 `im/v1/messages/{id}/resources/{key}` 接口，权限要求由「获取单聊、群组消息」（注册时已申请 `im:message:readonly`）覆盖；单文件上限 25MB。本地知识搜索仍是 `syno_knowledge_search`。识图失败对微信可见，禁止猜图。
 
 主人验收清单：
 

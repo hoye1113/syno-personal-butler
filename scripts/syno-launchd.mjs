@@ -1,5 +1,5 @@
 import { execFile, spawn } from "node:child_process";
-import { appendFileSync, promises as fs } from "node:fs";
+import { appendFileSync, readFileSync, promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
@@ -166,6 +166,27 @@ async function listListeners(port, run = execFileAsync) {
 // Host 以 detached 方式孵化 DSH（独立进程组）；Host 被 SIGKILL 类硬崩溃时 DSH 会成为孤儿并占住
 // DSH Web 端口，新 Host 永远绑不上（HARNESS_EXITED 恢复循环）。孵化新 Host 前回收命令行指向本仓
 // DSH 根的孤儿监听者；只认本仓 DSH，绝不碰陌生服务。
+// 机器级配置放仓库根 .env（gitignored，与 KIMI_API_KEY 同一处）。launcher 只把白名单里的
+// 开关透传给 Host 子进程——不整体注入 .env，避免把密钥类变量带进 Host 环境。
+// 与 key loader 同口径：进程环境变量优先，.env 只补缺。
+function dotenvPassthrough(repoRoot, env = process.env, names = ["SYNO_CHANNELS"]) {
+  const passthrough = {};
+  const wanted = names.filter((name) => !String(env[name] || "").trim());
+  if (!wanted.length) return passthrough;
+  let text = "";
+  try { text = readFileSync(path.join(repoRoot, ".env"), "utf8"); } catch { return passthrough; }
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const match = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/u.exec(line);
+    if (!match) continue;
+    if (!wanted.includes(match[1])) continue;
+    const value = match[2].trim().replace(/^["']|["']$/gu, "");
+    if (value) passthrough[match[1]] = value;
+  }
+  return passthrough;
+}
+
 async function reapOrphanDsh({ port, dshRoot, log, run = execFileAsync, kill = (pid, signal) => process.kill(pid, signal), sleepFn = sleep, graceMs = 5_000 }) {
   const listeners = await listListeners(port, run);
   const reaped = [];
@@ -349,7 +370,11 @@ async function main() {
 
   while (!state.stopping) {
     await reapOrphanDsh({ port: dshWebPort, dshRoot, log });
-    const child = spawn(nodePath, [serverPath], { cwd: repoRoot, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(nodePath, [serverPath], {
+      cwd: repoRoot,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, ...dotenvPassthrough(repoRoot) },
+    });
     state.child = child;
     child.stdout.pipe(process.stdout);
     child.stderr.pipe(process.stderr);
@@ -394,6 +419,7 @@ export {
   appleScriptString,
   crashAlertDue,
   crashLoopAlertBody,
+  dotenvPassthrough,
   createCrashAlertState,
   handleHostCrash,
   inspectListener,

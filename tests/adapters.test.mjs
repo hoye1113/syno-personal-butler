@@ -45,6 +45,42 @@ test("ChannelHub.start tolerates a failing adapter and keeps others running", as
   await hub.stop();
 });
 
+// 2026-10-16：默认 home 随实际注册通道走（主人只用飞书；单一通道时就是它自己）。
+test("ChannelHub derives the default home channel from the registered adapters", async () => {
+  const feishuOnly = new ChannelHub({ feishu: new FakeChannelAdapter() });
+  assert.equal(feishuOnly.homeChannel, "feishu");
+  const both = new ChannelHub({ weixin: new FakeChannelAdapter(), feishu: new FakeChannelAdapter() });
+  assert.equal(both.homeChannel, "feishu", "多通道时默认飞书");
+  const weixinOnly = new ChannelHub({ weixin: new FakeChannelAdapter() });
+  assert.equal(weixinOnly.homeChannel, "weixin", "只有微信时仍是微信");
+});
+
+test("Runtime honors SYNO_CHANNELS and rejects disabled-channel endpoints", async () => {
+  process.env.NODE_ENV = "test";
+  const previous = process.env.SYNO_CHANNELS;
+  process.env.SYNO_CHANNELS = "feishu";
+  try {
+    const { createSynoRuntime, routeSynoApi } = await import("../apps/syno/syno/runtime.mjs");
+    const runtime = createSynoRuntime({});
+    assert.equal(runtime.weixin, null, "SYNO_CHANNELS=feishu 时不得构造微信通道");
+    assert.ok(runtime.feishu, "飞书通道必须存在");
+    assert.deepEqual([...runtime.channels.adapters.keys()], ["feishu"]);
+    assert.equal(runtime.channels.homeChannel, "feishu");
+    await assert.rejects(
+      routeSynoApi(
+        runtime,
+        { method: "POST", headers: {} },
+        new URL("http://127.0.0.1:8888/api/syno/weixin/login/start"),
+        async () => ({}),
+      ),
+      (error) => error?.code === "CHANNEL_DISABLED" && error.statusCode === 409,
+    );
+  } finally {
+    if (previous === undefined) delete process.env.SYNO_CHANNELS;
+    else process.env.SYNO_CHANNELS = previous;
+  }
+});
+
 test("Markdown Calendar persists a rebuildable event", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-calendar-adapter-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));

@@ -15,7 +15,9 @@ class ChannelHub {
   constructor(adapters = {}, { stateFile = path.join(PATHS.stateRoot, "channels.json") } = {}) {
     this.adapters = new Map(Object.entries(adapters));
     this.stateFile = stateFile;
-    this.homeChannel = "weixin";
+    // 默认 home 随实际注册的通道走（2026-10-16：主人只用飞书，默认值不该再硬写 weixin）；
+    // 单一通道时就是它自己，多通道时优先 feishu。
+    this.homeChannel = this.adapters.has("feishu") ? "feishu" : ([...this.adapters.keys()][0] || "weixin");
   }
   async start() {
     let persistedHome = null;
