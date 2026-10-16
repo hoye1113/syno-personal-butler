@@ -211,7 +211,9 @@ async function listRepoHostProcesses({ serverPath, repoRoot, run = execFileAsync
 
 async function hasTcpListener(pid, run = execFileAsync) {
   try {
-    const { stdout } = await run("lsof", ["-nP", "-p", String(pid), "-iTCP", "-sTCP:LISTEN", "-t"], { timeout: 5_000 });
+    // -a 必须有：lsof 的 -p 与 -i 默认是并集，只有 -a 才取交集。
+    // 少了它会返回全系统监听者，任何进程都被误判为「还在监听」（2026-10-16 实测：回收整批失效）。
+    const { stdout } = await run("lsof", ["-nP", "-a", "-p", String(pid), "-iTCP", "-sTCP:LISTEN", "-t"], { timeout: 5_000 });
     return String(stdout).trim().length > 0;
   } catch {
     return false;

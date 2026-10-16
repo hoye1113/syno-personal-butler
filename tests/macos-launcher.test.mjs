@@ -286,8 +286,11 @@ test("命令行列举：只挑本仓 Host 入口，ps 失败时安全返回空",
     run: async () => ({ stdout: "8888 /usr/local/bin/node /elsewhere/apps/syno/server.mjs\n", stderr: "" }),
   });
   assert.deepEqual(foreign, [], "别的仓库的同名入口不得误认");
-  const listener = await hasTcpListener(1234, async () => ({ stdout: "\n" }));
+  const seen = [];
+  const listener = await hasTcpListener(1234, async (command, args) => { seen.push(args); return { stdout: "\n" }; });
   assert.equal(listener, false);
+  assert.ok(seen[0].includes("-a"), "lsof 必须用 -a 取 -p 与 -i 的交集，否则任何进程都会被判为在监听");
+  assert.equal(await hasTcpListener(1234, async () => ({ stdout: "1234\n" })), true);
 });
 
 test("监督器接线：孵化前先回收孤儿 DSH 端口", async () => {
