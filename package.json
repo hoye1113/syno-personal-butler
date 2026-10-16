@@ -31,7 +31,8 @@
     "harness:build": "pnpm --dir vendor/deepseek-harness run build",
     "probe:harness": "node scripts/probe-harness.mjs",
     "spike:capabilities": "node scripts/spike-capabilities.mjs",
-    "syno:doctor": "node scripts/syno-doctor.mjs"
+    "syno:doctor": "node scripts/syno-doctor.mjs",
+    "gate": "node scripts/run-tests.mjs && node scripts/verify-repository.mjs && node scripts/check-active-docs.mjs && git diff --check"
   },
   "engines": {
     "node": ">=22"

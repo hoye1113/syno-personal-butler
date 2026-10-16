@@ -188,3 +188,16 @@ test("replaying proposal publication reuses the same active PendingDecision", as
   assert.equal(replay.id, first.id);
   assert.equal((await store.list({ ownerKey: "owner", threadKey: "main" })).length, 1);
 });
+
+// 2026-10-16 flaky 回归：同一毫秒创建的两条 decision 曾用随机 id 兜底排序，
+// present 顺序约 1/5 概率反向。现在必须按插入顺序且反复读取稳定。
+test("同一毫秒创建的两条 decision 按插入顺序展示且反复读取稳定", async (t) => {
+  const { store } = await setup(t);
+  const first = await store.add({ jobId: "job-a", ownerKey: "owner", threadKey: "main", phase: "clarification", summary: "one" });
+  const second = await store.add({ jobId: "job-b", ownerKey: "owner", threadKey: "main", phase: "clarification", summary: "two" });
+  assert.equal(first.createdAt, second.createdAt, "前提：两条 decision 的 createdAt 相同");
+  for (let round = 1; round <= 20; round += 1) {
+    const presentation = await store.present({ ownerKey: "owner", threadKey: "main", channel: "weixin", businessVersion: "1" });
+    assert.deepEqual(presentation.orderedDecisionIds, [first.id, second.id], `第 ${round} 次读取顺序必须与插入序一致`);
+  }
+});

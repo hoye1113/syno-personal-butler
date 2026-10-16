@@ -117,11 +117,16 @@ class PendingDecisionStore {
 
   async present({ ownerKey, threadKey = "main", channel = "unknown", businessVersion = "1" } = {}) {
     return this.#mutate(async (decisions, state) => {
+      // 同一毫秒内创建的两条 decision 的 createdAt 完全相同；此前用随机 id 兜底，present 顺序会
+      // 随 id 抖动（2026-10-16 flaky：连加两条时约 1/5 概率顺序反）。改为按存储顺序（插入序）兜底，
+      // 既确定性又符合「先来先展示」的语义。
       const active = decisions
-        .filter((item) => !item.consumedAt
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => !item.consumedAt
           && item.ownerKey === String(ownerKey)
           && item.threadKey === String(threadKey))
-        .sort((a, b) => `${a.createdAt}\0${a.id}`.localeCompare(`${b.createdAt}\0${b.id}`));
+        .sort((a, b) => a.item.createdAt.localeCompare(b.item.createdAt) || a.index - b.index)
+        .map(({ item }) => item);
       const orderedDecisionIds = active.map((item) => item.id);
       const effectiveBusinessVersion = businessVersion === "1"
         ? active.map((item) => item.businessVersion || "1").join("|") || "1"
