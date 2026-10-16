@@ -193,7 +193,7 @@ dsh plugin --profile syno-lab add dsh-mnemon@0.2.13
 
 **识图在 Host**
 
-微信图片默认 `syno_image_read` → Zen HTTP `mimo-v2.5-free`；Zen key 留在 Host，不进 Harness 子进程。PDF/文本仍收录。明确「收录」才把识图 JSON 当 `kind: text` Intake。
+微信图片：聊天面没有读图工具（Host `image.read` 已摘除，2026-10-16），主人发图只会得到如实说明；明确「收录」才走 Host visionClient → Zen HTTP `mimo-v2.5-free`，识图 JSON 当 `kind: text` Intake。Zen key 留在 Host，不进 Harness 子进程。PDF/文本仍收录。
 
 ### Windows 飞书日历 CLI
 
@@ -250,11 +250,11 @@ pnpm start
 
 `harness:doctor` 不把密钥写进输出。协议冒烟用 `pnpm probe:harness`（假 sidecar + 中文 UTF-8）；`pnpm probe:harness -- --real` 验证真实 Harness runtime closure 可发现并报告缺失项。显式设置 `SYNO_RUN_REAL_DSH=1` 的测试文件才允许执行真实模型验收；模型 key 只从宿主环境 `KIMI_API_KEY` 或仓库根 `.env` 读取，不写入测试参数、日志、仓库文件或验收产物。
 
-生产 chat 由 Host 监督 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（可用 `SYNO_DSH_WEB_PORT` 覆盖），与微信注入同一 Harness Session。Host 会把 `@syno/dsh-plugin` junction/symlink 进 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\node_modules`，不必再跑 `dsh plugin install`。该对话页是特权壳（`approval: never`，permission 表只有 `workspace-write`），不是普通聊天 UI。普通聊天只显示 Bridge core 工具：`workflow.context`、`knowledge.search`、`knowledge.read_snippet`、`knowledge.fetch_url`、`today.read`、`learning.due`、`learning.teach_back`、`learning.submit`、`capture.start`、`capture.status`、`capture.list_pending`、`jobs.list`、`jobs.submit`、`image.read`。其中 `knowledge.fetch_url` 受安全抓取策略约束，`learning.submit` 只创建待审批的 `learning.evidence.record` Job，不直接改变知识或掌握度；隐藏工具的直接调用仍由 Host 拒绝。Capture Session 继续使用 Workflow 签发的浏览器 allowlist。`http://127.0.0.1:8888` 是控制面。收录分析仍是无 bash/fs/web 的 jsonrpc 第二进程。自动测试 / `SYNO_DSH_FAKE_AGENT` 仍走 jsonrpc fake。紧急回切 chat jsonrpc：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。不要把 jsonrpc sidecar 与生产 DSH Web 同时接到同一 session。不要执行 `dsh web`（那是库存 `--profile web`）。
+生产 chat 由 Host 监督 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（可用 `SYNO_DSH_WEB_PORT` 覆盖），与微信注入同一 Harness Session。Host 会把 `@syno/dsh-plugin` junction/symlink 进 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\node_modules`，不必再跑 `dsh plugin install`。该对话页是特权壳（`approval: never`，permission 表只有 `workspace-write`），不是普通聊天 UI。普通聊天默认走 capabilities 插件（canonical `syno_*` 名，6 件：`syno_knowledge_search`/`syno_knowledge_read_snippet`/`syno_knowledge_fetch_url`/`syno_today_read`/`syno_capture_start`/`syno_inspiration_record_feedback`）；Bridge 只在 `SYNO_CHAT_TOOLS=bridge` 回滚时注册 core 集。其中 `knowledge.fetch_url` 受安全抓取策略约束，`learning.submit` 只创建待审批的 `learning.evidence.record` Job，不直接改变知识或掌握度；隐藏工具的直接调用仍由 Host 拒绝。Capture Session 继续使用 Workflow 签发的浏览器 allowlist。`http://127.0.0.1:8888` 是控制面。收录分析仍是无 bash/fs/web 的 jsonrpc 第二进程。自动测试 / `SYNO_DSH_FAKE_AGENT` 仍走 jsonrpc fake。紧急回切 chat jsonrpc：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。不要把 jsonrpc sidecar 与生产 DSH Web 同时接到同一 session。不要执行 `dsh web`（那是库存 `--profile web`）。
 
 Chat 的 `web_search` 由自研 `syno-search` 链提供（ADR 0009）：豆包搜索（500 次/月免费）→ Tavily（1000 credit/月）→ Exa（每月 $10 额度）→ Parallel 匿名 MCP 备用（免 Key、额度未公布），按查询语言路由（中文优先豆包、英文优先 Tavily），失败/限流/空结果自动回退；key 走仓库根 `.env`（`DOUBAO_SEARCH_API_KEY` / `TAVILY_API_KEY` / `EXA_API_KEY`）经 Host 注入，`harness:doctor` 的 `search-keys` 检查报告就位情况；可用 `SYNO_WEB_SEARCH_CHAIN=exa,tavily` 覆盖链前缀。JSON-RPC chat 回退面在 `syno-chat.cordis.yml` 挂载同一接缝（该面以相对路径加载插件，没有 bundle linked-root 的 peer 拦截，插件内对 `@deepseek-ai/dsh-web` 采用可选解析，见 `plugins/web-search/index.mjs`）。`web_fetch` 仍为匿名 HTTP(S)。Web session 使用 Host 生成并显式绑定的 `syno` agent preset，compaction 与普通 schedule 由当前生产 profile 的官方 DSH 层接管（Web preset 使用官方 compaction-basic/tool-result-pruner/compact command，JSON-RPC 使用同一 stack，普通 schedule 由 `@deepseek-ai/dsh-schedule` function plugin 提供），Syno 的 SignalEngine / PriorityEngine / ChannelDeliveryOutbox 仍负责业务主动运营，不与普通 schedule 混用。不要对生产 `syno` profile 执行 `dsh plugin add`，也不要从 [dsh-plugin.org](https://dsh-plugin.org/plugins?q=search) 装社区搜索或记忆插件；实验 UI 只用 Host 生成的 `syno-lab` profile（无 Bridge、无 vault 写、无微信）。收录分析 profile 仍然没有 web。
 
-微信图片默认走聊天识图（Host `syno_image_read` → Zen HTTP `mimo-v2.5-free`）；PDF/文本附件仍收录。明确说「收录」时，识图 JSON 作为 `kind: text` 进入现有 Intake / Proposal。本地知识搜索仍是 `syno_knowledge_search`。识图失败对微信可见，禁止猜图。
+微信图片：聊天面不读图（Host `image.read` 已摘除 2026-10-16），主人发图只会得到如实说明；明确说「收录」时才走 Host visionClient → Zen HTTP `mimo-v2.5-free`，识图 JSON 作为 `kind: text` 进入现有 Intake / Proposal。PDF/文本附件仍收录。本地知识搜索仍是 `syno_knowledge_search`。识图失败对微信可见，禁止猜图。
 
 主人验收清单：
 

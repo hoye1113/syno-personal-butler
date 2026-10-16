@@ -725,7 +725,7 @@ test("read-link rule stays off for long residuals, multiple URLs and local-only 
   assert.equal(model.length, 3);
 });
 
-test("ChannelConversationHandler sends images to chat vision instead of ingest", async (t) => {
+test("ChannelConversationHandler tells the model the chat cannot see images instead of pointing at a removed tool", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "syno-channel-image-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const png = createGlyphPng("SYNO42");
@@ -739,7 +739,7 @@ test("ChannelConversationHandler sends images to chat vision instead of ingest",
     pendingDecisions: {},
     attachmentToPayload: async () => { throw new Error("image must not convert to intake"); },
     imageStore: new IsolatedImageStore({ quarantineRoots: [root] }),
-    visionClient: { async read() { throw new Error("Flash should call syno_image_read, not the handler"); } },
+    visionClient: { async read() { throw new Error("聊天的普通图片不得直接走 handler 识图（那是收录路径）"); } },
   });
   const response = await handler.handle({
     id: "wx-img-1",
@@ -751,8 +751,9 @@ test("ChannelConversationHandler sends images to chat vision instead of ingest",
   });
   assert.equal(response.text, "图是绿色字母");
   assert.equal(runs.length, 1);
-  assert.match(runs[0].text, /syno_image_read/);
-  assert.match(runs[0].text, /artifactId/);
+  assert.match(runs[0].text, /拿不到图片内容/);
+  assert.match(runs[0].text, /收录/);
+  assert.doesNotMatch(runs[0].text, /syno_image_read|artifactId/);
 });
 
 test("ChannelConversationHandler still ingests PDF/text attachments", async () => {
@@ -872,7 +873,7 @@ test("ChannelConversationHandler does not treat image captions as approval repli
     pendingDecisions: { async parse() { parsed = true; throw new Error("must not parse"); } },
     attachmentToPayload: async () => { throw new Error("image must not convert to intake"); },
     imageStore: new IsolatedImageStore({ quarantineRoots: [root] }),
-    visionClient: { async read() { throw new Error("Flash should call syno_image_read"); } },
+    visionClient: { async read() { throw new Error("聊天图片不得直接走 handler 识图"); } },
   });
   const response = await handler.handle({
     id: "wx-img-approve",
@@ -886,5 +887,5 @@ test("ChannelConversationHandler does not treat image captions as approval repli
   assert.equal(parsed, false);
   assert.equal(response.text, "已看图");
   assert.equal(runs.length, 1);
-  assert.match(runs[0].text, /syno_image_read/);
+  assert.match(runs[0].text, /拿不到图片内容/);
 });

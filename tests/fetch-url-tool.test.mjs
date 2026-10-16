@@ -90,8 +90,9 @@ test("createSynoRuntime registers knowledge.fetch_url and exposes it through the
   assert.equal(tool.risk, "read");
   assert.equal(tool.permission, "syno-read");
   assert.ok(runtime.toolBridge.exposed.has("knowledge_fetch_url"), "桥接应暴露 knowledge_fetch_url");
-  assert.ok(runtime.tools.list().find((item) => item.name === "image.read"), "ToolRegistry 应有 image.read");
-  assert.ok(runtime.toolBridge.exposed.has("image_read"), "桥接应暴露 image_read");
+  // 2026-10-16：image.read 已摘除（B5 后不在任何模型面，却仍被提示词指向）——不得回流
+  assert.equal(runtime.tools.list().some((item) => item.name === "image.read"), false);
+  assert.equal(runtime.toolBridge.exposed.has("image_read"), false);
 });
 
 // ---------- #20 反爬墙检测与浏览器升级（2026-09-03 生产实证建模） ----------

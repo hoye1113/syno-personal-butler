@@ -184,7 +184,7 @@ implementation:
 - 唯一静态 MCP `syno`，底层工具名由 Bridge 映射为最终 `syno_*`。
 - `syno_workflow_context` 从 canonical Skill 读取规则，不复制第二套知识语义。
 - Bridge 调用继续经过 ToolRegistry Schema、Policy 和固定 Owner 上下文。
-- 普通 chat 的 core 工具固定为 `workflow.context`、`knowledge.search`、`knowledge.read_snippet`、`knowledge.fetch_url`、`today.read`、`learning.due`、`learning.teach_back`、`learning.submit`、`capture.start`、`capture.status`、`capture.list_pending`、`jobs.list`、`jobs.submit`、`image.read`。其中 `learning.submit` 只接收主人原始学习输出并创建待审批的 `learning.evidence.record` Job，不直接写入知识或掌握度；其余隐藏工具不能通过直接 `tools/call` 绕过。
+- 普通 chat 的 core 工具固定为 `workflow.context`、`knowledge.search`、`knowledge.read_snippet`、`knowledge.fetch_url`、`today.read`、`learning.due`、`learning.teach_back`、`learning.submit`、`capture.start`、`capture.status`、`capture.list_pending`、`jobs.list`、`jobs.submit`。其中 `learning.submit` 只接收主人原始学习输出并创建待审批的 `learning.evidence.record` Job，不直接写入知识或掌握度；其余隐藏工具不能通过直接 `tools/call` 绕过。
 - `syno-lab` 保留 DSH CLI 已安装的实验 bundle，`dsh-mnemon@0.2.13` 不访问 Syno Bridge 或 canonical facts。
 - 知识读取为限长 snippet，敏感 frontmatter 默认拒绝。
 

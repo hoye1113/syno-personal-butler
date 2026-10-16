@@ -53,7 +53,6 @@ const BRIDGE_TOOL_NAMES = new Set([
   "jobs.list",
   "jobs.submit",
   "settings.adjust",
-  "image.read",
   "inspiration.record_feedback",
   "browser.status",
   "browser.navigate",

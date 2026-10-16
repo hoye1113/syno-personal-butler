@@ -345,28 +345,6 @@ function createSynoRuntime(options = {}) {
       },
     },
     {
-      name: "image.read",
-      description: "读取隔离区内一张图片：OCR、版面、摘要与针对问题的回答。只接受 artifactId 与 question。",
-      risk: "read",
-      permission: "syno-read",
-      retry: "safe",
-      version: "1",
-      inputSchema: {
-        type: "object",
-        required: ["artifactId"],
-        properties: {
-          artifactId: { type: "string", minLength: 1 },
-          question: { type: "string" },
-        },
-        additionalProperties: false,
-      },
-      outputSchema: { type: "object" },
-      execute: async ({ artifactId, question }) => {
-        if (!visionClient) throw Object.assign(new Error("识图通道未就绪"), { code: "VISION_UNAVAILABLE" });
-        return visionClient.read({ artifactId, question });
-      },
-    },
-    {
       name: "knowledge.read", description: "读取搜索结果中的完整知识笔记", risk: "read", permission: "syno-read", retry: "safe", version: "1",
       inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string", minLength: 1 } }, additionalProperties: false },
       outputSchema: { type: "object" },
