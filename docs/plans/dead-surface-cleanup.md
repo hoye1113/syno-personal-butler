@@ -4,6 +4,10 @@
 > 已执行（第一轮）：`image.read` 已摘除（commit `8cfc9d3`）。
 > 已执行（第二轮，2026-10-16，主人「按顺序执行下一轮推荐方案」）：B 隐藏工具面收缩、C 五个历史批次脚本删除、E `docs/plans/` 纳入索引分类并把无引用 devlog 移入 `docs/archive/`。
 > D 按结论保留（回滚面仍在用）。以下保留原始判定依据供追溯。
+> 第三轮（2026-10-16，主人「零散待办都解决掉」）：A 图片改为直投模型（`contentBlocks` 支持 image 块 +
+> 通道侧读字节，单图 3MB 上限）；C 再删 6 个一次性脚本（inventory-all-skills / generate-knowledge-index-doc /
+> update-wiki-home / sync-vault-to-wiki / ingest-wechat-articles / ingest-bilibili-opus）；README 平台描述按
+> 事实改写；相关文档全部同步。
 
 ## A. 已完成（本轮）
 
@@ -35,7 +39,12 @@
 ## C. 一次性脚本（17 个，需主人确认哪些还要留）
 
 **已执行**：删除 `reingest-tier1/2/3-articles.mjs`、`prune-coding-tutorials.mjs`、`prune-vault-knowledge.mjs`
-（五个纯历史批次脚本，无任何引用）。其余保留待主人划范围。
+（五个纯历史批次脚本，无任何引用）；第三轮再删 `inventory-all-skills`（硬编码 `D:\` 路径）、
+`generate-knowledge-index-doc`/`update-wiki-home`/`sync-vault-to-wiki`（飞书 wiki 迁移期工具，硬编码文档 token）、
+`ingest-wechat-articles`/`ingest-bilibili-opus`（一次性入库批次）。
+
+保留并说明理由：`heal-vault-wikilinks`、`radar-trending-skills`、`sync-feishu-intake`（devlog 当 runbook 引用）、
+`configure-feishu`（通道配置助手）、`r6-readiness`/`cutover-mobile-delivery`（执行事实源明确要求保持原样）。
 
 无 `package.json` 入口、也无代码引用的脚本：
 `configure-feishu`、`cutover-mobile-delivery`、`generate-knowledge-index-doc`、`heal-vault-wikilinks`、
