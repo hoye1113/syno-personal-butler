@@ -188,7 +188,9 @@ test("Syno agent instructions match the shared core chat tool set", async () => 
   assert.match(instructions, /具体 URL.*syno_knowledge_fetch_url/);
   assert.match(instructions, /不得.*web_fetch.*绕过/);
   assert.match(instructions, /blocked.*未取得正文/);
-  assert.match(instructions, /默认插件.*直抓/);
+  // 2026-10-16：浏览器升级接回插件路径，提示词口径改为「活聊天命中反爬墙自动改用本机浏览器」
+  assert.match(instructions, /命中反爬验证墙.*自动改用本机浏览器/);
+  assert.doesNotMatch(instructions, /默认插件仅支持直抓/);
   assert.doesNotMatch(instructions, /告知主人完成后回复|先.*web_search.*再.*web_fetch/);
 });
 

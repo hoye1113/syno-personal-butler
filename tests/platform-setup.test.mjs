@@ -26,6 +26,31 @@ test("Unix command discovery resolves executable paths containing Chinese and sp
   assert.equal(locateCommand("missing", "", { env: { PATH: root }, platform: "darwin" }), "missing");
 });
 
+test("Unix command discovery falls back to the user local bin when PATH is narrowed", async (t) => {
+  // 2026-10-16 实证：LaunchAgent 的 PATH 只有系统目录，bsk（~/.local/bin）因此解析不到，
+  // 聊天里的浏览器升级会静默降级成 browser_unavailable。
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), "syno-home-"));
+  t.after(() => fs.rm(home, { recursive: true, force: true }));
+  const bin = path.join(home, ".local", "bin");
+  await fs.mkdir(bin, { recursive: true });
+  const bsk = path.join(bin, "bsk");
+  await fs.writeFile(bsk, "#!/bin/sh\n");
+  await fs.chmod(bsk, 0o755);
+  const env = { PATH: "/usr/bin:/bin", HOME: home };
+  assert.equal(locateCommand("bsk", "SYNO_BSK_COMMAND", { env, platform: "darwin" }), bsk);
+  // PATH 命中优先于本地兜底
+  const pathDir = await fs.mkdtemp(path.join(os.tmpdir(), "syno-path-"));
+  t.after(() => fs.rm(pathDir, { recursive: true, force: true }));
+  const fromPath = path.join(pathDir, "bsk");
+  await fs.writeFile(fromPath, "#!/bin/sh\n");
+  await fs.chmod(fromPath, 0o755);
+  assert.equal(locateCommand("bsk", "SYNO_BSK_COMMAND", { env: { PATH: pathDir, HOME: home }, platform: "darwin" }), fromPath);
+  // 环境变量覆盖始终最优先
+  assert.equal(locateCommand("bsk", "SYNO_BSK_COMMAND", { env: { ...env, SYNO_BSK_COMMAND: "/opt/bsk" }, platform: "darwin" }), "/opt/bsk");
+  // 没有 HOME 时行为不变
+  assert.equal(locateCommand("bsk", "SYNO_BSK_COMMAND", { env: { PATH: "/usr/bin:/bin" }, platform: "darwin" }), "bsk");
+});
+
 test("portable setup initializes the pinned submodule and builds before doctor", async (t) => {
   const repoRoot = await fs.mkdtemp(path.join(os.tmpdir(), "syno-setup-"));
   t.after(() => fs.rm(repoRoot, { recursive: true, force: true }));

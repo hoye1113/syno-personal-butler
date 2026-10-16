@@ -231,13 +231,13 @@ test("ChannelConversationHandler deterministically captures an embedded URL with
   assert.match((await handler.handle({ id: "capture-1", ownerKey: "owner", channel: "weixin", text: "请收录 https://example.com/a" })).text, /workflow-new/);
   assert.equal(calls[0].payload.kind, "url");
   assert.equal(model.length, 0);
-  // 二次修订（2026-07-30）：「解释 <url> 的观点」这类读链接短语 → 不收录，注入提示让模型用 fetch_url 读正文回答
+  // 二次修订（2026-07-30）：「解释 <url> 的观点」这类读链接短语 → 不收录，注入提示让模型用 syno_knowledge_fetch_url 读正文回答
   const readLink = await handler.handle({ id: "chat-1", ownerKey: "owner", channel: "weixin", text: "解释 https://example.com/a 的观点" });
   assert.deepEqual(readLink, { text: "ordinary" });
   assert.equal(calls.length, 1);
   assert.equal(model.length, 1);
   assert.match(model[0], /^解释 https:\/\/example\.com\/a 的观点/);
-  assert.match(model[0], /knowledge\.fetch_url/);
+  assert.match(model[0], /syno_knowledge_fetch_url/);
   assert.match(model[0], /不要主动调用收录/);
 });
 
@@ -636,7 +636,7 @@ test("ChannelConversationHandler persists a modification as a revised ingest pro
   assert.ok(updates[0].patch.consumedAt);
 });
 
-test("read-link phrases read via fetch_url without entering the capture pipeline", async () => {
+test("read-link phrases read via syno_knowledge_fetch_url without entering the capture pipeline", async () => {
   const calls = [];
   const model = [];
   const handler = new ChannelConversationHandler({
@@ -658,7 +658,7 @@ test("read-link phrases read via fetch_url without entering the capture pipeline
   assert.deepEqual(response, { text: "能读到，这是概要" });
   assert.equal(calls.length, 0);
   assert.equal(model.length, 1);
-  assert.match(model[0], /knowledge\.fetch_url/);
+  assert.match(model[0], /syno_knowledge_fetch_url/);
   assert.match(model[0], /不要主动调用收录/);
 });
 
@@ -685,7 +685,7 @@ test("URL glued to Chinese text is not treated as a bare URL", async () => {
   assert.deepEqual(response, { text: "读完了" });
   assert.equal(calls.length, 0);
   assert.equal(model.length, 1);
-  assert.match(model[0], /knowledge\.fetch_url/);
+  assert.match(model[0], /syno_knowledge_fetch_url/);
   // 裸链接带尾随中文标点仍算裸链接（且提交的是干净链接，不带标点）
   const bare = await handler.handle({ id: "wx-bare-1", ownerKey: "owner", channel: "weixin", text: "https://example.com/a。" });
   assert.match(bare.text, /workflow-new/);

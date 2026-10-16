@@ -228,6 +228,39 @@ test("fetchUrlForChat honestly degrades when the browser daemon is unavailable",
 
 // ---------- 代码审查整改（2026-09-04）：maxChars 同口径 + 升级可观测 ----------
 
+test("plugin-style chat context escalates with a session-scoped workflow id", async () => {
+  const adapter = fakeBrowserAdapter({
+    capture: { status: "completed", finalUrl: "https://example.com/a", title: "t", content: "插件路径正文" },
+  });
+  const context = { channel: "chat", sessionId: "syno-main-0123456789abcdef0123456789abcdef" };
+  const result = await fetchUrlForChat({
+    url: "https://example.com/a",
+    fetcher: async (value) => ({ url: value, contentType: "text/html", text: WX_WALL_TEXT, truncated: false }),
+    browserCapture: adapter,
+    context,
+  });
+  assert.equal(result.via, "browser");
+  assert.match(result.content, /插件路径正文/);
+  assert.match(adapter.calls[0][1], /^workflow-chatread-[0-9a-f]{16}$/);
+  // 同会话同 URL 稳定
+  await fetchUrlForChat({
+    url: "https://example.com/a",
+    fetcher: async (value) => ({ url: value, contentType: "text/html", text: WX_WALL_TEXT, truncated: false }),
+    browserCapture: adapter,
+    context,
+  });
+  assert.equal(new Set(adapter.calls.map((call) => call[1])).size, 1, "sessionId 身份下 workflowId 确定不变");
+  // 换会话换 id：不同主人/线程不能用同一个浏览器会话
+  const other = fakeBrowserAdapter({ capture: { status: "completed", title: "t", content: "c" } });
+  await fetchUrlForChat({
+    url: "https://example.com/a",
+    fetcher: async (value) => ({ url: value, contentType: "text/html", text: WX_WALL_TEXT, truncated: false }),
+    browserCapture: other,
+    context: { channel: "chat", sessionId: "syno-main-fedcba9876543210fedcba9876543210" },
+  });
+  assert.notEqual(other.calls[0][1], adapter.calls[0][1]);
+});
+
 test("browser-escalated content honors maxChars and marks truncation honestly", async () => {
   const adapter = fakeBrowserAdapter({
     capture: { status: "completed", finalUrl: "https://mp.weixin.qq.com/s/abc", title: "长文", content: "正文".repeat(5000) },

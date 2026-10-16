@@ -5,7 +5,12 @@ import path from "node:path";
 function locateCommand(name, envName, { env = process.env, platform = process.platform } = {}) {
   if (env[envName]) return env[envName];
   if (platform !== "win32") {
-    for (const directory of String(env.PATH || "").split(path.delimiter).filter(Boolean)) {
+    // 服务/launchd 环境常把 PATH 收窄成系统目录，而 bsk、opencode 这类工具按惯例装在
+    // ~/.local/bin（2026-10-16 本机实证：LaunchAgent 的 PATH 不含它，浏览器升级因此解析不到 bsk）。
+    // PATH 优先，用户本地 bin 兜底。
+    const directories = String(env.PATH || "").split(path.delimiter).filter(Boolean);
+    if (env.HOME) directories.push(path.join(env.HOME, ".local", "bin"));
+    for (const directory of directories) {
       const candidate = path.resolve(directory, name);
       try { accessSync(candidate, constants.X_OK); if (statSync(candidate).isFile()) return candidate; } catch {}
     }
