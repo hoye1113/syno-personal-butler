@@ -50,20 +50,20 @@ test("SynoToolBridge uses durable receipts across bridge instances and never rep
   const store = makeStore(root);
   let executions = 0;
   const tools = new ToolRegistry([{
-    name: "settings.adjust", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1",
+    name: "capture.start", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1",
     agentAdjustableBoundary: true, inputSchema: { type: "object", required: ["key"], properties: { key: { type: "string" } }, additionalProperties: false },
     outputSchema: { type: "object", required: ["changed"], properties: { changed: { type: "boolean" } }, additionalProperties: false },
     execute: async () => { executions += 1; return { changed: true }; },
   }]);
-  const call = (id, key = "quiet") => ({ authorization: "Bearer secret", body: { jsonrpc: "2.0", id, method: "tools/call", params: { name: "settings_adjust", arguments: { key } } } });
+  const call = (id, key = "quiet") => ({ authorization: "Bearer secret", body: { jsonrpc: "2.0", id, method: "tools/call", params: { name: "capture_start", arguments: { key } } } });
   const makeBridge = () => new SynoToolBridge({ tools, token: "secret", effectReceipts: store });
   const first = makeBridge();
-  const release1 = first.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-1", allowedTools: ["settings_adjust"] });
+  const release1 = first.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-1", allowedTools: ["capture_start"] });
   const created = await first.handle(call(1));
   release1();
   assert.equal(created.result.directEffect.status, "committed");
   const second = makeBridge();
-  const release2 = second.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-1", allowedTools: ["settings_adjust"] });
+  const release2 = second.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-1", allowedTools: ["capture_start"] });
   const replay = await second.handle(call(2));
   const conflict = await second.handle(call(3, "different"));
   release2();
@@ -82,16 +82,16 @@ test("SynoToolBridge keeps invocation identity stable after Project removal (per
   let executions = 0;
   const contexts = [];
   const tools = new ToolRegistry([{
-    name: "settings.adjust", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1",
+    name: "capture.start", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1",
     agentAdjustableBoundary: true,
     inputSchema: { type: "object", required: ["key"], properties: { key: { type: "string" } }, additionalProperties: false },
     outputSchema: { type: "object", required: ["changed"], properties: { changed: { type: "boolean" } }, additionalProperties: false },
     execute: async (_input, context) => { executions += 1; contexts.push(context); return { changed: true }; },
   }]);
-  const call = (id) => ({ authorization: "Bearer secret", body: { jsonrpc: "2.0", id, method: "tools/call", params: { name: "settings_adjust", arguments: { key: "quiet" } } } });
+  const call = (id) => ({ authorization: "Bearer secret", body: { jsonrpc: "2.0", id, method: "tools/call", params: { name: "capture_start", arguments: { key: "quiet" } } } });
   const run = async (id) => {
     const bridge = new SynoToolBridge({ tools, token: "secret", effectReceipts: store });
-    const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "same-message", allowedTools: ["settings_adjust"] });
+    const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "same-message", allowedTools: ["capture_start"] });
     const result = await bridge.handle(call(id));
     release();
     return result;
@@ -114,7 +114,7 @@ test("Replay branch routes an array-shaped committed result through the serializ
   const store = makeStore(root);
   let executions = 0;
   const tools = new ToolRegistry([{
-    name: "settings.adjust", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1",
+    name: "capture.start", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1",
     agentAdjustableBoundary: true,
     inputSchema: { type: "object", required: ["key"], properties: { key: { type: "string" } }, additionalProperties: false },
     outputSchema: { type: "array", items: { type: "object" } },
@@ -122,16 +122,16 @@ test("Replay branch routes an array-shaped committed result through the serializ
     // （serializer 以运行时值 isPlainObject(result) 判定，而非声明 outputSchema）。
     execute: async () => { executions += 1; return [{ key: "quiet", changed: true }]; },
   }]);
-  const call = (id) => ({ authorization: "Bearer secret", body: { jsonrpc: "2.0", id, method: "tools/call", params: { name: "settings_adjust", arguments: { key: "quiet" } } } });
+  const call = (id) => ({ authorization: "Bearer secret", body: { jsonrpc: "2.0", id, method: "tools/call", params: { name: "capture_start", arguments: { key: "quiet" } } } });
   const makeBridge = () => new SynoToolBridge({ tools, token: "secret", effectReceipts: store });
   const first = makeBridge();
-  const release1 = first.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-replay-array", allowedTools: ["settings_adjust"] });
+  const release1 = first.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-replay-array", allowedTools: ["capture_start"] });
   const committed = await first.handle(call(1));
   release1();
   assert.equal(committed.result.directEffect.status, "committed");
   // 新 bridge 实例（模拟跨重启）：同 toolInvocationKey 命中 committed → 走重放分支。
   const second = makeBridge();
-  const release2 = second.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-replay-array", allowedTools: ["settings_adjust"] });
+  const release2 = second.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-replay-array", allowedTools: ["capture_start"] });
   const replay = await second.handle(call(2));
   release2();
   assert.equal(executions, 1); // 重放不重复执行写副作用
@@ -151,13 +151,13 @@ test("A pending receipt blocks a retry until reconciliation resolves it", async 
   const store = makeStore(root);
   let executions = 0;
   const tools = new ToolRegistry([{
-    name: "settings.adjust", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1", agentAdjustableBoundary: true,
+    name: "capture.start", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1", agentAdjustableBoundary: true,
     inputSchema: { type: "object", additionalProperties: false }, outputSchema: { type: "object" }, execute: async () => { executions += 1; return {}; },
   }]);
   const bridge = new SynoToolBridge({ tools, token: "secret", effectReceipts: store });
-  const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-pending", allowedTools: ["settings_adjust"] });
-  const args = { authorization: "Bearer secret", body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "settings_adjust", arguments: {} } } };
-  const invocation = toolInvocationKey({ ownerKey: "owner", threadKey: "main", messageId: "message-pending", toolName: "settings_adjust" });
+  const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-pending", allowedTools: ["capture_start"] });
+  const args = { authorization: "Bearer secret", body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "capture_start", arguments: {} } } };
+  const invocation = toolInvocationKey({ ownerKey: "owner", threadKey: "main", messageId: "message-pending", toolName: "capture_start" });
   const argumentsDigest = createHash("sha256").update(JSON.stringify({})).digest("hex");
   await store.begin({ toolInvocationKey: invocation, toolName: "settings.adjust", ownerKey: "owner", argumentsDigest });
   const response = await bridge.handle(args);
@@ -172,13 +172,13 @@ test("Tool output validation failure stores a committed direct-effect receipt", 
   t.after(() => cleanup(root));
   const store = makeStore(root);
   const tools = new ToolRegistry([{
-    name: "settings.adjust", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1", agentAdjustableBoundary: true,
+    name: "capture.start", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1", agentAdjustableBoundary: true,
     inputSchema: { type: "object", additionalProperties: false }, outputSchema: { type: "object", required: ["changed"], properties: { changed: { type: "boolean" } }, additionalProperties: false },
     execute: async () => ({ invalidAfterWrite: true }),
   }]);
   const bridge = new SynoToolBridge({ tools, token: "secret", effectReceipts: store });
-  const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-invalid", allowedTools: ["settings_adjust"] });
-  const response = await bridge.handle({ authorization: "Bearer secret", body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "settings_adjust", arguments: {} } } });
+  const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-invalid", allowedTools: ["capture_start"] });
+  const response = await bridge.handle({ authorization: "Bearer secret", body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "capture_start", arguments: {} } } });
   release();
   assert.equal(response.result.isError, true);
   assert.equal(response.result.directEffect.status, "committed");
@@ -194,15 +194,15 @@ test("Error-branch effectOutput bearing a secret is never persisted and the MCP 
   t.after(() => cleanup(root));
   const store = makeStore(root);
   const tools = new ToolRegistry([{
-    name: "settings.adjust", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1", agentAdjustableBoundary: true,
+    name: "capture.start", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1", agentAdjustableBoundary: true,
     inputSchema: { type: "object", required: ["key"], properties: { key: { type: "string" } }, additionalProperties: false },
     outputSchema: { type: "object", required: ["changed"], properties: { changed: { type: "boolean" } }, additionalProperties: false },
     // 违反 boolean outputSchema 且值夹带凭据：触发 output-validation 失败 + 含密 effectOutput。
     execute: async () => ({ changed: "Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456" }),
   }]);
   const bridge = new SynoToolBridge({ tools, token: "secret", effectReceipts: store });
-  const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-redact-error", allowedTools: ["settings_adjust"] });
-  const response = await bridge.handle({ authorization: "Bearer secret", body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "settings_adjust", arguments: { key: "quiet" } } } });
+  const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-redact-error", allowedTools: ["capture_start"] });
+  const response = await bridge.handle({ authorization: "Bearer secret", body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "capture_start", arguments: { key: "quiet" } } } });
   release();
   const serialized = JSON.stringify(response);
   assert.equal(response.result.isError, true);

@@ -50,10 +50,12 @@ async function callTool({ name, outputSchema, stub }) {
   return out;
 }
 
+// 2026-10-16：goals.list 已从 ToolRegistry/桥目录摘除（任何模型面都到不了），fixture 换成仍在
+// 目录里的数组返回工具，故意保留多个覆盖面。
 const ARRAY_TOOLS = [
   ["knowledge.search", [{ path: "vault/n.md", score: 0.9 }]],
   ["capture.list_pending", [{ artifactId: "a" }]],
-  ["goals.list", [{ goalId: "g" }]],
+  ["capture.status", [{ artifactId: "b" }]],
   ["jobs.list", [{ jobId: "j" }]],
 ];
 

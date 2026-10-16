@@ -169,7 +169,7 @@ test("core chat tool set is shared by the DSH plugin and excludes hidden domain 
   assert.deepEqual(CORE_CHAT_TOOL_NAMES.filter((name) => evictedTools.includes(name)), []);
   const definitions = [
     ...CORE_CHAT_TOOL_NAMES.map((name) => ({ name: name.replaceAll(".", "_"), description: name })),
-    { name: "claims_propose", description: "hidden" },
+    { name: "jobs_submit", description: "hidden" },
     { name: "browser_snapshot", description: "capture-only" },
   ];
   assert.deepEqual(selectToolDefinitions(definitions, "core").map((tool) => tool.name), CORE_CHAT_TOOL_NAMES.map((name) => name.replaceAll(".", "_")));

@@ -9,7 +9,6 @@ export const name = "syno-tool-bridge";
 export const inject = ["tools"];
 
 const FALLBACK_TOOLS = Object.freeze([
-  ["workflow_context", "Load Syno workflow context"],
   ["knowledge_search", "Search the Syno vault"],
   ["knowledge_read_snippet", "Read a vault snippet"],
   ["knowledge_fetch_url", "Fetch a URL through Syno"],
@@ -17,13 +16,8 @@ const FALLBACK_TOOLS = Object.freeze([
   ["capture_start", "Start a capture workflow"],
   ["capture_status", "Read capture status"],
   ["capture_list_pending", "List pending captures"],
-  ["goals_list", "List goals"],
-  ["claims_propose", "Propose a claim"],
-  ["evidence_source_read", "Read evidence source"],
-  ["evidence_propose", "Propose evidence"],
   ["jobs_list", "List Syno jobs"],
   ["jobs_submit", "Submit a Syno job"],
-  ["settings_adjust", "Adjust Syno settings"],
   ["inspiration_record_feedback", "Record owner feedback for the latest inspiration card"],
   ["browser_status", "Browser capture status"],
   ["browser_navigate", "Browser navigate"],

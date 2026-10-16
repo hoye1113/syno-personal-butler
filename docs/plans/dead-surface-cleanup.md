@@ -1,7 +1,9 @@
 # 死面清理：可删清单与判定依据（2026-10-16）
 
 > 起因：主人「没必要保留不可用的插件或工具」。
-> 已执行：`image.read` 已摘除（commit `8cfc9d3`）。以下是**第二轮候选**，逐项附证据与风险，等主人点头再动。
+> 已执行（第一轮）：`image.read` 已摘除（commit `8cfc9d3`）。
+> 已执行（第二轮，2026-10-16，主人「按顺序执行下一轮推荐方案」）：B 隐藏工具面收缩、C 五个历史批次脚本删除、E `docs/plans/` 纳入索引分类并把无引用 devlog 移入 `docs/archive/`。
+> D 按结论保留（回滚面仍在用）。以下保留原始判定依据供追溯。
 
 ## A. 已完成（本轮）
 
@@ -14,6 +16,9 @@
 
 清单：`workflow.context`、`knowledge.read`、`goals.list`、`claims.propose`、`evidence.propose`、
 `evidence.source_read`、`settings.adjust`。
+
+**已执行**：7 个注册全部摘除（ToolRegistry + 桥目录 + 降级目录），测试 fixture 改用仍在目录里的工具；
+`knowledge.read` 只删工具注册，`KnowledgeStore.read` 方法与 HTTP 端点不动。
 
 证据：
 - 默认聊天面 = capabilities 注册的 6 件（`config/deepseek-harness/syno-tool-sets.mjs`）。
@@ -28,6 +33,9 @@
 验收：`pnpm gate` 全绿 + 全仓 `tools.execute("...")`/桥目录/文档零残留 + 生产重启后真实会话抽检一次。
 
 ## C. 一次性脚本（17 个，需主人确认哪些还要留）
+
+**已执行**：删除 `reingest-tier1/2/3-articles.mjs`、`prune-coding-tutorials.mjs`、`prune-vault-knowledge.mjs`
+（五个纯历史批次脚本，无任何引用）。其余保留待主人划范围。
 
 无 `package.json` 入口、也无代码引用的脚本：
 `configure-feishu`、`cutover-mobile-delivery`、`generate-knowledge-index-doc`、`heal-vault-wikilinks`、

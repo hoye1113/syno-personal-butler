@@ -87,10 +87,10 @@ test("SynoToolBridge exposedToolNames narrows tools/list and blocks hidden direc
     body: { jsonrpc: "2.0", id: 1, method: "tools/list" },
   });
   assert.deepEqual(listed.result.tools.map((tool) => tool.name), ["knowledge_search"]);
-  const release = bridge.bindContext({ messageId: "hidden-call", allowedTools: ["claims_propose"] });
+  const release = bridge.bindContext({ messageId: "hidden-call", allowedTools: ["capture_status"] });
   const hidden = await bridge.handle({
     authorization: "Bearer bridge-secret",
-    body: { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "claims_propose", arguments: {} } },
+    body: { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "capture_status", arguments: {} } },
   });
   release();
   assert.equal(hidden.error.code, -32601);
@@ -122,7 +122,7 @@ test("SynoToolBridge accepts the OpenCode namespaced run capability for its inte
 
 test("SynoToolBridge blocks a secret-bearing ToolRegistry result before MCP serialization", async () => {
   const tools = new ToolRegistry([{
-    name: "evidence.source_read",
+    name: "knowledge.fetch_url",
     description: "Read public evidence",
     risk: "read",
     permission: "syno-read",
@@ -137,11 +137,11 @@ test("SynoToolBridge blocks a secret-bearing ToolRegistry result before MCP seri
     ownerKey: "owner",
     threadKey: "main",
     messageId: "message-secret-result",
-    allowedTools: ["syno_evidence_source_read"],
+    allowedTools: ["syno_knowledge_fetch_url"],
   });
   const called = await bridge.handle({
     authorization: "Bearer bridge-secret",
-    body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "evidence_source_read", arguments: {} } },
+    body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "knowledge_fetch_url", arguments: {} } },
   });
   release();
   const serialized = JSON.stringify(called);
@@ -153,7 +153,7 @@ test("SynoToolBridge blocks a secret-bearing ToolRegistry result before MCP seri
 
 test("SynoToolBridge redacts secret-bearing tool errors before returning MCP content", async () => {
   const tools = new ToolRegistry([{
-    name: "evidence.source_read",
+    name: "knowledge.fetch_url",
     description: "Read public evidence",
     risk: "read",
     permission: "syno-read",
@@ -168,11 +168,11 @@ test("SynoToolBridge redacts secret-bearing tool errors before returning MCP con
     ownerKey: "owner",
     threadKey: "main",
     messageId: "message-secret-error",
-    allowedTools: ["syno_evidence_source_read"],
+    allowedTools: ["syno_knowledge_fetch_url"],
   });
   const called = await bridge.handle({
     authorization: "Bearer bridge-secret",
-    body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "evidence_source_read", arguments: {} } },
+    body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "knowledge_fetch_url", arguments: {} } },
   });
   release();
   const serialized = JSON.stringify(called);
@@ -220,7 +220,7 @@ test("SynoToolBridge rejects a valid tool omitted from the run-scoped capability
     threadKey: "capture:artifact-1",
     channel: "capture",
     messageId: "capture-1",
-    allowedTools: ["workflow_context"],
+    allowedTools: ["capture_status"],
   });
   const response = await bridge.handle({
     authorization: "Bearer bridge-secret",
@@ -274,7 +274,7 @@ test("SynoToolBridge journals context bind, release and rejections with correlat
   });
   assert.equal(unbound.error.code, -32001);
 
-  const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", channel: "weixin", messageId: "msg-7", runId: "run-7", allowedTools: ["workflow_context"] });
+  const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", channel: "weixin", messageId: "msg-7", runId: "run-7", allowedTools: ["capture_status"] });
   const denied = await bridge.handle({
     authorization: "Bearer bridge-secret",
     body: { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "knowledge_search", arguments: { query: "agent" } } },
@@ -345,10 +345,10 @@ test("SynoToolBridge binds Owner thread and idempotency identity while tracking 
   let receivedContext;
   let executions = 0;
   const tools = new ToolRegistry([{
-    name: "settings.adjust",
+    name: "capture.start",
     description: "Adjust",
     risk: "low",
-    permission: "syno-settings",
+    permission: "syno-ops",
     retry: "idempotent",
     version: "1",
     agentAdjustableBoundary: true,
@@ -367,12 +367,12 @@ test("SynoToolBridge binds Owner thread and idempotency identity while tracking 
     threadKey: "project-a",
     channel: "feishu",
     messageId: "fs-99",
-    allowedTools: ["settings_adjust"],
+    allowedTools: ["capture_start"],
   });
   assert.equal(bridge.effectVersion(), 0);
   const call = {
     authorization: "Bearer bridge-secret",
-    body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "settings_adjust", arguments: { key: "quiet" } } },
+    body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "capture_start", arguments: { key: "quiet" } } },
   };
   await bridge.handle(call);
   await bridge.handle({ ...call, body: { ...call.body, id: 2 } });
@@ -381,16 +381,16 @@ test("SynoToolBridge binds Owner thread and idempotency identity while tracking 
   assert.equal(executions, 1);
   assert.equal(receivedContext.ownerId, "owner-1");
   assert.equal(receivedContext.channel, "feishu");
-  assert.match(receivedContext.conversationId, /^fs-99:<none>:settings_adjust:[a-f0-9]{16}$/);
+  assert.match(receivedContext.conversationId, /^fs-99:<none>:capture_start:[a-f0-9]{16}$/);
   assert.equal(resultContext.threadKey, "project-a");
 });
 
 test("SynoToolBridge marks a validated write attempt before output validation can fail", async () => {
   const tools = new ToolRegistry([{
-    name: "settings.adjust",
+    name: "capture.start",
     description: "Adjust",
     risk: "low",
-    permission: "syno-settings",
+    permission: "syno-ops",
     retry: "idempotent",
     version: "1",
     agentAdjustableBoundary: true,
@@ -404,11 +404,11 @@ test("SynoToolBridge marks a validated write attempt before output validation ca
     threadKey: "main",
     channel: "web",
     messageId: "message-write",
-    allowedTools: ["settings_adjust"],
+    allowedTools: ["capture_start"],
   });
   const response = await bridge.handle({
     authorization: "Bearer bridge-secret",
-    body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "settings_adjust", arguments: { key: "quiet" } } },
+    body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "capture_start", arguments: { key: "quiet" } } },
   });
   release();
   assert.equal(response.result.isError, true);

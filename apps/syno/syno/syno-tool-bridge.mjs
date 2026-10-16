@@ -38,7 +38,6 @@ function normalizeExposedToolName(name) {
 }
 
 const BRIDGE_TOOL_NAMES = new Set([
-  "workflow.context",
   "knowledge.search",
   "knowledge.read_snippet",
   "knowledge.fetch_url",
@@ -46,13 +45,8 @@ const BRIDGE_TOOL_NAMES = new Set([
   "capture.start",
   "capture.status",
   "capture.list_pending",
-  "goals.list",
-  "claims.propose",
-  "evidence.source_read",
-  "evidence.propose",
   "jobs.list",
   "jobs.submit",
-  "settings.adjust",
   "inspiration.record_feedback",
   "browser.status",
   "browser.navigate",
