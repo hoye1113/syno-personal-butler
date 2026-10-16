@@ -219,7 +219,7 @@ test("孤儿 DSH 回收：SIGTERM 无效时升级 SIGKILL；无监听时零动�
 });
 
 // 2026-10-16 实证：pid 75683 这种「关掉监听但没退出」的孤儿 Host 只能靠命令行识别。
-test("孤儿 Host 回收：只认本仓入口、跳过仍占端口的进程、端口有主时整体不动作", async () => {
+test("孤儿 Host 回收：只认本仓入口、跳过仍占端口的进程、keep 名单内的自己人不动", async () => {
   const serverPath = "/repo/apps/syno/server.mjs";
   const repoRoot = "/repo";
   const psOut = [
@@ -236,16 +236,16 @@ test("孤儿 Host 回收：只认本仓入口、跳过仍占端口的进程、�
     if (command === "lsof") return { stdout: "", stderr: "" };
     throw new Error(`unexpected ${command}`);
   };
-  // 端口有主（555 在听 8888）→ 整体跳过，正在启动/被收养的 Host 不会被误杀
+  // keep 名单（刚孵化的子进程）与仍占端口的 222 都不动；111 无端口 → 回收
   const skipCalls = [];
-  const skipped = await reapOrphanHosts({
-    port: 8888, serverPath, repoRoot, log: () => {}, run,
-    kill: (pid, signal) => skipCalls.push([pid, signal]), sleepFn: async () => {},
+  const kept = await reapOrphanHosts({
+    port: 8888, serverPath, repoRoot, log: () => {}, keep: [111], run,
+    kill: (pid, signal) => skipCalls.push([pid, signal]), sleepFn: async () => {}, graceMs: 0,
   });
-  assert.deepEqual(skipped, []);
-  assert.deepEqual(skipCalls, []);
+  assert.deepEqual(kept, [666], "keep 名单不动，其余无端口本仓残骸照收");
+  assert.deepEqual(skipCalls.filter(([pid]) => pid !== 666), []);
 
-  // 端口空着：111/666（无监听的本仓入口）被回收，222（自己还占端口）与 333（非本仓）不得触碰
+  // 无 keep：111/666（无监听的本仓入口）被回收，222（自己还占端口）与 333（非本仓）不得触碰
   const runNoListener = async (command, args) => command === "ps"
     ? { stdout: psOut, stderr: "" }
     : command === "lsof" && args.includes("222") ? { stdout: "222\n", stderr: "" } : { stdout: "", stderr: "" };
@@ -258,7 +258,7 @@ test("孤儿 Host 回收：只认本仓入口、跳过仍占端口的进程、�
   };
   const events = [];
   const reaped = await reapOrphanHosts({
-    port: 8888, serverPath, repoRoot, log: (event, fields) => events.push([event, fields]), run: runNoListener, kill, sleepFn: async () => {},
+    port: 8888, serverPath, repoRoot, log: (event, fields) => events.push([event, fields]), run: runNoListener, kill, sleepFn: async () => {}, graceMs: 0,
   });
   assert.deepEqual(reaped, [111, 666], "绝对入口与相对入口的本仓孤儿都回收");
   assert.deepEqual(calls.filter(([pid]) => ![111, 666].includes(pid)), [], "只回收确认无端口的本仓孤儿");
@@ -296,7 +296,11 @@ test("监督器接线：孵化前先回收孤儿 DSH 端口", async () => {
   assert.match(launcher, /SYNO_DSH_WEB_PORT/);
   const reapCall = launcher.indexOf("await reapOrphanDsh(");
   const spawnCall = launcher.indexOf("const child = spawn(");
-  assert.ok(reapCall >= 0 && spawnCall > reapCall, "回收必须发生在新 Host 孵化之前");
+  assert.ok(reapCall >= 0 && spawnCall > reapCall, "DSH 回收必须发生在新 Host 孵化之前");
+  // 孤儿 Host 残骸相反：必须在孵化之后（半死 Host 会先释放端口再滞留，孵化前回收会被端口守卫放过）
+  const hostReap = launcher.indexOf("await reapOrphanHosts(");
+  const hostStarted = launcher.indexOf('log("launcher.host_started"');
+  assert.ok(hostReap > hostStarted && hostStarted > spawnCall, "孤儿 Host 回收必须在孵化之后");
 });
 
 test("监督器接线：host_crashed → 告警判定 → 退避休眠 顺序固定（对齐 Windows 启动器）", async () => {

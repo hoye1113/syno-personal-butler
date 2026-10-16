@@ -218,13 +218,15 @@ async function hasTcpListener(pid, run = execFileAsync) {
   }
 }
 
-// 安全性两条：端口上有监听者（正在启动或正被收养的 Host）时整体跳过；候选进程自己还在监听 TCP 时也跳过
-// （例如主人手动起的测试 Host）。只回收真正「既没端口也没退出」的残骸。
-async function reapOrphanHosts({ port, serverPath, repoRoot, log, run = execFileAsync, kill = (pid, signal) => process.kill(pid, signal), sleepFn = sleep, graceMs = 5_000 }) {
-  if ((await listListeners(port, run)).length > 0) return [];
+// 安全性：候选进程只要还在监听 TCP 就跳过（正在启动的 Host、主人手动起的测试 Host 都算），
+// 只回收真正「既没端口也没退出」的残骸；调用方通过 keep 排除自己的子进程。
+// 时机很重要：必须在孵化出新 Host 之后调用——半死 Host 会先释放端口、再滞留若干秒，
+// 那时候旧端口守卫会把它整批放过（2026-10-16 实测：这样回收等于没做）。
+async function reapOrphanHosts({ port, serverPath, repoRoot, log, keep = [], run = execFileAsync, kill = (pid, signal) => process.kill(pid, signal), sleepFn = sleep, graceMs = 5_000 }) {
+  const skip = new Set([process.pid, ...keep].filter((pid) => Number.isInteger(pid) && pid > 0));
   const reaped = [];
   for (const host of await listRepoHostProcesses({ serverPath, repoRoot, run })) {
-    if (host.pid === process.pid) continue;
+    if (skip.has(host.pid)) continue;
     if (await hasTcpListener(host.pid, run)) continue;
     try { kill(host.pid, "SIGTERM"); } catch { continue; }
     const deadline = Date.now() + graceMs;
@@ -344,7 +346,6 @@ async function main() {
   }
 
   while (!state.stopping) {
-    await reapOrphanHosts({ port, serverPath, repoRoot, log });
     await reapOrphanDsh({ port: dshWebPort, dshRoot, log });
     const child = spawn(nodePath, [serverPath], { cwd: repoRoot, stdio: ["ignore", "pipe", "pipe"] });
     state.child = child;
@@ -353,6 +354,8 @@ async function main() {
     const startedAt = Date.now();
     await writeOwnership(pidFile, { version: 1, pid: child.pid, mode: "owned", nodePath, serverPath, repoRoot, startedAt: new Date(startedAt).toISOString() });
     log("launcher.host_started", { pid: child.pid });
+    // 孵化后才收残骸：此刻端口已由我们的子进程接管，「既没端口又没退出」的本仓 Host 只可能是旧残骸。
+    await reapOrphanHosts({ port, serverPath, repoRoot, log, keep: [child.pid] });
     const { code, signal } = await new Promise((resolve) => {
       child.once("exit", (exitCode, exitSignal) => resolve({ code: exitCode, signal: exitSignal }));
     });
