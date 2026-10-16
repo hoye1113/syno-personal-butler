@@ -112,19 +112,31 @@ function reportEscalation(recordEvent, { url, wall, outcome }) {
   recordEvent?.("knowledge.fetch_url.escalation", { host, wall: String(wall || ""), outcome }, { level: "info" })?.catch(() => {});
 }
 
+// 命中验证后在同一窗口里等人过验证的有界等待（2026-10-16「一步到位」）。
+// 上限受 DSH 单回合 180s 请求超时约束（apps/syno/syno/deepseek-harness-web-client.mjs:53）。
+const CLEARANCE_WAIT_MS = Math.min(150_000, Math.max(10_000, Number(process.env.SYNO_FETCH_CLEARANCE_WAIT_MS) || 90_000));
+// 等不到就保留窗口，但要有个上限：主人在这个窗口里过完验证再说「继续」都来得及，逾期自动收窗。
+const ABANDONED_WINDOW_CLOSE_MS = 10 * 60 * 1_000;
+
 async function escalateViaBrowser({ url, browserCapture, context, wall, maxText, recordEvent }) {
   const workflowId = chatReadWorkflowId(context, url);
+  // 活聊天才走到这里（上游按渠道门禁），因此允许保窗待人 + 必要时抢一次焦点。
+  const options = { keepSessionOnBlock: true, focus: true };
   let observation = null;
-  // 已有观察记录 = 同（主人, 会话, URL）的浏览器会话可能还在——原地续抓（「继续」场景）；
+  // 已有观察记录 = 同（主人, 会话, URL）的浏览器窗口可能还在——原地续抓（「继续」场景）；
   // 会话过期/丢失则重新签发打开。
   if (typeof browserCapture.observation === "function" && browserCapture.observation({ workflowId })) {
-    observation = await browserCapture.continue({ workflowId });
+    observation = await browserCapture.continue({ workflowId, ...options });
     const sessionGone = observation?.status !== "completed"
       && ["BROWSER_SESSION_EXPIRED", "BROWSER_SESSION_MISSING"].includes(observation?.error?.code);
     if (sessionGone) observation = null;
   }
   if (!observation) {
-    observation = await browserCapture.capture({ workflowId, exactUrl: url });
+    observation = await browserCapture.capture({ workflowId, exactUrl: url, ...options });
+  }
+  // 一步到位：命中验证时窗口不关，就地等主人过验证（只轮询，不点不填不绕）。
+  if (observation?.error?.code === "BROWSER_BLOCKED_UNATTENDED" && typeof browserCapture.waitForClearance === "function") {
+    observation = await browserCapture.waitForClearance({ workflowId, timeoutMs: CLEARANCE_WAIT_MS });
   }
   if (observation?.status === "completed") {
     reportEscalation(recordEvent, { url, wall, outcome: "completed" });
@@ -143,12 +155,14 @@ async function escalateViaBrowser({ url, browserCapture, context, wall, maxText,
   }
   if (observation?.status === "interaction_required" || observation?.error?.code === "BROWSER_BLOCKED_UNATTENDED") {
     reportEscalation(recordEvent, { url, wall, outcome: "blocked_unattended" });
+    // 窗口留着，但设上限自动回收，避免在主人浏览器里长期滞留。
+    scheduleAbandonedWindowClose({ browserCapture, workflowId });
     return {
       sourceUrl: url,
       contentType: "browser/unattended-blocker",
       content: [
-        `BSK 已在后台尝试读取页面（${observation.title || "标题未知"}），但页面要求登录或人机验证。`,
-        "无人值守模式已停止并关闭临时 Agent Window；不得要求主人接管，也不得绕过验证。可继续使用公开搜索结果、缓存页或官方替代来源完成其余工作。",
+        `BSK 已在后台窗口打开该页面，等主人完成登录或人机验证约 ${Math.round(CLEARANCE_WAIT_MS / 1_000)} 秒仍未通过（${observation.title || "标题未知"}）。窗口保持打开，正文尚未取得。`,
+        `如实告诉主人：窗口还开着，可以在窗口里完成验证后回复「继续」，我会用同一个窗口接着读（约 ${Math.round(ABANDONED_WINDOW_CLOSE_MS / 60_000)} 分钟内有效）；也可以改用公开替代来源。不得代替主人过验证、不得借用标签页、不得绕过验证。`,
       ].join("\n\n"),
       truncated: false,
       redacted: false,
@@ -172,6 +186,14 @@ async function escalateViaBrowser({ url, browserCapture, context, wall, maxText,
     via: "browser",
     blocked: "browser_unavailable",
   };
+}
+
+// 保窗是等人过验证的手段，不是长期占用：逾期仍未续读就自动收窗（定时器不持有进程）。
+function scheduleAbandonedWindowClose({ browserCapture, workflowId, delayMs = ABANDONED_WINDOW_CLOSE_MS }) {
+  if (typeof browserCapture?.closeSession !== "function") return;
+  const timer = setTimeout(() => { browserCapture.closeSession({ workflowId }).catch(() => {}); }, delayMs);
+  timer.unref?.();
+  return timer;
 }
 
 async function fetchUrlForChat({ url, maxChars = DEFAULT_MAX_CHARS, fetcher = fetchSourceText, browserCapture = null, context = null, recordEvent = null } = {}) {
@@ -219,4 +241,4 @@ async function fetchUrlForChat({ url, maxChars = DEFAULT_MAX_CHARS, fetcher = fe
   });
 }
 
-export { DEFAULT_MAX_CHARS, detectAntiBotWall, fetchUrlForChat };
+export { DEFAULT_MAX_CHARS, detectAntiBotWall, fetchUrlForChat, scheduleAbandonedWindowClose };

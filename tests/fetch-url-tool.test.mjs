@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { DEFAULT_MAX_CHARS, fetchUrlForChat } from "../packages/syno-core/fetch-url-tool.mjs";
+import { DEFAULT_MAX_CHARS, fetchUrlForChat, scheduleAbandonedWindowClose } from "../packages/syno-core/fetch-url-tool.mjs";
 import { inspectRemoteContent } from "../packages/syno-core/sensitive-content.mjs";
 import { MAX_SOURCE_TEXT } from "../packages/syno-core/source-fetcher.mjs";
 import { createSynoRuntime } from "../apps/syno/syno/runtime.mjs";
@@ -98,11 +98,16 @@ test("createSynoRuntime registers knowledge.fetch_url and exposes it through the
 
 function fakeBrowserAdapter(behavior) {
   const calls = [];
+  const options = [];
+  const closed = [];
   return {
     calls,
+    options,
+    closed,
     observation({ workflowId }) { return behavior.observations?.[workflowId] || null; },
-    async capture({ workflowId, exactUrl }) { calls.push(["capture", workflowId, exactUrl]); return behavior.capture; },
-    async continue({ workflowId }) { calls.push(["continue", workflowId]); return behavior.continue; },
+    async capture(input) { calls.push(["capture", input.workflowId, input.exactUrl]); options.push(input); return behavior.capture; },
+    async continue(input) { calls.push(["continue", input.workflowId]); options.push(input); return behavior.continue; },
+    async closeSession({ workflowId }) { closed.push(workflowId); return { closed: 1 }; },
   };
 }
 
@@ -137,7 +142,9 @@ test("fetchUrlForChat escalates an anti-bot wall to the browser in a live chat c
   assert.equal(adapter.calls[0][2], "https://mp.weixin.qq.com/s/abc");
 });
 
-test("fetchUrlForChat turns legacy interaction_required into an unattended blocker", async () => {
+test("fetchUrlForChat keeps the Agent Window open and asks the owner to finish verification", async () => {
+  // 2026-10-16「一步到位」：拦截不再当场关窗。窗口留着、话术允许提示「继续」，
+  // 因为人只能在还开着的窗口里过验证；仍然禁止代替主人验证或绕过验证。
   const adapter = fakeBrowserAdapter({
     capture: { status: "interaction_required", title: "验证页", interactionHint: "请在浏览器完成登录或验证后回复继续" },
   });
@@ -149,8 +156,44 @@ test("fetchUrlForChat turns legacy interaction_required into an unattended block
   });
   assert.equal(result.via, "browser");
   assert.equal(result.blocked, "unattended_auth");
-  assert.match(result.content, /不得要求主人接管/);
-  assert.doesNotMatch(result.content, /回复.{0,4}继续/);
+  assert.match(result.content, /窗口保持打开/);
+  assert.match(result.content, /回复「继续」/);
+  assert.match(result.content, /不得代替主人过验证/);
+  assert.match(result.content, /不得绕过验证/);
+  // 保窗与人介入都是活聊天专属参数：capture 必须收到 keepSessionOnBlock + focus
+  assert.equal(adapter.options[0].keepSessionOnBlock, true);
+  assert.equal(adapter.options[0].focus, true);
+  assert.deepEqual(adapter.closed, [], "拦截时不得关窗（等人过验证）");
+});
+
+test("fetchUrlForChat returns the article as soon as the owner clears the verification", async () => {
+  const waited = [];
+  const adapter = fakeBrowserAdapter({ capture: { status: "failed", blocked: "unattended_auth", error: { code: "BROWSER_BLOCKED_UNATTENDED", message: "需要验证" }, title: "验证页" } });
+  adapter.waitForClearance = async ({ workflowId, timeoutMs }) => {
+    waited.push({ workflowId, timeoutMs });
+    return { status: "completed", finalUrl: "https://mp.weixin.qq.com/s/abc", title: "过验证后", content: "验证通过后的正文" };
+  };
+  const result = await fetchUrlForChat({
+    url: "https://mp.weixin.qq.com/s/abc",
+    fetcher: async (value) => ({ url: value, contentType: "text/html", text: WX_WALL_TEXT, truncated: false }),
+    browserCapture: adapter,
+    context: chatContext,
+  });
+  assert.equal(result.via, "browser");
+  assert.equal(result.blocked, undefined, "过完验证就是正常正文");
+  assert.match(result.content, /验证通过后的正文/);
+  assert.equal(waited.length, 1);
+  assert.ok(waited[0].timeoutMs >= 10_000 && waited[0].timeoutMs <= 150_000, `等待预算应在有界区间，实得 ${waited[0].timeoutMs}`);
+});
+
+test("abandoned kept window is closed on a bounded timer", async () => {
+  const closed = [];
+  const browserCapture = { async closeSession({ workflowId }) { closed.push(workflowId); return { closed: 1 }; } };
+  const timer = scheduleAbandonedWindowClose({ browserCapture, workflowId: "workflow-chatread-abcdef0123456789", delayMs: 10 });
+  assert.ok(timer, "应返回定时器（可 unref、可清理）");
+  assert.deepEqual(closed, [], "还没到点不得收窗");
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  assert.deepEqual(closed, ["workflow-chatread-abcdef0123456789"]);
 });
 
 test("fetchUrlForChat never opens the browser outside live chat (scheduler/proactive)", async () => {

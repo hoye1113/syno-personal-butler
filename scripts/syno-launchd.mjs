@@ -184,6 +184,61 @@ async function reapOrphanDsh({ port, dshRoot, log, run = execFileAsync, kill = (
   return reaped;
 }
 
+// Host 被 SIGKILL 类硬崩溃或被 launchd 强换时会留下「关掉监听但没退出」的孤儿 Host
+// （2026-10-16 实测：pid 75683 在 8888 已换主的情况下存活两天，不占端口、不持锁，纯泄漏）。
+// 端口扫描找不到它，只能按命令行识别；只认本仓 apps/syno/server.mjs 入口，绝不碰陌生进程。
+async function listRepoHostProcesses({ serverPath, repoRoot, run = execFileAsync }) {
+  try {
+    const { stdout } = await run("ps", ["-ax", "-o", "pid=,args="], { timeout: 5_000 });
+    const relative = path.relative(repoRoot, serverPath).replace(/\\/g, "/");
+    // 相对路径必须自成一段（前有空白/开头，后有空白/结尾），否则 /elsewhere/apps/syno/server.mjs 会被误认。
+    const relativePattern = new RegExp(`(?:^|\\s)(?:\\./)?${relative.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=\\s|$)`, "u");
+    const hosts = [];
+    for (const line of String(stdout).split(/\r?\n/)) {
+      const match = /^\s*(\d+)\s+(.+)$/u.exec(line);
+      if (!match) continue;
+      const pid = Number(match[1]);
+      const command = match[2];
+      if (!Number.isInteger(pid) || pid <= 0) continue;
+      if (!command.includes(serverPath) && !relativePattern.test(command)) continue;
+      hosts.push({ pid, command });
+    }
+    return hosts;
+  } catch {
+    return [];
+  }
+}
+
+async function hasTcpListener(pid, run = execFileAsync) {
+  try {
+    const { stdout } = await run("lsof", ["-nP", "-p", String(pid), "-iTCP", "-sTCP:LISTEN", "-t"], { timeout: 5_000 });
+    return String(stdout).trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+// 安全性两条：端口上有监听者（正在启动或正被收养的 Host）时整体跳过；候选进程自己还在监听 TCP 时也跳过
+// （例如主人手动起的测试 Host）。只回收真正「既没端口也没退出」的残骸。
+async function reapOrphanHosts({ port, serverPath, repoRoot, log, run = execFileAsync, kill = (pid, signal) => process.kill(pid, signal), sleepFn = sleep, graceMs = 5_000 }) {
+  if ((await listListeners(port, run)).length > 0) return [];
+  const reaped = [];
+  for (const host of await listRepoHostProcesses({ serverPath, repoRoot, run })) {
+    if (host.pid === process.pid) continue;
+    if (await hasTcpListener(host.pid, run)) continue;
+    try { kill(host.pid, "SIGTERM"); } catch { continue; }
+    const deadline = Date.now() + graceMs;
+    while (Date.now() < deadline) {
+      try { kill(host.pid, 0); } catch { break; }
+      await sleepFn(100);
+    }
+    try { kill(host.pid, "SIGKILL"); } catch { /* 已退出 */ }
+    reaped.push(host.pid);
+  }
+  if (reaped.length) log("launcher.orphan_host_reaped", { port, pids: reaped });
+  return reaped;
+}
+
 function listenerMatchesHost(listener, { serverPath, repoRoot }) {
   if (!listener) return false;
   const comm = String(listener.comm || "");
@@ -289,6 +344,7 @@ async function main() {
   }
 
   while (!state.stopping) {
+    await reapOrphanHosts({ port, serverPath, repoRoot, log });
     await reapOrphanDsh({ port: dshWebPort, dshRoot, log });
     const child = spawn(nodePath, [serverPath], { cwd: repoRoot, stdio: ["ignore", "pipe", "pipe"] });
     state.child = child;
@@ -339,10 +395,13 @@ export {
   launcherLogDue,
   listenerMatchesHost,
   launchdTaskLogFile,
+  hasTcpListener,
   listListeners,
+  listRepoHostProcesses,
   makeLauncherLogger,
   purgeExpiredLogs,
   reapOrphanDsh,
+  reapOrphanHosts,
   sendCrashLoopPopup,
   validateHealth,
 };

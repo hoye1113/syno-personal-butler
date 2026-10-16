@@ -9,6 +9,7 @@ import { repoFingerprintFor } from "../packages/syno-core/repo-fingerprint.mjs";
 import {
   appleScriptString,
   crashAlertDue,
+  hasTcpListener,
   crashLoopAlertBody,
   createCrashAlertState,
   handleHostCrash,
@@ -17,9 +18,11 @@ import {
   listenerMatchesHost,
   launchdTaskLogFile,
   listListeners,
+  listRepoHostProcesses,
   makeLauncherLogger,
   purgeExpiredLogs,
   reapOrphanDsh,
+  reapOrphanHosts,
   validateHealth,
 } from "../scripts/syno-launchd.mjs";
 
@@ -213,6 +216,78 @@ test("孤儿 DSH 回收：SIGTERM 无效时升级 SIGKILL；无监听时零动�
     run: async () => ({ stdout: "" }), kill: () => { throw new Error("must not kill"); }, sleepFn: async () => {},
   });
   assert.deepEqual(empty, []);
+});
+
+// 2026-10-16 实证：pid 75683 这种「关掉监听但没退出」的孤儿 Host 只能靠命令行识别。
+test("孤儿 Host 回收：只认本仓入口、跳过仍占端口的进程、端口有主时整体不动作", async () => {
+  const serverPath = "/repo/apps/syno/server.mjs";
+  const repoRoot = "/repo";
+  const psOut = [
+    `  111 /usr/local/bin/node ${serverPath}`,
+    "  222 /usr/local/bin/node /repo/apps/syno/server.mjs --legacy",
+    "  333 /usr/local/bin/node /other/place/apps/syno/server.mjs",
+    "  666 /usr/local/bin/node apps/syno/server.mjs",
+    "  444 /usr/local/bin/node /repo/apps/syno/other-entry.mjs",
+  ].join("\n");
+  const run = async (command, args) => {
+    if (command === "ps") return { stdout: psOut, stderr: "" };
+    if (command === "lsof" && args.includes("-iTCP:8888")) return { stdout: "555\n", stderr: "" };
+    if (command === "lsof" && args.includes("222")) return { stdout: "222\n", stderr: "" };
+    if (command === "lsof") return { stdout: "", stderr: "" };
+    throw new Error(`unexpected ${command}`);
+  };
+  // 端口有主（555 在听 8888）→ 整体跳过，正在启动/被收养的 Host 不会被误杀
+  const skipCalls = [];
+  const skipped = await reapOrphanHosts({
+    port: 8888, serverPath, repoRoot, log: () => {}, run,
+    kill: (pid, signal) => skipCalls.push([pid, signal]), sleepFn: async () => {},
+  });
+  assert.deepEqual(skipped, []);
+  assert.deepEqual(skipCalls, []);
+
+  // 端口空着：111/666（无监听的本仓入口）被回收，222（自己还占端口）与 333（非本仓）不得触碰
+  const runNoListener = async (command, args) => command === "ps"
+    ? { stdout: psOut, stderr: "" }
+    : command === "lsof" && args.includes("222") ? { stdout: "222\n", stderr: "" } : { stdout: "", stderr: "" };
+  const calls = [];
+  const alive = new Set([111, 222]);
+  const kill = (pid, signal) => {
+    calls.push([pid, signal]);
+    if (signal === "SIGTERM" || signal === "SIGKILL") alive.delete(pid);
+    if (signal === 0 && !alive.has(pid)) throw Object.assign(new Error("gone"), { code: "ESRCH" });
+  };
+  const events = [];
+  const reaped = await reapOrphanHosts({
+    port: 8888, serverPath, repoRoot, log: (event, fields) => events.push([event, fields]), run: runNoListener, kill, sleepFn: async () => {},
+  });
+  assert.deepEqual(reaped, [111, 666], "绝对入口与相对入口的本仓孤儿都回收");
+  assert.deepEqual(calls.filter(([pid]) => ![111, 666].includes(pid)), [], "只回收确认无端口的本仓孤儿");
+  const record = events.find(([event]) => event === "launcher.orphan_host_reaped");
+  assert.ok(record);
+  assert.deepEqual(record[1].pids, [111, 666]);
+});
+
+test("命令行列举：只挑本仓 Host 入口，ps 失败时安全返回空", async () => {
+  const serverPath = "/repo/apps/syno/server.mjs";
+  const found = await listRepoHostProcesses({
+    serverPath, repoRoot: "/repo",
+    run: async () => ({ stdout: `9999 ${serverPath}\n8888 /usr/bin/other\n`, stderr: "" }),
+  });
+  assert.deepEqual(found, [{ pid: 9999, command: serverPath }]);
+  const empty = await listRepoHostProcesses({ serverPath, repoRoot: "/repo", run: async () => { throw new Error("ps 不可用"); } });
+  assert.deepEqual(empty, []);
+  const relative = await listRepoHostProcesses({
+    serverPath, repoRoot: "/repo",
+    run: async () => ({ stdout: "7777 /usr/local/bin/node apps/syno/server.mjs\n", stderr: "" }),
+  });
+  assert.deepEqual(relative.map((item) => item.pid), [7777], "相对入口也要认");
+  const foreign = await listRepoHostProcesses({
+    serverPath, repoRoot: "/repo",
+    run: async () => ({ stdout: "8888 /usr/local/bin/node /elsewhere/apps/syno/server.mjs\n", stderr: "" }),
+  });
+  assert.deepEqual(foreign, [], "别的仓库的同名入口不得误认");
+  const listener = await hasTcpListener(1234, async () => ({ stdout: "\n" }));
+  assert.equal(listener, false);
 });
 
 test("监督器接线：孵化前先回收孤儿 DSH 端口", async () => {

@@ -79,7 +79,7 @@ function registerCoreTools(ctx) {
   }));
   ctx.tools.register(defineTool({
     name: canonicalToolName(FETCH_URL_TOOL_NAME),
-    description: "受控读取公网网页正文。主人对话里命中反爬验证墙时自动改用本机浏览器后台窗口（不借标签页、不请求接管）重读；blocked 非空表示仍未取得正文，不得把验证页当文章；可继续搜索公开替代来源",
+    description: "受控读取公网网页正文。主人对话里命中反爬验证墙时自动改用本机浏览器后台窗口重读，并保留窗口等待主人完成验证（不借标签页、不代替主人验证）；blocked 非空表示仍未取得正文，不得把验证页当文章；可继续搜索公开替代来源",
     parameters: {
       url: { type: "string", required: true, description: "公网 URL" },
       maxChars: { type: "integer", description: "正文上限（1000-100000）" },

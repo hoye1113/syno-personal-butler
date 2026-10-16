@@ -118,3 +118,62 @@ test("BrowserCaptureAdapter expires logical sessions without launching BSK", asy
   assert.deepEqual(await adapter.closeSession({ workflowId: "workflow-expiry" }), { closed: 0 });
   assert.equal(fake.calls.length, 0);
 });
+
+// ---------- 2026-10-16「一步到位」：命中验证保窗等人，而非当场关窗 ----------
+
+const WALL_OBS = { url: "https://example.com/login", title: "登录验证", observation: "请输入验证码完成登录" };
+const ARTICLE_OBS = { url: "https://example.com/article", title: "文章", observation: "中文正文" };
+
+test("BrowserCaptureAdapter keeps and focuses the Agent Window on an auth wall when asked", async () => {
+  const fake = fakeRunner({ observations: [WALL_OBS, WALL_OBS] });
+  const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner });
+  const result = await adapter.capture({ workflowId: "workflow-keep", exactUrl: "https://example.com/article", keepSessionOnBlock: true, focus: true });
+  assert.equal(result.error.code, "BROWSER_BLOCKED_UNATTENDED");
+  assert.equal(fake.calls.filter((call) => call.args[0] === "session" && call.args[1] === "stop").length, 0, "保窗：拦截时不得 stop session");
+  assert.ok(fake.calls.some((call) => call.args[0] === "session" && call.args[1] === "start" && call.args.includes("--focus")), "需要人介入时必须把窗口带到前台");
+  // 同一地址再读：复用同一个窗口，不新开会话
+  await adapter.capture({ workflowId: "workflow-keep", exactUrl: "https://example.com/article", keepSessionOnBlock: true });
+  assert.equal(fake.calls.filter((call) => call.args[0] === "session" && call.args[1] === "start").length, 1);
+});
+
+test("BrowserCaptureAdapter defaults to closing the window on an auth wall (capture pipeline unchanged)", async () => {
+  const fake = fakeRunner({ observations: [WALL_OBS, WALL_OBS] });
+  const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner });
+  await adapter.capture({ workflowId: "workflow-unattended", exactUrl: "https://example.com/article" });
+  assert.equal(fake.calls.filter((call) => call.args[0] === "session" && call.args[1] === "stop").length, 1);
+  assert.equal(fake.calls.some((call) => call.args.includes("--focus")), false, "无人值守路径不得抢焦点");
+});
+
+test("waitForClearance returns the article once the owner clears the verification", async () => {
+  const fake = fakeRunner({ observations: [WALL_OBS, WALL_OBS, ARTICLE_OBS] });
+  const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner });
+  await adapter.capture({ workflowId: "workflow-clear", exactUrl: "https://example.com/article", keepSessionOnBlock: true, focus: true });
+  const cleared = await adapter.waitForClearance({ workflowId: "workflow-clear", timeoutMs: 5_000, intervalMs: 500, sleep: async () => {} });
+  assert.equal(cleared.status, "completed");
+  assert.match(cleared.content, /中文正文/);
+  assert.equal(fake.calls.filter((call) => call.args[0] === "session" && call.args[1] === "start").length, 1, "轮询必须用同一个窗口");
+});
+
+test("waitForClearance gives up at the deadline and leaves the window open", async () => {
+  const fake = fakeRunner({ observations: [WALL_OBS, WALL_OBS, WALL_OBS] });
+  let now = Date.parse("2026-10-16T00:00:00Z");
+  const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner, clock: () => new Date(now) });
+  await adapter.capture({ workflowId: "workflow-stuck", exactUrl: "https://example.com/article", keepSessionOnBlock: true });
+  const before = fake.calls.filter((call) => call.args[0] === "observe").length;
+  const result = await adapter.waitForClearance({
+    workflowId: "workflow-stuck", timeoutMs: 3_000, intervalMs: 1_000,
+    sleep: async (ms) => { now += ms; },
+  });
+  assert.equal(result.error.code, "BROWSER_BLOCKED_UNATTENDED");
+  assert.ok(fake.calls.filter((call) => call.args[0] === "observe").length > before, "超时前必须真的轮询过");
+  assert.equal(fake.calls.filter((call) => call.args[0] === "session" && call.args[1] === "stop").length, 0, "超时也要留窗等主人");
+});
+
+test("BrowserCaptureAdapter discards the old window when the workflow switches URL", async () => {
+  const fake = fakeRunner();
+  const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner });
+  await adapter.capture({ workflowId: "workflow-switch", exactUrl: "https://example.com/one" });
+  await adapter.capture({ workflowId: "workflow-switch", exactUrl: "https://example.com/two" });
+  assert.equal(fake.calls.filter((call) => call.args[0] === "session" && call.args[1] === "start").length, 2);
+  assert.equal(fake.calls.filter((call) => call.args[0] === "session" && call.args[1] === "stop").length, 2);
+});

@@ -158,6 +158,7 @@ class BrowserCaptureAdapter {
       startedAt: startedAt.toISOString(),
       expiresAt: new Date(startedAt.getTime() + this.sessionTtlMs).toISOString(),
       bskSession: "",
+      focus: false,
     };
     this.sessions.set(id, task);
     this.observations.delete(id);
@@ -186,10 +187,25 @@ class BrowserCaptureAdapter {
     return this.observations.get(safeWorkflowId(workflowId)) || null;
   }
 
-  async capture({ workflowId, exactUrl, timeoutMs } = {}) {
+  // keepSessionOnBlock（2026-10-16）：命中验证时保留 Agent Window，由调用方决定关闭时机——
+  // 活聊天读链接靠它做到「一步到位」：窗口留着、主人就地过验证、程序轮询同一窗口。收录链路保持
+  // 默认语义（阻塞即关窗），不让无人值守任务留着窗口。
+  // focus：只在调用方确认需要人介入时开启（默认不抢焦点）。
+  // 同一 workflowId + 同一地址且会话未过期时复用现有 BSK 会话与窗口（「继续」原地重读的前提）；
+  // 地址变了才丢弃旧窗口重开。
+  async capture({ workflowId, exactUrl, timeoutMs, keepSessionOnBlock = false, focus = false } = {}) {
     const id = safeWorkflowId(workflowId);
     const requested = assertSafeUrl(exactUrl).toString();
-    this.authorize({ workflowId: id, exactUrl: requested });
+    const existing = this.sessions.get(id);
+    const reusable = Boolean(existing)
+      && existing.requestedUrl === requested
+      && Date.parse(existing.expiresAt) > this.clock().getTime();
+    if (!reusable) {
+      if (existing) await this.closeSession({ workflowId: id }).catch(() => {});
+      this.authorize({ workflowId: id, exactUrl: requested });
+    }
+    const task = this.sessions.get(id);
+    if (focus) task.focus = true;
     const health = await this.health();
     if (!health.available) {
       const observation = { status: "unavailable", requestedUrl: requested, error: health.error || { code: "BROWSER_NOT_CONNECTED", message: "BSK 没有已连接的浏览器" } };
@@ -197,6 +213,7 @@ class BrowserCaptureAdapter {
       this.sessions.delete(id);
       return observation;
     }
+    let blocked = false;
     try {
       await this.#withTimeout(this.navigate({ workflowId: id }), timeoutMs);
       let observation = await this.#snapshot(id, requested, timeoutMs);
@@ -204,23 +221,44 @@ class BrowserCaptureAdapter {
         await this.#withTimeout(this.navigate({ workflowId: id }), timeoutMs);
         observation = await this.#snapshot(id, requested, timeoutMs);
       }
+      blocked = observation.error?.code === "BROWSER_BLOCKED_UNATTENDED";
       return observation;
     } catch (error) {
       const observation = { status: "failed", requestedUrl: requested, error: { code: error.code || "BROWSER_CAPTURE_FAILED", message: error.message } };
       this.observations.set(id, observation);
       return observation;
     } finally {
-      await this.closeSession({ workflowId: id });
+      if (!(keepSessionOnBlock && blocked)) await this.closeSession({ workflowId: id });
     }
   }
 
-  async continue({ workflowId, timeoutMs } = {}) {
+  // 命中验证后在同一 Agent Window 里等人过验证：只轮询 observe，不点击、不填表、不绕验证。
+  // 页面对了立即交出正文；超时把最后一次（仍是验证页的）观察还给调用方，由它决定关窗与话术。
+  async waitForClearance({ workflowId, timeoutMs = 90_000, intervalMs = 5_000, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
+    const id = safeWorkflowId(workflowId);
+    const deadline = this.clock().getTime() + Math.max(1_000, Number(timeoutMs) || 90_000);
+    const every = Math.max(500, Math.min(30_000, Number(intervalMs) || 5_000));
+    let observation = this.observations.get(id) || null;
+    for (;;) {
+      try {
+        observation = await this.snapshot({ workflowId: id });
+      } catch (error) {
+        return { status: "failed", requestedUrl: observation?.requestedUrl || "", error: { code: error.code || "BROWSER_CLEARANCE_FAILED", message: error.message } };
+      }
+      if (observation.status === "completed" || observation.error?.code !== "BROWSER_BLOCKED_UNATTENDED") return observation;
+      const remaining = deadline - this.clock().getTime();
+      if (remaining <= 0) return observation;
+      await sleep(Math.min(every, remaining));
+    }
+  }
+
+  async continue({ workflowId, timeoutMs, keepSessionOnBlock = false, focus = false } = {}) {
     const id = safeWorkflowId(workflowId);
     const task = this.sessions.get(id);
     const prior = this.observations.get(id);
     const requestedUrl = task?.requestedUrl || prior?.requestedUrl;
     if (!requestedUrl) return { status: "unavailable", error: { code: "BROWSER_SESSION_MISSING", message: "浏览器收录会话已不存在" } };
-    return this.capture({ workflowId: id, exactUrl: requestedUrl, timeoutMs });
+    return this.capture({ workflowId: id, exactUrl: requestedUrl, timeoutMs, keepSessionOnBlock, focus });
   }
 
   async listTabs({ workflowId } = {}) {
@@ -245,7 +283,7 @@ class BrowserCaptureAdapter {
 
   async #ensureSession(id, task) {
     if (task.bskSession) return task.bskSession;
-    const args = ["session", "start", "--json", "--no-focus", "--name", `Syno ${id.slice(-12)}`];
+    const args = ["session", "start", "--json", task.focus ? "--focus" : "--no-focus", "--name", `Syno ${id.slice(-12)}`];
     if (this.browser) args.push("--browser", this.browser);
     const result = await this.#run(args);
     const session = firstString(result, ["session_id", "sessionId", "id"]);
