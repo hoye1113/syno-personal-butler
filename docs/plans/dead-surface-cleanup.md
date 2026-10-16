@@ -4,6 +4,12 @@
 > 已执行（第一轮）：`image.read` 已摘除（commit `8cfc9d3`）。
 > 已执行（第二轮，2026-10-16，主人「按顺序执行下一轮推荐方案」）：B 隐藏工具面收缩、C 五个历史批次脚本删除、E `docs/plans/` 纳入索引分类并把无引用 devlog 移入 `docs/archive/`。
 > D 按结论保留（回滚面仍在用）。以下保留原始判定依据供追溯。
+> 第五轮（2026-10-16，主人「Zen → 自带 Kimi 和删除微信栈先做了」）：**收录图片转写改用模型链**
+> （`image-transcriber.mjs`，capability/capture sidecar 无工具），删除 Zen 视觉客户端与密钥装载；
+> **微信通道栈物理删除**（iLink 客户端、DSH channel-weixin 插件、`/api/syno/weixin/*`、维护页、
+> 探针与测试；抽出 `text-format.mjs`/`attachment-intake.mjs`/`env-toggle.mjs` 共用件；投递目标契约
+> 收敛为飞书 `{chatId, replyTo?}`）；`SYNO_CHANNELS` 开关随之删除。
+> 未动：`mobile-delivery-mode`（accepted-request 恢复链上的投递迁移开关，生产 legacy、v2 休眠）。
 > 第四轮（2026-10-16，主人「只用飞书」）：**A 微信通道停用**（`SYNO_CHANNELS` 开关 + 按注册通道启动 +
 > 默认 home/投递兜底改飞书 + 本机 `.env` 设 `SYNO_CHANNELS=feishu`；微信栈代码保留一版）；
 > **B 飞书附件接入**（资源下载 → `.runtime/quarantine/feishu` → 与微信同形状 artifact：图片直传模型、
