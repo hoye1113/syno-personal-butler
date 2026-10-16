@@ -29,6 +29,12 @@
 
 `docs/HANDOFF-EXECUTION-PLAN.md`、`docs/TODO-EXECUTION-PLAN.md`、`docs/project-aware-knowledge-execution-plan.md`（2026-09-01 SUPERSEDED）以及 `docs/archive/` 中的旧 OpenCode、旧分支和已归档计划只用于追溯。它们不能覆盖 `AGENTS.md`、`docs/ARCHITECTURE.md`、`docs/POLICY.md` 或当前执行计划；旧计划必须标记为 superseded 或 historical。
 
+## Working plans（`docs/plans/`）
+
+`docs/plans/` 存放**执行中的**计划、检修记录与设计草案：它们不是 Normative，不能覆盖上面的权威文档，只用于追溯「为什么这么做、当时否决了什么」。计划落地或被替代后，必须在该文件开头标注状态（如「已实施 YYYY-MM-DD」「已取消」「被 X 取代」），确认无引用后再移入 `docs/archive/`。
+
+当前在册：`chat-read-browser-escalation.md`（读链接浏览器升级，已实施）、`dead-surface-cleanup.md`（死面清理，执行中）、`claw-direct-to-dsh-migration.md`（迁移计划，B5 已落地、D/E 待办）、`claw-direct-to-dsh-execution-and-verification.md`、`claw-only-headless-remediation.md`、`kimi-code-provider-switch.md`、`mac-deployment-remaining-work.md`。
+
 ## Generated
 
 - Node 测试输出：命令行 `pnpm test`；如需持久化验收材料，保存到知识仓 `ops/acceptance/`。
