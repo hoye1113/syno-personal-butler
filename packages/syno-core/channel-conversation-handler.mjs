@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import { isDecisionReply } from "./pending-decision.mjs";
 import { CapabilityPresenter } from "./capability-presenter.mjs";
 import { ChannelIntentRouter } from "./channel-intent-router.mjs";
@@ -9,6 +11,9 @@ import { visionResultToIntakePayload } from "./vision-intake.mjs";
 // 2026-07-30「<url>；帮我读一下讲了什么」就被整串当裸链接走进了收录管线。
 const URL_IN_TEXT_PATTERN = /https?:\/\/[^\s⺀-鿿豈-﫿＀-￯　-〿]+/gi;
 const EXPLICIT_INGEST_PATTERN = /(?:收录|保存到知识库|记下来|存进知识库)/u;
+// 聊天里直接把主人发的图投给模型（模型链声明支持 image 输入）。上限取 3MB 原始字节：
+// pi-ai 目录给 kimi-coding 的单图预算是 4.5MB（base64 膨胀 4/3），留出安全余量。
+const MAX_INLINE_IMAGE_BYTES = 3 * 1024 * 1024;
 const BARE_URL_PATTERN = /^https?:\/\/[^\s⺀-鿿豈-﫿＀-￯　-〿]+$/i;
 const FEEDBACK_REPLY = /^(?:(?:这张|上一张|刚才(?:那张)?|也)\s*|(?:inspiration-\d{8}-[a-f0-9]{8})\s*)?(有用|没用|一般)(?:[。！!～~]?|\s*)$/u;
 const FEEDBACK_BY_TEXT = Object.freeze({ 有用: "useful", 没用: "not_useful", 一般: "neutral" });
@@ -664,6 +669,8 @@ class ChannelConversationHandler {
       // 用 syno_knowledge_fetch_url 读正文直接回答，不走收录管线。仅本地模式不自动抓取远端；
       // 剩余文字长或多链接的消息保持普通对话（模型仍可用读链接工具）。
       let runText = text;
+      const pendingImages = [];
+      const rejectedImages = [];
       if (!localOnly && urls.length === 1) {
         const residual = text.replace(urls[0], "").replace(/^[：:；;、，。\s]+|[？?！!。…\s]+$/gu, "").trim();
         if (residual.length > 0 && residual.length <= 30
@@ -673,14 +680,35 @@ class ChannelConversationHandler {
         }
       }
       if (Array.isArray(message.__imageArtifacts) && message.__imageArtifacts.length) {
-        // 2026-10-16：聊天面不再有读图工具（Host `image.read` 已摘除——B5 之后它不在任何模型面里，
-        // 却还在提示词里被要求调用）。当前 DSH 聊天只投递文本，所以如实说明能力边界，
-        // 不指向不存在的工具、不猜像素；需要识图时走「收录」管线（handler 直接调 visionClient）。
-        runText = `${runText}\n\n（系统提示：主人发了图片，但当前聊天会话只投递文字，你拿不到图片内容。如实说明这一点，并给出可行下一步：请主人把图中关键文字或结论用文字发来，或者说「收录」由收录管线识图后进入知识库。不得猜测看不见的像素，也不得声称已经看过图片。）`;
+        // 2026-10-16：主人发的图片直接作为 image 内容块投给模型（模型链 kimi-for-coding / k3-256k
+        // 本身声明 input: ["text","image"]），不再需要 Host 读图工具。隔离校验与大小上限仍在这里把关；
+        // 只有一张都读不出来时才退回如实说明，不猜像素。
+        for (const artifact of message.__imageArtifacts) {
+          try {
+            const record = this.imageStore ? this.imageStore.register(artifact) : null;
+            const file = record?.path || String(artifact?.path || "");
+            const mime = String(record?.mime || artifact?.mime || "").toLowerCase();
+            if (!file) throw Object.assign(new Error("图片路径缺失"), { code: "IMAGE_PATH_MISSING" });
+            if (!isImageMime(mime)) throw Object.assign(new Error(`不是可识图片：${mime || "未知"}`), { code: "IMAGE_MIME_UNSUPPORTED" });
+            const bytes = await readFile(file);
+            if (bytes.byteLength > MAX_INLINE_IMAGE_BYTES) {
+              throw Object.assign(new Error(`图片 ${Math.round(bytes.byteLength / 1024 / 1024)}MB 超过 ${MAX_INLINE_IMAGE_BYTES / 1024 / 1024}MB 上限`), { code: "IMAGE_TOO_LARGE" });
+            }
+            pendingImages.push({ mediaType: mime, data: bytes.toString("base64") });
+          } catch (error) {
+            rejectedImages.push(String(error?.message || error));
+            await this.#record("channel.image.rejected", { ...trace, code: error?.code || "IMAGE_READ_FAILED" }, { level: "warning" });
+          }
+        }
+        if (pendingImages.length) {
+          runText = `${runText}\n\n（系统提示：主人发了 ${pendingImages.length} 张图片，已作为图片附件投递给你，先看图再回答。不要猜测看不见的像素，也不要声称看过没有投递成功的图。）`;
+        } else {
+          runText = `${runText}\n\n（系统提示：主人发了图片，但这次没有一张能投递给你（${rejectedImages.join("；") || "未知原因"}）。如实说明，并给出可行下一步：请主人把图中关键文字或结论用文字发来，或者说「收录」由收录管线识图后进入知识库。不得猜测看不见的像素。）`;
+        }
       }
       try {
         await this.#record("channel.runtime.requested", { ...trace });
-        const result = await this.runtime.run({ text: runText }, {
+        const result = await this.runtime.run({ text: runText, ...(pendingImages.length ? { images: pendingImages } : {}) }, {
           ownerKey,
           threadKey,
           channel: message.channel,

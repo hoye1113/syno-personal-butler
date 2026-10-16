@@ -193,7 +193,7 @@ dsh plugin --profile syno-lab add dsh-mnemon@0.2.13
 
 **识图在 Host**
 
-微信图片：聊天面没有读图工具（Host `image.read` 已摘除，2026-10-16），主人发图只会得到如实说明；明确「收录」才走 Host visionClient → Zen HTTP `mimo-v2.5-free`，识图 JSON 当 `kind: text` Intake。Zen key 留在 Host，不进 Harness 子进程。PDF/文本仍收录。
+微信图片：主人发的图直接作为 image 内容块投给模型（2026-10-16 起，模型链支持看图；单图原始上限 3MB，超限/未过隔离校验则如实说明）；明确「收录」才走 Host visionClient → Zen HTTP `mimo-v2.5-free`，识图 JSON 当 `kind: text` Intake。Zen key 留在 Host，不进 Harness 子进程。PDF/文本仍收录。
 
 ### Windows 飞书日历 CLI
 
@@ -254,7 +254,7 @@ pnpm start
 
 Chat 的 `web_search` 由自研 `syno-search` 链提供（ADR 0009）：豆包搜索（500 次/月免费）→ Tavily（1000 credit/月）→ Exa（每月 $10 额度）→ Parallel 匿名 MCP 备用（免 Key、额度未公布），按查询语言路由（中文优先豆包、英文优先 Tavily），失败/限流/空结果自动回退；key 走仓库根 `.env`（`DOUBAO_SEARCH_API_KEY` / `TAVILY_API_KEY` / `EXA_API_KEY`）经 Host 注入，`harness:doctor` 的 `search-keys` 检查报告就位情况；可用 `SYNO_WEB_SEARCH_CHAIN=exa,tavily` 覆盖链前缀。JSON-RPC chat 回退面在 `syno-chat.cordis.yml` 挂载同一接缝（该面以相对路径加载插件，没有 bundle linked-root 的 peer 拦截，插件内对 `@deepseek-ai/dsh-web` 采用可选解析，见 `plugins/web-search/index.mjs`）。`web_fetch` 仍为匿名 HTTP(S)。Web session 使用 Host 生成并显式绑定的 `syno` agent preset，compaction 与普通 schedule 由当前生产 profile 的官方 DSH 层接管（Web preset 使用官方 compaction-basic/tool-result-pruner/compact command，JSON-RPC 使用同一 stack，普通 schedule 由 `@deepseek-ai/dsh-schedule` function plugin 提供），Syno 的 SignalEngine / PriorityEngine / ChannelDeliveryOutbox 仍负责业务主动运营，不与普通 schedule 混用。不要对生产 `syno` profile 执行 `dsh plugin add`，也不要从 [dsh-plugin.org](https://dsh-plugin.org/plugins?q=search) 装社区搜索或记忆插件；实验 UI 只用 Host 生成的 `syno-lab` profile（无 Bridge、无 vault 写、无微信）。收录分析 profile 仍然没有 web。
 
-微信图片：聊天面不读图（Host `image.read` 已摘除 2026-10-16），主人发图只会得到如实说明；明确说「收录」时才走 Host visionClient → Zen HTTP `mimo-v2.5-free`，识图 JSON 作为 `kind: text` 进入现有 Intake / Proposal。PDF/文本附件仍收录。本地知识搜索仍是 `syno_knowledge_search`。识图失败对微信可见，禁止猜图。
+微信图片：主人发的图直接投给模型看图（2026-10-16 起）；明确说「收录」时才走 Host visionClient → Zen HTTP `mimo-v2.5-free`，识图 JSON 作为 `kind: text` 进入现有 Intake / Proposal。PDF/文本附件仍收录。本地知识搜索仍是 `syno_knowledge_search`。识图失败对微信可见，禁止猜图。
 
 主人验收清单：
 

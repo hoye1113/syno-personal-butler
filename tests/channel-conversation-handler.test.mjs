@@ -725,7 +725,8 @@ test("read-link rule stays off for long residuals, multiple URLs and local-only 
   assert.equal(model.length, 3);
 });
 
-test("ChannelConversationHandler tells the model the chat cannot see images instead of pointing at a removed tool", async (t) => {
+// 2026-10-16：图片改为直接投递给模型（模型链声明支持 image 输入），不再走 Host 读图工具。
+test("ChannelConversationHandler delivers owner images to the model as image blocks", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "syno-channel-image-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const png = createGlyphPng("SYNO42");
@@ -751,9 +752,41 @@ test("ChannelConversationHandler tells the model the chat cannot see images inst
   });
   assert.equal(response.text, "图是绿色字母");
   assert.equal(runs.length, 1);
-  assert.match(runs[0].text, /拿不到图片内容/);
-  assert.match(runs[0].text, /收录/);
+  assert.match(runs[0].text, /已作为图片附件投递/);
   assert.doesNotMatch(runs[0].text, /syno_image_read|artifactId/);
+  assert.equal(runs[0].images.length, 1);
+  assert.equal(runs[0].images[0].mediaType, "image/png");
+  assert.equal(Buffer.from(runs[0].images[0].data, "base64").subarray(0, 8).toString("hex"), png.subarray(0, 8).toString("hex"), "投递的必须是原图字节");
+});
+
+test("ChannelConversationHandler falls back to an honest note when no image can be delivered", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "syno-channel-image-reject-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const png = createGlyphPng("SYNO42");
+  const file = path.join(root, "shot.png");
+  await writeFile(file, png);
+  const runs = [];
+  const handler = new ChannelConversationHandler({
+    runtime: { async run(request) { runs.push(request); return { text: "读不到图" }; } },
+    core: {},
+    ingest: { async receive() { throw new Error("image must not ingest"); }, async propose() {} },
+    pendingDecisions: {},
+    attachmentToPayload: async () => { throw new Error("image must not convert to intake"); },
+    // 未通过隔离校验（isolated !== true）→ 必须拒绝投递，并如实说明
+    imageStore: new IsolatedImageStore({ quarantineRoots: [root] }),
+  });
+  await handler.handle({
+    id: "wx-img-bad",
+    ownerKey: "owner",
+    senderId: "owner",
+    channel: "weixin",
+    text: "这是什么",
+    artifacts: [{ path: file, mime: "image/png", isolated: false, autoRead: false, size: png.length }],
+  });
+  assert.equal(runs.length, 1);
+  assert.equal(runs[0].images, undefined, "不合格图片绝不上行");
+  assert.match(runs[0].text, /没有一张能投递/);
+  assert.match(runs[0].text, /不得猜测看不见的像素/);
 });
 
 test("ChannelConversationHandler still ingests PDF/text attachments", async () => {
@@ -887,5 +920,6 @@ test("ChannelConversationHandler does not treat image captions as approval repli
   assert.equal(parsed, false);
   assert.equal(response.text, "已看图");
   assert.equal(runs.length, 1);
-  assert.match(runs[0].text, /拿不到图片内容/);
+  assert.match(runs[0].text, /已作为图片附件投递/);
+  assert.equal(runs[0].images.length, 1);
 });

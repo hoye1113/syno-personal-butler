@@ -111,7 +111,7 @@ Host → DSH 的会话 id 是确定性的 `syno-<threadKey>-<uuid>`（`apps/syno
 - **搜索那一级已经在链上**：`web_search` 由 syno 搜索链提供（`packages/syno-dsh-plugin/cordis.patch.yml:96-97`，豆包→Tavily→Exa→Parallel），无需新增，只需在文案里明确「被墙后自动转镜像/转载搜索」。
 
 ## 7. 同源发现（不在本方案范围，另行裁决）
-- `syno_image_read` 不在 capabilities 的 10 个工具里（只在 Host 注册表/桥），默认模式下看图工具对模型不可见，而 `channel-conversation-handler.mjs:683` 仍指示模型调用它。（主人 2026-10-16 表态：所选模型本身能看图，该工具不需要，故不做迁移；遗留指令待收尾。）
+- ~~`syno_image_read` 不在 capabilities 的工具面里，提示词却指向它~~ **已收尾（2026-10-16）**：工具注册、桥目录、降级目录、提示词引用全部摘除，聊天图片改为直接投递给模型（见 `dead-surface-cleanup.md`）。
 - 文档滞后：`docs/OPERATIONS.md:253`、`docs/POLICY.md:11`、`docs/SECURITY.md:5`、`docs/ARCHITECTURE.md:43` 仍把 Bridge core 工具集描述为普通聊天工具面。
 
 ## 8. 追加评估（2026-10-16）：为什么不「一步到位」，以及怎么做

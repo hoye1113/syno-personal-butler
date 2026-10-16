@@ -259,10 +259,20 @@ function retryableFailure(error) {
   ].includes(error?.code);
 }
 
-function contentBlocks(text, system) {
+// 图片投递（2026-10-16）：模型链（kimi-for-coding / k3-256k / k3）本身声明 input: ["text","image"]，
+// 主人发来的图片由通道侧读成 base64 后经这里作为 image 内容块直达模型——不再需要 Host 读图工具。
+// 注意：图片字节不做远程安全检查（那是文本路径的规则）；它们来自主人自己发的附件，
+// 与既有 vision 通路同信任级，且模型链本来就是远端。
+function contentBlocks(text, system, images = []) {
   const parts = [];
   if (system) parts.push({ type: "text", text: `${system}\n\n` });
   parts.push({ type: "text", text });
+  for (const image of Array.isArray(images) ? images : []) {
+    const data = String(image?.data || "");
+    const mediaType = String(image?.mediaType || "");
+    if (!data || !mediaType.startsWith("image/")) continue;
+    parts.push({ type: "image", mediaType, data, ...(image?.name ? { name: String(image.name) } : {}) });
+  }
   return parts;
 }
 
@@ -461,6 +471,7 @@ class DeepSeekHarnessCognitiveRuntime {
 
   async run(request, context = {}) {
     const safeRequestText = assertRemoteSafe(request.text || request.message || "");
+    const requestImages = Array.isArray(request.images) ? request.images : [];
     const ownerKey = String(context.ownerKey || context.ownerId || "local-user");
     const threadKey = String(context.threadKey || (context.proactive ? "proactive" : "main"));
     const sessionKey = `${ownerKey}\0${threadKey}`;
@@ -538,7 +549,7 @@ class DeepSeekHarnessCognitiveRuntime {
               const client = await this.supervisor.ensure(profile, route);
               const response = await client.runTurn(
                 binding.harnessSessionId,
-                contentBlocks(safeRequestText, context.system ? assertRemoteSafe(context.system) : undefined),
+                contentBlocks(safeRequestText, context.system ? assertRemoteSafe(context.system) : undefined, requestImages),
                 { signal: controller.signal },
               );
               if (controller.signal.aborted) throw new SchedulerCancellationError();

@@ -263,3 +263,36 @@ test("cancel shuts down the profile sidecar", async (t) => {
   await Promise.resolve();
   assert.deepEqual(stops, ["chat"]);
 });
+
+// 2026-10-16：主人发来的图片必须作为 image 内容块进入 session/prompt，
+// 与文本块同批送达（模型链 kimi-for-coding / k3-256k 声明支持 image 输入）。
+test("run delivers owner images as image content blocks alongside the text", async () => {
+  const file = await fs.mkdtemp(path.join(os.tmpdir(), "syno-image-blocks-"));
+  const prompts = [];
+  const supervisor = {
+    async ensure() {
+      return {
+        initialized: true,
+        async runTurn(_sessionId, blocks) { prompts.push(blocks); return { finalResponse: "看到了", events: [], notifications: [] }; },
+      };
+    },
+    async stop() { return { state: "stopped" }; },
+  };
+  const bindings = new DeepSeekHarnessSessionBindingStore({ file: path.join(file, "bindings.json") });
+  const runtime = new DeepSeekHarnessCognitiveRuntime({ supervisor, bindings, tools: { list: () => [], effectVersion: () => 0, bindContext: () => () => {} } });
+  await runtime.run(
+    { text: "这是什么", images: [{ mediaType: "image/png", data: "aGVsbG8=" }] },
+    { ownerKey: "owner", threadKey: "main", channel: "weixin" },
+  );
+  assert.equal(prompts.length, 1);
+  assert.deepEqual(prompts[0].map((block) => block.type), ["text", "image"]);
+  assert.equal(prompts[0][1].mediaType, "image/png");
+  assert.equal(prompts[0][1].data, "aGVsbG8=");
+  // 非图片或空数据不得伪装成附件
+  prompts.length = 0;
+  await runtime.run(
+    { text: "只有文字", images: [{ mediaType: "text/plain", data: "x" }, { mediaType: "image/png", data: "" }] },
+    { ownerKey: "owner", threadKey: "main", channel: "weixin" },
+  );
+  assert.deepEqual(prompts[0].map((block) => block.type), ["text"]);
+});
