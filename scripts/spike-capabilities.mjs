@@ -5,7 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 // 真实 DSH smoke：scratch profile + 真实模型。三类场景：
-//   默认（知识三轮）/ SYNO_CHAT_TOOLS=plugin（canonical 名）/ SYNO_WEIXIN_SPIKE=1（fake 通道往返）。
+//   默认（知识三轮）/ SYNO_CHAT_TOOLS=plugin（canonical 名）。
 // 生产行为不受影响：使用独立 DSH_HOME / workspace / runtime / localData。
 
 const SYNO_ROOT = path.resolve(import.meta.dirname, "..");
@@ -56,12 +56,11 @@ const env = {
   SYNO_RUNTIME_ROOT: path.join(SCRATCH, "runtime"),
   SYNO_LOCAL_DATA: path.join(SCRATCH, "localdata"),
   ...(process.env.SYNO_CHAT_TOOLS ? { SYNO_CHAT_TOOLS: process.env.SYNO_CHAT_TOOLS } : {}),
-  ...(process.env.SYNO_WEIXIN_SPIKE ? { SYNO_WEIXIN_SPIKE: process.env.SYNO_WEIXIN_SPIKE } : {}),
   ...secrets,
 };
 delete env.SYNO_KNOWLEDGE_ROOT;
 
-console.log(`spike:capabilities 启动 dsh（port=${port}, home=${homeRoot}, mode=${process.env.SYNO_WEIXIN_SPIKE === "1" ? "weixin" : process.env.SYNO_CHAT_TOOLS === "plugin" ? "plugin" : "default"}）`);
+console.log(`spike:capabilities 启动 dsh（port=${port}, home=${homeRoot}, mode=${process.env.SYNO_CHAT_TOOLS === "plugin" ? "plugin" : "default"}）`);
 const child = spawn(process.execPath, args, { cwd: DSH_ROOT, env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 let out = "";
 child.stdout.on("data", (data) => { out += String(data); process.stdout.write(data); });
@@ -73,8 +72,8 @@ const timer = setTimeout(() => {
 }, 240_000);
 child.on("exit", (code, signal) => {
   clearTimeout(timer);
-  const ok = out.includes("SPIKE_A_OK") || out.includes("WEIXIN_SPIKE_OK");
-  const failLine = out.split(/\r?\n/).find((line) => line.includes("SPIKE_A_FAIL") || line.includes("WEIXIN_SPIKE_FAIL"));
+  const ok = out.includes("SPIKE_A_OK");
+  const failLine = out.split(/\r?\n/).find((line) => line.includes("SPIKE_A_FAIL"));
   console.log(`spike:capabilities exit code=${code} signal=${signal} ok=${ok}`);
   if (failLine) console.log(failLine);
   process.exit(ok && code === 0 ? 0 : 1);

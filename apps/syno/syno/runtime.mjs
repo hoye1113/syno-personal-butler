@@ -6,7 +6,7 @@ import { AgentHost } from "../../../packages/syno-core/agent-host.mjs";
 import { ApprovalAdvisor, minimalAdvice } from "./approval-advisor.mjs";
 import { BrowserCaptureAdapter } from "../../../packages/syno-core/browser-capture-adapter.mjs";
 import { createBrowserCaptureTools } from "./browser-capture-tools.mjs";
-import { ChannelHub, delegateChannel, resolveChannelOwner } from "../../../packages/syno-core/channels.mjs";
+import { ChannelHub } from "../../../packages/syno-core/channels.mjs";
 import { ChannelContinuationStore } from "../../../packages/syno-core/channel-continuation-store.mjs";
 import { ChannelConversationHandler } from "../../../packages/syno-core/channel-conversation-handler.mjs";
 import { ClaimEvidenceService } from "../../../packages/syno-core/claim-evidence-service.mjs";
@@ -55,8 +55,9 @@ import { ToolLoopAgent } from "./tool-loop-agent.mjs";
 import { ToolLoopExecutor } from "./tool-loop-executor.mjs";
 import { ToolRegistry } from "./tool-registry.mjs";
 import { TodayService } from "../../../packages/syno-core/today-service.mjs";
-import { WeixinIlinkAdapter, envToggle } from "../../../packages/syno-core/weixin-ilink.mjs";
-import { clip, formatWx, stripMarkdown } from "../../../packages/syno-core/weixin-text-format.mjs";
+import { envToggle } from "../../../packages/syno-core/env-toggle.mjs";
+import { clip, formatNotice, stripMarkdown } from "../../../packages/syno-core/text-format.mjs";
+import { artifactToIntakePayload } from "../../../packages/syno-core/attachment-intake.mjs";
 import { VaultMigrationService } from "./vault-migration-service.mjs";
 import { WindowsServiceManager } from "./windows-service-manager.mjs";
 import { WorkflowContextCompiler } from "./workflow-context-compiler.mjs";
@@ -73,9 +74,8 @@ import { RecentInteractionView } from "../../../packages/syno-core/recent-intera
 import { CaptureChunkStore } from "./capture-chunk-store.mjs";
 import { CaptureChunkScheduler } from "./capture-chunk-scheduler.mjs";
 import { mergeCaptureAnalyses, splitSourceText } from "./capture-analysis.mjs";
-import { artifactToIntakePayload, createWeixinMessageHandler, parseWeixinApproval } from "./weixin-message-handler.mjs";
 import { IsolatedImageStore } from "./isolated-image-store.mjs";
-import { OpencodeVisionClient } from "./opencode-vision-client.mjs";
+import { ImageTranscriber } from "./image-transcriber.mjs";
 
 const PUBLIC_COMMAND_INTENTS = Object.freeze({
   search: "search",
@@ -213,14 +213,10 @@ function createSynoRuntime(options = {}) {
   const inspirationSampler = options.inspirationSampler || new InspirationSampler({ knowledge, inspirations: inspirationStore });
   const imageStore = options.imageStore || new IsolatedImageStore({
     quarantineRoots: [
-      path.join(PATHS.runtimeRoot, "quarantine", "weixin"),
       path.join(PATHS.runtimeRoot, "quarantine", "feishu"),
       path.join(PATHS.runtimeRoot, "quarantine"),
     ],
   });
-  const visionClient = options.visionClient !== undefined
-    ? options.visionClient
-    : new OpencodeVisionClient({ store: imageStore });
   const credentials = options.credentials || new ProviderCredentialStore();
   const provider = options.provider || new ProviderClient({ credentials });
   const conversations = options.conversations || new ConversationStore();
@@ -507,6 +503,10 @@ function createSynoRuntime(options = {}) {
     tools: toolBridge,
   });
   const cognitiveRuntime = options.cognitiveRuntime || harnessCognitiveRuntime;
+  // 收录图片转写走自带模型链（capture profile + ephemeralSession：无工具、不污染聊天会话）。
+  const imageTranscriber = options.imageTranscriber !== undefined
+    ? options.imageTranscriber
+    : new ImageTranscriber({ store: imageStore, runtime: cognitiveRuntime });
   ingestWorkflows.configure?.({
     contextCompiler: workflowContextCompiler,
     analyze: async ({ workflow, artifact, bundle }) => {
@@ -699,9 +699,9 @@ function createSynoRuntime(options = {}) {
     ingest,
     ingestWorkflows,
     pendingDecisions,
-    // 附件隔离区按通道分目录（weixin/feishu），转换器必须用对应根做目录内校验
-    attachmentToPayload: (artifact, { channel } = {}) => artifactToIntakePayload(artifact, {
-      quarantineRoot: path.join(PATHS.runtimeRoot, "quarantine", channel === "feishu" ? "feishu" : "weixin"),
+    // 附件隔离区：飞书专属目录；转换器在该目录内做越界与大小校验
+    attachmentToPayload: (artifact) => artifactToIntakePayload(artifact, {
+      quarantineRoot: path.join(PATHS.runtimeRoot, "quarantine", "feishu"),
     }),
     journal,
     browserCapture,
@@ -714,14 +714,14 @@ function createSynoRuntime(options = {}) {
     mobileDeliveryMode,
     wakeDelivery: () => drainChannelDeliveryOutbox().catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })),
     imageStore,
-    visionClient,
+    imageTranscriber,
   });
   if (acceptedRecovery && typeof channelConversationHandler.processAcceptedRequest === "function") {
     acceptedRecovery.processRequest = (request) => channelConversationHandler.processAcceptedRequest(request);
   }
   async function onDuplicateWorkflow({ workflow, context = {} } = {}) {
     const targetChannel = String(context.channel || workflow?.originChannel || "");
-    if (!workflow || !["weixin", "feishu"].includes(targetChannel)) return;
+    if (!workflow || targetChannel !== "feishu") return;
     if (typeof workflowOutbox.findLatest !== "function") return;
     const latest = await workflowOutbox.findLatest({ workflowId: workflow.id, targetChannel });
     const messageId = String(context.messageId || "");
@@ -770,7 +770,7 @@ function createSynoRuntime(options = {}) {
     onDuplicate: onDuplicateWorkflow,
     onProposed: async ({ workflow, candidate, proposal, action: selectedAction }) => {
       if (!proposalAllowsWriteJob(proposal)) {
-        const summary = formatWx({
+        const summary = formatNotice({
           title: "🚫 Syno 建议拒收",
           sections: [
             { icon: "📂", heading: "方案", lines: [proposal.suggestedPath] },
@@ -834,7 +834,7 @@ function createSynoRuntime(options = {}) {
         // 无冲突：approval:none 已让 host.receive 自动执行并落盘。发"已收录"回执 +
         // 带 diffHash 的审计事件（D2：无确认环节即无物可伪，仅记完整性指纹）。
         await ingestWorkflows.store.update(workflow.id, { stage: "committed", jobId: job.id });
-        const committedSummary = formatWx({
+        const committedSummary = formatNotice({
           title: "✅ 已收录",
           sections: [
             { icon: "📂", heading: "保存位置", lines: [proposal.suggestedPath] },
@@ -896,7 +896,7 @@ function createSynoRuntime(options = {}) {
       if (decisionPresentation.decisions.length > 1) {
         footerLines.push(`待确认编号：${decisionPresentation.decisions.map((item, index) => `${index + 1}.${item.jobId}`).join("、")} → 回复「确认 1/2…」`);
       }
-      const summary = formatWx({
+      const summary = formatNotice({
         title: "📥 收录方案待确认",
         sections: [
           ...(previewLines.length ? [{ icon: "📝", heading: "内容要点", lines: previewLines }] : []),
@@ -1000,31 +1000,14 @@ function createSynoRuntime(options = {}) {
       };
     },
   });
-  // 通道开关（2026-10-16）：SYNO_CHANNELS=feishu 只起飞书；缺省仍是 weixin,feishu（兼容 Windows 生产）。
-  const enabledChannels = new Set(String(process.env.SYNO_CHANNELS || "weixin,feishu")
-    .split(",").map((item) => item.trim().toLowerCase()).filter(Boolean));
-  const weixin = options.weixin || (enabledChannels.has("weixin") ? new WeixinIlinkAdapter({
-    // typing 指示器默认开；SYNO_WEIXIN_TYPING=0|false 可关。
-    typingIndicator: envToggle(process.env.SYNO_WEIXIN_TYPING, { defaultOn: true }),
-    // ack 文本默认关：实测 typing「正在输入」可见（纯 UI 状态、不占聊天流、无存储），ack 是真实消息会在聊天流累积成噪音。
-    // SYNO_WEIXIN_ACK=1|true 可开（typing 不可见的微信版本/场景保底）。
-    ackOnReceive: envToggle(process.env.SYNO_WEIXIN_ACK, { defaultOn: false }),
-    onMessage: (message) => channelConversationHandler.handle({ ...message, ownerKey: "local-user", threadKey: "main", channel: "weixin" }),
-  }) : null);
-  // C5 前置：通道 owner 双轨。`SYNO_CHANNEL_OWNER=dsh` 时 Host 不再抢微信轮询，
-  // 由 in-process 通道插件持有；Host 侧仅保留登录/发送代理与状态（delegated 标记）。
-  const channelOwner = resolveChannelOwner(process.env);
-  const weixinChannel = weixin && channelOwner === "dsh" ? delegateChannel(weixin, channelOwner) : weixin;
-  const feishu = options.feishu || (enabledChannels.has("feishu") ? new FeishuChannelAdapter({
+  const feishu = options.feishu || new FeishuChannelAdapter({
     // 「正在回复中」占位卡默认开；SYNO_FEISHU_TYPING=0|false 可关（关闭后退回单条最终回复）。
     typingIndicator: envToggle(process.env.SYNO_FEISHU_TYPING, { defaultOn: true }),
     onMessage: (message) => channelConversationHandler.handle({ ...message, ownerKey: "local-user", threadKey: "main", channel: "feishu" }),
     // 入站附件落到飞书专属隔离区（图片直传 / 文件收录共用同一条 artifact 契约）
     quarantineRoot: path.join(PATHS.runtimeRoot, "quarantine", "feishu"),
-  }) : null);
-  const channels = options.channels || new ChannelHub(
-    Object.fromEntries(Object.entries({ weixin: weixinChannel, feishu }).filter(([, adapter]) => Boolean(adapter))),
-  );
+  });
+  const channels = options.channels || new ChannelHub({ feishu });
   // proactive 主动通道连续投递失败计数（drain 回调增/重投成功清零）；health 探活 O(1) 读，避免每探活扫 outbox。
   let proactiveDeliveryConsecutiveFailures = 0;
   const systemAlertLastSentAt = new Map();
@@ -1096,7 +1079,7 @@ function createSynoRuntime(options = {}) {
         return { delivered: false, retryable: false, reason: "WORKFLOW_DELIVERY_EXHAUSTED" };
       }
       let deliveryTarget = event.deliveryTarget || {};
-      if (["weixin", "feishu"].includes(event.targetChannel)) {
+      if (event.targetChannel === "feishu") {
         let persistedTarget;
         try {
           persistedTarget = await ownerChannelTargets?.get?.(event.ownerKey, event.targetChannel) || null;
@@ -1175,7 +1158,7 @@ function createSynoRuntime(options = {}) {
           }, { level: "error" });
           return { retryable: true, reason: "CHANNEL_TARGET_UNAVAILABLE" };
         }
-        if (["weixin", "feishu"].includes(event.targetChannel) && !persistedTarget) {
+        if (event.targetChannel === "feishu" && !persistedTarget) {
           await recordEvent("proactive.target_unavailable", {
             bundleId: event.sourceId,
             signalCount: Array.isArray(payload.signalVersions) ? payload.signalVersions.length : 0,
@@ -1347,7 +1330,6 @@ function createSynoRuntime(options = {}) {
     proactive,
     signalSources,
     scheduler: proactive,
-    weixin: weixinChannel,
     feishu,
     credentials,
     provider,
@@ -1362,7 +1344,7 @@ function createSynoRuntime(options = {}) {
     harnessBindings,
     toolBridge,
     imageStore,
-    visionClient,
+    imageTranscriber,
     contextManager,
     settingsRegistry,
     controlMutationLock,
@@ -1412,7 +1394,7 @@ function createSynoRuntime(options = {}) {
         componentState.store = "ready";
         await recordEvent("syno.host.recovered");
         // 主动通道连续失败计数的重启种子在 channels.start() 完成后执行（见下方 .then）：
-        // 持久化 home 通道只有那时才恢复，提前读取会用默认 weixin 误种历史失败（2026-10-12 实测）。
+        // 持久化 home 通道只有那时才恢复，提前读取会用默认值误种历史失败（2026-10-12 实测）。
         reconciliationWorker?.start();
         if (runtimeMode === "deepseek-harness") {
           try {
@@ -1437,7 +1419,7 @@ function createSynoRuntime(options = {}) {
             await recordEvent("syno.channels.started");
             // 重启后用持久化 outbox 重建「主动通道连续失败」计数：计数器是进程级 let，重启归零，
             // 否则 health.deliveryOk 会在通道仍坏时短暂假绿。必须在 channels.start() 之后执行——
-            // 持久化 home 通道在该调用内恢复，提前读取会用默认 weixin 误种历史失败（2026-10-12 实测）。
+            // 持久化 home 通道在该调用内恢复，提前读取会用默认值误种历史失败（2026-10-12 实测）。
             // 口径与 live 计数器一致：从最新事件向前累加连续失败态事件的 attempts。best-effort。
             try {
               const homeChannel = channels.homeChannel;
@@ -1808,19 +1790,10 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "GET" && url.pathname === "/api/syno/today") return runtime.today.snapshot();
   if (method === "POST" && url.pathname === "/api/syno/index/rebuild") return runtime.core.rebuildIndex();
   if (method === "POST" && url.pathname === "/api/syno/reports/run") return runtime.core.report((await readBody(req)).kind || "manual", webContext);
-  // 通道可在 SYNO_CHANNELS 里停用；停用后端点给明确的 409，而不是碰 null。
-  const channelDisabled = (id) => Object.assign(
-    new Error(`${id} 通道未启用（SYNO_CHANNELS 未包含它）`),
-    { code: "CHANNEL_DISABLED", statusCode: 409 },
-  );
-  if (method === "POST" && url.pathname === "/api/syno/weixin/login/start") return runtime.weixin ? runtime.weixin.beginLogin() : Promise.reject(channelDisabled("weixin"));
-  if (method === "POST" && url.pathname === "/api/syno/weixin/login/poll") return runtime.weixin ? runtime.weixin.pollLogin() : Promise.reject(channelDisabled("weixin"));
-  if (method === "POST" && url.pathname === "/api/syno/weixin/connect") return runtime.weixin ? runtime.weixin.start() : Promise.reject(channelDisabled("weixin"));
-  if (method === "POST" && url.pathname === "/api/syno/weixin/disconnect") return runtime.weixin ? runtime.weixin.stop() : Promise.reject(channelDisabled("weixin"));
-  if (method === "POST" && url.pathname === "/api/syno/feishu/register/start") return runtime.feishu ? runtime.feishu.beginRegistration() : Promise.reject(channelDisabled("feishu"));
-  if (method === "GET" && url.pathname === "/api/syno/feishu/register/status") return runtime.feishu ? runtime.feishu.registrationStatus() : Promise.reject(channelDisabled("feishu"));
-  if (method === "POST" && url.pathname === "/api/syno/feishu/connect") return runtime.feishu ? runtime.feishu.start() : Promise.reject(channelDisabled("feishu"));
-  if (method === "POST" && url.pathname === "/api/syno/feishu/disconnect") return runtime.feishu ? runtime.feishu.stop() : Promise.reject(channelDisabled("feishu"));
+  if (method === "POST" && url.pathname === "/api/syno/feishu/register/start") return runtime.feishu.beginRegistration();
+  if (method === "GET" && url.pathname === "/api/syno/feishu/register/status") return runtime.feishu.registrationStatus();
+  if (method === "POST" && url.pathname === "/api/syno/feishu/connect") return runtime.feishu.start();
+  if (method === "POST" && url.pathname === "/api/syno/feishu/disconnect") return runtime.feishu.stop();
   if (method === "POST" && url.pathname === "/api/syno/channels/home") {
     const body = await readBody(req);
     const nextHome = String(body.channel || "");
@@ -1899,4 +1872,4 @@ async function assertWebJobOwner(runtime, webContext, jobId) {
   }
 }
 
-export { PUBLIC_COMMAND_INTENTS, buildConversationMigrationContext, createControlMutationLock, createSynoRuntime, createWeixinMessageHandler, parseWeixinApproval, redactMigrationText, resolveCognitiveRuntimeMode, routeSynoApi };
+export { PUBLIC_COMMAND_INTENTS, buildConversationMigrationContext, createControlMutationLock, createSynoRuntime, redactMigrationText, resolveCognitiveRuntimeMode, routeSynoApi };

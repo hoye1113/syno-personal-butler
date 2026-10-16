@@ -19,7 +19,7 @@ async function tempState(t, prefix) {
   return path.join(root, "proactive.json");
 }
 
-function makeProactive(t, { messages, homeChannel = "weixin", signalSources, agentText, signalEngine, eventsLog, notifications } = {}) {
+function makeProactive(t, { messages, homeChannel = "feishu", signalSources, agentText, signalEngine, eventsLog, notifications } = {}) {
   return tempState(t, "syno-proactive-reliability-").then((stateFile) => {
     const root = path.dirname(stateFile);
     const channels = {
@@ -129,7 +129,7 @@ test("one tick aggregates multiple high-value events into one Home Channel summa
   ];
   await proactive.tick({ now: new Date("2026-07-30T08:30:00+08:00"), highValueEvents: events });
   assert.equal(messages.length, 1);
-  assert.deepEqual(messages[0].targets, ["weixin"]);
+  assert.deepEqual(messages[0].targets, ["feishu"]);
   assert.match(messages[0].message.body, /A/);
   assert.match(messages[0].message.body, /B/);
   assert.equal((await proactive.getDiagnostics()).eligibleSignals, 2);
@@ -232,7 +232,7 @@ test("proactive delivery is persisted in one Outbox event and survives a second 
     protect: async (value) => value,
     unprotect: async (value) => value,
   });
-  const channels = { homeChannel: "weixin", async send() { throw new Error("must drain through Outbox"); } };
+  const channels = { homeChannel: "feishu", async send() { throw new Error("must drain through Outbox"); } };
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { return { job: { id: "unused", status: "waiting_provider" } }; } },
     today: { async snapshot() { return { priorities: [] }; } },
@@ -249,7 +249,7 @@ test("proactive delivery is persisted in one Outbox event and survives a second 
   const records = await outbox.list({ sourceId: first[0].bundleId });
   assert.equal(records.length, 1);
   assert.equal(records[0].responseKind, "proactive");
-  assert.equal(records[0].targetChannel, "weixin");
+  assert.equal(records[0].targetChannel, "feishu");
 });
 
 test("OwnerChannelTargetStore keeps mobile targets encrypted and restores them", async (t) => {
@@ -290,8 +290,8 @@ test("versionless proactive ledger migrates a previously notified event without 
     host: { async receive() { return { job: { status: "waiting_provider" } }; } },
     today: { async snapshot() { return { priorities: [] }; } },
     channels: {
-      homeChannel: "weixin",
-      async send(message, targets) { messages.push({ message, targets }); return { weixin: { delivered: true } }; },
+      homeChannel: "feishu",
+      async send(message, targets) { messages.push({ message, targets }); return { feishu: { delivered: true } }; },
     },
     signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
     stateFile,
@@ -322,7 +322,7 @@ test("a delivered Outbox event rebuilds a missing Ledger without creating a next
     protect: async (value) => value,
     unprotect: async (value) => value,
   });
-  const channels = { homeChannel: "weixin", async send() { throw new Error("direct delivery is forbidden"); } };
+  const channels = { homeChannel: "feishu", async send() { throw new Error("direct delivery is forbidden"); } };
   const common = {
     host: { async receive() { return { job: { status: "waiting_provider" } }; } },
     today: { async snapshot() { return { priorities: [] }; } },
@@ -402,7 +402,7 @@ test("an unreadable proactive Outbox payload becomes an explicit recovery failur
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { return { job: { status: "waiting_provider" } }; } },
     today: { async snapshot() { return { priorities: [] }; } },
-    channels: { homeChannel: "weixin", async send() { throw new Error("no direct delivery"); } },
+    channels: { homeChannel: "feishu", async send() { throw new Error("no direct delivery"); } },
     channelDeliveryOutbox: outbox,
     signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
     stateFile,
@@ -432,7 +432,7 @@ test("a failed_terminal proactive Outbox event is excluded from reconcile and ne
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { return { job: { status: "waiting_provider" } }; } },
     today: { async snapshot() { return { priorities: [] }; } },
-    channels: { homeChannel: "weixin", async send() { throw new Error("no direct delivery"); } },
+    channels: { homeChannel: "feishu", async send() { throw new Error("no direct delivery"); } },
     channelDeliveryOutbox: outbox,
     signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
     stateFile,
@@ -468,7 +468,7 @@ test("legacy Web audit suppresses a migrated current event when lastRuns is inco
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { return { job: { status: "waiting_provider" } }; } },
     today: { async snapshot() { return { priorities: [] }; } },
-    channels: { homeChannel: "weixin", async send() { throw new Error("direct delivery is forbidden"); } },
+    channels: { homeChannel: "feishu", async send() { throw new Error("direct delivery is forbidden"); } },
     channelDeliveryOutbox: outbox,
     notifications: {
       async list() {
@@ -500,7 +500,7 @@ test("an unconfirmed legacy event is migration-ambiguous and waits for a materia
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { return { job: { status: "waiting_provider" } }; } },
     today: { async snapshot() { return { priorities: [] }; } },
-    channels: { homeChannel: "weixin", async send() { throw new Error("direct delivery is forbidden"); } },
+    channels: { homeChannel: "feishu", async send() { throw new Error("direct delivery is forbidden"); } },
     notifications: { async list() { return []; } },
     channelDeliveryOutbox: outbox,
     signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
@@ -535,7 +535,7 @@ test("Outbox wake observes the persisted pending Bundle", async (t) => {
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { return { job: { status: "waiting_provider" } }; } },
     today: { async snapshot() { return { priorities: [] }; } },
-    channels: { homeChannel: "weixin", async send() { throw new Error("direct delivery is forbidden"); } },
+    channels: { homeChannel: "feishu", async send() { throw new Error("direct delivery is forbidden"); } },
     channelDeliveryOutbox: outbox,
     wakeDelivery: async () => {
       const state = JSON.parse(await fs.readFile(stateFile, "utf8"));
@@ -564,7 +564,7 @@ test("concurrent ticks create one Bundle result and one Outbox event", async (t)
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { await new Promise((resolve) => setTimeout(resolve, 20)); return { job: { status: "waiting_provider" } }; } },
     today: { async snapshot() { return { priorities: [] }; } },
-    channels: { homeChannel: "weixin", async send() { throw new Error("direct delivery is forbidden"); } },
+    channels: { homeChannel: "feishu", async send() { throw new Error("direct delivery is forbidden"); } },
     channelDeliveryOutbox: outbox,
     signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
     stateFile: path.join(root, "proactive.json"),
@@ -595,7 +595,7 @@ test("resolved proactive subjects are retained for 30 days and then pruned", asy
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { return { job: { status: "waiting_provider" } }; } },
     today: { async snapshot() { return { priorities: [] }; } },
-    channels: { homeChannel: "weixin", async send() { throw new Error("no delivery expected"); } },
+    channels: { homeChannel: "feishu", async send() { throw new Error("no delivery expected"); } },
     signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
     stateFile,
   });
@@ -618,7 +618,7 @@ test("production start keeps proactive delivery paused until the Owner enables t
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { throw new Error("paused start must not invoke the model"); } },
     today: { async snapshot() { throw new Error("paused start must not build content"); } },
-    channels: { homeChannel: "weixin", async send() { throw new Error("paused start must not send"); } },
+    channels: { homeChannel: "feishu", async send() { throw new Error("paused start must not send"); } },
     settingsRegistry: { async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? false : undefined; } },
     signalSources: {
       async collect() {
@@ -648,7 +648,7 @@ test("stop wins a race with asynchronous start and prevents a late tick or timer
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { throw new Error("stopped start must not invoke the model"); } },
     today: { async snapshot() { throw new Error("stopped start must not build content"); } },
-    channels: { homeChannel: "weixin", async send() { throw new Error("stopped start must not send"); } },
+    channels: { homeChannel: "feishu", async send() { throw new Error("stopped start must not send"); } },
     settingsRegistry: { async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? setting : undefined; } },
     signalSources: { async collect() { collections += 1; return []; } },
     signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
@@ -684,7 +684,7 @@ test("stop during the startup tick prevents model work, enqueue and wake", async
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { modelCalls += 1; return { job: { status: "waiting_provider" } }; } },
     today: { async snapshot() { return { priorities: [] }; } },
-    channels: { homeChannel: "weixin", async send() { throw new Error("must not send"); } },
+    channels: { homeChannel: "feishu", async send() { throw new Error("must not send"); } },
     settingsRegistry: { async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? true : undefined; } },
     signalSources: {
       async collect() {
@@ -721,7 +721,7 @@ test("stop while enqueue waits on its lock cancels the durable proactive event",
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { return { job: { status: "waiting_provider" } }; } },
     today: { async snapshot() { return { priorities: [] }; } },
-    channels: { homeChannel: "weixin" },
+    channels: { homeChannel: "feishu" },
     settingsRegistry: { async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? deliveryEnabled : undefined; } },
     signalSources: {
       async collect() {
@@ -767,7 +767,7 @@ test("proactive preview reports a redacted Bundle without mutating Ledger or Out
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { throw new Error("preview must not invoke the model"); } },
     today: { async snapshot() { throw new Error("preview must not render user content"); } },
-    channels: { homeChannel: "weixin", async send() { throw new Error("preview must not send"); } },
+    channels: { homeChannel: "feishu", async send() { throw new Error("preview must not send"); } },
     ownerChannelTargets: { async get() { return { contextToken: "must-not-be-returned" }; } },
     channelDeliveryOutbox: outbox,
     signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
@@ -780,9 +780,9 @@ test("proactive preview reports a redacted Bundle without mutating Ledger or Out
 
   assert.deepEqual(preview, {
     enabled: false,
-    homeChannel: "weixin",
+    homeChannel: "feishu",
     homeTargetAvailable: true,
-    deliveryHealth: { homeChannel: "weixin", consecutiveFailures: 0, lastDeliveryError: null, lastSeenAt: null, targetTokenAgeMs: null },
+    deliveryHealth: { homeChannel: "feishu", consecutiveFailures: 0, lastDeliveryError: null, lastSeenAt: null, targetTokenAgeMs: null },
     eligibleSignals: 1,
     bundle: { bundleId: preview.bundle.bundleId, signalCount: 1, remainingCount: 0 },
   });
@@ -800,7 +800,7 @@ test("proactive diagnostics cover disabled, quiet and missing targets without pe
     const fail = async () => { throw new Error("diagnostics must not generate, send or change settings"); };
     const proactive = new ProactiveOrchestrator({
       host: { receive: fail }, today: { snapshot: fail },
-      channels: { homeChannel: "weixin", send: fail },
+      channels: { homeChannel: "feishu", send: fail },
       ownerChannelTargets: { async get() { return scenario === "missing-target" ? null : { contextToken: "private-target-canary" }; } },
       settingsRegistry: {
         async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? scenario !== "disabled" : undefined; },
@@ -840,7 +840,7 @@ test("Ledger migration is an explicit no-delivery step before any production tic
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { throw new Error("migration must not invoke the model"); } },
     today: { async snapshot() { throw new Error("migration must not render content"); } },
-    channels: { homeChannel: "weixin", async send() { throw new Error("migration must not send"); } },
+    channels: { homeChannel: "feishu", async send() { throw new Error("migration must not send"); } },
     signalSources: {
       async collect() {
         return [{ id: "ingest-pending:migration-current", kind: "ingest-pending", title: "当前旧事项", priority: 95, ref: { status: "pending", businessVersion: "1" } }];
@@ -882,7 +882,7 @@ test("ordinary tick cannot complete or bypass a pending Ledger migration", async
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { throw new Error("pending migration must not invoke model"); } },
     today: { async snapshot() { throw new Error("pending migration must not render"); } },
-    channels: { homeChannel: "weixin" },
+    channels: { homeChannel: "feishu" },
     settingsRegistry: { async get() { return true; } },
     signalSources: { async collect() { collections += 1; return []; } },
     channelDeliveryOutbox: {
@@ -917,7 +917,7 @@ test("controlled proactive test creates one tagged Outbox event without collecti
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { throw new Error("controlled test must not invoke the model"); } },
     today: { async snapshot() { throw new Error("controlled test must not render real content"); } },
-    channels: { homeChannel: "weixin", async send() { throw new Error("Outbox owns delivery"); } },
+    channels: { homeChannel: "feishu", async send() { throw new Error("Outbox owns delivery"); } },
     signalSources: { async collect() { collections += 1; return []; } },
     settingsRegistry: {
       async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? false : undefined; },
@@ -960,7 +960,7 @@ test("a second controlled run is rejected while the exact first test remains non
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { throw new Error("controlled test must not invoke model"); } },
     today: { async snapshot() { throw new Error("controlled test must not render"); } },
-    channels: { homeChannel: "weixin" },
+    channels: { homeChannel: "feishu" },
     settingsRegistry: {
       async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? false : undefined; },
       async set() {},
@@ -994,7 +994,7 @@ test("replaying an already delivered controlled run does not reauthorize or rede
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { throw new Error("controlled test must not invoke model"); } },
     today: { async snapshot() { throw new Error("controlled test must not render"); } },
-    channels: { homeChannel: "weixin" },
+    channels: { homeChannel: "feishu" },
     settingsRegistry: {
       async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? false : undefined; },
       async set(_key, value) { authorizations.push(value); },
@@ -1028,7 +1028,7 @@ async function buildDrainRuntime(t, { proactiveResult, terminalResult } = {}) {
   const acceptedUpdates = [];
   const acceptedRequests = { async update(id, patch) { acceptedUpdates.push({ id, patch }); } };
   const channels = {
-    homeChannel: "weixin",
+    homeChannel: "feishu",
     async send(message, targets) {
       sent.push({ source: message.source, level: message.level, deliveryKey: message.deliveryKey, targets });
       const result = {};
@@ -1055,7 +1055,7 @@ async function buildDrainRuntime(t, { proactiveResult, terminalResult } = {}) {
     unprotect: async (value) => value,
     clock: () => clockState.now,
   });
-  await targets.set("local-user", "weixin", { toUserId: "owner", contextToken: "ctx" });
+  await targets.set("local-user", "feishu", { chatId: "owner-chat", replyTo: "m-1" });
   const journal = { async record(event, data, settings) { recorded.push({ event, data, level: settings?.level }); return true; } };
   const settingsRegistry = {
     async get(key) { return key === "notifications.proactiveDeliveryEnabled" ? true : null; },
@@ -1079,7 +1079,7 @@ async function buildWorkflowDuplicateRuntime(t, {
     unprotect: async (value) => value,
   });
   if (targetAvailable) {
-    await ownerChannelTargets.set("owner", "weixin", { toUserId: "current-owner", contextToken: "current-context" });
+    await ownerChannelTargets.set("owner", "feishu", { chatId: "current-chat", replyTo: "current-message" });
   }
   const store = new IngestWorkflowStore({ root: path.join(root, "workflows") });
   const ingest = {
@@ -1093,7 +1093,7 @@ async function buildWorkflowDuplicateRuntime(t, {
   const coordinator = new IngestWorkflowCoordinator({ ingest, store, schedule: () => {} });
   const sent = [];
   const channels = {
-    homeChannel: "weixin",
+    homeChannel: "feishu",
     async send(message, targets) {
       sent.push({ message, targets });
       return Object.fromEntries(targets.map((target) => [target, deliveryResult]));
@@ -1124,17 +1124,17 @@ async function waitForWorkflowDuplicate(condition, message) {
   throw new Error(message);
 }
 
-test("duplicate Workflow delivery hydrates the current encrypted Weixin target and does not replay delivered events", async (t) => {
+test("duplicate Workflow delivery hydrates the current encrypted Feishu target and does not replay delivered events", async (t) => {
   const { coordinator, workflowOutbox, sent } = await buildWorkflowDuplicateRuntime(t);
   const first = await coordinator.receive(
     { kind: "url", value: "https://example.com/workflow-target" },
-    { ownerKey: "owner", channel: "weixin", messageId: "wx-original", replyTarget: { toUserId: "stale-owner" } },
+    { ownerKey: "owner", channel: "feishu", messageId: "fs-original", replyTarget: { chatId: "stale-chat" } },
   );
   await workflowOutbox.enqueue({
     workflowId: first.workflow.id,
     eventType: "proposal.ready",
     ownerKey: "owner",
-    targetChannel: "weixin",
+    targetChannel: "feishu",
     threadKey: "main",
     deliveryTarget: { toUserId: "stale-owner" },
     redactedPayload: { text: "方案已准备好" },
@@ -1143,43 +1143,43 @@ test("duplicate Workflow delivery hydrates the current encrypted Weixin target a
 
   await coordinator.receive(
     { kind: "url", value: "https://example.com/workflow-target" },
-    { ownerKey: "owner", channel: "weixin", messageId: "wx-duplicate", replyTarget: { toUserId: "stale-owner" } },
+    { ownerKey: "owner", channel: "feishu", messageId: "fs-duplicate", replyTarget: { chatId: "stale-chat" } },
   );
   await waitForWorkflowDuplicate(() => sent.length === 1, "duplicate Workflow did not wake its pending Outbox");
-  await waitForWorkflowDuplicate(async () => (await workflowOutbox.findLatest({ workflowId: first.workflow.id, targetChannel: "weixin" }))?.status === "delivered", "duplicate Workflow Outbox did not settle as delivered");
+  await waitForWorkflowDuplicate(async () => (await workflowOutbox.findLatest({ workflowId: first.workflow.id, targetChannel: "feishu" }))?.status === "delivered", "duplicate Workflow Outbox did not settle as delivered");
 
   assert.equal(sent.length, 1);
-  assert.equal(sent[0].targets[0], "weixin");
-  assert.equal(sent[0].message.toUserId, "current-owner");
-  assert.equal(sent[0].message.contextToken, "current-context");
-  assert.equal((await workflowOutbox.findLatest({ workflowId: first.workflow.id, targetChannel: "weixin" })).status, "delivered");
+  assert.equal(sent[0].targets[0], "feishu");
+  assert.equal(sent[0].message.chatId, "current-chat");
+  assert.equal(sent[0].message.replyTo, "current-message");
+  assert.equal((await workflowOutbox.findLatest({ workflowId: first.workflow.id, targetChannel: "feishu" })).status, "delivered");
 
   await coordinator.receive(
     { kind: "url", value: "https://example.com/workflow-target" },
-    { ownerKey: "owner", channel: "weixin", messageId: "wx-duplicate", replyTarget: { toUserId: "stale-owner" } },
+    { ownerKey: "owner", channel: "feishu", messageId: "fs-duplicate", replyTarget: { chatId: "stale-chat" } },
   );
-  assert.equal(sent.length, 1, "同一微信消息再次进入不能重复发送已确认的最终事件");
+  assert.equal(sent.length, 1, "同一条飞书消息再次进入不能重复发送已确认的最终事件");
 });
 
-test("Workflow delivery does not send without a current encrypted Weixin target and remains retryable", async (t) => {
+test("Workflow delivery does not send without a current encrypted Feishu target and remains retryable", async (t) => {
   const { coordinator, workflowOutbox, sent, recorded } = await buildWorkflowDuplicateRuntime(t, { targetAvailable: false });
   const first = await coordinator.receive(
     { kind: "url", value: "https://example.com/workflow-target-missing" },
-    { ownerKey: "owner", channel: "weixin", messageId: "wx-missing-original", replyTarget: { toUserId: "stale-owner" } },
+    { ownerKey: "owner", channel: "feishu", messageId: "fs-missing-original", replyTarget: { chatId: "stale-chat" } },
   );
   await workflowOutbox.enqueue({
     workflowId: first.workflow.id,
     eventType: "workflow.reported",
     ownerKey: "owner",
-    targetChannel: "weixin",
+    targetChannel: "feishu",
     redactedPayload: { text: "不可空投" },
     idempotencyKey: `${first.workflow.id}:reported:missing-target`,
   });
   await coordinator.receive(
     { kind: "url", value: "https://example.com/workflow-target-missing" },
-    { ownerKey: "owner", channel: "weixin", messageId: "wx-missing-duplicate", replyTarget: { toUserId: "stale-owner" } },
+    { ownerKey: "owner", channel: "feishu", messageId: "fs-missing-duplicate", replyTarget: { chatId: "stale-chat" } },
   );
-  await waitForWorkflowDuplicate(async () => (await workflowOutbox.findLatest({ workflowId: first.workflow.id, targetChannel: "weixin" }))?.status === "failed_retryable", "missing target did not remain retryable");
+  await waitForWorkflowDuplicate(async () => (await workflowOutbox.findLatest({ workflowId: first.workflow.id, targetChannel: "feishu" }))?.status === "failed_retryable", "missing target did not remain retryable");
 
   assert.equal(sent.length, 0);
   assert.ok(recorded.some((item) => item.event === "ingest.workflow.outbox.target_unavailable" && item.data.status === "target_missing"));
@@ -1196,7 +1196,7 @@ test("runtime quality rejection writes notifications before converging the Workf
     protect: async (value) => value,
     unprotect: async (value) => value,
   });
-  await ownerChannelTargets.set("owner", "weixin", { toUserId: "owner", contextToken: "ctx" });
+  await ownerChannelTargets.set("owner", "feishu", { chatId: "owner-chat", replyTo: "m-1" });
   const store = new IngestWorkflowStore({ root: path.join(root, "workflows") });
   const ingest = {
     async receive(payload) {
@@ -1217,7 +1217,7 @@ test("runtime quality rejection writes notifications before converging the Workf
   };
   const coordinator = new IngestWorkflowCoordinator({ ingest, store, schedule: (work) => scheduled.push(work) });
   const runtime = createSynoRuntime({
-    channels: { homeChannel: "weixin", async send() { return { weixin: { delivered: true } }; } },
+    channels: { homeChannel: "feishu", async send() { return { feishu: { delivered: true } }; } },
     workflowOutbox,
     ownerChannelTargets,
     ingest,
@@ -1230,7 +1230,7 @@ test("runtime quality rejection writes notifications before converging the Workf
   });
   const receipt = await coordinator.receive(
     { kind: "url", value: "https://example.com/quality-rejection", analysisMode: "local-only" },
-    { ownerKey: "owner", channel: "weixin", messageId: "wx-quality", replyTarget: { toUserId: "owner" } },
+    { ownerKey: "owner", channel: "feishu", messageId: "fs-quality", replyTarget: { toUserId: "owner" } },
   );
   await scheduled.shift()();
 
@@ -1239,7 +1239,7 @@ test("runtime quality rejection writes notifications before converging the Workf
   assert.equal(workflow.pendingAction, undefined);
   assert.equal(workflow.nextRetryAt, undefined);
   assert.equal(workflow.lastError, undefined);
-  assert.equal((await workflowOutbox.findLatest({ workflowId: workflow.id, targetChannel: "weixin" })).status, "pending");
+  assert.equal((await workflowOutbox.findLatest({ workflowId: workflow.id, targetChannel: "feishu" })).status, "pending");
   assert.equal((await workflowOutbox.findLatest({ workflowId: workflow.id, targetChannel: "main-session" })).status, "pending");
   assert.equal((await coordinator.recover()).scheduled, 0);
 });
@@ -1248,22 +1248,22 @@ test("duplicate Workflow creates one replay for a terminally failed final event 
   const failedCase = await buildWorkflowDuplicateRuntime(t);
   const failedFirst = await failedCase.coordinator.receive(
     { kind: "url", value: "https://example.com/workflow-terminal-replay" },
-    { ownerKey: "owner", channel: "weixin", messageId: "wx-terminal-original", replyTarget: { toUserId: "stale-owner" } },
+    { ownerKey: "owner", channel: "feishu", messageId: "fs-terminal-original", replyTarget: { chatId: "stale-chat" } },
   );
   const failedEvent = await failedCase.workflowOutbox.enqueue({
     workflowId: failedFirst.workflow.id,
     eventType: "workflow.reported",
     ownerKey: "owner",
-    targetChannel: "weixin",
+    targetChannel: "feishu",
     redactedPayload: { text: "最终结果" },
     idempotencyKey: `${failedFirst.workflow.id}:reported`,
   });
   await failedCase.workflowOutbox.deliverDue(async () => ({ delivered: false, retryable: false, reason: "CHANNEL_PERMANENTLY_UNAVAILABLE" }));
-  assert.equal((await failedCase.workflowOutbox.findLatest({ workflowId: failedFirst.workflow.id, targetChannel: "weixin" })).status, "failed_terminal");
+  assert.equal((await failedCase.workflowOutbox.findLatest({ workflowId: failedFirst.workflow.id, targetChannel: "feishu" })).status, "failed_terminal");
 
   await failedCase.coordinator.receive(
     { kind: "url", value: "https://example.com/workflow-terminal-replay" },
-    { ownerKey: "owner", channel: "weixin", messageId: "wx-terminal-replay", replyTarget: { toUserId: "stale-owner" } },
+    { ownerKey: "owner", channel: "feishu", messageId: "fs-terminal-replay", replyTarget: { chatId: "stale-chat" } },
   );
   await waitForWorkflowDuplicate(async () => {
     const records = (await failedCase.workflowOutbox.list()).filter((item) => item.workflowId === failedFirst.workflow.id);
@@ -1281,21 +1281,21 @@ test("duplicate Workflow creates one replay for a terminally failed final event 
   });
   const failedReplayFirst = await failedReplayCase.coordinator.receive(
     { kind: "url", value: "https://example.com/workflow-terminal-replay-idempotent" },
-    { ownerKey: "owner", channel: "weixin", messageId: "wx-terminal-original-2", replyTarget: { toUserId: "stale-owner" } },
+    { ownerKey: "owner", channel: "feishu", messageId: "fs-terminal-original-2", replyTarget: { chatId: "stale-chat" } },
   );
   await failedReplayCase.workflowOutbox.enqueue({
     workflowId: failedReplayFirst.workflow.id,
     eventType: "workflow.reported",
     ownerKey: "owner",
-    targetChannel: "weixin",
+    targetChannel: "feishu",
     redactedPayload: { text: "最终结果" },
     idempotencyKey: `${failedReplayFirst.workflow.id}:reported`,
   });
   await failedReplayCase.workflowOutbox.deliverDue(async () => ({ delivered: false, retryable: false, reason: "CHANNEL_PERMANENTLY_UNAVAILABLE" }));
-  for (const messageId of ["wx-terminal-replay-2", "wx-terminal-replay-2"]) {
+  for (const messageId of ["fs-terminal-replay-2", "fs-terminal-replay-2"]) {
     await failedReplayCase.coordinator.receive(
       { kind: "url", value: "https://example.com/workflow-terminal-replay-idempotent" },
-      { ownerKey: "owner", channel: "weixin", messageId, replyTarget: { toUserId: "stale-owner" } },
+      { ownerKey: "owner", channel: "feishu", messageId, replyTarget: { chatId: "stale-chat" } },
     );
     await waitForWorkflowDuplicate(async () => {
       const records = (await failedReplayCase.workflowOutbox.list()).filter((item) => item.workflowId === failedReplayFirst.workflow.id);
@@ -1308,17 +1308,17 @@ test("duplicate Workflow creates one replay for a terminally failed final event 
   const statusCase = await buildWorkflowDuplicateRuntime(t);
   const statusFirst = await statusCase.coordinator.receive(
     { kind: "url", value: "https://example.com/workflow-status-replay" },
-    { ownerKey: "owner", channel: "weixin", messageId: "wx-status-original", replyTarget: { toUserId: "stale-owner" } },
+    { ownerKey: "owner", channel: "feishu", messageId: "fs-status-original", replyTarget: { chatId: "stale-chat" } },
   );
   await statusCase.store.update(statusFirst.workflow.id, { stage: "rejected" });
   await statusCase.coordinator.receive(
     { kind: "url", value: "https://example.com/workflow-status-replay" },
-    { ownerKey: "owner", channel: "weixin", messageId: "wx-status-original", replyTarget: { toUserId: "stale-owner" } },
+    { ownerKey: "owner", channel: "feishu", messageId: "fs-status-original", replyTarget: { chatId: "stale-chat" } },
   );
   await waitForWorkflowDuplicate(() => statusCase.sent.length === 1, "terminal status replay was not delivered");
   assert.equal(statusCase.sent.length, 1);
   assert.match(statusCase.sent[0].message.text, /当前状态：已拒收/);
-  assert.equal((await statusCase.workflowOutbox.findLatest({ workflowId: statusFirst.workflow.id, targetChannel: "weixin" })).eventType, "workflow.status_replay");
+  assert.equal((await statusCase.workflowOutbox.findLatest({ workflowId: statusFirst.workflow.id, targetChannel: "feishu" })).eventType, "workflow.status_replay");
 });
 
 test("a persistently rejected proactive bundle exhausts attempts to terminal and raises observable signals", async (t) => {
@@ -1327,9 +1327,9 @@ test("a persistently rejected proactive bundle exhausts attempts to terminal and
     sourceType: "proactive_bundle",
     sourceId: "bundle-exhaust",
     ownerKey: "local-user",
-    targetChannel: "weixin",
+    targetChannel: "feishu",
     responseKind: "proactive",
-    deliveryKey: "bundle-exhaust:weixin:v1",
+    deliveryKey: "bundle-exhaust:feishu:v1",
     payload: { signalVersions: [{ kind: "ingest-pending", title: "x" }] },
     dueAt: clockState.now.toISOString(),
   });
@@ -1362,7 +1362,7 @@ test("an accepted_request final terminal delivery pushes the request to failed_t
     sourceType: "accepted_request",
     sourceId: "request-orphan",
     ownerKey: "local-user",
-    targetChannel: "weixin",
+    targetChannel: "feishu",
     responseKind: "final",
     deliveryKey: "accepted-terminal-1",
     payload: { text: "FINAL" },
@@ -1388,7 +1388,7 @@ test("preview deliveryHealth sums consecutive failed attempts and surfaces the n
   const proactive = new ProactiveOrchestrator({
     host: { async receive() { throw new Error("preview must not invoke the model"); } },
     today: { async snapshot() { throw new Error("preview must not render user content"); } },
-    channels: { homeChannel: "weixin", async send() { throw new Error("preview must not send"); } },
+    channels: { homeChannel: "feishu", async send() { throw new Error("preview must not send"); } },
     channelDeliveryOutbox: outbox,
     signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, weeklyDay: 6, maxDailyNotifications: 3 } }),
     stateFile,
@@ -1397,9 +1397,9 @@ test("preview deliveryHealth sums consecutive failed attempts and surfaces the n
     sourceType: "proactive_bundle",
     sourceId: "bundle-health",
     ownerKey: "local-user",
-    targetChannel: "weixin",
+    targetChannel: "feishu",
     responseKind: "proactive",
-    deliveryKey: "bundle-health:weixin:v1",
+    deliveryKey: "bundle-health:feishu:v1",
     payload: { signalVersions: [{ kind: "ingest-pending", title: "x" }] },
     dueAt: clockState.now.toISOString(),
   });
@@ -1409,7 +1409,7 @@ test("preview deliveryHealth sums consecutive failed attempts and surfaces the n
     clockState.now = new Date(clockState.now.getTime() + 20 * 60_000);
   }
   const preview = await proactive.preview({ now: clockState.now, highValueEvents: [] });
-  assert.equal(preview.deliveryHealth.homeChannel, "weixin");
+  assert.equal(preview.deliveryHealth.homeChannel, "feishu");
   assert.equal(preview.deliveryHealth.consecutiveFailures, 3);
   assert.equal(preview.deliveryHealth.lastDeliveryError, "provider_rejected");
   const before = await outbox.list({ limit: 10 });

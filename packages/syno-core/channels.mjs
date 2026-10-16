@@ -15,9 +15,8 @@ class ChannelHub {
   constructor(adapters = {}, { stateFile = path.join(PATHS.stateRoot, "channels.json") } = {}) {
     this.adapters = new Map(Object.entries(adapters));
     this.stateFile = stateFile;
-    // 默认 home 随实际注册的通道走（2026-10-16：主人只用飞书，默认值不该再硬写 weixin）；
-    // 单一通道时就是它自己，多通道时优先 feishu。
-    this.homeChannel = this.adapters.has("feishu") ? "feishu" : ([...this.adapters.keys()][0] || "weixin");
+    // 默认 home 随实际注册的通道走（多通道时优先飞书）；持久化的 home 在 start() 里覆盖它。
+    this.homeChannel = this.adapters.has("feishu") ? "feishu" : ([...this.adapters.keys()][0] || "feishu");
   }
   async start() {
     let persistedHome = null;
@@ -31,9 +30,6 @@ class ChannelHub {
       try { results[id] = await adapter.start(); }
       catch (error) { results[id] = { delivered: false, error: String(error?.message || error) }; }
     }));
-    // Retire the old local-workbench delivery state only when WeChat is genuinely bound.
-    // Otherwise leave the default WeChat target unavailable; never fall back to a GUI surface.
-    if (persistedHome === "web" && results.weixin?.ownerBound) await this.setHome("weixin");
     return results;
   }
   async stop() {
@@ -68,21 +64,6 @@ class ChannelHub {
   get(id) { return this.adapters.get(id); }
 }
 
-function resolveChannelOwner(env = process.env) {
-  return String(env.SYNO_CHANNEL_OWNER || "").trim() === "dsh" ? "dsh" : "host";
-}
 
-function delegateChannel(adapter, owner = "dsh") {
-  const passthrough = {};
-  for (const method of ["beginLogin", "pollLogin", "send"]) {
-    if (typeof adapter[method] === "function") passthrough[method] = (...args) => adapter[method](...args);
-  }
-  return {
-    ...passthrough,
-    start: async () => ({ delegated: true, owner }),
-    stop: async () => ({ delegated: true, owner }),
-    status: () => ({ ...(adapter.status?.() || {}), running: false, delegated: true, owner }),
-  };
-}
 
-export { ChannelHub, FakeChannelAdapter, delegateChannel, resolveChannelOwner };
+export { ChannelHub, FakeChannelAdapter };

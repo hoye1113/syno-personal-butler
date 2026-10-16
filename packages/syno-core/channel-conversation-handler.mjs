@@ -58,7 +58,7 @@ function captureReceiptText(receipt, { attachment = false } = {}) {
 }
 
 class ChannelConversationHandler {
-  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelContinuations, inspirationStore, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery, imageStore = null, visionClient = null } = {}) {
+  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelContinuations, inspirationStore, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery, imageStore = null, imageTranscriber = null } = {}) {
     if (!runtime || !core || (!ingest && !ingestWorkflows) || !pendingDecisions) throw new Error("ChannelConversationHandler 缺少 Runtime、Core、IngestWorkflow 或 PendingDecision Store");
     this.runtime = runtime;
     this.core = core;
@@ -79,7 +79,7 @@ class ChannelConversationHandler {
     this.ownerChannelTargets = ownerChannelTargets;
     this.wakeDelivery = wakeDelivery;
     this.imageStore = imageStore;
-    this.visionClient = visionClient;
+    this.imageTranscriber = imageTranscriber;
   }
 
   #record(event, data = {}, options) {
@@ -97,9 +97,7 @@ class ChannelConversationHandler {
         messageId: message.id,
         replyTarget: message.channel === "feishu"
           ? { chatId: String(message.chatId || ""), replyTo: String(message.id || "") }
-          : message.channel === "weixin"
-            ? { toUserId: String(message.senderId || "") }
-            : undefined,
+          : undefined,
       });
     }
     const receipt = await this.ingest.receive(payload, {
@@ -148,13 +146,14 @@ class ChannelConversationHandler {
       }
     }
     if (images.length && explicitIngest) {
-      if (!this.imageStore || !this.visionClient) {
+      if (!this.imageStore || !this.imageTranscriber) {
         rejected.push("识图通道未就绪");
       } else {
         for (const image of images) {
           try {
             const registered = this.imageStore.register(image);
-            const vision = await this.visionClient.read({
+            // 转写走自带模型链（capture sidecar，无工具）；失败如实回报，不猜图
+            const vision = await this.imageTranscriber.read({
               artifactId: registered.artifactId,
               question: text || "请提取图中可见文字并概述画面。",
             });
@@ -215,17 +214,13 @@ class ChannelConversationHandler {
   #deliveryTarget(message) {
     return message.channel === "feishu"
       ? { chatId: String(message.chatId || ""), replyTo: String(message.id || "") }
-      : message.channel === "weixin"
-        ? { toUserId: String(message.senderId || ""), contextToken: String(message.contextToken || "") }
-        : null;
+      : null;
   }
 
   async #rememberChannelTarget(message) {
-    if (!this.ownerChannelTargets?.set || !["weixin", "feishu"].includes(message.channel)) return;
+    if (!this.ownerChannelTargets?.set || message.channel !== "feishu") return;
     const target = this.#deliveryTarget(message);
-    const complete = message.channel === "weixin"
-      ? Boolean(target?.toUserId && target?.contextToken)
-      : Boolean(target?.chatId);
+    const complete = Boolean(target?.chatId);
     if (!complete) return;
     try {
       await this.ownerChannelTargets.set(message.ownerKey, message.channel, target);

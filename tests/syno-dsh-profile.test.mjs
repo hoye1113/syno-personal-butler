@@ -27,7 +27,8 @@ test("Syno production bundle declares the agent preset in DSH's active registry"
   assert.match(bundlePatch, /name: Syno production/);
   assert.doesNotMatch(bundlePatch, /includeUserRoot/);
   assert.match(bundlePatch, /id: syno-capabilities[\s\S]*name: '\.\/plugins\/capabilities\/index\.mjs'/);
-  assert.match(bundlePatch, /id: syno-channel-weixin[\s\S]*name: '\.\/plugins\/channel-weixin\/index\.mjs'/);
+  // 微信通道栈已随「只用飞书」物理删除（2026-10-16），生产 bundle 不得再挂载它
+  assert.doesNotMatch(bundlePatch, /channel-weixin/);
 });
 
 test("Host-generated syno profile pins bundles and forbids marketplace add", async (t) => {

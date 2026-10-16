@@ -15,9 +15,9 @@ const DEFAULT_MAX_CHARS = 20_000;
 // 活聊天渠道：只有主人正在对话的入口才允许升级浏览器。proactive 生成走 channel:"scheduler"、
 // 收录兜底走 channel:"capture"（自带显式授权链），都不在此列。
 // "chat"（2026-10-16）是 DSH 插件路径的标记：该路径工具拿不到 Host 的 channel，改按会话身份
-// 门禁（capabilities/chat-session.mjs 只放行 syno-main-* 与 weixin-* 活聊天会话），到此已是
+// 门禁（capabilities/chat-session.mjs 只放行 syno-main-* 活聊天会话），到此已是
 // 已判定的活聊天，故与其他活聊天渠道同权。
-const LIVE_CHAT_CHANNELS = new Set(["weixin", "feishu", "web", "chat"]);
+const LIVE_CHAT_CHANNELS = new Set(["feishu", "web", "chat"]);
 
 // 反爬墙签名（2026-09-03 生产实证：mp.weixin.qq.com 直抓被重定向到 wappoc_appmsgcaptcha
 // 验证码页，正文为"当前环境异常，完成验证后即可继续访问"）。故意比 adapter 的

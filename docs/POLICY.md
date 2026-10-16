@@ -15,7 +15,7 @@ The Bridge and DSH plugin share the same tool-set names. DSH plugin data must no
 ## Owner isolation
 
 - `ownerKey` is the isolation boundary for Goal/Job/Workflow/Note references and all durable clarification/recovery views. Read-side listings (`jobs.list`, `goals.list`) are Owner-scoped.
-- Job ID 直达的 advice、approve、reject、cancel、retry 等操作必须在服务端重新校验 Owner；历史会话或旧微信命令不能提供隐式授权。
+- Job ID 直达的 advice、approve、reject、cancel、retry 等操作必须在服务端重新校验 Owner；历史会话或旧渠道消息不能提供隐式授权。
 - The Project subsystem (server-owned `projectRef`, `/project` directive, `projects.*` tools) was removed on 2026-09-01 (product-slimming D6). Historical `ops/projects/*.md` records stay read-only; no Project authorization path remains.
 
 | Action | Execution | Workspace | Notes |

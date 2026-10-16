@@ -151,8 +151,9 @@ class OwnerChannelTargetStore {
 
   async set(ownerKey, channel, target) {
     if (!ownerKey || !channel || !target || typeof target !== "object") throw new Error("OwnerChannelTargetStore 缺少身份或目标");
-    const allowed = channel === "weixin" ? ["toUserId", "contextToken"] : channel === "feishu" ? ["chatId"] : [];
-    if (!allowed.length || allowed.some((key) => !String(target[key] || ""))) throw new Error("渠道目标不完整");
+    // 飞书目标以 chatId 为必需身份，replyTo 只是可选的回复锚点。
+    if (channel !== "feishu" || !String(target.chatId || "")) throw new Error("渠道目标不完整");
+    const allowed = ["chatId", "replyTo"];
     return this.processLock.run(async () => {
       const metadataPath = metadataFile(this.root, ownerKey, channel);
       let prior = null;
@@ -161,7 +162,11 @@ class OwnerChannelTargetStore {
       const payloadRef = `${digest({ ownerKey, channel })}-${randomUUID()}`;
       const updatedAt = this.clock().toISOString();
       await fs.mkdir(this.payloadRoot, { recursive: true });
-      await atomicWriteText(payloadFile(this.payloadRoot, payloadRef), await this.protect(JSON.stringify(Object.fromEntries(allowed.map((key) => [key, String(target[key])])))));
+      // 只落有值的键：可选键（replyTo）缺失时不得写出 "undefined" 字符串。
+      const persisted = Object.fromEntries(allowed
+        .filter((key) => target[key] !== undefined && target[key] !== null && String(target[key]) !== "")
+        .map((key) => [key, String(target[key])]));
+      await atomicWriteText(payloadFile(this.payloadRoot, payloadRef), await this.protect(JSON.stringify(persisted)));
       await atomicWriteJson(metadataPath, {
         version: 1,
         ownerKey: String(ownerKey),

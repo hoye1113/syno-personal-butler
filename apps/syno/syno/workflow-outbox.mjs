@@ -42,11 +42,8 @@ function safePayload(payload) {
 
 function safeDeliveryTarget(targetChannel, target) {
   if (!target || typeof target !== "object" || Array.isArray(target)) return undefined;
-  const allowed = targetChannel === "weixin"
-    ? ["toUserId"]
-    : targetChannel === "feishu"
-      ? ["chatId", "replyTo"]
-      : [];
+  // 通道凭据白名单：飞书用 chatId（+ 可选的回复锚点），其它通道不携带任何投递目标。
+  const allowed = targetChannel === "feishu" ? ["chatId", "replyTo"] : [];
   const result = Object.fromEntries(allowed
     .filter((key) => String(target[key] || ""))
     .map((key) => [key, String(target[key])]));

@@ -28,7 +28,7 @@ function validateValue(key, value) {
       && !Array.isArray(value)
       && typeof value.eventId === "string"
       && typeof value.runId === "string"
-      && ["weixin", "feishu"].includes(value.homeChannel)
+      && value.homeChannel === "feishu"
       && value.visibleCount === 1
       && value.order === "single"
       && value.performedBy === "owner"

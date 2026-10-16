@@ -113,7 +113,7 @@ function fakeBrowserAdapter(behavior) {
 }
 
 const WX_WALL_TEXT = "当前环境异常，完成验证后即可继续访问。去验证";
-const chatContext = { channel: "weixin", ownerId: "local-user", threadKey: "main", conversationId: "m1" };
+const chatContext = { channel: "feishu", ownerId: "local-user", threadKey: "main", conversationId: "m1" };
 
 test("detectAntiBotWall recognizes the WeChat verification wall and spares normal pages", async () => {
   const { detectAntiBotWall } = await import("../packages/syno-core/fetch-url-tool.mjs");

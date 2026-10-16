@@ -33,41 +33,12 @@ function send(res, status, body, type = "application/json; charset=utf-8") {
   res.end(body);
 }
 
-// 维护页脚本与样式走同源静态路由：CSP 的 script-src/style-src 'self' 会阻止任何
-// inline 块，内联进 HTML 等于让页面自锁（按钮无响应），因此保持外链。
-const QR_PAGE = `<!doctype html><meta charset="utf-8"><title>Syno 微信重绑</title><link rel="stylesheet" href="/maintenance/weixin.css"><h1>微信重绑</h1><p id="state">仅用于扫码绑定；完成后请关闭此页。</p><button id="start">开始扫码</button><p><img id="qr" hidden alt="微信扫码二维码"></p><script src="/maintenance/weixin.js" defer></script>`;
-const QR_CSS = "body{font:16px system-ui;max-width:420px;margin:48px auto;padding:0 18px}img{max-width:320px}button{padding:9px 14px}";
-const QR_JS = `const state = document.querySelector("#state");
-const qr = document.querySelector("#qr");
-let timer;
-async function call(path) {
-  const response = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-  return response.json();
-}
-document.querySelector("#start").onclick = async () => {
-  try {
-    const started = await call("/maintenance/weixin/start");
-    qr.src = started.imageUrl;
-    qr.hidden = false;
-    state.textContent = "请用微信扫码确认。";
-    timer = setInterval(async () => {
-      const polled = await call("/maintenance/weixin/poll");
-      state.textContent = polled.status === "confirmed" ? "已连接，可关闭此页。" : ("等待确认：" + polled.status);
-      if (polled.status === "confirmed") { clearInterval(timer); await call("/maintenance/weixin/connect"); }
-    }, 2000);
-  } catch { state.textContent = "重绑未开始，请稍后重试。"; }
-};
-`;
-
-const maintenance = Object.freeze({ "/maintenance/weixin/start": "/api/syno/weixin/login/start", "/maintenance/weixin/poll": "/api/syno/weixin/login/poll", "/maintenance/weixin/connect": "/api/syno/weixin/connect" });
 const server = createServer(async (req, res) => {
   try {
     if (!isLoopback(req) || !isLocalHostHeader(req)) return send(res, 403, JSON.stringify({ error: "loopback_only" }));
     const url = new URL(req.url || "/", "http://127.0.0.1");
-    if (req.method === "GET" && url.pathname === "/maintenance/weixin") return send(res, 200, QR_PAGE, "text/html; charset=utf-8");
-    if (req.method === "GET" && url.pathname === "/maintenance/weixin.css") return send(res, 200, QR_CSS, "text/css; charset=utf-8");
-    if (req.method === "GET" && url.pathname === "/maintenance/weixin.js") return send(res, 200, QR_JS, "text/javascript; charset=utf-8");
-    const routed = maintenance[url.pathname] || url.pathname;
+    // 微信重绑维护页已随微信通道栈删除（2026-10-16）；飞书注册走 /api/syno/feishu/register/*。
+    const routed = url.pathname;
     if (!isAllowedSynoApiPath(routed)) return send(res, 404, JSON.stringify({ error: "not_found" }));
     const apiUrl = new URL(routed, url);
     const value = await routeSynoApi(runtime, req, apiUrl, readJson);

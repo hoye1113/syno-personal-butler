@@ -90,8 +90,6 @@
     # 不设 env 时既不注册工具也不建通道；`SYNO_CHAT_TOOLS=plugin` 时 bridge 静默）。
     - id: syno-capabilities
       name: './plugins/capabilities/index.mjs'
-    - id: syno-channel-weixin
-      name: './plugins/channel-weixin/index.mjs'
     # Syno 组合搜索 provider（豆包 → Tavily → Exa → Parallel 匿名备用，按查询语言路由）。
     - id: syno-web-search
       name: './plugins/web-search/index.mjs'

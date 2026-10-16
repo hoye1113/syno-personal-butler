@@ -155,7 +155,7 @@ test("ChannelConversationHandler receipts the recorded feedback even when settli
   assert.equal(journal.some((entry) => entry.event === "inspiration.feedback.recorded"), true);
 });
 
-test("ChannelConversationHandler shadow-persists mobile text before model execution without changing reply flow", async () => {
+test("ChannelConversationHandler persists accepted requests before model execution without changing reply flow", async () => {
   const accepted = [];
   const runs = [];
   const targets = [];
@@ -172,22 +172,22 @@ test("ChannelConversationHandler shadow-persists mobile text before model execut
     wakeDelivery: async () => { wakes += 1; },
   });
   const response = await handler.handle({
-    id: "wx-shadow-1",
+    id: "fs-shadow-1",
     ownerKey: "owner",
     senderId: "owner",
-    contextToken: "context-token",
-    channel: "weixin",
-    text: "移动 shadow 测试",
+    chatId: "chat-shadow",
+    channel: "feishu",
+    text: "受理 shadow 测试",
   });
   assert.deepEqual(response, { text: "shadow-reply" });
   assert.equal(runs.length, 1);
   assert.equal(accepted.length, 1);
-  assert.equal(accepted[0].originChannel, "weixin");
-  assert.equal(accepted[0].platformMessageId, "wx-shadow-1");
-  assert.deepEqual(accepted[0].payload, { text: "移动 shadow 测试", attachments: [] });
-  assert.deepEqual(accepted[0].deliveryTarget, { toUserId: "owner", contextToken: "context-token" });
-  assert.deepEqual(targets, [{ ownerKey: "owner", channel: "weixin", target: { toUserId: "owner", contextToken: "context-token" } }]);
-  assert.deepEqual(targetWakeups, [{ ownerKey: "owner", channel: "weixin" }]);
+  assert.equal(accepted[0].originChannel, "feishu");
+  assert.equal(accepted[0].platformMessageId, "fs-shadow-1");
+  assert.deepEqual(accepted[0].payload, { text: "受理 shadow 测试", attachments: [] });
+  assert.deepEqual(accepted[0].deliveryTarget, { chatId: "chat-shadow", replyTo: "fs-shadow-1" });
+  assert.deepEqual(targets, [{ ownerKey: "owner", channel: "feishu", target: { chatId: "chat-shadow", replyTo: "fs-shadow-1" } }]);
+  assert.deepEqual(targetWakeups, [{ ownerKey: "owner", channel: "feishu" }]);
   assert.equal(wakes, 1);
 });
 
@@ -266,14 +266,14 @@ test("ChannelConversationHandler returns the existing Workflow status for a dupl
     id: "capture-duplicate-1",
     ownerKey: "owner",
     senderId: "owner",
-    contextToken: "current-context",
-    channel: "weixin",
+    chatId: "chat-current",
+    channel: "feishu",
     text: "https://example.com/already-captured",
   });
 
   assert.equal(receives, 1);
   assert.equal(modelRuns, 0);
-  assert.deepEqual(targets, [{ ownerKey: "owner", channel: "weixin", target: { toUserId: "owner", contextToken: "current-context" } }]);
+  assert.deepEqual(targets, [{ ownerKey: "owner", channel: "feishu", target: { chatId: "chat-current", replyTo: "capture-duplicate-1" } }]);
   assert.equal(response.text, "已存在收录编号：workflow-existing。当前状态：已拒收。");
   assert.doesNotMatch(response.text, /正在后台安全提取/);
 });
@@ -740,7 +740,7 @@ test("ChannelConversationHandler delivers owner images to the model as image blo
     pendingDecisions: {},
     attachmentToPayload: async () => { throw new Error("image must not convert to intake"); },
     imageStore: new IsolatedImageStore({ quarantineRoots: [root] }),
-    visionClient: { async read() { throw new Error("聊天的普通图片不得直接走 handler 识图（那是收录路径）"); } },
+    imageTranscriber: { async read() { throw new Error("聊天的普通图片不得直接走 handler 识图（那是收录路径）"); } },
   });
   const response = await handler.handle({
     id: "wx-img-1",
@@ -830,7 +830,7 @@ test("ChannelConversationHandler turns explicit 收录 plus image into text inta
     pendingDecisions: {},
     attachmentToPayload: async () => { throw new Error("must not use binary image intake"); },
     imageStore: new IsolatedImageStore({ quarantineRoots: [root] }),
-    visionClient: {
+    imageTranscriber: {
       async read({ question }) {
         assert.match(question, /收录/);
         return { ocr: "SYNO42", layout: "row", summary: "green", answer: "green", uncertain: [] };
@@ -871,7 +871,7 @@ test("ChannelConversationHandler reports retryable vision failure without invent
     pendingDecisions: {},
     attachmentToPayload: async () => { throw new Error("no"); },
     imageStore: new IsolatedImageStore({ quarantineRoots: [root] }),
-    visionClient: {
+    imageTranscriber: {
       async read() {
         throw Object.assign(new Error("timeout"), { code: "VISION_TIMEOUT", retryable: true });
       },
@@ -906,7 +906,7 @@ test("ChannelConversationHandler does not treat image captions as approval repli
     pendingDecisions: { async parse() { parsed = true; throw new Error("must not parse"); } },
     attachmentToPayload: async () => { throw new Error("image must not convert to intake"); },
     imageStore: new IsolatedImageStore({ quarantineRoots: [root] }),
-    visionClient: { async read() { throw new Error("聊天图片不得直接走 handler 识图"); } },
+    imageTranscriber: { async read() { throw new Error("聊天图片不得直接走 handler 识图"); } },
   });
   const response = await handler.handle({
     id: "wx-img-approve",

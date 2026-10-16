@@ -56,8 +56,8 @@ pnpm state:archive -- restore D:\Backups\syno-state-20260717
 - 主动/工作流 outbox 的终态记录（`delivered`/`failed_terminal`）由 `retain()` 按小时节流、超 14 天自动淘汰，目录不再单调膨胀（drain 时 best-effort，不阻塞投递）。
 - 收录重复 URL 不会重新调用模型或创建活动 Workflow：渠道直接返回已有收录编号和当前状态。只有同一重复消息发现最终通知尚未确认送达时，才唤醒原 Outbox；`failed_terminal` 才按该消息 ID 创建一次安全 replay。终态 URL 仍允许新的来源检查，因此主人可以主动重新收录。
 - 质量拒收通知入队成功后，Workflow 进入 `rejected` 终态，清除 `pendingAction`、`nextRetryAt` 和 `lastError`；Host 重启恢复不会再次触发质量分析或重复生成拒收通知。
-- Workflow Outbox 的 `delivered` 只表示渠道 Provider 接受了 at-least-once 投递请求，不代表主人已经阅读。微信/飞书发送前从加密的 `OwnerChannelTargetStore` 恢复当前目标；`contextToken` 不写入 Workflow、普通 Outbox JSON、日志或诊断输出。目标缺失或解密失败会进入有界可重试路径，耗尽后记录脱敏终态事件。
-- 飞书没有 typing API：收到主人私聊后先发一条可原位更新的「⏳ Syno 正在回复中…」卡片（引用原消息），答复就绪后用 `im.v1.message.patch`（`channel.updateCard`）把同一条卡片更新为最终答复；更新失败则收回占位卡并退回普通发送，占位发送失败不阻断正常回复；模型处理异常或延迟投递（v2 ack 路径）时收回占位卡。默认开启，`SYNO_FEISHU_TYPING=0|false` 可关；微信侧对应开关是 `SYNO_WEIXIN_TYPING`。
+- Workflow Outbox 的 `delivered` 只表示渠道 Provider 接受了 at-least-once 投递请求，不代表主人已经阅读。飞书发送前从加密的 `OwnerChannelTargetStore` 恢复当前目标（`chatId` 必需，`replyTo` 可选）；目标凭据不写入 Workflow、普通 Outbox JSON、日志或诊断输出。目标缺失或解密失败会进入有界可重试路径，耗尽后记录脱敏终态事件。
+- 飞书没有 typing API：收到主人私聊后先发一条可原位更新的「⏳ Syno 正在回复中…」卡片（引用原消息），答复就绪后用 `im.v1.message.patch`（`channel.updateCard`）把同一条卡片更新为最终答复；更新失败则收回占位卡并退回普通发送，占位发送失败不阻断正常回复；模型处理异常或延迟投递（v2 ack 路径）时收回占位卡。默认开启，`SYNO_FEISHU_TYPING=0|false` 可关。
 - 历史上 `proactive.bundle.recovery_failed`（如 f1b29459）刷屏的根因是对账循环重读已损坏的 outbox payload 抛错、每 tick 记一条失败——已由「对账排除 `failed_terminal`（C6）」+「drain 时把结构损坏 payload 转终态（A1）」根治，不再复现。若日志仍见，多为修复前残留记录：把 `state/channel-outbox/<id>.json` 的 status 改 `failed_terminal`，或删除其 `.dpapi` payload 后重启即可。
 - 系统性「静默无限重试/停滞」bug 类已由 P1–P4 + 收尾复审 R1–R3（commit `8ce4cb3`）根治：凡是 `loop / retry / 定时 drain / setInterval tick` 的回调内 uncaught throw 被外层归默认 retryable、又无终态升级、再加过宽 `.catch(()=>{})` 吞错，就会不抛错不告警地永远重试或永远不推进。**改动任何重试/循环路径必须保留三件套**：终态出口（`failed_terminal`）、maxAttempts 上限（惯例 8）、可观测回调（`recordEvent`，不得 `.catch(()=>{})` 吞）；且 maxAttempts cap 必须放在 `send()`/调用**之前**（事后 cap 在 send 抛错时结构性不可达，R3）。诊断事件：`accepted_request.recovery_failed`（accepted 恢复 tick 抛错）、`INGEST_PREPARE_EXHAUSTED`（收录 prepare 重试耗尽）、`WORKFLOW_DELIVERY_EXHAUSTED`/`PROACTIVE_DELIVERY_EXHAUSTED`（投递耗尽转终态）、`proactive.bundle.blocked_sensitive`（主动提醒命中高精度凭据，已净化为回退文案）。这些只在真实故障时出现，正常启动不应刷屏。
 
@@ -113,7 +113,7 @@ $log = Get-ChildItem "$env:LOCALAPPDATA\Syno\logs\syno-runtime-*.jsonl" |
 Get-Content -LiteralPath $log.FullName -Tail 80
 ```
 
-渠道健康 probe 可以在 Host 运行时直接执行。它优先读取 `http://127.0.0.1:<PORT>/api/syno/channels` 的脱敏状态，返回 `source: running_worker`（历史字段名，表示本机 Host 渠道进程在线）；仅在本机服务不可达时才启动独立 Adapter。这样不会与微信进程锁竞争，也不会为飞书重复建立长连接。
+渠道健康 probe 可以在 Host 运行时直接执行。它优先读取 `http://127.0.0.1:<PORT>/api/syno/channels` 的脱敏状态，返回 `source: running_worker`（历史字段名，表示本机 Host 渠道进程在线）；仅在本机服务不可达时才启动独立 Adapter。这样不会重复建立飞书长连接，也不会与 Host 内的渠道进程争锁。
 
 ### zh-CN 主机的 PowerShell/子进程编码陷阱
 
@@ -121,13 +121,11 @@ Get-Content -LiteralPath $log.FullName -Tail 80
 
 根治约束：**只让 Base64（7-bit ASCII，所有常见代码页的公共子集）跨过 console/stdio 边界**——Node 侧 `Buffer.from(x,"utf8").toString("base64")` 写入 stdin，脚本内只用 `FromBase64String/ToBase64String`（Python 侧用 `io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")` 或注入 `PYTHONUTF8=1`），绝不调 `UTF8.GetString/GetBytes` 或依赖默认编码。`runDpapi`（`provider-credential-store.mjs`）与 Harness JSON-RPC sidecar 均遵循此约束；新增任何跨进程文本往返必须沿用，否则中文路径会静默损坏。
 
-### 通道开关（2026-10-16）
+### 通道（2026-10-16）
 
-- `SYNO_CHANNELS`（逗号分隔，默认 `weixin,feishu`）决定 Host 构造并启动哪些通道；停用的通道不出现在 `/api/syno/channels`，其端点返回 `409 CHANNEL_DISABLED`。
-- 机器级配置写在仓库根 `.env`（gitignored）；launcher 只把 `SYNO_CHANNELS` 这一白名单变量透传给 Host 子进程，不整体注入 `.env`。
-- 当前生产：`SYNO_CHANNELS=feishu`（主人只用飞书；微信栈代码保留一版，改回 `weixin,feishu` 即可恢复）。
-- 通道默认 home 随实际注册的通道走（多通道时优先飞书）；主动推送只投 home 通道。
-- 飞书入站附件：图片/文件走官方资源接口下载到 `.runtime/quarantine/feishu`，形状与微信 artifact 完全一致（图片直传模型、文件走收录）；单文件上限 25MB，超限或格式无法识别时如实拒绝。
+- 当前只有飞书一条通道（`feishu`）：微信 iLink 客户端、DSH `channel-weixin` 插件、`/api/syno/weixin/*` 端点与 `/maintenance/weixin` 重绑页已随「只用飞书」一并删除。
+- 通道默认 home 取注册到的通道（多通道时优先飞书）；主动推送只投 home 通道。
+- 飞书入站附件：图片/文件走官方资源接口下载到 `.runtime/quarantine/feishu`（isolated/autoRead 同规约）→ 图片直传模型、文件走收录；单文件上限 25MB，超限或格式无法识别时如实拒绝。
 
 ### DeepSeek Harness 生产 chat（2026-08-21）
 
@@ -201,7 +199,7 @@ dsh plugin --profile syno-lab add dsh-mnemon@0.2.13
 
 **识图在 Host**
 
-图片（微信/飞书同一条链）：主人发的图直接作为 image 内容块投给模型（2026-10-16 起，模型链支持看图；单图原始上限 3MB，超限/未过隔离校验则如实说明）；明确「收录」才走 Host visionClient → Zen HTTP `mimo-v2.5-free`，识图 JSON 当 `kind: text` Intake。Zen key 留在 Host，不进 Harness 子进程。PDF/文本附件走收录。
+图片（微信/飞书同一条链）：主人发的图直接作为 image 内容块投给模型（2026-10-16 起，模型链支持看图；单图原始上限 3MB，超限/未过隔离校验则如实说明）；明确「收录」才额外做一次模型转写（同链、capture sidecar 无工具），结构化 JSON 当 `kind: text` Intake。PDF/文本附件走收录。
 
 ### Windows 飞书日历 CLI
 
@@ -262,7 +260,7 @@ pnpm start
 
 Chat 的 `web_search` 由自研 `syno-search` 链提供（ADR 0009）：豆包搜索（500 次/月免费）→ Tavily（1000 credit/月）→ Exa（每月 $10 额度）→ Parallel 匿名 MCP 备用（免 Key、额度未公布），按查询语言路由（中文优先豆包、英文优先 Tavily），失败/限流/空结果自动回退；key 走仓库根 `.env`（`DOUBAO_SEARCH_API_KEY` / `TAVILY_API_KEY` / `EXA_API_KEY`）经 Host 注入，`harness:doctor` 的 `search-keys` 检查报告就位情况；可用 `SYNO_WEB_SEARCH_CHAIN=exa,tavily` 覆盖链前缀。JSON-RPC chat 回退面在 `syno-chat.cordis.yml` 挂载同一接缝（该面以相对路径加载插件，没有 bundle linked-root 的 peer 拦截，插件内对 `@deepseek-ai/dsh-web` 采用可选解析，见 `plugins/web-search/index.mjs`）。`web_fetch` 仍为匿名 HTTP(S)。Web session 使用 Host 生成并显式绑定的 `syno` agent preset，compaction 与普通 schedule 由当前生产 profile 的官方 DSH 层接管（Web preset 使用官方 compaction-basic/tool-result-pruner/compact command，JSON-RPC 使用同一 stack，普通 schedule 由 `@deepseek-ai/dsh-schedule` function plugin 提供），Syno 的 SignalEngine / PriorityEngine / ChannelDeliveryOutbox 仍负责业务主动运营，不与普通 schedule 混用。不要对生产 `syno` profile 执行 `dsh plugin add`，也不要从 [dsh-plugin.org](https://dsh-plugin.org/plugins?q=search) 装社区搜索或记忆插件；实验 UI 只用 Host 生成的 `syno-lab` profile（无 Bridge、无 vault 写、无微信）。收录分析 profile 仍然没有 web。
 
-图片与附件（2026-10-16 起飞书同样支持）：主人发的图直接投给模型看图；文件（PDF/docx/md/txt/html）落隔离区后走收录。明确说「收录」时图片才走 Host visionClient → Zen HTTP `mimo-v2.5-free`，识图 JSON 作为 `kind: text` 进入现有 Intake / Proposal。飞书资源下载走官方 `im/v1/messages/{id}/resources/{key}` 接口，权限要求由「获取单聊、群组消息」（注册时已申请 `im:message:readonly`）覆盖；单文件上限 25MB。本地知识搜索仍是 `syno_knowledge_search`。识图失败对微信可见，禁止猜图。
+图片与附件（2026-10-16 起飞书同样支持）：主人发的图直接投给模型看图；文件（PDF/docx/md/txt/html）落隔离区后走收录。明确说「收录」时图片才额外做一次模型转写（同链、capture sidecar 无工具），JSON 作为 `kind: text` 进入现有 Intake / Proposal。飞书资源下载走官方 `im/v1/messages/{id}/resources/{key}` 接口，权限要求由「获取单聊、群组消息」（注册时已申请 `im:message:readonly`）覆盖；单文件上限 25MB。本地知识搜索仍是 `syno_knowledge_search`。识图失败对微信可见，禁止猜图。
 
 主人验收清单：
 

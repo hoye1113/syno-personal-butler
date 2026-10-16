@@ -519,7 +519,7 @@ test("proactive Owner observation is stable release evidence, not a transient la
   const evidence = {
     eventId: "outbox-test-1",
     runId: "release-20260730",
-    homeChannel: "weixin",
+    homeChannel: "feishu",
     visibleCount: 1,
     order: "single",
     performedBy: "owner",
