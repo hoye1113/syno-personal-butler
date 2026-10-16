@@ -129,10 +129,20 @@ async function inspectListener(port, run = execFileAsync) {
     const { stdout } = await run("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-t"], { timeout: 5_000 });
     const pid = Number(String(stdout).trim().split(/\r?\n/)[0]);
     if (!Number.isInteger(pid) || pid <= 0) return null;
-    const { stdout: psOut } = await run("ps", ["-p", String(pid), "-o", "comm=,args="], { timeout: 5_000 });
-    const text = String(psOut).trim();
-    const comm = text.split(/\s+/)[0] || "";
-    return { pid, comm, command: text };
+    return listenerFor(pid, run);
+  } catch {
+    return null;
+  }
+}
+
+// macOS 的 p_comm 截断为 16 字符（绝对路径启动的 node 会变成 "/usr/local/bin/n"），因此可执行路径
+// 从 ps args 的首个 token 取，而不是 comm 列。
+async function listenerFor(pid, run = execFileAsync) {
+  try {
+    const { stdout: psOut } = await run("ps", ["-p", String(pid), "-o", "args="], { timeout: 5_000 });
+    const command = String(psOut).trim();
+    const comm = command.split(/\s+/)[0] || "";
+    return { pid, comm, command };
   } catch {
     return null;
   }
@@ -144,11 +154,8 @@ async function listListeners(port, run = execFileAsync) {
     const pids = [...new Set(String(stdout).split(/\r?\n/).map((line) => Number(line.trim())).filter((pid) => Number.isInteger(pid) && pid > 0))];
     const listeners = [];
     for (const pid of pids) {
-      try {
-        const { stdout: psOut } = await run("ps", ["-p", String(pid), "-o", "comm=,args="], { timeout: 5_000 });
-        const text = String(psOut).trim();
-        listeners.push({ pid, comm: text.split(/\s+/)[0] || "", command: text });
-      } catch { /* 进程可能已退出 */ }
+      const listener = await listenerFor(pid, run);
+      if (listener) listeners.push(listener);
     }
     return listeners;
   } catch {
@@ -253,21 +260,28 @@ async function main() {
   log("launcher.started", { nodePath, serverPath, port, parentPid: process.pid });
 
   // 内层：端口上已有健康的本仓 Host（例如手动启动或上一轮退避窗口内被手动拉起）时收养并看护，
-  // 不生成第二个竞争者；直到该 Host 消失才落入外层自行孵化。
+  // 不生成第二个竞争者；直到该 Host 消失才落入外层自行孵化。无法确认归属时先做有界重试
+  // （旧 Host 可能正在优雅退出），连续 3 次仍无法确认才安静停下（非零退出会触发 throttle 重启循环）。
+  let adoptRejections = 0;
   while (!state.stopping) {
     const health = await fetchHealth(port);
     if (!health) break;
     if (!validateHealth(health, fingerprint)) {
-      // 端口被非本仓服务占用：按 launchd 语义安静停下（非零退出会触发 throttle 快速重启循环），
-      // 记录 launcher.adopt_rejected 供诊断，绝不与陌生服务争抢端口。
-      log("launcher.adopt_rejected", { reason: "foreign_health", product: health?.product ?? null, protocolVersion: health?.protocolVersion ?? null });
-      process.exit(0);
+      adoptRejections += 1;
+      log("launcher.adopt_rejected", { reason: "foreign_health", attempt: adoptRejections, product: health?.product ?? null, protocolVersion: health?.protocolVersion ?? null });
+      if (adoptRejections >= 3) process.exit(0);
+      await sleep(15_000);
+      continue;
     }
     const listener = await inspectListener(port);
     if (!listenerMatchesHost(listener, { serverPath, repoRoot })) {
-      log("launcher.adopt_rejected", { reason: "listener_unverified", listenerPid: listener?.pid ?? null, listenerCommand: listener?.command ?? null });
-      process.exit(0);
+      adoptRejections += 1;
+      log("launcher.adopt_rejected", { reason: "listener_unverified", attempt: adoptRejections, listenerPid: listener?.pid ?? null, listenerCommand: listener?.command ?? null });
+      if (adoptRejections >= 3) process.exit(0);
+      await sleep(15_000);
+      continue;
     }
+    adoptRejections = 0;
     log("launcher.health_ok", { listenerPid: listener.pid });
     log("launcher.adopted", { listenerPid: listener.pid });
     await writeOwnership(pidFile, { version: 1, pid: listener.pid, mode: "adopted", nodePath, serverPath, repoRoot, recordedAt: new Date().toISOString() });
