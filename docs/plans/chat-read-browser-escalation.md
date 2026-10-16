@@ -15,10 +15,12 @@
   `channel-conversation-handler.mjs`（含过期的 `knowledge.fetch_url` 工具名）文案同步。
 - 门禁：`pnpm test` 929 项（909 通过 / 0 失败 / 20 跳过）、`pnpm run verify`（2392 文件 + 8 文档）、
   `git diff --check` 全绿。
-- 未做（留后）：续办（阶段 2）、DSH 侧 journal（跨进程单写者原则，改用 DSH 会话日志 +
-  工具返回的 `via`/`blocked` 取证）。
+- 未做（留后）：DSH 侧 journal（跨进程单写者原则，改用 DSH 会话日志 +
+  工具返回的 `via`/`blocked` 取证）。「继续」续办（原阶段 2）**已被第 8 节的一步到位方案取代**，
+  待主人决策后再排。
 - 待真机验收：重启生产 DSH 后，在飞书发一篇会命中 `verification_redirect` 的微信文章，
-  期望 `via=browser` 正文。
+  期望 `via=browser` 正文。**已由本机端到端探针预验**（2026-10-16）：活聊天会话 `via=browser`
+  17,549 字符，主动运营会话 `via=direct` + `blocked`（门禁有效）。
 
 ## 1. 现象与期望
 
@@ -108,6 +110,33 @@ Host → DSH 的会话 id 是确定性的 `syno-<threadKey>-<uuid>`（`apps/syno
 - **搜索那一级已经在链上**：`web_search` 由 syno 搜索链提供（`packages/syno-dsh-plugin/cordis.patch.yml:96-97`，豆包→Tavily→Exa→Parallel），无需新增，只需在文案里明确「被墙后自动转镜像/转载搜索」。
 
 ## 7. 同源发现（不在本方案范围，另行裁决）
-
-- `syno_image_read` 不在 capabilities 的 10 个工具里（只在 Host 注册表/桥），默认模式下看图工具对模型不可见，而 `channel-conversation-handler.mjs:683` 仍指示模型调用它。
+- `syno_image_read` 不在 capabilities 的 10 个工具里（只在 Host 注册表/桥），默认模式下看图工具对模型不可见，而 `channel-conversation-handler.mjs:683` 仍指示模型调用它。（主人 2026-10-16 表态：所选模型本身能看图，该工具不需要，故不做迁移；遗留指令待收尾。）
 - 文档滞后：`docs/OPERATIONS.md:253`、`docs/POLICY.md:11`、`docs/SECURITY.md:5`、`docs/ARCHITECTURE.md:43` 仍把 Bridge core 工具集描述为普通聊天工具面。
+
+## 8. 追加评估（2026-10-16）：为什么不「一步到位」，以及怎么做
+
+主人质疑：「继续协议不太牢固，既然能通过继续完成，为什么不直接一步到位？」评估结论：质疑成立，但根因不在协议繁琐，而在**拦截即关窗**。
+
+### 8.1 现协议实际能做什么（证据）
+
+- `capture()` 无论成功、失败还是阻塞都在 `finally` 里关掉会话：`packages/syno-core/browser-capture-adapter.mjs:212-214`；ADR 0006 的措辞也是「阻塞后立即关闭」。
+- 因此 `continue()` 不是「在原窗口里接着读」，而是 `capture()` 重新 navigate 同一 URL：`:217-223`（会话已被删除，只从 observation 里取回 requestedUrl）。
+- 结论：现在的「继续」= **整轮重试**，成败取决于浏览器 profile 的登录态与风控是否放行，**没人接力的空间**。这是「不牢固」的真正原因；而原阶段 2 想补的跨进程续办，补的也只是「记住 URL + 口令 + TTL」，并不解决人无处介入的问题。
+
+### 8.2 为什么当初这么设计
+
+ADR 0006 的无人值守边界是为**收录/主动任务**定的：没人在场，窗口不能留着占资源，也禁止「请求主人接管」。这条边界被顺手套用到了活聊天——而活聊天里主人就在当场，属于边界用错了地方。
+
+### 8.3 一步到位的方案（取代原阶段 2）
+
+**核心动作：命中验证时把窗口留着，人在里面过验证，程序轮询同一个窗口，过了就直接返回正文。**
+
+- A1（同一轮内等待）：工具调用里有界轮询（建议 90–120s），主人过完验证即回正文；超时才降级为如实报告。技术可行：DSH 的 `defineTool` 没有默认执行超时（`timeoutMs` 为可选，未设即不限），adapter 侧加 `waitForClearance({ workflowId, timeoutMs, intervalMs })` 复用 `snapshot` 即可。代价：主人不在时这一轮会空等到超时。
+- A2（不等，主人回话后查）：窗口与会话都留着，主人办完回一句，程序去查那个还开着的窗口。比 A1 便宜，但仍有「回一句」的动作。
+- 两者都需要先改 `capture()`：拦截分支不再自动关窗，改由调用方决定关闭时机（超时/结束）。
+
+### 8.4 待主人决策
+
+1. **是否允许把主人拉进来**：现行策略是「绝不请求接管」。A1/A2 都突破这条，但只在活聊天生效（收录/主动任务维持关窗）。
+2. **拦截时要不要抢一次焦点**：现在 `--no-focus`，窗口可能被无视。不抢焦点走 A2，抢焦点才适合 A1。
+3. 若采纳，原阶段 2（跨进程续办）可以整体取消，协议面反而变小。
