@@ -200,6 +200,10 @@ test("Syno agent instructions match the shared core chat tool set", async () => 
   assert.match(instructions, /命中反爬验证墙.*自动改用本机浏览器/);
   assert.doesNotMatch(instructions, /默认插件仅支持直抓/);
   assert.doesNotMatch(instructions, /告知主人完成后回复|先.*web_search.*再.*web_fetch/);
+  // 2026-10-17 工具面重设计：没有的能力必须如实说，已删的模型工具不得回流到提示词
+  assert.match(instructions, /没有今日快照/);
+  assert.match(instructions, /不得编造快照/);
+  assert.doesNotMatch(instructions, /syno_(?:capture|jobs|today|inspiration)/);
 });
 
 test("cordis configs live in the Syno repo and never inline API keys", async () => {
