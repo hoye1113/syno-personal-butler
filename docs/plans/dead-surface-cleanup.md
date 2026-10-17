@@ -8,6 +8,8 @@
 > 删除 `capture.start/status/list_pending`、`jobs.list/submit`、`today.read`、`inspiration_record_feedback` 及其
 > 插件模块/测试/eval；灵感反馈机制整体下线（确定性口令 + 微信专属续办 + Host 工具一起删）；
 > DSH 侧关闭 `bash`/`pwsh`/`fs`/`fs-search`/`jobs`/`schedule` 与通用 `web_fetch`（读网页只留受控路径）。
+> 真机验证：`pnpm spike:capabilities` 四轮全绿，模型实际调用 `syno_knowledge_search` → `syno_knowledge_read_snippet`
+> → `web_search`（21s）；spike 同步去掉已不存在的 `web_fetch` 轮次。
 > 第五轮（2026-10-16，主人「Zen → 自带 Kimi 和删除微信栈先做了」）：**收录图片转写改用模型链**
 > （`image-transcriber.mjs`，capability/capture sidecar 无工具），删除 Zen 视觉客户端与密钥装载；
 > **微信通道栈物理删除**（iLink 客户端、DSH channel-weixin 插件、`/api/syno/weixin/*`、维护页、

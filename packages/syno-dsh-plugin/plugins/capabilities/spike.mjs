@@ -120,20 +120,9 @@ async function runSpike(ctx) {
   const fourthText = observed.finalText;
   line(`turn-4 ${fourthReason} ${fourthText}`);
 
-  const fifth = nextTurn();
-  observed.finalText = "";
-  handle.agent.followup(createUserMessage({
-    content: [{ type: "text", text: "请调用 web_fetch 工具读取 https://example.com ，然后用一句话说明页面标题。" }],
-    source: { kind: "user" },
-  }));
-  const fifthReason = await timed(fifth);
-  const fifthText = observed.finalText;
-  line(`turn-5 ${fifthReason} ${fifthText}`);
-
   const toolCalled = observed.toolCalls.includes(SEARCH_TOOL);
   const readSnippetCalled = observed.toolCalls.includes(READ_SNIPPET_TOOL);
   const webSearchCalled = observed.toolCalls.includes("web_search");
-  const webFetchCalled = observed.toolCalls.includes("web_fetch");
   const payload = {
     sessionId,
     preset: preset.id,
@@ -148,11 +137,9 @@ async function runSpike(ctx) {
     thirdText,
     fourthReason,
     fourthText,
-    fifthReason,
-    fifthText,
     elapsedMs: Date.now() - started,
   };
-  if (!toolCalled || !readSnippetCalled || !webSearchCalled || !webFetchCalled || secondReason !== "completed" || thirdReason !== "completed" || fourthReason !== "completed" || fifthReason !== "completed") {
+  if (!toolCalled || !readSnippetCalled || !webSearchCalled || secondReason !== "completed" || thirdReason !== "completed" || fourthReason !== "completed") {
     line(`SPIKE_A_FAIL tool-call mismatch ${JSON.stringify(payload)}`);
     setTimeout(() => process.exit(1), 100);
     return;
