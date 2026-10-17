@@ -51,8 +51,14 @@ test("「今天有什么」直接读 TodayService 快照，不调用模型", asy
       async snapshot({ capacity }) {
         assert.equal(capacity, 5);
         return {
-          primary: { title: "写完 Syno 工具面重设计" },
-          priorities: [{ title: "写完 Syno 工具面重设计" }, { title: "回复飞书消息" }, { title: "复盘今天的清理" }, { title: "第四条不该出现" }],
+          primary: { kind: "goal", title: "写完 Syno 工具面重设计" },
+          priorities: [
+            { kind: "goal", title: "写完 Syno 工具面重设计" },
+            { kind: "commitment", title: "回复飞书消息" },
+            { kind: "goal", title: "复盘今天的清理" },
+            { kind: "goal", title: "第四条不该出现" },
+            { kind: "knowledge-maintenance", title: "维护知识：关联孤立笔记：某篇没链接的笔记" },
+          ],
           needsYou: [{ id: "a" }, { id: "b" }],
           recentIntake: [{ id: "ingest-1" }],
           progress: { completed: 3, waiting: 2 },
@@ -66,8 +72,29 @@ test("「今天有什么」直接读 TodayService 快照，不调用模型", asy
   assert.match(response.text, /首要：写完 Syno 工具面重设计/);
   assert.match(response.text, /回复飞书消息/);
   assert.doesNotMatch(response.text, /第四条不该出现/, "只列前 3 条");
+  assert.doesNotMatch(response.text, /孤立笔记|维护知识/, "建议类信号不进快照展示（2026-10-18 主人「不显示」）");
   assert.match(response.text, /待你确认：2 项（含收录 1）/);
   assert.match(response.text, /进度：已完成 3 \/ 待确认 2/);
+});
+
+test("「今天有什么」在只剩建议信号时不显示首要/待办，但仍报待确认与进度", async () => {
+  const handler = makeHandler({
+    today: {
+      async snapshot() {
+        return {
+          primary: { kind: "claim-review", title: "复核时效主张：某条说法到期" },
+          priorities: [{ kind: "claim-review", title: "复核时效主张：某条说法到期" }],
+          needsYou: [{ id: "a" }],
+          recentIntake: [],
+          progress: { completed: 0, waiting: 1 },
+        };
+      },
+    },
+  });
+  const response = await handler.handle({ id: "fs-today-4", ownerKey: "owner", channel: "feishu", text: "今天有什么" });
+  assert.doesNotMatch(response.text, /首要|待办|复核时效主张/);
+  assert.match(response.text, /待你确认：1 项/);
+  assert.match(response.text, /进度：已完成 0 \/ 待确认 1/);
 });
 
 test("「今天有什么」在快照不可用时如实说明", async () => {

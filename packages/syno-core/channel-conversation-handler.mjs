@@ -212,10 +212,14 @@ class ChannelConversationHandler {
     if (!snapshot) return { text: "今日快照暂时不可用，稍后再试。" };
     const date = new Date().toISOString().slice(0, 10);
     const lines = [`今天（${date}）`];
-    const primary = snapshot.primary?.title;
+    // 只显示需要主人动手的条目：目标与任务（含待确认 Job）。
+    // 信号类建议（收录候选/创作机会/时效复核/孤立笔记）仍参与内部排序（needsYou 计数），但不进快照展示
+    // ——2026-10-18 主人「不显示」。
+    const hardKinds = new Set(["goal", "commitment", "approval"]);
+    const hard = (snapshot.priorities || []).filter((item) => item?.title && hardKinds.has(item.kind)).slice(0, 3);
+    const primary = hard[0]?.title;
     if (primary) lines.push(`· 首要：${primary}`);
-    const priorities = (snapshot.priorities || []).filter((item) => item?.title).slice(0, 3);
-    if (priorities.length) lines.push(`· 待办：${priorities.map((item) => item.title).join("；")}`);
+    if (hard.length) lines.push(`· 待办：${hard.map((item) => item.title).join("；")}`);
     const needsYou = Array.isArray(snapshot.needsYou) ? snapshot.needsYou.length : 0;
     const intake = Array.isArray(snapshot.recentIntake) ? snapshot.recentIntake.length : 0;
     if (needsYou || intake) lines.push(`· 待你确认：${needsYou} 项${intake ? `（含收录 ${intake}）` : ""}`);

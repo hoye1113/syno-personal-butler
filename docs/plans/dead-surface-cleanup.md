@@ -8,7 +8,9 @@
 > 删除 `capture.start/status/list_pending`、`jobs.list/submit`、`today.read`、`inspiration_record_feedback` 及其
 > 插件模块/测试/eval；灵感反馈机制整体下线（确定性口令 + 微信专属续办 + Host 工具一起删）；
 > DSH 侧关闭 `bash`/`pwsh`/`fs`/`fs-search`/`jobs`/`schedule` 与通用 `web_fetch`（读网页只留受控路径）。
-> 第十二轮（2026-10-18，主人「更新同步一下本地文档」）：**文档同步**——ARCHITECTURE 数据流图/适配器/调度条目改
+> 第十二轮（2026-10-18，主人「更新同步一下本地文档」+「不显示」）：**文档同步 + 快照口径**——
+> `今天有什么` 只显示目标/任务/待确认，信号类建议（收录候选、创作机会、时效复核、孤立笔记）不再进快照展示。
+> **文档同步**——ARCHITECTURE 数据流图/适配器/调度条目改
 > 写为单通道（飞书）+ 无调度现实；OPERATIONS、POLICY、KNOWN-LIMITATIONS 清理微信与主动推送时代残留；
 > TODO-EXECUTION-PLAN 与 product-slimming 补历史横幅；NEXT_SESSION 记录待办清零（收录执行、记忆候选 rejected）。
 > 第十一轮（2026-10-17，主人「所有主动的先删除，因为会影响我对话」）：**主动推送 + 崩溃补发整体下线**——
