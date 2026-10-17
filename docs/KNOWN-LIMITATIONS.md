@@ -17,7 +17,7 @@
 - `567f23d` 是执行语义与移动可靠交付计划的审查基线，不是所有后续 PR 的永久父提交。该时点尚未提供的 ACK 前持久化、通用 ChannelDeliveryOutbox、Effect Receipt 和 Unknown Case Store 已在后续 PR 交付；本小节整体为 2026-07 历史记录，当前能力以 `docs/ARCHITECTURE.md` 为准。
 
 - token-cloud 固定模型五轮真实工具调用、故障持久等待和同模型恢复已通过，不再是发布门槛。
-- 微信 iLink 已完成扫码、Owner 绑定、4/4 连续回复、故障恢复和 durable seen ID 跨重启；主人直发真实 MD 收到 Artifact 回执，后台形成 Proposal 且未写入 vault。
+- （历史，2026-09 记录）微信 iLink 曾完成扫码、Owner 绑定、连续回复与故障恢复；微信通道栈已于 2026-10-16 物理删除，以下不再适用。
 - 飞书消息已完成 Owner 私聊、真实 ID 重放拒绝与重启恢复；飞书日历已完成 user 授权、主日历 CRUD、错误拒绝与恢复。
 - `0cc2669` 的 fresh clone 已通过 Node 172/172、vault 57/57 和仓库校验；`a4ec17d` 完成最终回归。真实 Windows Web 生命周期与桌面/移动浏览器增量复验通过。当前代码完整 bundle 为 `C:\tmp\syno-repository-backup-a4ec17d.bundle`，SHA-256 见最终验收矩阵。
 
@@ -46,7 +46,7 @@ Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导�
 
 ## DSH Hub 与 Mnemon 限制
 
-- `syno-lab` 是唯一实验 profile；`dsh-mnemon@0.2.13` 不加载到生产 `syno`，不接入 Syno Bridge、微信、飞书或 `vault/ops` 写入。
+- `syno-lab` 是唯一实验 profile；`dsh-mnemon@0.2.13` 不加载到生产 `syno`，不接入 Syno Bridge、飞书或 `vault/ops` 写入。
 - Mnemon Native 需要 Windows release 至少 `0.2.3`。外部 Memory Provider 必须关闭，只允许 Runtime Memory、Documents 和本地 Native；Native 缺失时应显示降级状态而不是伪报 Recall/Remember/Forget 成功。
 - Mnemon 数据不是 Syno canonical fact；生产推广需要固定版本/构建产物、敏感数据边界验证、独立安全审查和显式政策批准。
 - 上游当前没有确定性密钥扫描器，故任何 Token、Cookie、私钥或原始敏感日志都不得进入 Mnemon；不得依赖插件自行完成脱敏。
@@ -54,7 +54,7 @@ Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导�
 
 ## 数据与渠道限制
 
-- 当前 R4.1–R4.7 工作树已完成全量 Node、vault、Repository verify、fresh clone 和 `git diff --check` 自动门禁；浏览器真实页面、Windows 登录冷启动和微信/飞书设备行为仍由主人 P4 验收。
+- 当前 R4.1–R4.7 工作树已完成全量 Node、vault、Repository verify、fresh clone 和 `git diff --check` 自动门禁；浏览器真实页面、Windows 登录冷启动和飞书设备行为仍由主人 P4 验收。
 - Workflow Outbox 已采用 5 分钟可恢复租约、稳定 eventId/idempotencyKey 和接收方幂等边界，仍按 durable at-least-once 语义设计。`delivered` 只证明 Provider 接受请求，不证明主人已读；若渠道已经接收而进程在送达状态落盘前崩溃，恢复后可能重复投递同一工作流回执，这不会重复写入或重复触发澄清。重复 URL 会返回已有 Workflow 状态。2026-10-17 起系统不再有主动推送与崩溃补发：重启不会重放历史消息。
 - Bilibili 专用 canonical 规则、HTML/DOCX 边界和来源更新组合场景已有 Spec/组合测试；Bilibili 未完成语义审阅时保持 incomplete，不伪报 verified。
 - 当前差异的 Standards、Spec、Security 最终复审均完成，未解决 P0/P1 为 0。

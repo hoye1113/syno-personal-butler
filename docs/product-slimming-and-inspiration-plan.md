@@ -1,4 +1,6 @@
 # Syno 产品精简与今日灵感执行计划
+> **2026-10-18 状态更新**：主动推送与崩溃补发已整体删除（见 `docs/plans/dead-surface-cleanup.md` 第十/十一轮）；本文 D7/D12 关于今日灵感、`ProactiveOrchestrator`、`ChannelDeliveryOutbox`、通知预算与 proactive Session 的设计均为历史记录，不再有效。保留的产品面：搜索、收录、知识库查找与对话。
+
 > **2026-10-17 更新**：主人确认从不看「今日灵感」卡，该功能**整体下线**——灵感采样（`inspiration-sampler`）、
 > 灵感仓（`inspiration-store` 与 `ops/content/inspirations/` 23 份存档）、每日 12:30 投递、反馈机制全部删除。
 > 本文档其余部分（搜索/收录/深度探索/知识库查找）继续有效；下文 D7 与「反馈路由」段落仅作历史追溯。

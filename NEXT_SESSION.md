@@ -1,4 +1,4 @@
-# 当前执行状态（2026-10-12）
+# 当前执行状态（2026-10-18）
 
 本节是当前交接摘要；下方各期交接仅用于追溯，不能覆盖这里的事实。
 
@@ -7,6 +7,7 @@
 - **分支/远端**：`main`，本轮已提交两个提交：`e424250`（切换 + 搜索链）与 `65e964f`（投递失败种子时序修复）；**未 Push**。
 - **首轮真机验收发现并修复（2026-10-12，两轮 fix 提交）**：主人发「搜一下今天的 AI 新闻」暴露两处用户可见缺陷——① 系统提示从未注入当前时间（Harness 的 `@deepseek-ai/dsh-time-context` 存在但无 bundle 挂载），模型把「今天」猜成 2026-09-24；② 回复把英文过程叙述与草稿备注写进正文——根因是 0.1.7 生产根的 `kimi-for-coding` 目录条目缺 `thinkingLevelMap`，未声明档位时请求不启用 thinking，模型的「思考」全部落进 text 通道。修复：两个 chat overlay 挂载 `time-context`（Asia/Shanghai）；三处 kimi 路由经 `modelOverrides.reasoningEfforts` 补齐 low/high/max 档位并启用 `reasoning: high`（capture 用 `low`）；`syno-agent.md` 增加「正文只给结果、不给过程叙述、以 time-context 快照为准」规约。重启后 spike 实测 reasoning 块恢复（与 DeepSeek 时代一致）。
 - **飞书「正在回复中」状态气泡（2026-10-12）**：飞书无 typing API，改为占位卡方案——收到主人私聊先发「⏳ Syno 正在回复中…」卡片（引用原消息），答复就绪后 `im.v1.message.patch` 原位更新为最终答复；更新失败收回占位卡并退回普通发送；处理异常/延迟投递时收回占位卡。默认开启，`SYNO_FEISHU_TYPING=0|false` 可关。测试 `tests/feishu-typing.test.mjs` 6 项。
+- **待办清零 + 文档同步（2026-10-18）**：挂了一天的收录已按 `keep-separate` 执行完成（`job-20261016-23bcb6af` → 提交 `c43dc8c`/`465530b`，写入 `vault/00-Inbox/分享一个最近很惊艳的开源skill-一句话让ai搓出任何原理的科普视频-dc23bbd3.md`，决策已 consumed，workflow=`reported`）；记忆候选 `memory-20261017-73778c96` 已置 `rejected`。**缺口**：记忆候选只有创建、没有聊天内的确认/丢弃入口，当前靠人工改状态。文档同步：ARCHITECTURE 数据流与适配器、OPERATIONS/ POLICY/ KNOWN-LIMITATIONS 的微信与主动推送残留、TODO-EXECUTION-PLAN 与 product-slimming 补历史横幅。
 - **主动推送与崩溃补发全删（2026-10-17 晚，主人「所有主动的先删除」）**：SignalEngine、ProactiveOrchestrator、proactive-reliability、ChannelDeliveryOutbox、AcceptedRequestStore/RecoveryWorker、NotificationStore 与全部相关端点/设置/测试/状态数据一起删除；只保留「你说话 → 它回答」。同步回复不再落受理记录，重启不补发历史消息。
 - **今日灵感已下线（2026-10-17）**：主人从不看卡，采样器/灵感仓/23 份存档/12:30 投递/反馈机制全部删除。
 - **工具面（2026-10-17 重设计）**：聊天只剩受控知识三件套（`syno_knowledge_search`/`syno_knowledge_read_snippet`/`syno_knowledge_fetch_url`）+ `web_search` + `skill`。DSH 的 shell/文件系统/后台作业/会话内调度与通用 `web_fetch` 全部关闭；收录、任务/审批、今日快照、灵感反馈都不再是模型工具：今日快照与「记住 …」走确定性口令（`今天有什么` / `记住 …`，2026-10-17 新增），其余走既有路由。
@@ -22,7 +23,7 @@
   2. 子模块 0.2.1 的 runtime closure 检查把外部依赖 `@deepseek-ai/libreoffice-kit` 判为 `#runtime-entry` missing（pnpm 严格布局下该包不在根 node_modules），导致**未设置 `SYNO_DSH_ROOT` 时** `harness:doctor` 的 capture-sidecar 报 closure 不完整；外部克隆（0.1.7）无此依赖所以不受影响。
   3. 收敛二选一：升级外部克隆到 0.2.1，或修 closure 的外部依赖解析后切回子模块缺省。
 - **下一步（按序）**：
-  1. ~~Owner 微信真机验收~~ **已作废（2026-10-16 删除微信栈）**；改为飞书等价验收：知识检索、收录一条、联网搜索一条，并观察 `waiting_provider` 与失败码分布。
+  1. 飞书真机验收：知识检索、收录一条、联网搜索一条（收录一条已于 2026-10-18 通过：`job-20261016-23bcb6af` completed），并观察 `waiting_provider` 与失败码分布。
   2. 当日对账：Kimi 控制台额度 + 豆包/Tavily/Exa 三家搜索用量（均由控制台查看）。
   3. 首 72h 观察失败码（401/403/429）；回滚 = `git revert` 本轮两提交 + `.env` 保留/移除对应 key（`llm-deepseek` 惰性挂载即回滚面；搜索回滚 = overlay 摘 `syno-web-search` 行并恢复 `search:false`）。
   4. 主动推送已全删（2026-10-17），不再有恢复主动卡的步骤。

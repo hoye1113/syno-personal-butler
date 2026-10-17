@@ -142,7 +142,7 @@ Get-Content -LiteralPath $log.FullName -Tail 80
 **进程与端口**
 
 - `http://127.0.0.1:8888`：Syno Host 控制面（凭据、渠道、Policy、`GET /api/syno/harness`）。
-- `http://127.0.0.1:3088`（`SYNO_DSH_WEB_PORT`）：受控 DSH Web，与微信同一 Harness Session。这是特权壳（`approval: never`），不是 8888 的聊天 UI。能打开该 origin 的本机进程等于该 session 的代理。
+- `http://127.0.0.1:3088`（`SYNO_DSH_WEB_PORT`）：受控 DSH Web，与生产 chat 同一 Harness Session。这是特权壳（`approval: never`），不是 8888 的聊天 UI。能打开该 origin 的本机进程等于该 session 的代理。
 - 收录分析仍是第二进程 JSON-RPC sidecar（`dsh --profile sdk-minimal --patch syno-capture.cordis.yml`）：Syno overlay 关闭两个持久 shell 工具，不挂载 filesystem/web 工具，只插入 Syno Bridge。JSON-RPC 聊天回退使用官方 `sdk` profile 和 `syno-chat.cordis.yml`。禁止 JSON-RPC chat 与生产 DSH Web 同时写同一 session。紧急回切：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。
 
 **实际 argv（不要抄错）**
@@ -185,7 +185,7 @@ Windows 计划任务 `start-syno.ps1` **不会**写入 `SYNO_DSH_ROOT`。未设�
 
 `workspace-write` + `approval: never` 不是 DSH 库存 preset（库存 `workspace-write` 是 `ask`）。必须在 `packages/syno-dsh-plugin/cordis.patch.yml` 里显式 `defaultPreset: workspace-write`，且 `presets` **只**含这一条（`sandbox: workspace-write` + `approval: never`）。缺省时 boot 报：`composed sandbox and approval defaults match no preset`。
 
-禁止再往生产表加 `danger-full-access` 或 `read-only`/`ask`。`/permission` UI 与 `/permission <name>` 会按表切换：全盘访问会离开 `DSH_CWD`，绕过 `syno_*` + Policy + GitGuard；`ask` 会让微信回合卡在没有审批 UI 的地方。`tests/syno-dsh-profile.test.mjs` 锁住生产 patch 不含 `sandbox: danger-full-access`。
+禁止再往生产表加 `danger-full-access` 或 `read-only`/`ask`。`/permission` UI 与 `/permission <name>` 会按表切换：全盘访问会离开 `DSH_CWD`，绕过 `syno_*` + Policy + GitGuard；`ask` 会让聊天回合卡在没有审批 UI 的地方。`tests/syno-dsh-profile.test.mjs` 锁住生产 patch 不含 `sandbox: danger-full-access`。
 
 沙箱根是 `%LOCALAPPDATA%\Syno\harness\workspace\chat`，**不是** git 仓库根。
 
@@ -207,7 +207,7 @@ dsh plugin --profile syno-lab add dsh-mnemon@0.2.13
 
 **识图在 Host**
 
-图片（微信/飞书同一条链）：主人发的图直接作为 image 内容块投给模型（2026-10-16 起，模型链支持看图；单图原始上限 3MB，超限/未过隔离校验则如实说明）；明确「收录」才额外做一次模型转写（同链、capture sidecar 无工具），结构化 JSON 当 `kind: text` Intake。PDF/文本附件走收录。
+图片（飞书）：主人发的图直接作为 image 内容块投给模型（2026-10-16 起，模型链支持看图；单图原始上限 3MB，超限/未过隔离校验则如实说明）；明确「收录」才额外做一次模型转写（同链、capture sidecar 无工具），结构化 JSON 当 `kind: text` Intake。PDF/文本附件走收录。
 
 ### Windows 飞书日历 CLI
 
@@ -223,7 +223,7 @@ lark-cli version
 ## 发布和切换
 
 - 发布前逐项执行 `docs/CUTOVER-CHECKLIST.md`，结果写入 `docs/FINAL-ACCEPTANCE.md`。
-- 任何真实 Provider、微信或飞书门槛未通过时，只能继续本地隔离运行，不得宣称完成最终切换。
+- 任何真实 Provider 或飞书门槛未通过时，只能继续本地隔离运行，不得宣称完成最终切换。
 - 已知限制统一维护在 `docs/KNOWN-LIMITATIONS.md`；修复后必须附对应测试或真实验收证据再移除。
 
 ## 主人实测验收
@@ -264,20 +264,20 @@ pnpm start
 
 `harness:doctor` 不把密钥写进输出。协议冒烟用 `pnpm probe:harness`（假 sidecar + 中文 UTF-8）；`pnpm probe:harness -- --real` 验证真实 Harness runtime closure 可发现并报告缺失项。显式设置 `SYNO_RUN_REAL_DSH=1` 的测试文件才允许执行真实模型验收；模型 key 只从宿主环境 `KIMI_API_KEY` 或仓库根 `.env` 读取，不写入测试参数、日志、仓库文件或验收产物。
 
-生产 chat 由 Host 监督 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（可用 `SYNO_DSH_WEB_PORT` 覆盖），与微信注入同一 Harness Session。Host 会把 `@syno/dsh-plugin` junction/symlink 进 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\node_modules`，不必再跑 `dsh plugin install`。该对话页是特权壳（`approval: never`，permission 表只有 `workspace-write`），不是普通聊天 UI。普通聊天默认走 capabilities 插件，只注册 3 件受控知识工具：`syno_knowledge_search`/`syno_knowledge_read_snippet`/`syno_knowledge_fetch_url`（2026-10-17 工具面重设计：收录、任务/审批、今日快照都不再是模型工具，改由确定性路由承担）。Bridge 只在 `SYNO_CHAT_TOOLS=bridge` 回滚时注册，core 名单同为这 3 件。`knowledge.fetch_url` 受安全抓取策略约束。Capture Session 继续使用 Workflow 签发的浏览器 allowlist。`http://127.0.0.1:8888` 是控制面。收录分析仍是无 bash/fs/web 的 jsonrpc 第二进程。自动测试 / `SYNO_DSH_FAKE_AGENT` 仍走 jsonrpc fake。紧急回切 chat jsonrpc：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。不要把 jsonrpc sidecar 与生产 DSH Web 同时接到同一 session。不要执行 `dsh web`（那是库存 `--profile web`）。
+生产 chat 由 Host 监督 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（可用 `SYNO_DSH_WEB_PORT` 覆盖），与普通聊天注入同一 Harness Session。Host 会把 `@syno/dsh-plugin` junction/symlink 进 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\node_modules`，不必再跑 `dsh plugin install`。该对话页是特权壳（`approval: never`，permission 表只有 `workspace-write`），不是普通聊天 UI。普通聊天默认走 capabilities 插件，只注册 3 件受控知识工具：`syno_knowledge_search`/`syno_knowledge_read_snippet`/`syno_knowledge_fetch_url`（2026-10-17 工具面重设计：收录、任务/审批、今日快照都不再是模型工具，改由确定性路由承担）。Bridge 只在 `SYNO_CHAT_TOOLS=bridge` 回滚时注册，core 名单同为这 3 件。`knowledge.fetch_url` 受安全抓取策略约束。Capture Session 继续使用 Workflow 签发的浏览器 allowlist。`http://127.0.0.1:8888` 是控制面。收录分析仍是无 bash/fs/web 的 jsonrpc 第二进程。自动测试 / `SYNO_DSH_FAKE_AGENT` 仍走 jsonrpc fake。紧急回切 chat jsonrpc：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。不要把 jsonrpc sidecar 与生产 DSH Web 同时接到同一 session。不要执行 `dsh web`（那是库存 `--profile web`）。
 
-Chat 的 `web_search` 由自研 `syno-search` 链提供（ADR 0009）：豆包搜索（500 次/月免费）→ Tavily（1000 credit/月）→ Exa（每月 $10 额度）→ Parallel 匿名 MCP 备用（免 Key、额度未公布），按查询语言路由（中文优先豆包、英文优先 Tavily），失败/限流/空结果自动回退；key 走仓库根 `.env`（`DOUBAO_SEARCH_API_KEY` / `TAVILY_API_KEY` / `EXA_API_KEY`）经 Host 注入，`harness:doctor` 的 `search-keys` 检查报告就位情况；可用 `SYNO_WEB_SEARCH_CHAIN=exa,tavily` 覆盖链前缀。JSON-RPC chat 回退面在 `syno-chat.cordis.yml` 挂载同一接缝（该面以相对路径加载插件，没有 bundle linked-root 的 peer 拦截，插件内对 `@deepseek-ai/dsh-web` 采用可选解析，见 `plugins/web-search/index.mjs`）。`web_fetch` 已于 2026-10-17 从会话面关闭（读网页只留受控路径，避免绕过 SSRF 防护与脱敏）。Web session 使用 Host 生成并显式绑定的 `syno` agent preset，compaction 与普通 schedule 由当前生产 profile 的官方 DSH 层接管（Web preset 使用官方 compaction-basic/tool-result-pruner/compact command，JSON-RPC 使用同一 stack，`@deepseek-ai/dsh-schedule` 已于 2026-10-17 关闭，主动运营只保留 Host 一套）。系统不再有任何主动推送：SignalEngine / ProactiveOrchestrator / ChannelDeliveryOutbox 已于 2026-10-17 删除。不要对生产 `syno` profile 执行 `dsh plugin add`，也不要从 [dsh-plugin.org](https://dsh-plugin.org/plugins?q=search) 装社区搜索或记忆插件；实验 UI 只用 Host 生成的 `syno-lab` profile（无 Bridge、无 vault 写、无微信）。收录分析 profile 仍然没有 web。
+Chat 的 `web_search` 由自研 `syno-search` 链提供（ADR 0009）：豆包搜索（500 次/月免费）→ Tavily（1000 credit/月）→ Exa（每月 $10 额度）→ Parallel 匿名 MCP 备用（免 Key、额度未公布），按查询语言路由（中文优先豆包、英文优先 Tavily），失败/限流/空结果自动回退；key 走仓库根 `.env`（`DOUBAO_SEARCH_API_KEY` / `TAVILY_API_KEY` / `EXA_API_KEY`）经 Host 注入，`harness:doctor` 的 `search-keys` 检查报告就位情况；可用 `SYNO_WEB_SEARCH_CHAIN=exa,tavily` 覆盖链前缀。JSON-RPC chat 回退面在 `syno-chat.cordis.yml` 挂载同一接缝（该面以相对路径加载插件，没有 bundle linked-root 的 peer 拦截，插件内对 `@deepseek-ai/dsh-web` 采用可选解析，见 `plugins/web-search/index.mjs`）。`web_fetch` 已于 2026-10-17 从会话面关闭（读网页只留受控路径，避免绕过 SSRF 防护与脱敏）。Web session 使用 Host 生成并显式绑定的 `syno` agent preset，compaction 与普通 schedule 由当前生产 profile 的官方 DSH 层接管（Web preset 使用官方 compaction-basic/tool-result-pruner/compact command，JSON-RPC 使用同一 stack，`@deepseek-ai/dsh-schedule` 已于 2026-10-17 关闭，Host 也不再有任何调度器）。系统不再有任何主动推送：SignalEngine / ProactiveOrchestrator / ChannelDeliveryOutbox 已于 2026-10-17 删除。不要对生产 `syno` profile 执行 `dsh plugin add`，也不要从 [dsh-plugin.org](https://dsh-plugin.org/plugins?q=search) 装社区搜索或记忆插件；实验 UI 只用 Host 生成的 `syno-lab` profile（无 Bridge、无 vault 写、无微信）。收录分析 profile 仍然没有 web。
 
-图片与附件（2026-10-16 起飞书同样支持）：主人发的图直接投给模型看图；文件（PDF/docx/md/txt/html）落隔离区后走收录。明确说「收录」时图片才额外做一次模型转写（同链、capture sidecar 无工具），JSON 作为 `kind: text` 进入现有 Intake / Proposal。飞书资源下载走官方 `im/v1/messages/{id}/resources/{key}` 接口，权限要求由「获取单聊、群组消息」（注册时已申请 `im:message:readonly`）覆盖；单文件上限 25MB。本地知识搜索仍是 `syno_knowledge_search`。识图失败对微信可见，禁止猜图。
+图片与附件（2026-10-16 起飞书同样支持）：主人发的图直接投给模型看图；文件（PDF/docx/md/txt/html）落隔离区后走收录。明确说「收录」时图片才额外做一次模型转写（同链、capture sidecar 无工具），JSON 作为 `kind: text` 进入现有 Intake / Proposal。飞书资源下载走官方 `im/v1/messages/{id}/resources/{key}` 接口，权限要求由「获取单聊、群组消息」（注册时已申请 `im:message:readonly`）覆盖；单文件上限 25MB。本地知识搜索仍是 `syno_knowledge_search`。识图失败如实回报，禁止猜图。
 
 主人验收清单：
 
-1. 微信发送一个 Markdown 文件，飞书发送一个 PDF，再发送一个纯 URL。
+1. 在飞书发送一个 Markdown 文件、一个 PDF，再发送一个纯 URL。
 2. 分别发送“帮我收录这个 URL”和一次带“仅本地”的内容。
 3. 查询“刚才的文件怎么样了”和“待我确认的收录”，确认不依赖模型也能返回持久状态。
 4. 修改一次 Proposal，完成三次明确写入自动执行和一次冲突澄清。
 5. 在 Proposal 生成前重启服务；另一次在 PendingDecision 形成后重启，确认状态和待决策项仍可恢复。
-6. 从微信发起，在飞书查询或确认，验证同一 Owner 的跨渠道连续性。
+6. 在飞书查询或确认此前的收录与任务，验证同一 Owner 的会话连续性。
 7. 累计完成 30 条跨渠道消息、10 组多轮追问和 5 次 ToolRegistry 调用。
 8. 对已收录知识做一次 teach-back，确认“已收录”不会自动提高掌握度，只有主人证据会推进学习状态。
 9. 已执行真实 Windows 任务安装、状态和受控重启；仍需在下次登录后确认 Syno Host、Harness sidecar 和未完成 Workflow 共同恢复。

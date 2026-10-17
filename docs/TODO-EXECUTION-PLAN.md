@@ -4,6 +4,9 @@
 
 更新日期：2026-08-25（Asia/Shanghai）
 
+> **2026-10-18 复核**：本文的「微信通道、ACK 前持久化恢复载荷、AcceptedRequest/ChannelDeliveryOutbox、proactive Session、通知预算」等条目均已被后续决策取代——微信栈 2026-10-16 删除，全部主动推送与崩溃补发 2026-10-17 删除。当前能力以 `docs/ARCHITECTURE.md` 与 `docs/POLICY.md` 为准。
+
+
 本文后半包含 2026-07 的历史 PR-00～PR-10 与 OpenCode 记录。**当前活动产品内核是 DeepSeek Harness**（受控 `dsh --profile syno` Web + 8888 控制面）；历史章节只用于追溯，不是当前实现契约。启动、构建、WebSocket 事件流、permission 表的硬约束以根 `AGENTS.md` 与 `docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」为准。
 
 本文不再是当前执行入口。历史运行时、知识闭环和既有验收记录继续保留在本文后续章节与 `docs/archive/`，但不得覆盖 [`docs/project-aware-knowledge-execution-plan.md`](project-aware-knowledge-execution-plan.md) 的当前执行顺序。
