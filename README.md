@@ -1,6 +1,6 @@
 # Syno · 赛诺个人管家
 
-Syno 是一个本机运行的主动式知识闭环私人管家（当前生产在 macOS：launchd 登录自启 + 钥匙串凭据；Windows 仍兼容，后台服务由主人手动安装）。当前只启用飞书通道（`SYNO_CHANNELS=feishu`，微信栈保留一版可恢复）。它以 Markdown + YAML 为长期事实源，沿用 Afu 的收件箱、选题卡和周历工作台，统一管理收录、整理、学习、复习、创作与反馈，并保留可审计的执行与恢复边界。
+Syno 是一个本机运行的知识闭环私人管家（当前生产在 macOS：launchd 登录自启 + 钥匙串凭据；Windows 仍兼容，后台服务由主人手动安装）。当前只启用飞书通道（`SYNO_CHANNELS=feishu`；微信栈已于 2026-10-16 删除）。只在你说话时回复，不发任何主动消息。它以 Markdown + YAML 为长期事实源，沿用 Afu 的收件箱、选题卡和周历工作台，统一管理收录、整理、学习、复习、创作与反馈，并保留可审计的执行与恢复边界。
 
 ## 快速开始
 
@@ -19,9 +19,9 @@ pnpm verify
 pnpm start
 ```
 
-若未设置环境变量 `$env:SYNO_DSH_ROOT`，系统会自动缺省使用本仓内置的子模块 `./vendor/deepseek-harness`。如果本机已有独立的 Harness 克隆，亦可通过 `$env:SYNO_DSH_ROOT = "<外部路径>"` 覆盖。浏览器打开 <http://127.0.0.1:8888> 进入控制面（凭据、渠道、Policy）。日常对话在受控 DSH Web（默认 <http://127.0.0.1:3088>），与微信同一会话。启动、事件协议和 permission 表的踩坑见 [运维](docs/OPERATIONS.md)。Syno 不依赖 Obsidian，也不依赖 OpenClaw。
+若未设置环境变量 `$env:SYNO_DSH_ROOT`，系统会自动缺省使用本仓内置的子模块 `./vendor/deepseek-harness`。如果本机已有独立的 Harness 克隆，亦可通过 `$env:SYNO_DSH_ROOT = "<外部路径>"` 覆盖。浏览器打开 <http://127.0.0.1:8888> 进入控制面（凭据、渠道、Policy）。日常对话在受控 DSH Web（默认 <http://127.0.0.1:3088>）。启动、事件协议和 permission 表的踩坑见 [运维](docs/OPERATIONS.md)。Syno 不依赖 Obsidian，也不依赖 OpenClaw。
 
-知识库与运行记录住在知识仓库（由 `SYNO_KNOWLEDGE_ROOT` 指向；未设置时回退到代码仓库根的单库形态，见 [运维](docs/OPERATIONS.md)「知识仓库拆分」）。token-cloud Provider、飞书和微信均按需配置；未配置时不影响本地知识阅读、任务、提醒与待决策项。
+知识库与运行记录住在知识仓库（由 `SYNO_KNOWLEDGE_ROOT` 指向；未设置时回退到代码仓库根的单库形态，见 [运维](docs/OPERATIONS.md)「知识仓库拆分」）。token-cloud Provider 与飞书均按需配置；未配置时不影响本地知识阅读、任务、提醒与待决策项。
 
 ## 核心约束
 
@@ -32,15 +32,13 @@ pnpm start
 - 删除、覆盖、移动、新 MOC、新 tag 与代码修改在隔离工作区自动执行，并产生可审计差异。
 - 新增与修改均在隔离工作区自动执行；高风险写入经 validator 与 GitGuard 兜底，整理冲突时暂停澄清。
 - 每次提交只暂存精确的 `changed_paths`；不使用 `git add -A`，不自动 Push。
-- 微信只连接独立 ClawBot 私聊，不读取个人聊天记录或控制微信群。
 
 ## 已交付流程
 
 - Afu 收件箱 → 选题卡 → Content Brief → Markdown/飞书排期。
 - 知识库搜索、全文阅读和低显著度原文编辑入口，无需 Obsidian。
 - 任务、待决策项、通知、学习证据、输出机会和“问赛诺”工作抽屉。
-- 08:30 晨报、22:00 晚间复盘、周日 20:00 周报；单一 Syno Host 独立于浏览器运行。
-- 可选微信 iLink 私聊渠道。二维码兼容探针与完整限制见 [docs/WEIXIN-ANDROID-PROBE.md](docs/WEIXIN-ANDROID-PROBE.md)。
+- 报告按需生成（无定时推送）；单一 Syno Host 独立于浏览器运行。
 
 登录自启 Syno Host：
 

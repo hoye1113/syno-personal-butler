@@ -4,46 +4,18 @@ import path from "node:path";
 import { PATHS } from "./paths.mjs";
 
 const GROUPS = Object.freeze({
-  agentAdjustable: Object.freeze(["notifications.cadence", "notifications.quietHours", "ui.displayOrder", "ui.preferences"]),
-  confirmationRequired: Object.freeze(["provider.modelId", "budget", "channels", "calendar", "ownerAllowlist", "retention", "actions.allowlist", "context.thresholds", "notifications.proactiveDeliveryEnabled", "notifications.proactiveReleaseEvidence"]),
+  agentAdjustable: Object.freeze(["ui.displayOrder", "ui.preferences"]),
+  confirmationRequired: Object.freeze(["provider.modelId", "budget", "channels", "calendar", "ownerAllowlist", "retention", "actions.allowlist", "context.thresholds"]),
   immutable: Object.freeze(["provider.baseUrl", "provider.token", "policy", "allowedRoots", "toolRegistry", "approvals", "security", "source", "contracts"]),
 });
 
 const DEFAULT_VALUES = Object.freeze({
-  "notifications.cadence": "balanced",
-  "notifications.quietHours": Object.freeze({ start: "22:30", end: "07:30" }),
-  "notifications.proactiveDeliveryEnabled": false,
-  "notifications.proactiveReleaseEvidence": null,
-  "notifications.proactiveTestEventId": null,
   "ui.displayOrder": Object.freeze(["today", "capture", "knowledge", "create"]),
   "ui.preferences": Object.freeze({ reducedDensity: false }),
   "context.thresholds": null,
 });
 
 function validateValue(key, value) {
-  if (key === "notifications.proactiveDeliveryEnabled" && typeof value !== "boolean") throw new Error(`${key} 必须为布尔值`);
-  if (key === "notifications.proactiveReleaseEvidence") {
-    const valid = value === null || (value
-      && typeof value === "object"
-      && !Array.isArray(value)
-      && typeof value.eventId === "string"
-      && typeof value.runId === "string"
-      && value.homeChannel === "feishu"
-      && value.visibleCount === 1
-      && value.order === "single"
-      && value.performedBy === "owner"
-      && value.result === "passed"
-      && !Number.isNaN(new Date(value.confirmedAt).getTime()));
-    if (!valid) throw new Error("主动通知 Owner 验收证据无效");
-  }
-  if (key === "notifications.proactiveTestEventId" && value !== null && (typeof value !== "string" || !value.trim())) {
-    throw new Error("主动通知受控测试事件 ID 无效");
-  }
-  if (key === "notifications.cadence" && !["minimal", "balanced", "active"].includes(value)) throw new Error("通知节奏无效");
-  if (key === "notifications.quietHours") {
-    const valid = (item) => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(item || "");
-    if (!valid(value?.start) || !valid(value?.end)) throw new Error("安静时间无效");
-  }
   if (key === "ui.displayOrder") {
     const allowed = ["today", "capture", "knowledge", "create"];
     if (!Array.isArray(value) || value.length !== allowed.length || !allowed.every((item) => value.includes(item))) throw new Error("显示顺序必须包含四个主区且不能重复");
@@ -106,15 +78,6 @@ class SettingsRegistry {
   async set(key, value, options = {}) {
     const group = this.assertChange(key, options);
     validateValue(key, value);
-    if (key === "notifications.proactiveDeliveryEnabled" && value === true && !String(options.evidenceRef || "").trim()) {
-      throw Object.assign(new Error("启用真实主动通知前必须提供已确认的测试投递证据"), { code: "PROACTIVE_TEST_REQUIRED" });
-    }
-    if (key === "notifications.proactiveReleaseEvidence" && options.releaseEvidenceVerified !== true) {
-      throw Object.assign(new Error("主动通知 Owner 验收证据必须由受控验证入口写入"), { code: "PROACTIVE_RELEASE_EVIDENCE_UNVERIFIED" });
-    }
-    if (key === "notifications.proactiveTestEventId" && options.proactiveTestAuthorizationVerified !== true) {
-      throw Object.assign(new Error("主动通知受控测试授权只能由受控测试入口写入"), { code: "PROACTIVE_TEST_AUTHORIZATION_UNVERIFIED" });
-    }
     return this.#serialized(async () => {
       const state = await this.load();
       state.values[key] = value;

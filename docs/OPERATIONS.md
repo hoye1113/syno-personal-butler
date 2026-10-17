@@ -3,7 +3,7 @@
 ## 状态分层
 
 - 单仓（本仓）：Git 同时跟踪 `contracts/`、`config/`、应用源码、脚本、文档、`vault/` 和 `ops/`——长期知识与全部运行记录共用一个事实源和远端。
-- 本地可重建：`.runtime/` 的索引、锁、队列快照、投递通知和临时状态。
+- 本地可重建：`.runtime/` 的索引、锁、队列快照和临时状态。
 - 本地敏感：`%LOCALAPPDATA%\Syno\credentials` 的 DPAPI 凭据；严禁复制到仓库、日志或工单。
 - 本地持久：对话、等待重试的 Job、未完成摄取状态。清理前先停 Syno Host 并备份。
 
@@ -53,13 +53,12 @@ pnpm state:archive -- restore D:\Backups\syno-state-20260717
 - 未完成任务保留到 completed/failed/rejected/canceled 等终态。
 - 删除缓存前验证目标是仓库 `.runtime/` 或明确的 Syno 本地目录，不对宽泛路径递归操作。
 - `.pnpm-store/` 是安装缓存，删除需要按仓库受控执行规则提供精确目标和影响预览。
-- 主动/工作流 outbox 的终态记录（`delivered`/`failed_terminal`）由 `retain()` 按小时节流、超 14 天自动淘汰，目录不再单调膨胀（drain 时 best-effort，不阻塞投递）。
+- 工作流 outbox 的终态记录（`delivered`/`failed_terminal`）由 `retain()` 按小时节流、超 14 天自动淘汰，目录不再单调膨胀（drain 时 best-effort，不阻塞投递）。
 - 收录重复 URL 不会重新调用模型或创建活动 Workflow：渠道直接返回已有收录编号和当前状态。只有同一重复消息发现最终通知尚未确认送达时，才唤醒原 Outbox；`failed_terminal` 才按该消息 ID 创建一次安全 replay。终态 URL 仍允许新的来源检查，因此主人可以主动重新收录。
 - 质量拒收通知入队成功后，Workflow 进入 `rejected` 终态，清除 `pendingAction`、`nextRetryAt` 和 `lastError`；Host 重启恢复不会再次触发质量分析或重复生成拒收通知。
 - Workflow Outbox 的 `delivered` 只表示渠道 Provider 接受了 at-least-once 投递请求，不代表主人已经阅读。飞书发送前从加密的 `OwnerChannelTargetStore` 恢复当前目标（`chatId` 必需，`replyTo` 可选）；目标凭据不写入 Workflow、普通 Outbox JSON、日志或诊断输出。目标缺失或解密失败会进入有界可重试路径，耗尽后记录脱敏终态事件。
 - 飞书没有 typing API：收到主人私聊后先发一条可原位更新的「⏳ Syno 正在回复中…」卡片（引用原消息），答复就绪后用 `im.v1.message.patch`（`channel.updateCard`）把同一条卡片更新为最终答复；更新失败则收回占位卡并退回普通发送，占位发送失败不阻断正常回复；模型处理异常或延迟投递（v2 ack 路径）时收回占位卡。默认开启，`SYNO_FEISHU_TYPING=0|false` 可关。
-- 历史上 `proactive.bundle.recovery_failed`（如 f1b29459）刷屏的根因是对账循环重读已损坏的 outbox payload 抛错、每 tick 记一条失败——已由「对账排除 `failed_terminal`（C6）」+「drain 时把结构损坏 payload 转终态（A1）」根治，不再复现。若日志仍见，多为修复前残留记录：把 `state/channel-outbox/<id>.json` 的 status 改 `failed_terminal`，或删除其 `.dpapi` payload 后重启即可。
-- 系统性「静默无限重试/停滞」bug 类已由 P1–P4 + 收尾复审 R1–R3（commit `8ce4cb3`）根治：凡是 `loop / retry / 定时 drain / setInterval tick` 的回调内 uncaught throw 被外层归默认 retryable、又无终态升级、再加过宽 `.catch(()=>{})` 吞错，就会不抛错不告警地永远重试或永远不推进。**改动任何重试/循环路径必须保留三件套**：终态出口（`failed_terminal`）、maxAttempts 上限（惯例 8）、可观测回调（`recordEvent`，不得 `.catch(()=>{})` 吞）；且 maxAttempts cap 必须放在 `send()`/调用**之前**（事后 cap 在 send 抛错时结构性不可达，R3）。诊断事件：`accepted_request.recovery_failed`（accepted 恢复 tick 抛错）、`INGEST_PREPARE_EXHAUSTED`（收录 prepare 重试耗尽）、`WORKFLOW_DELIVERY_EXHAUSTED`/`PROACTIVE_DELIVERY_EXHAUSTED`（投递耗尽转终态）、`proactive.bundle.blocked_sensitive`（主动提醒命中高精度凭据，已净化为回退文案）。这些只在真实故障时出现，正常启动不应刷屏。
+- 系统性「静默无限重试/停滞」bug 类已由 P1–P4 + 收尾复审 R1–R3（commit `8ce4cb3`）根治：凡是 `loop / retry / 定时 drain / setInterval tick` 的回调内 uncaught throw 被外层归默认 retryable、又无终态升级、再加过宽 `.catch(()=>{})` 吞错，就会不抛错不告警地永远重试或永远不推进。**改动任何重试/循环路径必须保留三件套**：终态出口（`failed_terminal`）、maxAttempts 上限（惯例 8）、可观测回调（`recordEvent`，不得 `.catch(()=>{})` 吞）；且 maxAttempts cap 必须放在 `send()`/调用**之前**（事后 cap 在 send 抛错时结构性不可达，R3）。诊断事件：`INGEST_PREPARE_EXHAUSTED`（收录 prepare 重试耗尽）、`WORKFLOW_DELIVERY_EXHAUSTED`（投递耗尽转终态）。这些只在真实故障时出现，正常启动不应刷屏。
 
 ## 故障检查顺序
 
@@ -128,12 +127,12 @@ Get-Content -LiteralPath $log.FullName -Tail 80
 - `今天有什么` / `今日安排` / `今天要做什么` → 读 TodayService 快照（首要、前 3 条待办、待确认数、进度），不消耗模型回合。
 - `记住 …` / `记一下 …` / `帮我记住 …` → 生成 `memory.proposals.create` 记忆候选 Job（按 messageId 幂等），回复里给候选编号并说明「确认后才进入长期记忆」；内容 > 500 字或写入失败时如实回报。带链接的「记住 …」转成显式收录（要抓取正文，不能只存一行）。
 
-其余收录/任务仍走既有确定性路由与主动推送；模型没有对应工具。灵感卡与其反馈机制已于 2026-10-17 整体下线。
+其余收录/任务仍走既有确定性路由；模型没有对应工具。灵感卡、全部主动推送与崩溃补发已于 2026-10-17 下线。
 
 ### 通道（2026-10-16）
 
 - 当前只有飞书一条通道（`feishu`）：微信 iLink 客户端、DSH `channel-weixin` 插件、`/api/syno/weixin/*` 端点与 `/maintenance/weixin` 重绑页已随「只用飞书」一并删除。
-- 通道默认 home 取注册到的通道（多通道时优先飞书）；主动推送只投 home 通道。
+- 通道默认 home 取注册到的通道（多通道时优先飞书）；系统不发主动消息。
 - 飞书入站附件：图片/文件走官方资源接口下载到 `.runtime/quarantine/feishu`（isolated/autoRead 同规约）→ 图片直传模型、文件走收录；单文件上限 25MB，超限或格式无法识别时如实拒绝。
 
 ### DeepSeek Harness 生产 chat（2026-08-21）
@@ -265,9 +264,9 @@ pnpm start
 
 `harness:doctor` 不把密钥写进输出。协议冒烟用 `pnpm probe:harness`（假 sidecar + 中文 UTF-8）；`pnpm probe:harness -- --real` 验证真实 Harness runtime closure 可发现并报告缺失项。显式设置 `SYNO_RUN_REAL_DSH=1` 的测试文件才允许执行真实模型验收；模型 key 只从宿主环境 `KIMI_API_KEY` 或仓库根 `.env` 读取，不写入测试参数、日志、仓库文件或验收产物。
 
-生产 chat 由 Host 监督 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（可用 `SYNO_DSH_WEB_PORT` 覆盖），与微信注入同一 Harness Session。Host 会把 `@syno/dsh-plugin` junction/symlink 进 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\node_modules`，不必再跑 `dsh plugin install`。该对话页是特权壳（`approval: never`，permission 表只有 `workspace-write`），不是普通聊天 UI。普通聊天默认走 capabilities 插件，只注册 3 件受控知识工具：`syno_knowledge_search`/`syno_knowledge_read_snippet`/`syno_knowledge_fetch_url`（2026-10-17 工具面重设计：收录、任务/审批、今日快照都不再是模型工具，改由确定性路由与主动推送承担）。Bridge 只在 `SYNO_CHAT_TOOLS=bridge` 回滚时注册，core 名单同为这 3 件。`knowledge.fetch_url` 受安全抓取策略约束。Capture Session 继续使用 Workflow 签发的浏览器 allowlist。`http://127.0.0.1:8888` 是控制面。收录分析仍是无 bash/fs/web 的 jsonrpc 第二进程。自动测试 / `SYNO_DSH_FAKE_AGENT` 仍走 jsonrpc fake。紧急回切 chat jsonrpc：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。不要把 jsonrpc sidecar 与生产 DSH Web 同时接到同一 session。不要执行 `dsh web`（那是库存 `--profile web`）。
+生产 chat 由 Host 监督 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（可用 `SYNO_DSH_WEB_PORT` 覆盖），与微信注入同一 Harness Session。Host 会把 `@syno/dsh-plugin` junction/symlink 进 `%LOCALAPPDATA%\Syno\harness\home\profiles\syno\node_modules`，不必再跑 `dsh plugin install`。该对话页是特权壳（`approval: never`，permission 表只有 `workspace-write`），不是普通聊天 UI。普通聊天默认走 capabilities 插件，只注册 3 件受控知识工具：`syno_knowledge_search`/`syno_knowledge_read_snippet`/`syno_knowledge_fetch_url`（2026-10-17 工具面重设计：收录、任务/审批、今日快照都不再是模型工具，改由确定性路由承担）。Bridge 只在 `SYNO_CHAT_TOOLS=bridge` 回滚时注册，core 名单同为这 3 件。`knowledge.fetch_url` 受安全抓取策略约束。Capture Session 继续使用 Workflow 签发的浏览器 allowlist。`http://127.0.0.1:8888` 是控制面。收录分析仍是无 bash/fs/web 的 jsonrpc 第二进程。自动测试 / `SYNO_DSH_FAKE_AGENT` 仍走 jsonrpc fake。紧急回切 chat jsonrpc：`$env:SYNO_DSH_CHAT_SURFACE = "jsonrpc"`。不要把 jsonrpc sidecar 与生产 DSH Web 同时接到同一 session。不要执行 `dsh web`（那是库存 `--profile web`）。
 
-Chat 的 `web_search` 由自研 `syno-search` 链提供（ADR 0009）：豆包搜索（500 次/月免费）→ Tavily（1000 credit/月）→ Exa（每月 $10 额度）→ Parallel 匿名 MCP 备用（免 Key、额度未公布），按查询语言路由（中文优先豆包、英文优先 Tavily），失败/限流/空结果自动回退；key 走仓库根 `.env`（`DOUBAO_SEARCH_API_KEY` / `TAVILY_API_KEY` / `EXA_API_KEY`）经 Host 注入，`harness:doctor` 的 `search-keys` 检查报告就位情况；可用 `SYNO_WEB_SEARCH_CHAIN=exa,tavily` 覆盖链前缀。JSON-RPC chat 回退面在 `syno-chat.cordis.yml` 挂载同一接缝（该面以相对路径加载插件，没有 bundle linked-root 的 peer 拦截，插件内对 `@deepseek-ai/dsh-web` 采用可选解析，见 `plugins/web-search/index.mjs`）。`web_fetch` 已于 2026-10-17 从会话面关闭（读网页只留受控路径，避免绕过 SSRF 防护与脱敏）。Web session 使用 Host 生成并显式绑定的 `syno` agent preset，compaction 与普通 schedule 由当前生产 profile 的官方 DSH 层接管（Web preset 使用官方 compaction-basic/tool-result-pruner/compact command，JSON-RPC 使用同一 stack，`@deepseek-ai/dsh-schedule` 已于 2026-10-17 关闭，主动运营只保留 Host 一套）。Syno 的 SignalEngine / PriorityEngine / ChannelDeliveryOutbox 负责业务主动运营。不要对生产 `syno` profile 执行 `dsh plugin add`，也不要从 [dsh-plugin.org](https://dsh-plugin.org/plugins?q=search) 装社区搜索或记忆插件；实验 UI 只用 Host 生成的 `syno-lab` profile（无 Bridge、无 vault 写、无微信）。收录分析 profile 仍然没有 web。
+Chat 的 `web_search` 由自研 `syno-search` 链提供（ADR 0009）：豆包搜索（500 次/月免费）→ Tavily（1000 credit/月）→ Exa（每月 $10 额度）→ Parallel 匿名 MCP 备用（免 Key、额度未公布），按查询语言路由（中文优先豆包、英文优先 Tavily），失败/限流/空结果自动回退；key 走仓库根 `.env`（`DOUBAO_SEARCH_API_KEY` / `TAVILY_API_KEY` / `EXA_API_KEY`）经 Host 注入，`harness:doctor` 的 `search-keys` 检查报告就位情况；可用 `SYNO_WEB_SEARCH_CHAIN=exa,tavily` 覆盖链前缀。JSON-RPC chat 回退面在 `syno-chat.cordis.yml` 挂载同一接缝（该面以相对路径加载插件，没有 bundle linked-root 的 peer 拦截，插件内对 `@deepseek-ai/dsh-web` 采用可选解析，见 `plugins/web-search/index.mjs`）。`web_fetch` 已于 2026-10-17 从会话面关闭（读网页只留受控路径，避免绕过 SSRF 防护与脱敏）。Web session 使用 Host 生成并显式绑定的 `syno` agent preset，compaction 与普通 schedule 由当前生产 profile 的官方 DSH 层接管（Web preset 使用官方 compaction-basic/tool-result-pruner/compact command，JSON-RPC 使用同一 stack，`@deepseek-ai/dsh-schedule` 已于 2026-10-17 关闭，主动运营只保留 Host 一套）。系统不再有任何主动推送：SignalEngine / ProactiveOrchestrator / ChannelDeliveryOutbox 已于 2026-10-17 删除。不要对生产 `syno` profile 执行 `dsh plugin add`，也不要从 [dsh-plugin.org](https://dsh-plugin.org/plugins?q=search) 装社区搜索或记忆插件；实验 UI 只用 Host 生成的 `syno-lab` profile（无 Bridge、无 vault 写、无微信）。收录分析 profile 仍然没有 web。
 
 图片与附件（2026-10-16 起飞书同样支持）：主人发的图直接投给模型看图；文件（PDF/docx/md/txt/html）落隔离区后走收录。明确说「收录」时图片才额外做一次模型转写（同链、capture sidecar 无工具），JSON 作为 `kind: text` 进入现有 Intake / Proposal。飞书资源下载走官方 `im/v1/messages/{id}/resources/{key}` 接口，权限要求由「获取单聊、群组消息」（注册时已申请 `im:message:readonly`）覆盖；单文件上限 25MB。本地知识搜索仍是 `syno_knowledge_search`。识图失败对微信可见，禁止猜图。
 

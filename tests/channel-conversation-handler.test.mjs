@@ -24,44 +24,6 @@ test("ChannelConversationHandler routes ordinary cross-channel messages to one O
   assert.deepEqual(runs.map((item) => [item.context.ownerKey, item.context.threadKey]), [["owner", "main"], ["owner", "main"]]);
 });
 
-test("ChannelConversationHandler persists accepted requests before model execution without changing reply flow", async () => {
-  const accepted = [];
-  const runs = [];
-  const targets = [];
-  const targetWakeups = [];
-  let wakes = 0;
-  const handler = new ChannelConversationHandler({
-    runtime: { async run(request) { runs.push(request); return { text: "shadow-reply" }; } },
-    core: {},
-    ingest: {},
-    pendingDecisions: {},
-    acceptedRequests: { async accept(input) { accepted.push(input); return { created: true, request: { requestId: "request-1" } }; } },
-    ownerChannelTargets: { async set(ownerKey, channel, target) { targets.push({ ownerKey, channel, target }); } },
-    channelDeliveryOutbox: { async wakeTarget(ownerKey, channel) { targetWakeups.push({ ownerKey, channel }); } },
-    wakeDelivery: async () => { wakes += 1; },
-  });
-  const response = await handler.handle({
-    id: "fs-shadow-1",
-    ownerKey: "owner",
-    senderId: "owner",
-    chatId: "chat-shadow",
-    channel: "feishu",
-    text: "受理 shadow 测试",
-  });
-  assert.deepEqual(response, { text: "shadow-reply" });
-  assert.equal(runs.length, 1);
-  assert.equal(accepted.length, 1);
-  assert.equal(accepted[0].originChannel, "feishu");
-  assert.equal(accepted[0].platformMessageId, "fs-shadow-1");
-  assert.deepEqual(accepted[0].payload, { text: "受理 shadow 测试", attachments: [] });
-  assert.deepEqual(accepted[0].deliveryTarget, { chatId: "chat-shadow", replyTo: "fs-shadow-1" });
-  assert.deepEqual(targets, [{ ownerKey: "owner", channel: "feishu", target: { chatId: "chat-shadow", replyTo: "fs-shadow-1" } }]);
-  assert.deepEqual(targetWakeups, [{ ownerKey: "owner", channel: "feishu" }]);
-  assert.equal(wakes, 1);
-});
-
-
-
 test("ChannelConversationHandler receives URL before invoking the model and records source message identity", async () => {
   const received = [];
   const proposed = [];
@@ -113,7 +75,6 @@ test("ChannelConversationHandler deterministically captures an embedded URL with
 test("ChannelConversationHandler returns the existing Workflow status for a duplicate URL without invoking the model", async () => {
   let modelRuns = 0;
   let receives = 0;
-  const targets = [];
   const handler = new ChannelConversationHandler({
     runtime: { async run() { modelRuns += 1; throw new Error("duplicate capture must not invoke the model"); } },
     core: {},
@@ -127,7 +88,6 @@ test("ChannelConversationHandler returns the existing Workflow status for a dupl
         };
       },
     },
-    ownerChannelTargets: { async set(ownerKey, channel, target) { targets.push({ ownerKey, channel, target }); } },
     pendingDecisions: {},
   });
 
@@ -142,7 +102,6 @@ test("ChannelConversationHandler returns the existing Workflow status for a dupl
 
   assert.equal(receives, 1);
   assert.equal(modelRuns, 0);
-  assert.deepEqual(targets, [{ ownerKey: "owner", channel: "feishu", target: { chatId: "chat-current", replyTo: "capture-duplicate-1" } }]);
   assert.equal(response.text, "已存在收录编号：workflow-existing。当前状态：已拒收。");
   assert.doesNotMatch(response.text, /正在后台安全提取/);
 });

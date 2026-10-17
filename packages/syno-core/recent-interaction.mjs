@@ -29,21 +29,19 @@ function recentSort(left, right) {
 }
 
 class RecentInteractionView {
-  constructor({ core, pendingDecisions, ingestWorkflows, acceptedRequests, reconciliationCases, limit = 10 } = {}) {
+  constructor({ core, pendingDecisions, ingestWorkflows, reconciliationCases, limit = 10 } = {}) {
     this.core = core;
     this.pendingDecisions = pendingDecisions;
     this.ingestWorkflows = ingestWorkflows;
-    this.acceptedRequests = acceptedRequests;
     this.reconciliationCases = reconciliationCases;
     this.limit = Math.max(1, Number(limit) || 10);
   }
 
   async snapshot({ ownerKey = "local-user", channel, threadKey = "main" } = {}) {
-    const [decisions, workflows, jobs, accepted, unknown] = await Promise.all([
+    const [decisions, workflows, jobs, unknown] = await Promise.all([
       this.pendingDecisions?.list({ ownerKey, threadKey }) || [],
       this.ingestWorkflows?.listPending(ownerKey) || [],
       this.core?.host?.list ? this.core.host.list({ limit: this.limit * 3 }) : [],
-      this.acceptedRequests?.list ? this.acceptedRequests.list({ ownerKey, limit: this.limit * 3 }) : [],
       this.reconciliationCases?.list ? this.reconciliationCases.list({ ownerKey, status: "open", limit: this.limit * 3 }) : [],
     ]);
     const ownedJobs = (jobs || []).filter((job) => job.ownerKey === ownerKey
@@ -54,7 +52,6 @@ class RecentInteractionView {
       ...(decisions || []).map((item) => ({ kind: "decision", id: item.id, status: "awaiting_decision", createdAt: item.createdAt, updatedAt: item.createdAt, presentationId: item.presentationId || null })),
       ...(workflows || []).map((item) => ({ kind: "ingest", id: item.id, status: item.stage, createdAt: item.createdAt, updatedAt: item.updatedAt, browserStatus: item.browserStatus || null })),
       ...ownedJobs.map((item) => ({ kind: "job", id: item.id, status: item.status, createdAt: item.created, updatedAt: item.updated })),
-      ...(accepted || []).filter((item) => !["delivered", "canceled", "failed_terminal"].includes(item.status)).map((item) => ({ kind: "accepted_request", id: item.requestId, status: item.status, createdAt: item.receivedAt, updatedAt: item.updatedAt, originChannel: item.originChannel })),
       ...(unknown || []).map((item) => ({ kind: "unknown", id: item.caseId, status: item.status, createdAt: item.createdAt, updatedAt: item.updatedAt, toolName: item.toolName })),
     ].sort(recentSort).slice(0, this.limit);
     return {
@@ -68,7 +65,6 @@ class RecentInteractionView {
         decisions: (decisions || []).length,
         workflows: (workflows || []).length,
         jobs: ownedJobs.length,
-        acceptedRequests: (accepted || []).length,
         unknown: (unknown || []).length,
       },
     };

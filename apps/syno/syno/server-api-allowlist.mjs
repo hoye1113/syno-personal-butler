@@ -9,9 +9,6 @@ const ALLOWED_SYNO_API_PATHS = new Set([
   "/api/syno/feishu/register/status",
   "/api/syno/feishu/connect",
   "/api/syno/feishu/disconnect",
-  "/api/syno/proactive/status",
-  "/api/syno/proactive/test",
-  "/api/syno/proactive/confirm-test",
   "/api/syno/settings",
 ]);
 

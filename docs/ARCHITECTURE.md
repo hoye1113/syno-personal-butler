@@ -80,11 +80,10 @@ Job files and immutable events are the recovery log. Per-job locks serialize sta
 - Repository truth (code repo): `config/`, `contracts/`, source, docs.
 - Rebuildable cache: `.runtime/`.
 - Secrets: `%LOCALAPPDATA%\Syno\credentials`.
-- Durable local execution state, channel delivery and encrypted recovery payloads: `%LOCALAPPDATA%\Syno\state`.
+- Durable local execution state (jobs, ingest workflows, decisions, reconciliation cases): `%LOCALAPPDATA%\Syno\state`.
 - All write worktrees (job checkouts of the knowledge repo): `.worktrees/syno-job-<id>`.
 
 Harness conversation bindings expire after 30 days; confirmed raw voice remains 7 days, failed payloads 30 days, and unfinished jobs remain until terminal state. Model outage never switches provider or runtime: deterministic local features continue and LLM jobs remain durable for retry.
 
-The single-Host proactive path is `SignalEngine → PriorityEngine → ProactiveOrchestrator → CognitiveRuntime`.
 
-飞书是当前唯一日常入口（微信通道栈已于 2026-10-16 删除）。用户可见 ACK 只能在请求进入可恢复事实源后发送；最终结果默认回到原始渠道。Web 是配置、诊断、桌面接管和完整审计入口，不是普通对话、写入或歧义决策的必经界面。完整边界见 ADR 0003–0005。
+飞书是当前唯一日常入口（微信通道栈已于 2026-10-16 删除）。用户可见 ACK 只表示消息已收到并开始处理；最终结果默认回到原始渠道。系统不发主动消息，也不在重启后补发历史回复。Web 是配置、诊断、桌面接管和完整审计入口，不是普通对话、写入或歧义决策的必经界面。完整边界见 ADR 0003–0005。

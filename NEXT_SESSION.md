@@ -7,11 +7,11 @@
 - **分支/远端**：`main`，本轮已提交两个提交：`e424250`（切换 + 搜索链）与 `65e964f`（投递失败种子时序修复）；**未 Push**。
 - **首轮真机验收发现并修复（2026-10-12，两轮 fix 提交）**：主人发「搜一下今天的 AI 新闻」暴露两处用户可见缺陷——① 系统提示从未注入当前时间（Harness 的 `@deepseek-ai/dsh-time-context` 存在但无 bundle 挂载），模型把「今天」猜成 2026-09-24；② 回复把英文过程叙述与草稿备注写进正文——根因是 0.1.7 生产根的 `kimi-for-coding` 目录条目缺 `thinkingLevelMap`，未声明档位时请求不启用 thinking，模型的「思考」全部落进 text 通道。修复：两个 chat overlay 挂载 `time-context`（Asia/Shanghai）；三处 kimi 路由经 `modelOverrides.reasoningEfforts` 补齐 low/high/max 档位并启用 `reasoning: high`（capture 用 `low`）；`syno-agent.md` 增加「正文只给结果、不给过程叙述、以 time-context 快照为准」规约。重启后 spike 实测 reasoning 块恢复（与 DeepSeek 时代一致）。
 - **飞书「正在回复中」状态气泡（2026-10-12）**：飞书无 typing API，改为占位卡方案——收到主人私聊先发「⏳ Syno 正在回复中…」卡片（引用原消息），答复就绪后 `im.v1.message.patch` 原位更新为最终答复；更新失败收回占位卡并退回普通发送；处理异常/延迟投递时收回占位卡。默认开启，`SYNO_FEISHU_TYPING=0|false` 可关。测试 `tests/feishu-typing.test.mjs` 6 项。
-- **移动 v2 投递链路已删除（2026-10-17）**：模式开关、cutover 脚本、v2 分支、恢复器与 `/api/syno/mobile-delivery` 端点全删；`AcceptedRequestStore` 落盘保留（幂等/审计）；**恢复器已于同日接回非 v2 路径**：同步回复成功即把记录收口为 `delivered`（`#settleAcceptedReply`），启动时先 `runOnce()` 补投非终态请求再常驻轮询，补投走 ChannelDeliveryOutbox（投递成功由 outbox 把记录标 `delivered`）。
-- **今日灵感已下线（2026-10-17）**：主人从不看卡，采样器/灵感仓/23 份存档/12:30 投递/反馈机制全部删除；主动运营只剩晨间 08:00、晚间 21:00、每周日复盘。
-- **工具面（2026-10-17 重设计）**：聊天只剩受控知识三件套（`syno_knowledge_search`/`syno_knowledge_read_snippet`/`syno_knowledge_fetch_url`）+ `web_search` + `skill`。DSH 的 shell/文件系统/后台作业/会话内调度与通用 `web_fetch` 全部关闭；收录、任务/审批、今日快照、灵感反馈都不再是模型工具：今日快照与「记住 …」走确定性口令（`今天有什么` / `记住 …`，2026-10-17 新增），其余走既有路由与主动推送。
+- **主动推送与崩溃补发全删（2026-10-17 晚，主人「所有主动的先删除」）**：SignalEngine、ProactiveOrchestrator、proactive-reliability、ChannelDeliveryOutbox、AcceptedRequestStore/RecoveryWorker、NotificationStore 与全部相关端点/设置/测试/状态数据一起删除；只保留「你说话 → 它回答」。同步回复不再落受理记录，重启不补发历史消息。
+- **今日灵感已下线（2026-10-17）**：主人从不看卡，采样器/灵感仓/23 份存档/12:30 投递/反馈机制全部删除。
+- **工具面（2026-10-17 重设计）**：聊天只剩受控知识三件套（`syno_knowledge_search`/`syno_knowledge_read_snippet`/`syno_knowledge_fetch_url`）+ `web_search` + `skill`。DSH 的 shell/文件系统/后台作业/会话内调度与通用 `web_fetch` 全部关闭；收录、任务/审批、今日快照、灵感反馈都不再是模型工具：今日快照与「记住 …」走确定性口令（`今天有什么` / `记住 …`，2026-10-17 新增），其余走既有路由。
 - **通道现状（2026-10-16）**：只剩飞书一条通道（`weixin` 适配器、DSH 通道插件、`/api/syno/weixin/*`、`/maintenance/weixin` 均已删除）；入站图片直投模型、附件走收录。
-- **生产运行态（2026-10-12 11:35 重启后实测）**：Host `ready`、`deliveryOk=true`（failures 0）、微信/飞书均 `running + ownerBound`、3088 DSH chat 子进程已按 `kimi-for-coding` 路由启动；current home channel = **feishu**（微信 proactive 目标因 09-29～10-09 的 9 条 `PROACTIVE_DELIVERY_EXHAUSTED` 旧记录处于冻结态，主动卡自 10-09 起投往飞书）。真机验收（微信发消息）仍待 Owner 执行。
+- **生产运行态（2026-10-17 重启后实测）**：Host `ready`、health ok（`/api/syno/health` 只回报存活与生命周期状态）；唯一通道为飞书（`running + ownerBound`），3088 DSH chat 子进程按 `kimi-for-coding` 路由启动；无主动推送、无补发。
 - **决策**：产品认知层改用 Kimi Code 订阅（ADR 0008）。模型链 `kimi-coding/kimi-for-coding` → `kimi-coding/k3-256k`，经 DSH 内置 pi-ai 适配器的 `kimi-coding` 目录路由（`https://api.kimi.com/coding`，Anthropic Messages 协议）。`llm-deepseek` 保留惰性挂载作为回滚面。
 - **密钥链路**：仓库根 `.env`（gitignored，Owner 已填 `KIMI_API_KEY` + 三把搜索 key）→ supervisor 统一读出后按进程环境变量注入三个 DSH 子进程（chat web / chat JSON-RPC / capture）；`syno-key-loader.mjs` 取代旧 deepseek loader（删除 opencode `auth.json` 兜底）；`.env.example` 入库。
 - **web_search 恢复**：自研 `syno-search` 链（ADR 0009）——豆包搜索（500 次/月免费，中文优先）→ Tavily（1000 credit/月，英文优先）→ Exa（每月 $10 额度），按查询语言路由、失败/限流/空结果确定性回退、缺 key 自动跳过；单次 ≤8 条、单 provider 15s 超时；`SYNO_WEB_SEARCH_CHAIN` 可覆盖链前缀。生产 web profile 与 JSON-RPC chat 回退面同链（回退面相对路径加载，插件对 `@deepseek-ai/dsh-web` 采用可选解析）；preset `tool-web` 已同时开放 `search` 与 `fetch`。kimi 路由图片预算收紧（单图 786KB / 聚合 1.4MB base64）对齐 Kimi ~2MB 请求上限。
@@ -25,7 +25,7 @@
   1. ~~Owner 微信真机验收~~ **已作废（2026-10-16 删除微信栈）**；改为飞书等价验收：知识检索、收录一条、联网搜索一条，并观察 `waiting_provider` 与失败码分布。
   2. 当日对账：Kimi 控制台额度 + 豆包/Tavily/Exa 三家搜索用量（均由控制台查看）。
   3. 首 72h 观察失败码（401/403/429）；回滚 = `git revert` 本轮两提交 + `.env` 保留/移除对应 key（`llm-deepseek` 惰性挂载即回滚面；搜索回滚 = overlay 摘 `syno-web-search` 行并恢复 `search:false`）。
-  4. ~~如需恢复微信主动卡……~~ **已作废（2026-10-16 删除微信栈）**；主动卡只投飞书。
+  4. 主动推送已全删（2026-10-17），不再有恢复主动卡的步骤。
 - **边界**：不改 `vendor/`；不内联 key；不新增高频自动调用（Kimi 社区规则禁止非交互批量自动化）。
 
 ## 启动自愈加固：Host 崩溃循环自动桌面告警（2026-10-12）

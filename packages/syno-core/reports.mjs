@@ -4,10 +4,9 @@ import { PATHS, relativeToRoot } from "./paths.mjs";
 import { writeRecord } from "./markdown-record.mjs";
 
 class ReportService {
-  constructor({ host, knowledge, notifications, channels, gitGuard, opsRoot = PATHS.opsRoot, pathResolver, clock = () => new Date() } = {}) {
+  constructor({ host, knowledge, channels, gitGuard, opsRoot = PATHS.opsRoot, pathResolver, clock = () => new Date() } = {}) {
     this.host = host;
     this.knowledge = knowledge;
-    this.notifications = notifications;
     this.channels = channels;
     this.gitGuard = gitGuard;
     this.opsRoot = opsRoot;

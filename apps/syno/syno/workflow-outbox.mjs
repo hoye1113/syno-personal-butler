@@ -213,7 +213,7 @@ class WorkflowOutbox {
 
   // C8：有界保留——终态记录（delivered/failed_terminal）永不重投，淘汰最旧的以防目录单调膨胀
   //（否则每个 drain tick 重新读解析所有文件，且诊断切片会被旧记录挤出窗口）。deliverDue 的候选过滤已排除
-  // 这些状态，故淘汰它们对投递安全。镜像 ChannelDeliveryOutbox.retain，按小时节流（见 drainWorkflowOutbox）。
+  // 这些状态，故淘汰它们对投递安全。按小时节流（见 drainWorkflowOutbox）。
   async retain({ now = this.clock(), maxAgeMs = 14 * 24 * 60 * 60 * 1000, limit = 200 } = {}) {
     const terminal = new Set(["delivered", "failed_terminal"]);
     const cutoff = new Date(now).getTime() - Math.max(0, Number(maxAgeMs) || 0);
@@ -246,7 +246,7 @@ class WorkflowOutbox {
         try {
           const current = sanitizeRecord(await this.#get(item.eventId));
           if (!current || current.status === "delivered" || current.status === "failed_terminal") continue;
-          // 镜像 ChannelDeliveryOutbox：deliver 抛错按 retryable（默认）归类，除非显式 retryable:false。
+          // deliver 抛错按 retryable（默认）归类，除非显式 retryable:false。
           let result;
           try {
             result = await deliver(current);

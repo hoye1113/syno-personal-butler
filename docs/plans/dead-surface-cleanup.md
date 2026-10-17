@@ -8,7 +8,12 @@
 > 删除 `capture.start/status/list_pending`、`jobs.list/submit`、`today.read`、`inspiration_record_feedback` 及其
 > 插件模块/测试/eval；灵感反馈机制整体下线（确定性口令 + 微信专属续办 + Host 工具一起删）；
 > DSH 侧关闭 `bash`/`pwsh`/`fs`/`fs-search`/`jobs`/`schedule` 与通用 `web_fetch`（读网页只留受控路径）。
-> 第十轮（2026-10-17，主人「按推荐执行」）：**崩溃恢复接回**——handler 的 `#settleAcceptedReply`
+> 第十一轮（2026-10-17，主人「所有主动的先删除，因为会影响我对话」）：**主动推送 + 崩溃补发整体下线**——
+> 删除 `SignalEngine`、`ProactiveOrchestrator`、`proactive-reliability`（含 OwnerChannelTargetStore）、
+> `ChannelDeliveryOutbox`、`AcceptedRequestStore`/`AcceptedRequestRecoveryWorker`、`NotificationStore` 及其
+> 端点（`/api/syno/proactive/*`、`/api/syno/notifications*`）、设置键（`notifications.proactive*`、`cadence`、`quietHours`）、
+> handler 的授理落盘/收口/恢复入口与 runtime 的 drain/定时器/健康字段；16 个测试文件与 8 份状态数据一并删除。
+> 第十轮（已被第十一轮推翻）：**崩溃恢复接回**——handler 的 `#settleAcceptedReply`
 > （同步回复成功即收口 delivered）＋ `processAcceptedRequest`（重跑→Outbox 补投→final_pending），
 > runtime 恢复构造/接线/启动 `runOnce()+start()`/close 停止；恢复器与其测试从第九轮删除中恢复。
 > 第九轮（2026-10-17，主人「可以删除」）：**移动 v2 投递链路删除**——`mobile-delivery-mode.mjs`、

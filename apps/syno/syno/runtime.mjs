@@ -29,7 +29,6 @@ import { assertKnowledgeNotSensitive, readKnowledgeSnippet } from "../../../pack
 import { KnowledgeMaintenanceSource } from "../../../packages/syno-core/knowledge-maintenance-source.mjs";
 import { fetchUrlForChat } from "../../../packages/syno-core/fetch-url-tool.mjs";
 import { KnowledgeProfileService } from "./knowledge-profile-service.mjs";
-import { NotificationStore } from "./notification-store.mjs";
 import { OperationExecutor } from "../../../packages/syno-core/operation-executor.mjs";
 import { PendingDecisionStore } from "../../../packages/syno-core/pending-decision.mjs";
 import { buildOperationRequest } from "../../../packages/syno-core/operation-registry.mjs";
@@ -39,7 +38,6 @@ import { PostIngestCandidateStore } from "./post-ingest-candidates.mjs";
 import { OutputService } from "../../../packages/syno-core/output-service.mjs";
 import { ProviderClient } from "./provider-client.mjs";
 import { ProviderCredentialStore } from "../../../packages/syno-core/provider-credential-store.mjs";
-import { ProactiveOrchestrator } from "./proactive-orchestrator.mjs";
 import { ReportService } from "../../../packages/syno-core/reports.mjs";
 import { RuntimeJournal } from "../../../packages/syno-core/runtime-journal.mjs";
 import { validateValue } from "../../../packages/syno-core/schema-registry.mjs";
@@ -59,10 +57,6 @@ import { VaultMigrationService } from "./vault-migration-service.mjs";
 import { WindowsServiceManager } from "./windows-service-manager.mjs";
 import { WorkflowContextCompiler } from "./workflow-context-compiler.mjs";
 import { WorkflowOutbox } from "./workflow-outbox.mjs";
-import { AcceptedRequestStore } from "../../../packages/syno-core/accepted-request-store.mjs";
-import { AcceptedRequestRecoveryWorker } from "../../../packages/syno-core/accepted-request-recovery.mjs";
-import { ChannelDeliveryOutbox, aggregateDeliveryFailures } from "../../../packages/syno-core/channel-delivery-outbox.mjs";
-import { OwnerChannelTargetStore } from "../../../packages/syno-core/proactive-reliability.mjs";
 import { EffectReceiptStore } from "./effect-receipt-store.mjs";
 import { EffectReconciliationCaseStore } from "./effect-reconciliation-case-store.mjs";
 import { EffectReconciliationWorker } from "./effect-reconciliation-worker.mjs";
@@ -88,8 +82,6 @@ const REPO_FINGERPRINT = createHash("sha256")
   .update(path.resolve(PATHS.repoRoot).toLocaleLowerCase("en-US"), "utf8")
   .digest("hex").slice(0, 16);
 
-const PROACTIVE_MAX_DELIVERY_ATTEMPTS = 8;
-const PROACTIVE_EARLY_WARN_ATTEMPTS = 4;
 const WORKFLOW_OUTBOX_MAX_ATTEMPTS = 8;
 const SYSTEM_ALERT_COOLDOWN_MS = 30 * 60 * 1000;
 
@@ -200,7 +192,6 @@ function createSynoRuntime(options = {}) {
   };
   const journal = options.journal || new RuntimeJournal();
   const recordEvent = (event, data, settings) => journal.record(event, data, settings).catch(() => null);
-  const notifications = options.notifications || new NotificationStore();
   const jobStore = options.jobStore || new JobStore();
   const pendingDecisions = options.pendingDecisions || new PendingDecisionStore();
   const knowledge = options.knowledge || new KnowledgeStore();
@@ -225,26 +216,6 @@ function createSynoRuntime(options = {}) {
   const ingest = options.ingest || new IngestService({ intake: sourceIntake, knowledge });
   const workflowContextCompiler = options.workflowContextCompiler || new WorkflowContextCompiler();
   const workflowOutbox = options.workflowOutbox || new WorkflowOutbox();
-  const acceptedRequests = options.acceptedRequests || (process.env.NODE_ENV === "test" ? null : new AcceptedRequestStore());
-  // 2026-10-17：恢复器接回非 v2 路径——崩溃重启后补投未完成回复的受理请求。
-  // 前置已就位：同步回复成功即把记录收口为 delivered（handler 的 #settleAcceptedReply），
-  // 因此恢复器只会看到真正没答完的消息（含 v2 时代遗留的非终态记录）。
-  const acceptedRecovery = acceptedRequests
-    ? (options.acceptedRecovery || new AcceptedRequestRecoveryWorker({
-      store: acceptedRequests,
-      recordEvent,
-      onEscalation: async (request) => {
-        await recordEvent("accepted.request.recovery_escalation", {
-          requestId: request?.requestId,
-          ownerKey: request?.ownerKey,
-          originChannel: request?.originChannel,
-          attempts: Number(request?.attempts || 0),
-        }, { level: "warning" });
-      },
-    }))
-    : null;
-  const channelDeliveryOutbox = options.channelDeliveryOutbox || (process.env.NODE_ENV === "test" ? null : new ChannelDeliveryOutbox());
-  const ownerChannelTargets = options.ownerChannelTargets || (process.env.NODE_ENV === "test" ? null : new OwnerChannelTargetStore());
   const effectReceipts = options.effectReceipts || (process.env.NODE_ENV === "test" ? null : new EffectReceiptStore());
   const reconciliationCases = options.reconciliationCases || (process.env.NODE_ENV === "test" ? null : new EffectReconciliationCaseStore());
   const reconciliationWorker = reconciliationCases
@@ -617,8 +588,6 @@ function createSynoRuntime(options = {}) {
     ingestWorkflows,
     captureChunks,
     captureScheduler,
-    acceptedRequests,
-    acceptedRecovery,
     reconciliationCases,
   });
   const channelConversationHandler = options.channelConversationHandler || new ChannelConversationHandler({
@@ -633,12 +602,8 @@ function createSynoRuntime(options = {}) {
     }),
     journal,
     browserCapture,
-    acceptedRequests,
     recentInteractions,
     channelContinuations,
-    channelDeliveryOutbox,
-    ownerChannelTargets,
-    wakeDelivery: () => drainChannelDeliveryOutbox().catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })),
     imageStore,
     imageTranscriber,
     // today 服务在本函数后半段才构造（依赖 host/goals），这里给惰性代理，避免 TDZ
@@ -933,11 +898,6 @@ function createSynoRuntime(options = {}) {
     quarantineRoot: path.join(PATHS.runtimeRoot, "quarantine", "feishu"),
   });
   const channels = options.channels || new ChannelHub({ feishu });
-  if (acceptedRecovery && typeof channelConversationHandler.processAcceptedRequest === "function") {
-    acceptedRecovery.processRequest = (request) => channelConversationHandler.processAcceptedRequest(request);
-  }
-  // proactive 主动通道连续投递失败计数（drain 回调增/重投成功清零）；health 探活 O(1) 读，避免每探活扫 outbox。
-  let proactiveDeliveryConsecutiveFailures = 0;
   const systemAlertLastSentAt = new Map();
   const notifySystemAlert = ({ title, body, level = "error" }) => {
     const now = Date.now();
@@ -949,16 +909,14 @@ function createSynoRuntime(options = {}) {
     const alertBody = String(body || "").slice(0, 500);
     return recordEvent("system.alert", { title: alertTitle, body: alertBody, level: key });
   };
-  reports = new ReportService({ host, knowledge, notifications, channels, gitGuard });
+  reports = new ReportService({ host, knowledge, channels, gitGuard });
   const today = options.today || new TodayService({ goals, host, settingsRegistry, signalSources, planner });
-  core = new SynoCore({ host, knowledge, notifications, channels, reports, today });
-  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance: knowledgeMaintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, channelContinuations, wakeDelivery: (deliveryOptions) => drainChannelDeliveryOutbox(deliveryOptions).catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })), recordEvent });
+  core = new SynoCore({ host, knowledge, channels, reports, today });
   const approvalAdvisor = options.approvalAdvisor || new ApprovalAdvisor({ ingest });
   let channelRecoveryTimer = null;
   let providerRecoveryTimer = null;
   let workflowOutboxTimer = null;
   let workflowRetryTimer = null;
-  let channelDeliveryOutboxTimer = null;
   let harnessRecoveryPromise = null;
   async function recoverHarness() {
     if (runtimeMode !== "deepseek-harness" || componentState.harness !== "degraded") return;
@@ -985,7 +943,7 @@ function createSynoRuntime(options = {}) {
     refreshLifecycleState();
   }
   async function drainWorkflowOutbox() {
-    // C8：有界保留——每小时淘汰终态旧记录，防目录单调膨胀（与 drainChannelDeliveryOutbox 同形）。
+    // C8：有界保留——每小时淘汰终态旧记录，防目录单调膨胀。
     // 用函数属性节流，避免 15s drain timer 每 tick 触发扫描；best-effort，绝不阻塞投递。
     const retentionNow = Date.now();
     if (!drainWorkflowOutbox.retainAt || retentionNow - drainWorkflowOutbox.retainAt > 3600_000) {
@@ -1006,31 +964,15 @@ function createSynoRuntime(options = {}) {
       if (Number(event.attempts || 0) >= WORKFLOW_OUTBOX_MAX_ATTEMPTS) {
         return { delivered: false, retryable: false, reason: "WORKFLOW_DELIVERY_EXHAUSTED" };
       }
-      let deliveryTarget = event.deliveryTarget || {};
-      if (event.targetChannel === "feishu") {
-        let persistedTarget;
-        try {
-          persistedTarget = await ownerChannelTargets?.get?.(event.ownerKey, event.targetChannel) || null;
-        } catch (error) {
-          await recordEvent("ingest.workflow.outbox.target_unavailable", {
-            workflowId: event.workflowId,
-            eventId: event.eventId,
-            targetChannel: event.targetChannel,
-            status: "target_decrypt_failed",
-            error: { code: error?.code || "CHANNEL_TARGET_UNAVAILABLE" },
-          }, { level: "warning" });
-          return { delivered: false, retryable: true, reason: "CHANNEL_TARGET_UNAVAILABLE" };
-        }
-        if (!persistedTarget) {
-          await recordEvent("ingest.workflow.outbox.target_unavailable", {
-            workflowId: event.workflowId,
-            eventId: event.eventId,
-            targetChannel: event.targetChannel,
-            status: "target_missing",
-          }, { level: "warning" });
-          return { delivered: false, retryable: true, reason: "CHANNEL_TARGET_MISSING" };
-        }
-        deliveryTarget = persistedTarget;
+      const deliveryTarget = event.deliveryTarget || {};
+      if (event.targetChannel === "feishu" && !String(deliveryTarget.chatId || "").trim()) {
+        await recordEvent("ingest.workflow.outbox.target_unavailable", {
+          workflowId: event.workflowId,
+          eventId: event.eventId,
+          targetChannel: event.targetChannel,
+          status: "target_missing",
+        }, { level: "warning" });
+        return { delivered: false, retryable: true, reason: "CHANNEL_TARGET_MISSING" };
       }
       const results = await channels.send({
         ...event.redactedPayload,
@@ -1057,158 +999,6 @@ function createSynoRuntime(options = {}) {
       }, { level: "error" }),
     });
   }
-  async function drainChannelDeliveryOutbox({ allowProactiveEventId = null } = {}) {
-    if (!channelDeliveryOutbox || !channels) return { skipped: true };
-    // Bounded retention (R7): evict old terminal records hourly (throttled via a function property so
-    // the 1s drain timer doesn't trigger a sweep every tick). Best-effort; never blocks delivery.
-    const retentionNow = Date.now();
-    if (!drainChannelDeliveryOutbox.retainAt || retentionNow - drainChannelDeliveryOutbox.retainAt > 3600_000) {
-      drainChannelDeliveryOutbox.retainAt = retentionNow;
-      channelDeliveryOutbox.retain?.({ now: new Date(retentionNow) }).catch(() => {});
-    }
-    const outboxReport = await channelDeliveryOutbox.deliverDue(async (payload, event) => {
-      let persistedTarget = null;
-      if (event.sourceType === "proactive_bundle") {
-        // R3：cap 提到 target 查找与 send 之前（同 workflow outbox），覆盖 send 抛错路径、省一次空投。
-        if (Number(event.attempts || 0) >= PROACTIVE_MAX_DELIVERY_ATTEMPTS) {
-          return { delivered: false, retryable: false, reason: "PROACTIVE_DELIVERY_EXHAUSTED" };
-        }
-        try {
-          persistedTarget = await ownerChannelTargets?.get?.(event.ownerKey, event.targetChannel) || null;
-        } catch (error) {
-          await recordEvent("proactive.target_unavailable", {
-            bundleId: event.sourceId,
-            signalCount: Array.isArray(payload.signalVersions) ? payload.signalVersions.length : 0,
-            channel: event.targetChannel,
-            outboxEventId: event.eventId,
-            status: "target_decrypt_failed",
-            error,
-          }, { level: "error" });
-          return { retryable: true, reason: "CHANNEL_TARGET_UNAVAILABLE" };
-        }
-        if (event.targetChannel === "feishu" && !persistedTarget) {
-          await recordEvent("proactive.target_unavailable", {
-            bundleId: event.sourceId,
-            signalCount: Array.isArray(payload.signalVersions) ? payload.signalVersions.length : 0,
-            channel: event.targetChannel,
-            outboxEventId: event.eventId,
-            status: "target_missing",
-          });
-          return { retryable: true, reason: "CHANNEL_TARGET_MISSING" };
-        }
-      }
-      const results = await channels.send({
-        ...payload,
-        ...(event.sourceType === "proactive_bundle" ? (persistedTarget || {}) : (event.deliveryTarget || {})),
-        eventId: event.eventId,
-        deliveryKey: event.deliveryKey,
-      }, [event.targetChannel]);
-      const result = results[event.targetChannel] || { delivered: false, reason: "channel_missing" };
-      return result;
-    }, {
-      onDelivered: async (event) => {
-        if (event.sourceType === "accepted_request" && acceptedRequests) {
-          if (["final", "decision", "recovery"].includes(event.responseKind)) {
-            await acceptedRequests.update(event.sourceId, { status: "delivered", finalEventId: event.eventId, claim: null });
-          } else if (event.responseKind === "ack") {
-            await acceptedRequests.update(event.sourceId, { ackEventId: event.eventId });
-          }
-        } else if (event.sourceType === "proactive_bundle") {
-          proactiveDeliveryConsecutiveFailures = 0;
-          await proactive.markBundleDelivered(event.sourceId, event.eventId);
-          if ((await settingsRegistry.get("notifications.proactiveTestEventId").catch(() => null)) === event.eventId) {
-            await settingsRegistry.set("notifications.proactiveTestEventId", null, {
-              actor: "system",
-              proactiveTestAuthorizationVerified: true,
-            });
-          }
-        }
-      },
-      onDeliveryUnknown: async (event) => {
-        if (event.sourceType !== "proactive_bundle") return;
-        await notifications?.updateDeliveryStatus?.(event.deliveryKey, {
-          status: "delivery_unknown",
-          outboxEventId: event.eventId,
-        });
-        await recordEvent("proactive.bundle.delivery_unknown", {
-          bundleId: event.sourceId,
-          signalCount: 0,
-          channel: event.targetChannel,
-          outboxEventId: event.eventId,
-          status: event.status,
-        }, { level: "warning" });
-      },
-      onFailedRetryable: async (event) => {
-        if (event.sourceType !== "proactive_bundle") return;
-        proactiveDeliveryConsecutiveFailures += 1;
-        const attempts = Number(event.attempts || 0);
-        await recordEvent("proactive.bundle.delivery_failed_retryable", {
-          bundleId: event.sourceId,
-          signalCount: 0,
-          channel: event.targetChannel,
-          outboxEventId: event.eventId,
-          status: event.status,
-          lastErrorCode: event.lastErrorCode,
-          attempts,
-        }, { level: "warning" });
-        if (attempts >= PROACTIVE_EARLY_WARN_ATTEMPTS) {
-          notifySystemAlert({
-            title: "Syno 主动通道异常",
-            body: `${event.targetChannel} 主动通知连续投递失败（第 ${attempts} 次）。微信给 Syno 发条消息可刷新 token 恢复。`,
-            level: "warning",
-          });
-        }
-      },
-      onFailedTerminal: async (event) => {
-        if (event.sourceType === "proactive_bundle") {
-          proactiveDeliveryConsecutiveFailures += 1;
-          await recordEvent("proactive.bundle.delivery_failed_terminal", {
-            bundleId: event.sourceId,
-            signalCount: 0,
-            channel: event.targetChannel,
-            outboxEventId: event.eventId,
-            status: event.status,
-            lastErrorCode: event.lastErrorCode,
-            attempts: Number(event.attempts || 0),
-          }, { level: "error" });
-          notifySystemAlert({
-            title: "Syno 主动通道异常",
-            body: `${event.targetChannel} 连续投递失败已达上限，主动播报暂停。微信给 Syno 发条消息可刷新 token 恢复。`,
-            level: "error",
-          });
-        } else if (event.sourceType === "accepted_request" && acceptedRequests && ["final", "decision", "recovery"].includes(event.responseKind)) {
-          await acceptedRequests.update(event.sourceId, { status: "failed_terminal", claim: null }).catch(() => {});
-          await recordEvent("accepted_request.delivery_failed_terminal", {
-            requestId: event.sourceId,
-            outboxEventId: event.eventId,
-            responseKind: event.responseKind,
-            lastErrorCode: event.lastErrorCode,
-          }, { level: "error" }).catch(() => {});
-        }
-      },
-      shouldDeliver: async (event) => {
-        if (event.sourceType !== "proactive_bundle") return true;
-        if (event.targetChannel !== channels.homeChannel) return false;
-        if (allowProactiveEventId && event.eventId === allowProactiveEventId) return true;
-        try {
-          if ((await settingsRegistry.get("notifications.proactiveTestEventId")) === event.eventId) return true;
-          return (await settingsRegistry.get("notifications.proactiveDeliveryEnabled")) === true;
-        } catch (error) {
-          await recordEvent("proactive.release_gate.unavailable", {
-            outboxEventId: event.eventId,
-            status: "paused",
-            error,
-          }, { level: "error" }).catch(() => {});
-          return false;
-        }
-      },
-    });
-    // A5：投影（onDelivered 状态回写）重试达上限——消息已送达但状态回写持续失败转终态，落 journal 可观测。
-    if (outboxReport?.projectionExhausted) {
-      await recordEvent("channel.outbox.projection_exhausted", { count: outboxReport.projectionExhausted }, { level: "warning" }).catch(() => {});
-    }
-    return outboxReport;
-  }
   async function startHarnessSecurely({ restart = false } = {}) {
     const route = parseHarnessModel(HARNESS_MODEL_CHAIN[0]);
     if (restart) await harnessSupervisor.stop("chat");
@@ -1234,9 +1024,6 @@ function createSynoRuntime(options = {}) {
     ingestWorkflows,
     workflowContextCompiler,
     workflowOutbox,
-    acceptedRequests,
-    channelDeliveryOutbox,
-    ownerChannelTargets,
     effectReceipts,
     reconciliationCases,
     reconciliationWorker,
@@ -1250,11 +1037,8 @@ function createSynoRuntime(options = {}) {
     postIngestCandidates,
     migration,
     today,
-    notifications,
     channels,
-    proactive,
     signalSources,
-    scheduler: proactive,
     feishu,
     credentials,
     provider,
@@ -1279,7 +1063,6 @@ function createSynoRuntime(options = {}) {
       return {
         state: lifecycleState,
         components: { ...componentState },
-        proactiveDeliveryConsecutiveFailures,
       };
     },
     restartHarness: () => startHarnessSecurely({ restart: true }),
@@ -1327,27 +1110,7 @@ function createSynoRuntime(options = {}) {
             componentState.channels = "ready";
             refreshLifecycleState();
             await recordEvent("syno.channels.started");
-            // 重启后用持久化 outbox 重建「主动通道连续失败」计数：计数器是进程级 let，重启归零，
-            // 否则 health.deliveryOk 会在通道仍坏时短暂假绿。必须在 channels.start() 之后执行——
-            // 持久化 home 通道在该调用内恢复，提前读取会用默认值误种历史失败（2026-10-12 实测）。
-            // 口径与 live 计数器一致：从最新事件向前累加连续失败态事件的 attempts。best-effort。
-            try {
-              const homeChannel = channels.homeChannel;
-              if (channelDeliveryOutbox && homeChannel) {
-                // list 在服务端按 sourceType/targetChannel 过滤后再切片，避免被其它类型事件挤出窗口导致假绿。
-                const scoped = await channelDeliveryOutbox.list({ limit: 200, order: "desc", sourceType: "proactive_bundle", targetChannel: homeChannel });
-                const { consecutiveFailures: seed } = aggregateDeliveryFailures(scoped);
-                proactiveDeliveryConsecutiveFailures = seed;
-                if (seed) await recordEvent("proactive.delivery.seeded_failures", { homeChannel, consecutiveFailures: seed });
-              }
-            } catch (error) {
-              await recordEvent("proactive.delivery.seed_failed", { error }, { level: "warning" }).catch(() => {});
-            }
             await drainWorkflowOutbox();
-            await drainChannelDeliveryOutbox();
-            // 崩溃恢复：先把非终态的受理请求补投一次，再常驻轮询（自愈，不依赖重启）
-            await acceptedRecovery?.runOnce().catch((error) => recordEvent("accepted_request.recovery_failed", { error }, { level: "error" }));
-            acceptedRecovery?.start();
           })
           .catch(async (error) => {
             if (lifecycleState === "stopping") return;
@@ -1358,12 +1121,6 @@ function createSynoRuntime(options = {}) {
           });
         refreshLifecycleState();
         if (worker) {
-          proactive.start()
-            .then(() => recordEvent("syno.proactive.started"))
-            .catch(async (error) => {
-              await recordEvent("syno.proactive.degraded", { error }, { level: "error" });
-              console.error("[syno] proactive.start 降级:", String(error?.message || error));
-            });
           channelRecoveryTimer = setInterval(() => recoverChannels().catch(() => {}), 60_000);
           providerRecoveryTimer = setInterval(() => {
             recoverHarness().catch(() => {});
@@ -1372,10 +1129,6 @@ function createSynoRuntime(options = {}) {
         workflowOutboxTimer = setInterval(() => drainWorkflowOutbox().catch((error) =>
           recordEvent("ingest.outbox.drain_failed", { error }, { level: "error" }).catch(() => {}),
         ), 15_000);
-        channelDeliveryOutboxTimer = setInterval(() => drainChannelDeliveryOutbox().catch((error) =>
-          recordEvent("channel.outbox.drain_failed", { error }, { level: "error" }).catch(() => {}),
-        ), 1_000);
-        channelDeliveryOutboxTimer.unref?.();
         // C5: effect reconcile 由 reconciliationWorker.start()（自带 single-flight）单驱动；此前另有一个 60s
         // reconciliationTimer 重复 runOnce（绕过 single-flight），已移除以消除重复驱动。
         // C3: ingest failed_retryable 工作流此前只在进程重启 recover() 时处理（retryDue 全仓零 caller），失败后停滞到下次重启。
@@ -1405,19 +1158,15 @@ function createSynoRuntime(options = {}) {
       lifecycleState = "stopping";
       closePromise = (async () => {
         await recordEvent("syno.shutdown.requested");
-        proactive.stop();
         if (channelRecoveryTimer) clearInterval(channelRecoveryTimer);
         channelRecoveryTimer = null;
         if (providerRecoveryTimer) clearInterval(providerRecoveryTimer);
         providerRecoveryTimer = null;
         if (workflowOutboxTimer) clearInterval(workflowOutboxTimer);
         workflowOutboxTimer = null;
-        if (channelDeliveryOutboxTimer) clearInterval(channelDeliveryOutboxTimer);
-        channelDeliveryOutboxTimer = null;
         if (workflowRetryTimer) clearInterval(workflowRetryTimer);
         workflowRetryTimer = null;
         await reconciliationWorker?.stop().catch(() => {});
-        await acceptedRecovery?.stop().catch(() => {});
         await channels.stop().catch(() => {});
         try { await harnessSupervisor.stop(); }
         catch (error) {
@@ -1434,7 +1183,6 @@ function createSynoRuntime(options = {}) {
 async function routeSynoApi(runtime, req, url, readBody) {
   const method = req.method || "GET";
   // 诊断 GET 不创建会话，也不经过生成、投递或控制面修改路径。
-  if (method === "GET" && url.pathname === "/api/syno/proactive/status") return runtime.proactive.preview();
   const webContext = {
     channel: "web", senderId: "local-user", ownerKey: "local-user", developmentMode: runtime.developmentMode,
     conversationId: runtime.conversationRouter ? await runtime.conversationRouter.resolve({ ownerKey: "local-user" }) : undefined,
@@ -1444,13 +1192,10 @@ async function routeSynoApi(runtime, req, url, readBody) {
     ? runtime.lifecycle()
     : { state: "ready", components: {} };
   if (method === "GET" && url.pathname === "/api/syno/health") {
-    const consecutive = Number(lifecycle.proactiveDeliveryConsecutiveFailures) || 0;
     return {
       ok: true, alive: true, state: lifecycle.state, product: HEALTH_PRODUCT,
       protocolVersion: HEALTH_PROTOCOL_VERSION, repoFingerprint: REPO_FINGERPRINT,
       now: new Date().toISOString(),
-      deliveryOk: consecutive < PROACTIVE_EARLY_WARN_ATTEMPTS,
-      deliveryConsecutiveFailures: consecutive,
     };
   }
   if (method === "GET" && url.pathname === "/api/syno/readiness") return {
@@ -1488,70 +1233,7 @@ async function routeSynoApi(runtime, req, url, readBody) {
   }) };
   if (method === "GET" && url.pathname === "/api/syno/note") return runtime.core.read(url.searchParams.get("path") || "");
   if (method === "GET" && url.pathname === "/api/syno/jobs") return { jobs: await runtime.host.list({ limit: 100, ownerKey: webContext.ownerKey }) };
-  if (method === "GET" && url.pathname === "/api/syno/notifications") return { notifications: await runtime.notifications.list({ limit: 100 }) };
-  if (method === "POST" && url.pathname === "/api/syno/notifications/archive") {
-    return runControlMutation(runtime, async () => runtime.notifications.archive(await readBody(req)));
-  }
   if (method === "GET" && url.pathname === "/api/syno/channels") return { channels: runtime.channels.status() };
-  if (method === "POST" && url.pathname === "/api/syno/proactive/migrate") {
-    const body = await readBody(req);
-    if (body?.confirmed !== true) {
-      throw Object.assign(new Error("主动通知 Ledger 迁移需要 Owner 明确确认"), { code: "PROACTIVE_MIGRATION_CONFIRMATION_REQUIRED", statusCode: 409 });
-    }
-    if ((await runtime.settingsRegistry.get("notifications.proactiveDeliveryEnabled")) === true) {
-      throw Object.assign(new Error("迁移前必须暂停主动通知"), { code: "PROACTIVE_DELIVERY_MUST_BE_PAUSED", statusCode: 409 });
-    }
-    return runtime.proactive.migrateLedger();
-  }
-  if (method === "POST" && url.pathname === "/api/syno/proactive/test") {
-    const body = await readBody(req);
-    if (body?.confirmed !== true) {
-      throw Object.assign(new Error("主动通知受控测试需要 Owner 明确确认"), { code: "PROACTIVE_TEST_CONFIRMATION_REQUIRED", statusCode: 409 });
-    }
-    if ((await runtime.settingsRegistry.get("notifications.proactiveDeliveryEnabled")) === true) {
-      throw Object.assign(new Error("受控测试期间必须保持真实主动通知暂停"), { code: "PROACTIVE_DELIVERY_MUST_BE_PAUSED", statusCode: 409 });
-    }
-    return runtime.proactive.triggerTest(body.runId);
-  }
-  if (method === "POST" && url.pathname === "/api/syno/proactive/confirm-test") {
-    const body = await readBody(req);
-    if (body?.confirmed !== true) {
-      throw Object.assign(new Error("主动通知手机验收需要 Owner 明确确认"), { code: "PROACTIVE_OWNER_CONFIRMATION_REQUIRED", statusCode: 409 });
-    }
-    return runControlMutation(runtime, async () => {
-      const homeChannel = runtime.channels?.homeChannel;
-      const eventId = String(body.eventId || "");
-      const runId = String(body.runId || "");
-      const event = await runtime.channelDeliveryOutbox?.get?.(eventId).catch(() => null);
-      const valid = event
-        && event.sourceType === "proactive_bundle"
-        && event.status === "delivered"
-        && event.ownerKey === "local-user"
-        && event.targetChannel === homeChannel
-        && event.deliveryKey === `proactive-test:${runId}:${homeChannel}:v1`
-        && body.visibleCount === 1
-        && body.order === "single"
-        && body.result === "passed";
-      if (!valid) {
-        throw Object.assign(new Error("主动通知手机验收与当前 Home Channel 或测试投递不匹配"), { code: "PROACTIVE_OWNER_EVIDENCE_INVALID", statusCode: 409 });
-      }
-      const evidence = {
-        eventId,
-        runId,
-        homeChannel,
-        visibleCount: 1,
-        order: "single",
-        performedBy: "owner",
-        result: "passed",
-        confirmedAt: new Date().toISOString(),
-      };
-      return runtime.settingsRegistry.set("notifications.proactiveReleaseEvidence", evidence, {
-        actor: "user",
-        confirmed: true,
-        releaseEvidenceVerified: true,
-      });
-    });
-  }
   if (method === "GET" && url.pathname === "/api/syno/recent-interactions") return runtime.recentInteractions.snapshot({ ownerKey: "local-user", channel: url.searchParams.get("channel") || undefined, threadKey: url.searchParams.get("thread") || "main" });
   if (method === "GET" && url.pathname === "/api/syno/effect-cases") return { cases: (await runtime.reconciliationCases?.list({ ownerKey: "local-user", limit: 100 }) || []).map((item) => ({ caseId: item.caseId, toolName: item.toolName, status: item.status, attempts: item.attempts, nextReconcileAt: item.nextReconcileAt, lastErrorCode: item.lastErrorCode, ownerResolution: item.ownerResolution, systemResolution: item.systemResolution, createdAt: item.createdAt, updatedAt: item.updatedAt })) };
   if (method === "GET" && url.pathname === "/api/syno/provider") return runtime.credentials.status();
@@ -1559,45 +1241,6 @@ async function routeSynoApi(runtime, req, url, readBody) {
   if (method === "GET" && url.pathname === "/api/syno/settings") return runtime.settingsRegistry.load();
   if (method === "POST" && url.pathname === "/api/syno/settings") {
     const body = await readBody(req);
-    if (["notifications.proactiveReleaseEvidence", "notifications.proactiveTestEventId"].includes(String(body.key || ""))) {
-      throw Object.assign(new Error("主动通知内部发布状态只能由受控入口写入"), { code: "PROACTIVE_RELEASE_STATE_UNVERIFIED", statusCode: 409 });
-    }
-    if (String(body.key || "") === "notifications.proactiveDeliveryEnabled") {
-      return runControlMutation(runtime, async () => {
-        if (body.value === true) {
-          const release = await runtime.proactive.releaseStatus();
-          if (!release.migrationComplete) {
-            throw Object.assign(new Error("主动通知 Ledger 尚未完成受控迁移"), { code: "PROACTIVE_MIGRATION_REQUIRED", statusCode: 409 });
-          }
-          const evidenceEventId = String(body.evidenceEventId || "");
-          const ownerEvidence = await runtime.settingsRegistry.get("notifications.proactiveReleaseEvidence");
-          const homeChannel = runtime.channels?.homeChannel;
-          const evidenceEvent = await runtime.channelDeliveryOutbox?.get?.(evidenceEventId).catch(() => null);
-          const deliveredTest = Boolean(evidenceEvent
-            && evidenceEvent.eventId === evidenceEventId
-            && evidenceEvent.sourceType === "proactive_bundle"
-            && evidenceEvent.status === "delivered"
-            && evidenceEvent.ownerKey === "local-user"
-            && evidenceEvent.targetChannel === homeChannel
-            && ownerEvidence?.eventId === evidenceEventId
-            && ownerEvidence?.homeChannel === homeChannel
-            && ownerEvidence?.performedBy === "owner"
-            && ownerEvidence?.result === "passed"
-            && ownerEvidence?.visibleCount === 1
-            && ownerEvidence?.order === "single"
-            && evidenceEvent.deliveryKey === `proactive-test:${ownerEvidence?.runId}:${homeChannel}:v1`);
-          if (!deliveredTest) {
-            throw Object.assign(new Error("启用真实主动通知前必须完成一条受控测试投递"), { code: "PROACTIVE_TEST_REQUIRED", statusCode: 409 });
-          }
-          return runtime.settingsRegistry.set(String(body.key || ""), body.value, {
-            actor: "user",
-            confirmed: body.confirmed === true,
-            evidenceRef: evidenceEventId,
-          });
-        }
-        return runtime.settingsRegistry.set(String(body.key || ""), body.value, { actor: "user", confirmed: body.confirmed === true });
-      });
-    }
     return runtime.settingsRegistry.set(String(body.key || ""), body.value, { actor: "user", confirmed: body.confirmed === true });
   }
   const migrationPreview = /^\/api\/syno\/migrations\/([^/]+)$/.exec(url.pathname);
@@ -1688,32 +1331,9 @@ async function routeSynoApi(runtime, req, url, readBody) {
     const body = await readBody(req);
     const nextHome = String(body.channel || "");
     return runControlMutation(runtime, async () => {
-      if (nextHome !== runtime.channels.homeChannel) {
-        const availableChannels = runtime.channels.status();
-        if (!Object.hasOwn(availableChannels, nextHome)) {
-          throw Object.assign(new Error(`未知渠道：${nextHome}`), { code: "CHANNEL_NOT_FOUND", statusCode: 400 });
-        }
-        const previousHome = runtime.channels.homeChannel;
-        await runtime.settingsRegistry.set("notifications.proactiveDeliveryEnabled", false, {
-          actor: "user",
-          confirmed: true,
-        });
-        const cutover = await runtime.channelDeliveryOutbox?.beginProactiveTargetCutover?.("local-user", previousHome);
-        try {
-          const channelState = await runtime.channels.setHome(nextHome);
-          await runtime.settingsRegistry.set("notifications.proactiveReleaseEvidence", null, {
-            actor: "system",
-            confirmed: true,
-            releaseEvidenceVerified: true,
-          });
-          await runtime.settingsRegistry.set("notifications.proactiveTestEventId", null, {
-            actor: "system",
-            proactiveTestAuthorizationVerified: true,
-          });
-          return { channels: channelState };
-        } finally {
-          cutover?.release?.();
-        }
+      const availableChannels = runtime.channels.status();
+      if (!Object.hasOwn(availableChannels, nextHome)) {
+        throw Object.assign(new Error(`未知渠道：${nextHome}`), { code: "CHANNEL_NOT_FOUND", statusCode: 400 });
       }
       return { channels: await runtime.channels.setHome(nextHome) };
     });
