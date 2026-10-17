@@ -5,7 +5,6 @@ import path from "node:path";
 import test from "node:test";
 
 import { ChannelConversationHandler } from "../packages/syno-core/channel-conversation-handler.mjs";
-import { InspirationStore } from "../packages/syno-core/inspiration-store.mjs";
 import { IsolatedImageStore } from "../apps/syno/syno/isolated-image-store.mjs";
 import { createGlyphPng } from "../apps/syno/syno/image-png.mjs";
 

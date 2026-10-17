@@ -5,11 +5,10 @@ import path from "node:path";
 import test from "node:test";
 
 import { ChannelDeliveryOutbox } from "../packages/syno-core/channel-delivery-outbox.mjs";
-import { InspirationStore } from "../packages/syno-core/inspiration-store.mjs";
 import { ProactiveOrchestrator } from "../apps/syno/syno/proactive-orchestrator.mjs";
 import { SignalEngine } from "../apps/syno/syno/signal-engine.mjs";
 
-// L0b（#17）tick 三段拆分 + 组合租约的新行为测试。语义回归门在 proactive-reliability/inspiration/
+// tick 三段拆分 + 组合租约的新行为测试。语义回归门在 proactive-reliability。
 // provider-agent 三件套（零改动即绿）；这里只覆盖重构引入的新机制：
 // 租约并发抑制、崩溃恢复、commit 双守卫、投递落定不被长生成阻塞、分段观测、attempts 跨重启持久。
 
@@ -264,57 +263,3 @@ test("L0b observation: a productive tick records segmented timings", async (t) =
 });
 
 // 灵感 attempts 跨重启持久：实例 A 失败一次（commit 记 attempts=1），实例 B 同 stateFile 接力计到 2。
-async function makeInspirationLease(t, { stateFile, root, agentRun }) {
-  const outbox = new ChannelDeliveryOutbox({
-    root: path.join(root, `outbox-${Math.random().toString(36).slice(2, 8)}`),
-    payloadRoot: path.join(root, "payloads"),
-    lockFile: path.join(root, `outbox-${Math.random().toString(36).slice(2, 8)}.lock`),
-    protect: async (value) => value,
-    unprotect: async (value) => value,
-  });
-  const agentCalls = [];
-  let proactive;
-  proactive = new ProactiveOrchestrator({
-    host: { async receive() { throw new Error("灵感生成不应落回 host.receive"); } },
-    today: { async snapshot() { return { priorities: [] }; } },
-    channels: { homeChannel: "weixin", async send() { return { weixin: { delivered: true } }; } },
-    signalSources: { async collect() { return []; } },
-    cognitiveRuntime: {
-      async run(request) { agentCalls.push(request); return agentRun(request); },
-      async appendSystemEvent() {},
-    },
-    channelDeliveryOutbox: outbox,
-    inspirationStore: new InspirationStore({ opsRoot: path.join(root, "ops") }),
-    inspirationSampler: {
-      async sample() {
-        return {
-          notes: [
-            { path: "vault/02-Resources/a.md", title: "笔记甲", tags: ["agent"], excerpt: "甲的摘要" },
-            { path: "vault/02-Resources/b.md", title: "笔记乙", tags: [], excerpt: "乙的摘要" },
-          ],
-        };
-      },
-    },
-    signalEngine: new SignalEngine({ schedule: { morningHour: 99, eveningHour: 99, inspirationHour: 16, weeklyDay: 6, maxDailyNotifications: 3 } }),
-    stateFile,
-    quietHours: { start: "23:00", end: "07:00" },
-  });
-  return { proactive, agentCalls };
-}
-
-test("L0b: inspiration attempts accumulate across orchestrator restarts", async (t) => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-lease-insp-"));
-  t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const stateFile = path.join(root, "proactive.json");
-  const instanceA = await makeInspirationLease(t, { stateFile, root, agentRun: () => ({ text: "   " }) });
-  await instanceA.proactive.tick({ now: new Date("2026-09-04T16:30:00+08:00") });
-  assert.equal(instanceA.agentCalls.length, 1);
-  let state = JSON.parse(await fs.readFile(stateFile, "utf8"));
-  assert.equal(state.inspiration.attempts, 1, "空文本生成在 commit 记 attempts=1");
-  // 重启（新实例，同 stateFile）：attempts 不归零，接力到 2
-  const instanceB = await makeInspirationLease(t, { stateFile, root, agentRun: () => ({ text: "" }) });
-  await instanceB.proactive.tick({ now: new Date("2026-09-04T16:35:00+08:00") });
-  assert.equal(instanceB.agentCalls.length, 1);
-  state = JSON.parse(await fs.readFile(stateFile, "utf8"));
-  assert.equal(state.inspiration.attempts, 2, "attempts 跨重启累计");
-});

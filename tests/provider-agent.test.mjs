@@ -260,11 +260,10 @@ test("Signal and Priority engines are deterministic and notification-bounded", (
   assert.deepEqual(priority.allocate(20), { digest: 12, ingest: 5, maintenance: 3 });
   const signal = new SignalEngine({ schedule: { morningHour: 8, eveningHour: 20, weeklyDay: 0, maxDailyNotifications: 3 } });
   const now = new Date("2026-07-19T21:00:00+08:00");
-  assert.equal(signal.collect({ now, notificationsToday: 2, highValueEvents: [{ id: "e1" }] }).length, 5); // event + morning + evening + inspiration + weekly 合并为一个 Bundle
-  // B1：事件预算耗尽只抑制 event 类——预约信号（morning/evening/inspiration/weekly）恒 eligible
+  assert.equal(signal.collect({ now, notificationsToday: 2, highValueEvents: [{ id: "e1" }] }).length, 4); // event + morning + evening + weekly 合并为一个 Bundle
+  // B1：事件预算耗尽只抑制 event 类——预约信号（morning/evening/weekly）恒 eligible
   const exhausted = signal.collect({ now, notificationsToday: 3, highValueEvents: [{ id: "e2" }] });
   assert.equal(exhausted.some((s) => s.kind === "event"), false);
-  assert.equal(exhausted.some((s) => s.kind === "inspiration"), true);
   assert.match(localDateKey(now), /^2026-07-/);
 });
 
@@ -405,15 +404,12 @@ test("weekly uses an ISO-week identity; appointments stay eligible past the even
   // morning + weekly 同 tick 合并为一个 Bundle；B1 起预约信号本就不消耗事件预算。
   const evening = signal.collect({
     now: new Date("2026-07-19T21:00:00+08:00"),
-    lastRuns: { "morning:2026-07-19": "2026-07-19", "weekly:2026-W29": "2026-07-19" },
+    lastRuns: { "morning:2026-07-19": "2026-07-19", "weekly:2026-W29": "2026-07-19", "inspiration:2026-07-19": "2026-07-19" },
     notificationsToday: 1,
     maxDailyNotifications: 2,
   });
-  // D12：21:00 时 evening 与 inspiration（12:30 后 eligible）同时发出；slot 竞争中 evening 在前
-  assert.deepEqual(evening, [
-    { kind: "evening", key: "evening:2026-07-19" },
-    { kind: "inspiration", key: "inspiration:2026-07-19" },
-  ]);
+  // 2026-10-17 灵感卡下线后，21:00 只剩 evening（morning 已跑过、weekly 已跑过）
+  assert.deepEqual(evening, [{ kind: "evening", key: "evening:2026-07-19" }]);
   // B1：预算耗尽只抑制 event 类；预约信号照常（周日 09:00 → morning + weekly）
   const sundayExhausted = signal.collect({ now: sunday, notificationsToday: 2, maxDailyNotifications: 2 });
   assert.deepEqual(sundayExhausted.map((s) => s.kind), ["morning", "weekly"]);

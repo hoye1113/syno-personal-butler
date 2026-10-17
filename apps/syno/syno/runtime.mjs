@@ -26,8 +26,6 @@ import { IntakeService } from "../../../packages/syno-core/intake.mjs";
 import { KnowledgeStore } from "../../../packages/syno-core/knowledge-store.mjs";
 import { remoteSafeJobSummary } from "../../../packages/syno-core/job-summary.mjs";
 import { assertKnowledgeNotSensitive, readKnowledgeSnippet } from "../../../packages/syno-core/knowledge-read.mjs";
-import { InspirationSampler } from "./inspiration-sampler.mjs";
-import { InspirationStore } from "../../../packages/syno-core/inspiration-store.mjs";
 import { KnowledgeMaintenanceSource } from "../../../packages/syno-core/knowledge-maintenance-source.mjs";
 import { fetchUrlForChat } from "../../../packages/syno-core/fetch-url-tool.mjs";
 import { KnowledgeProfileService } from "./knowledge-profile-service.mjs";
@@ -207,9 +205,7 @@ function createSynoRuntime(options = {}) {
   const jobStore = options.jobStore || new JobStore();
   const pendingDecisions = options.pendingDecisions || new PendingDecisionStore();
   const knowledge = options.knowledge || new KnowledgeStore();
-  const inspirationStore = options.inspirationStore || new InspirationStore();
   const channelContinuations = options.channelContinuations || new ChannelContinuationStore();
-  const inspirationSampler = options.inspirationSampler || new InspirationSampler({ knowledge, inspirations: inspirationStore });
   const imageStore = options.imageStore || new IsolatedImageStore({
     quarantineRoots: [
       path.join(PATHS.runtimeRoot, "quarantine", "feishu"),
@@ -650,7 +646,6 @@ function createSynoRuntime(options = {}) {
     acceptedRequests,
     recentInteractions,
     channelContinuations,
-    inspirationStore,
     channelDeliveryOutbox,
     ownerChannelTargets,
     mobileDeliveryMode,
@@ -968,7 +963,7 @@ function createSynoRuntime(options = {}) {
   reports = new ReportService({ host, knowledge, notifications, channels, gitGuard });
   const today = options.today || new TodayService({ goals, host, settingsRegistry, signalSources, planner });
   core = new SynoCore({ host, knowledge, notifications, channels, reports, today });
-  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance: knowledgeMaintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, inspirationStore, inspirationSampler, channelContinuations, wakeDelivery: (deliveryOptions) => drainChannelDeliveryOutbox(deliveryOptions).catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })), recordEvent });
+  const proactive = options.proactive || new ProactiveOrchestrator({ host, today, channels, conversations, cognitiveRuntime, settingsRegistry, signalSources, maintenance: knowledgeMaintenance, channelDeliveryOutbox, notifications, ownerChannelTargets, channelContinuations, wakeDelivery: (deliveryOptions) => drainChannelDeliveryOutbox(deliveryOptions).catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })), recordEvent });
   const approvalAdvisor = options.approvalAdvisor || new ApprovalAdvisor({ ingest });
   let channelRecoveryTimer = null;
   let providerRecoveryTimer = null;
@@ -1260,7 +1255,6 @@ function createSynoRuntime(options = {}) {
     reconciliationWorker,
     recentInteractions,
     channelContinuations,
-    inspirationStore,
     outputs,
     goals,
     claims,

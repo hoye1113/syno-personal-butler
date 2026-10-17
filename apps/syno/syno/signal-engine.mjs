@@ -1,12 +1,9 @@
 import { signalIdentity } from "../../../packages/syno-core/proactive-reliability.mjs";
 
 // D12：灵感卡出卡时间默认为 12:30（2026-09-02 Owner 自 16:00 调整——午时阅读更自然）。
-const DEFAULT_SCHEDULE = Object.freeze({ morningHour: 8, eveningHour: 21, inspirationHour: 12, inspirationMinute: 30, weeklyDay: 0, maxDailyNotifications: 3 });
+const DEFAULT_SCHEDULE = Object.freeze({ morningHour: 8, eveningHour: 21, weeklyDay: 0, maxDailyNotifications: 3 });
 
 // 分钟精度判定：超过整点或等于整点且分钟达到门槛（tick 60s——12:30 首拍即触发）。
-function timeReached(now, hour, minute = 0) {
-  return now.getHours() > hour || (now.getHours() === hour && now.getMinutes() >= minute);
-}
 
 function localDateKey(now) {
   return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
@@ -29,7 +26,7 @@ class SignalEngine {
     const maximum = Math.max(0, Math.min(this.schedule.maxDailyNotifications, Number(maxDailyNotifications) || 0));
     const date = localDateKey(now);
     // B1（2026-09-03 验收期缺陷修复）：预算是「事件型推送」的防打扰上限，不是预约信号的闸门——
-    // morning/evening/inspiration/weekly 恒 eligible（每日/每周自去重、总量有界），不该被清晨的
+    // morning/evening/weekly 恒 eligible（每日/每周自去重、总量有界），不该被清晨的
     // 维护/待办事件饿死（实证：07:30 孤儿提醒 + 08:01 早报吃光预算，12:30 日卡静默消失）。
     // 预算耗尽只过滤 event 类，且经 onBudgetSuppressed 上报（消灭静默）。
     const budgetExhausted = notificationsToday >= maximum;
@@ -57,13 +54,8 @@ class SignalEngine {
     if (budgetExhausted && events.length && typeof onBudgetSuppressed === "function") onBudgetSuppressed(events.map((signal) => signal.key));
     const morningKey = `morning:${date}`;
     const eveningKey = `evening:${date}`;
-    const inspirationKey = `inspiration:${date}`;
     if (now.getHours() >= this.schedule.morningHour && !lastRuns[morningKey] && lastRuns.morning !== date) daily.push({ kind: "morning", key: morningKey });
     if (now.getHours() >= this.schedule.eveningHour && !lastRuns[eveningKey] && lastRuns.evening !== date) daily.push({ kind: "evening", key: eveningKey });
-    // D12（2026-09-01）：今日灵感每日一卡；12:30 后 eligible（2026-09-02 Owner 自 16:00 调整）。
-    // 与 morning/evening 同模式；B1 起预约信号不占事件预算（恒 eligible）。生成失败时 lastRuns
-    // 不标记（下一 tick 重试，直至编排层当日 maxAttempts 终态）；素材不足/终态由编排层标记。
-    if (timeReached(now, this.schedule.inspirationHour, this.schedule.inspirationMinute ?? 0) && !lastRuns[inspirationKey] && lastRuns.inspiration !== date) daily.push({ kind: "inspiration", key: inspirationKey });
     return [...daily, ...weekly];
   }
 }

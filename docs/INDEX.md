@@ -2,7 +2,7 @@
 
 本文只负责说明文档分类、唯一权威性和当前状态；具体产品规则以对应 Normative 文档为准。
 
-2026-09-01 Owner 决策产品范围收敛为搜索、收录、深度探索分析、知识库查找与今日灵感；学习子系统与项目子系统已物理移除（`f23954d`、`ec068b9`），用户入口只允许更改知识库（`e49a66c`、`b634efd`）。2026-09-18 完成单仓迁移：`vault/` 与 `ops/` 已回到本仓库并由同一个 Git 事实源管理；生产环境不设置 `SYNO_KNOWLEDGE_ROOT`，该变量仅保留为回滚兼容入口，D13 拆库记录作为历史追溯。当前唯一执行事实源是 `docs/product-slimming-and-inspiration-plan.md`。Project-aware Knowledge MVP 已关闭为 SUPERSEDED，其计划文档与知识仓 `ops/acceptance/project-aware-knowledge-mvp/` 证据仅作历史追溯。2026-10-08 知识库二源合一：obsidian_repository 策展主线全量并入本仓 vault/（74 篇捕获原位保留、205 篇旧布局重复清除、零丢失），obsidian 仓退役为归档仓并留 junction 别名；外部 syno-knowledge 冻结副本已删，回滚仅靠本仓 Git 历史。
+2026-09-01 Owner 决策产品范围收敛为搜索、收录、深度探索分析、知识库查找（今日灵感已于 2026-10-17 下线）；学习子系统与项目子系统已物理移除（`f23954d`、`ec068b9`），用户入口只允许更改知识库（`e49a66c`、`b634efd`）。2026-09-18 完成单仓迁移：`vault/` 与 `ops/` 已回到本仓库并由同一个 Git 事实源管理；生产环境不设置 `SYNO_KNOWLEDGE_ROOT`，该变量仅保留为回滚兼容入口，D13 拆库记录作为历史追溯。当前唯一执行事实源是 `docs/product-slimming-and-inspiration-plan.md`。Project-aware Knowledge MVP 已关闭为 SUPERSEDED，其计划文档与知识仓 `ops/acceptance/project-aware-knowledge-mvp/` 证据仅作历史追溯。2026-10-08 知识库二源合一：obsidian_repository 策展主线全量并入本仓 vault/（74 篇捕获原位保留、205 篇旧布局重复清除、零丢失），obsidian 仓退役为归档仓并留 junction 别名；外部 syno-knowledge 冻结副本已删，回滚仅靠本仓 Git 历史。
 
 ## Normative
 
@@ -12,7 +12,7 @@
 | `AGENTS.md` | Agent 执行契约、权限边界、编码和源码修改规则 | Normative |
 | `docs/ARCHITECTURE.md` | 当前模块边界、数据流和事务边界 | Normative |
 | `docs/POLICY.md` | Owner、Policy、Job、工具和写入权限 | Normative |
-| `docs/product-slimming-and-inspiration-plan.md` | 产品精简与今日灵感的唯一执行事实源 | IN_PROGRESS（Owner 2026-09-01 批准，执行中） |
+| `docs/product-slimming-and-inspiration-plan.md` | 产品精简的唯一执行事实源（文件名保留历史，今日灵感已于 2026-10-17 下线） | IN_PROGRESS（Owner 2026-09-01 批准，执行中） |
 | `contracts/*.schema.json` | 机器可校验的数据契约 | Normative |
 | `config/deepseek-harness/syno-agent.md` | DSH Syno Agent 的工具与行为边界 | Normative |
 | 知识仓 `vault/AGENTS.md`、`vault/99-System/Agent/` | 知识收录、关联、写作和 MOC 规则 | Normative |

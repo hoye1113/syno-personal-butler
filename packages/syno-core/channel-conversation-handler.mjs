@@ -53,7 +53,7 @@ function captureReceiptText(receipt, { attachment = false } = {}) {
 }
 
 class ChannelConversationHandler {
-  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelContinuations, inspirationStore, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery, imageStore = null, imageTranscriber = null, today = null } = {}) {
+  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelContinuations, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery, imageStore = null, imageTranscriber = null, today = null } = {}) {
     if (!runtime || !core || (!ingest && !ingestWorkflows) || !pendingDecisions) throw new Error("ChannelConversationHandler 缺少 Runtime、Core、IngestWorkflow 或 PendingDecision Store");
     this.runtime = runtime;
     this.core = core;
@@ -68,7 +68,6 @@ class ChannelConversationHandler {
     this.acceptedRequests = acceptedRequests;
     this.recentInteractions = recentInteractions;
     this.channelContinuations = channelContinuations;
-    this.inspirationStore = inspirationStore;
     this.channelDeliveryOutbox = channelDeliveryOutbox;
     this.mobileDeliveryMode = mobileDeliveryMode;
     this.ownerChannelTargets = ownerChannelTargets;

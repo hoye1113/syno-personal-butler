@@ -7,7 +7,6 @@ import test from "node:test";
 import { SynoToolBridge } from "../apps/syno/syno/syno-tool-bridge.mjs";
 import { ToolRegistry } from "../apps/syno/syno/tool-registry.mjs";
 import { createBrowserCaptureTools } from "../apps/syno/syno/browser-capture-tools.mjs";
-import { InspirationStore } from "../packages/syno-core/inspiration-store.mjs";
 import { CORE_CHAT_TOOL_NAMES } from "../config/deepseek-harness/syno-tool-sets.mjs";
 
 function registry() {

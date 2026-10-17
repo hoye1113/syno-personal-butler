@@ -8,6 +8,10 @@
 > 删除 `capture.start/status/list_pending`、`jobs.list/submit`、`today.read`、`inspiration_record_feedback` 及其
 > 插件模块/测试/eval；灵感反馈机制整体下线（确定性口令 + 微信专属续办 + Host 工具一起删）；
 > DSH 侧关闭 `bash`/`pwsh`/`fs`/`fs-search`/`jobs`/`schedule` 与通用 `web_fetch`（读网页只留受控路径）。
+> 第八轮（2026-10-17，主人「把灵感卡都删了吧，我都没想过看」）：**今日灵感功能整体下线**——删除
+> `inspiration-sampler.mjs`、`inspiration-store.mjs`、编排器里的灵感链路（提示词/成卡/终态预检/compose/commit/
+> markDelivered）、signal-engine 的 12:30 灵感日程、`tests/inspiration.test.mjs` 与 `ops/content/inspirations/` 23 份存档；
+> 能力回执的「灵感」改为「主动提醒」。
 > 第七轮（2026-10-17）：补两条确定性口令——`今天有什么`（读 TodayService 快照）、`记住 …`（memory proposal Job，
 > 按 messageId 幂等），都不进模型；带链接的「记住」转成显式收录。
 > 真机验证：`pnpm spike:capabilities` 四轮全绿，模型实际调用 `syno_knowledge_search` → `syno_knowledge_read_snippet`

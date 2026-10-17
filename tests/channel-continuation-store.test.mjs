@@ -36,7 +36,7 @@ test("ChannelContinuationStore settles a record out of the active set and keeps 
     protect: async (value) => Buffer.from(value, "utf8").toString("base64"), unprotect: async (value) => Buffer.from(value, "base64").toString("utf8"),
   });
   const opened = await store.open({
-    ownerKey: "owner-a", channel: "weixin", threadKey: "main", type: "inspiration_feedback",
+    ownerKey: "owner-a", channel: "weixin", threadKey: "main", type: "link_read",
     correlationId: "inspiration-20260922-abcdef12", expiresAt: new Date("2026-09-23T06:00:00Z"), payload: { inspirationId: "inspiration-20260922-abcdef12" },
   });
   const settled = await store.settle(opened.id, { status: "resolved" });
