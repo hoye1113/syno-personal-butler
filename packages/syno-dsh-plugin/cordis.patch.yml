@@ -143,10 +143,12 @@
     provider: kimi-coding
     model: kimi-for-coding
 
+# 根层 tool-web 同样只留搜索：读网页只有受控路径（syno_knowledge_fetch_url）。
+# 2026-10-17 修正：此前只关了 preset 层那份，根层仍 fetch:true，web_fetch 实际没被关掉。
 - id: tool-web
   disabled: false
   config:
-    fetch: true
+    fetch: false
     search: true
     searchTimeoutMs: 60000
 
