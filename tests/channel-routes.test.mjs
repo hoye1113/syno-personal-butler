@@ -96,6 +96,27 @@ test("「记住 X」生成待确认的记忆候选 Job，并按 messageId 幂等
   assert.equal(calls[0].context.messageId, "fs-mem-1", "messageId 必须作为幂等键传给 Host");
 });
 
+test("「记住 X」回执引用 operationResult.record.id（真机 Job 结构）", async () => {
+  const handler = makeHandler({
+    core: {
+      async execute() {
+        return {
+          job: {
+            id: "job-mem-9",
+            status: "completed",
+            result: { operationResult: { record: { id: "memory-20261017-73778c96", status: "proposed" }, changedPaths: ["ops/memory/2026/10/x.md"] } },
+          },
+          requiresApproval: false,
+        };
+      },
+    },
+  });
+  const response = await handler.handle({ id: "fs-mem-9", ownerKey: "owner", channel: "feishu", text: "记住 明天上午十点交周报" });
+  assert.match(response.text, /已记录为记忆候选 memory-20261017-73778c96/);
+  assert.match(response.text, /status=proposed/);
+  assert.doesNotMatch(response.text, /job-mem-9/);
+});
+
 test("「记住 X」的边界：需要审批、内容过长、写入失败都如实回执", async () => {
   const awaiting = makeHandler({
     core: { async execute() { return { job: { id: "job-mem-2", status: "awaiting_approval" }, requiresApproval: true }; } },

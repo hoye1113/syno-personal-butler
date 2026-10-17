@@ -312,11 +312,14 @@ class ChannelConversationHandler {
         { channel: channel || "feishu", senderId: ownerKey, ownerKey, threadKey, messageId },
       );
       const job = result?.job || {};
-      const recordId = job.result?.record?.id || job.id;
+      // Job 结构：result.operationResult.record 才是记忆候选本体（真机验证 2026-10-17）
+      const record = job.result?.operationResult?.record || job.result?.record || null;
+      const recordId = record?.id || job.id;
       if (result?.requiresApproval === true || job.status === "awaiting_approval") {
         return { text: `已提交记忆候选 ${recordId}，待你确认后才会写入长期记忆。` };
       }
-      return { text: `已记录为记忆候选 ${recordId}（状态 ${job.status || "已提交"}），确认后才会进入长期记忆。` };
+      if (record) return { text: `已记录为记忆候选 ${recordId}（status=${record.status || "proposed"}），确认后才会进入长期记忆。` };
+      return { text: `已记录为记忆候选 ${recordId}（Job 状态 ${job.status || "已提交"}），确认后才会进入长期记忆。` };
     } catch (error) {
       return { text: `这次没能记住：${error?.message || error}。稍后再试，或让我把它归档成笔记。` };
     }
