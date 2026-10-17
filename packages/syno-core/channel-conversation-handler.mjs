@@ -5,6 +5,7 @@ import { CapabilityPresenter } from "./capability-presenter.mjs";
 import { ChannelIntentRouter } from "./channel-intent-router.mjs";
 import { parseRecentReference } from "./recent-interaction.mjs";
 import { isImageMime } from "./image-mime.mjs";
+import { buildOperationRequest } from "./operation-registry.mjs";
 import { visionResultToIntakePayload } from "./vision-intake.mjs";
 
 // 链接字符集排除 CJK 与中文/全角标点：微信里链接后紧贴中文是常态，\S+ 会把中文粘进链接——
@@ -56,7 +57,7 @@ function captureReceiptText(receipt, { attachment = false } = {}) {
 }
 
 class ChannelConversationHandler {
-  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelContinuations, inspirationStore, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery, imageStore = null, imageTranscriber = null } = {}) {
+  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelContinuations, inspirationStore, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery, imageStore = null, imageTranscriber = null, today = null } = {}) {
     if (!runtime || !core || (!ingest && !ingestWorkflows) || !pendingDecisions) throw new Error("ChannelConversationHandler 缺少 Runtime、Core、IngestWorkflow 或 PendingDecision Store");
     this.runtime = runtime;
     this.core = core;
@@ -78,6 +79,7 @@ class ChannelConversationHandler {
     this.wakeDelivery = wakeDelivery;
     this.imageStore = imageStore;
     this.imageTranscriber = imageTranscriber;
+    this.today = today;
   }
 
   #record(event, data = {}, options) {
@@ -357,6 +359,53 @@ class ChannelConversationHandler {
   }
 
 
+  // 确定性路由：今日快照（不进模型、不花 token）
+  async #todaySnapshot() {
+    if (typeof this.today?.snapshot !== "function") return { text: "今日快照暂时不可用，稍后再试。" };
+    let snapshot = null;
+    try {
+      snapshot = await this.today.snapshot({ capacity: 5 });
+    } catch {
+      return { text: "今日快照读取失败，稍后再试。" };
+    }
+    if (!snapshot) return { text: "今日快照暂时不可用，稍后再试。" };
+    const date = new Date().toISOString().slice(0, 10);
+    const lines = [`今天（${date}）`];
+    const primary = snapshot.primary?.title;
+    if (primary) lines.push(`· 首要：${primary}`);
+    const priorities = (snapshot.priorities || []).filter((item) => item?.title).slice(0, 3);
+    if (priorities.length) lines.push(`· 待办：${priorities.map((item) => item.title).join("；")}`);
+    const needsYou = Array.isArray(snapshot.needsYou) ? snapshot.needsYou.length : 0;
+    const intake = Array.isArray(snapshot.recentIntake) ? snapshot.recentIntake.length : 0;
+    if (needsYou || intake) lines.push(`· 待你确认：${needsYou} 项${intake ? `（含收录 ${intake}）` : ""}`);
+    if (snapshot.progress) lines.push(`· 进度：已完成 ${snapshot.progress.completed ?? 0} / 待确认 ${snapshot.progress.waiting ?? 0}`);
+    if (snapshot.guidance) lines.push(`· 提示：${snapshot.guidance}`);
+    if (lines.length === 2) lines.push("· 今天暂时没有安排；想加目标或待办直接告诉我。");
+    return { text: lines.join("\n") };
+  }
+
+  // 确定性路由：把「记住 X」变成待确认的记忆候选（走 Policy/审批，不直接写 vault）
+  async #rememberNote({ statement, ownerKey, threadKey, channel, messageId }) {
+    const content = String(statement || "").trim();
+    if (content.length < 2) return { text: "要记住什么？把内容写在「记住」后面就行。" };
+    if (content.length > 500) return { text: `内容太长了（${content.length} 字，上限 500）。请拆成几条，或先让我整理成摘要。` };
+    if (typeof this.core?.execute !== "function") return { text: "记忆写入通道未就绪，这次没有保存。" };
+    try {
+      const result = await this.core.execute(
+        buildOperationRequest("memory.proposals.create", { statement: content, reason: "主人要求记住" }),
+        { channel: channel || "feishu", senderId: ownerKey, ownerKey, threadKey, messageId },
+      );
+      const job = result?.job || {};
+      const recordId = job.result?.record?.id || job.id;
+      if (result?.requiresApproval === true || job.status === "awaiting_approval") {
+        return { text: `已提交记忆候选 ${recordId}，待你确认后才会写入长期记忆。` };
+      }
+      return { text: `已记录为记忆候选 ${recordId}（状态 ${job.status || "已提交"}），确认后才会进入长期记忆。` };
+    } catch (error) {
+      return { text: `这次没能记住：${error?.message || error}。稍后再试，或让我把它归档成笔记。` };
+    }
+  }
+
   async #continueLinkRead({ ownerKey, channel, threadKey }) {
     if (!this.channelContinuations) return null;
     const continuation = await this.channelContinuations.resolve({ ownerKey, channel, threadKey, type: "link_read" });
@@ -582,6 +631,18 @@ class ChannelConversationHandler {
           await this.#record("capture.browser.session_closed", { ...trace, workflowId: workflow.id });
         }
         return { text: closed ? `已关闭 ${closed} 个收录浏览器标签。` : "当前没有可关闭的收录浏览器标签。" };
+      }
+      if (intent.kind === "today_snapshot") {
+        return this.#todaySnapshot();
+      }
+      if (intent.kind === "memory_note") {
+        const statement = String(intent.statement || "").trim();
+        if (/(?:https?:\/\/)/u.test(statement)) {
+          // 带链接的「记住 …」转成显式收录（链接要抓取，不能只存一行文字）
+          text = `收录 ${statement}`;
+        } else {
+          return this.#rememberNote({ statement, ownerKey, threadKey, channel: message.channel, messageId: message.id });
+        }
       }
       if (["capture_status", "list_pending_capture"].includes(intent.kind) && this.ingestWorkflows) {
         const pending = await this.ingestWorkflows.listPending(ownerKey);

@@ -657,6 +657,8 @@ function createSynoRuntime(options = {}) {
     wakeDelivery: () => drainChannelDeliveryOutbox().catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })),
     imageStore,
     imageTranscriber,
+    // today 服务在本函数后半段才构造（依赖 host/goals），这里给惰性代理，避免 TDZ
+    today: { snapshot: (options = {}) => today.snapshot(options) },
   });
   if (acceptedRecovery && typeof channelConversationHandler.processAcceptedRequest === "function") {
     acceptedRecovery.processRequest = (request) => channelConversationHandler.processAcceptedRequest(request);

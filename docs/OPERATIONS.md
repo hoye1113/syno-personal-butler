@@ -121,6 +121,15 @@ Get-Content -LiteralPath $log.FullName -Tail 80
 
 根治约束：**只让 Base64（7-bit ASCII，所有常见代码页的公共子集）跨过 console/stdio 边界**——Node 侧 `Buffer.from(x,"utf8").toString("base64")` 写入 stdin，脚本内只用 `FromBase64String/ToBase64String`（Python 侧用 `io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")` 或注入 `PYTHONUTF8=1`），绝不调 `UTF8.GetString/GetBytes` 或依赖默认编码。`runDpapi`（`provider-credential-store.mjs`）与 Harness JSON-RPC sidecar 均遵循此约束；新增任何跨进程文本往返必须沿用，否则中文路径会静默损坏。
 
+### 确定性口令（2026-10-17）
+
+聊天里这两件事不进模型，由 Host 直接回执：
+
+- `今天有什么` / `今日安排` / `今天要做什么` → 读 TodayService 快照（首要、前 3 条待办、待确认数、进度），不消耗模型回合。
+- `记住 …` / `记一下 …` / `帮我记住 …` → 生成 `memory.proposals.create` 记忆候选 Job（按 messageId 幂等），回复里给候选编号并说明「确认后才进入长期记忆」；内容 > 500 字或写入失败时如实回报。带链接的「记住 …」转成显式收录（要抓取正文，不能只存一行）。
+
+其余收录/任务/灵感反馈仍走既有确定性路由与主动推送；模型没有对应工具。
+
 ### 通道（2026-10-16）
 
 - 当前只有飞书一条通道（`feishu`）：微信 iLink 客户端、DSH `channel-weixin` 插件、`/api/syno/weixin/*` 端点与 `/maintenance/weixin` 重绑页已随「只用飞书」一并删除。

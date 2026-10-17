@@ -1,6 +1,8 @@
 const INTENTS = Object.freeze([
   "new_conversation",
   "show_capabilities",
+  "today_snapshot",
+  "memory_note",
   "capture_status",
   "list_pending_capture",
   "continue_browser_capture",
@@ -42,6 +44,14 @@ class ChannelIntentRouter {
     }
     if (/^(?:请)?\s*(?:关闭|清理)(?:刚才|这个|收录)?\s*(?:的)?\s*(?:浏览器)?标签(?:页)?(?:吧|呢)?$/u.test(text)) {
       return { kind: "close_capture_tabs", confidence: 1, text };
+    }
+    // 2026-10-17：今日快照与「记住 X」是确定性路由（不是模型工具）——整句锚定，避免误伤普通对话。
+    if (/^(?:今天(?:有什么|要做什么|干什么|干些什么|安排)|今日(?:安排|有什么|待办))(?:[？?。！!])?$/u.test(text)) {
+      return { kind: "today_snapshot", confidence: 1, text };
+    }
+    const remember = /^(?:记住|记一下|帮我记住)[:：\s]*([\s\S]{2,})$/u.exec(text);
+    if (remember) {
+      return { kind: "memory_note", confidence: 1, text, statement: remember[1].trim() };
     }
     return { kind: "normal_conversation", confidence: 1, text };
   }

@@ -8,6 +8,7 @@ const CAPABILITY_LABELS = Object.freeze([
 class CapabilityPresenter {
   describe({ runtime = {}, pendingCaptureCount = 0, browserCapture = {} } = {}) {
     const lines = ["我可以帮你：", ...CAPABILITY_LABELS.map(([title, description]) => `- ${title}：${description}`)];
+    lines.push("直接说「今天有什么」看今日快照；说「记住 …」生成待你确认的记忆候选。");
     const pending = Math.max(0, Number(pendingCaptureCount) || 0);
     lines.push(pending ? `当前有 ${pending} 项收录等待你处理，可以直接说“收录状态”。` : "当前没有收录等待你处理。")
     if (browserCapture.available === true) {
