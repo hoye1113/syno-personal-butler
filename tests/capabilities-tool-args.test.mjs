@@ -7,7 +7,7 @@ test("canonical tool names are the default; bridge mode rolls back to dev names"
   assert.equal(canonicalToolName("syno_core_knowledge_search", "plugin"), "syno_knowledge_search");
   assert.equal(canonicalToolName("syno_core_knowledge_search", undefined), "syno_knowledge_search");
   assert.equal(canonicalToolName("syno_core_knowledge_search", ""), "syno_knowledge_search");
-  assert.equal(canonicalToolName("syno_core_jobs_submit", ""), "syno_jobs_submit");
+  assert.equal(canonicalToolName("syno_core_knowledge_read_snippet", ""), "syno_knowledge_read_snippet");
   assert.equal(canonicalToolName("syno_core_knowledge_search", "bridge"), "syno_core_knowledge_search");
 });
 

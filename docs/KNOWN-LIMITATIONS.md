@@ -39,7 +39,7 @@ Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导�
 - 2026-08-25 的 packaged-bin 失败已由 Syno 侧 adapter 处理：Supervisor 现在检查完整 closure、配置包的实际运行入口，并在 Web/JSON-RPC 两条路径分别报告 `bootable`；缺失时返回 `HARNESS_RUNTIME_CLOSURE_UNAVAILABLE`，不会误报 `bootable`，也不会选择 OpenCode、原生 Agent 或 fake runtime。当前 doctor 的 closure 已完整；最终真实 JSON-RPC `initialize`、Capture round-trip 和 Web 官方 `web_search` 已通过显式 live 测试（历史上的 Project A/B 对照随项目子系统移除而作废，仅作追溯）。
 - 当前外部 DSH clone 在 Windows 上 graceful protocol shutdown/EOF 可能触发其自身 libuv assertion。Syno Supervisor 对自己创建的 sidecar/Web 进程使用有界 process-tree termination 清理；同时覆盖 tsx 外层先退出而 launcher 孙进程仍存活的情况。最终 live 命令已正常退出，本阶段不修改外部 clone，生产重启/崩溃行为仍需继续观察。
 - 聊天读图（2026-10-16 已打通）：主人发来的图片由通道侧读成 base64 后作为 image 内容块直达模型（模型链声明支持 image 输入），单图原始字节上限 3MB；超限或未通过隔离校验的图被拒并如实说明。「收录」路径额外做一次模型转写（同一条模型链、capture sidecar 无工具）把图转成结构化文本进 Intake。转写失败如实回报，禁止猜图。
-- Chat `web_search` 由自研 `syno-search` 链提供（豆包 → Tavily → Exa，ADR 0009）：免费额度合计 ≈2,900+ 次/月，按查询语言路由、失败自动回退、缺 key 自动跳过；中文覆盖由豆包承担，豆包英文质量弱（语言路由已规避）。该 seam 没有查询/域名白名单；每次搜索是一次额外模型轮次。`web_fetch` 仍是匿名 HTTP(S)，Harness 侧不做 SSRF 过滤。收录分析 sidecar 没有 web。
+- Chat `web_search` 由自研 `syno-search` 链提供（豆包 → Tavily → Exa，ADR 0009）：免费额度合计 ≈2,900+ 次/月，按查询语言路由、失败自动回退、缺 key 自动跳过；中文覆盖由豆包承担，豆包英文质量弱（语言路由已规避）。该 seam 没有查询/域名白名单；每次搜索是一次额外模型轮次。`web_fetch` 已于 2026-10-17 关闭；读网页只保留 `syno_knowledge_fetch_url`（SSRF 防护 + 脱敏 + 反爬升级）。收录分析 sidecar 没有 web。
 - OpenCode、Hermes 和原生 Agent 不是产品运行时；旧认知模块的删除仍受 R6 真实验收门禁约束。
 - 模型不可用时，本地搜索、收录回执、任务、提醒与决策解析继续工作；需要模型的 Job 保留为 `waiting_provider`，不会自动换 Provider 或原生 Agent。
 - 产品运行时不能修改自身源码或控制系统：`code_change` 意图、`allowSelfModify`/`allowSystemControl` 开关与 Windows 服务注册操作已物理删除（2026-09-01，`e49a66c`），不是开关关闭而是代码不存在；SettingsRegistry 只保留白名单内的偏好变更。

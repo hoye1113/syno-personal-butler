@@ -7,7 +7,6 @@ import test from "node:test";
 import { SynoToolBridge } from "../apps/syno/syno/syno-tool-bridge.mjs";
 import { ToolRegistry } from "../apps/syno/syno/tool-registry.mjs";
 import { createBrowserCaptureTools } from "../apps/syno/syno/browser-capture-tools.mjs";
-import { createInspirationFeedbackTool } from "../apps/syno/syno/inspiration-feedback-tool.mjs";
 import { InspirationStore } from "../packages/syno-core/inspiration-store.mjs";
 import { CORE_CHAT_TOOL_NAMES } from "../config/deepseek-harness/syno-tool-sets.mjs";
 
@@ -345,7 +344,7 @@ test("SynoToolBridge binds Owner thread and idempotency identity while tracking 
   let receivedContext;
   let executions = 0;
   const tools = new ToolRegistry([{
-    name: "capture.start",
+    name: "knowledge.search",
     description: "Adjust",
     risk: "low",
     permission: "syno-ops",
@@ -367,12 +366,12 @@ test("SynoToolBridge binds Owner thread and idempotency identity while tracking 
     threadKey: "project-a",
     channel: "feishu",
     messageId: "fs-99",
-    allowedTools: ["capture_start"],
+    allowedTools: ["knowledge_search"],
   });
   assert.equal(bridge.effectVersion(), 0);
   const call = {
     authorization: "Bearer bridge-secret",
-    body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "capture_start", arguments: { key: "quiet" } } },
+    body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "knowledge_search", arguments: { key: "quiet" } } },
   };
   await bridge.handle(call);
   await bridge.handle({ ...call, body: { ...call.body, id: 2 } });
@@ -381,13 +380,13 @@ test("SynoToolBridge binds Owner thread and idempotency identity while tracking 
   assert.equal(executions, 1);
   assert.equal(receivedContext.ownerId, "owner-1");
   assert.equal(receivedContext.channel, "feishu");
-  assert.match(receivedContext.conversationId, /^fs-99:<none>:capture_start:[a-f0-9]{16}$/);
+  assert.match(receivedContext.conversationId, /^fs-99:<none>:knowledge_search:[a-f0-9]{16}$/);
   assert.equal(resultContext.threadKey, "project-a");
 });
 
 test("SynoToolBridge marks a validated write attempt before output validation can fail", async () => {
   const tools = new ToolRegistry([{
-    name: "capture.start",
+    name: "knowledge.search",
     description: "Adjust",
     risk: "low",
     permission: "syno-ops",
@@ -404,74 +403,13 @@ test("SynoToolBridge marks a validated write attempt before output validation ca
     threadKey: "main",
     channel: "web",
     messageId: "message-write",
-    allowedTools: ["capture_start"],
+    allowedTools: ["knowledge_search"],
   });
   const response = await bridge.handle({
     authorization: "Bearer bridge-secret",
-    body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "capture_start", arguments: { key: "quiet" } } },
+    body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "knowledge_search", arguments: { key: "quiet" } } },
   });
   release();
   assert.equal(response.result.isError, true);
   assert.equal(bridge.effectVersion(), 1);
-});
-
-test("SynoToolBridge passes browser Workflow context and blocks it outside capture", async () => {
-  let received;
-  const tools = new ToolRegistry(createBrowserCaptureTools({
-    async status(input) { received = input; return { available: true }; },
-  }));
-  const bridge = new SynoToolBridge({ tools, token: "bridge-secret" });
-  const mainRelease = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "main-1", allowedTools: ["browser_status"], browserWorkflowId: "workflow-1" });
-  const denied = await bridge.handle({ authorization: "Bearer bridge-secret", body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "browser_status", arguments: {} } } });
-  mainRelease();
-  assert.equal(denied.result.isError, true);
-  const captureRelease = bridge.bindContext({ ownerKey: "owner", threadKey: "capture:artifact-1", messageId: "capture-1", allowedTools: ["browser_status"], browserWorkflowId: "workflow-1" });
-  const allowed = await bridge.handle({ authorization: "Bearer bridge-secret", body: { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "browser_status", arguments: {} } } });
-  captureRelease();
-  assert.deepEqual(allowed.result.structuredContent, { available: true });
-  assert.deepEqual(received, { workflowId: "workflow-1" });
-});
-
-test("SynoToolBridge exposes inspiration_record_feedback, executes idempotently per message and returns a receipt", async (t) => {
-  // P1：反馈工具桥层行为——tools/list 可见（桥命名 inspiration_record_feedback）、
-  // 同 messageId 重复调用只落账一次（桥幂等键）、效应收据版本前进。
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-bridge-fb-"));
-  t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const store = new InspirationStore({ opsRoot: path.join(root, "ops") });
-  const card = await store.create({ date: "2026-09-04", sampledRefs: ["vault/a.md", "vault/b.md"], text: "串联" });
-  await store.markDelivered(card.id, "event-1");
-  const tools = new ToolRegistry([createInspirationFeedbackTool({ inspirationStore: store })]);
-  let resultContext;
-  const bridge = new SynoToolBridge({
-    tools,
-    token: "bridge-secret",
-    onResult: async (context) => { resultContext = context; },
-  });
-  const listed = await bridge.handle({
-    authorization: "Bearer bridge-secret",
-    body: { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} },
-  });
-  assert.deepEqual(listed.result.tools.map((tool) => tool.name), ["inspiration_record_feedback"]);
-  const release = bridge.bindContext({
-    ownerKey: "owner",
-    threadKey: "main",
-    channel: "weixin",
-    messageId: "wx-fb-77",
-    allowedTools: ["inspiration_record_feedback"],
-  });
-  const call = {
-    authorization: "Bearer bridge-secret",
-    body: { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "inspiration_record_feedback", arguments: { feedback: "useful" } } },
-  };
-  const first = await bridge.handle(call);
-  const second = await bridge.handle({ ...call, body: { ...call.body, id: 3 } });
-  release();
-  assert.equal(first.result.isError || false, false);
-  assert.equal(first.result.structuredContent.recorded, true);
-  assert.equal(second.result.structuredContent.recorded, true, "幂等重放返回同一收据");
-  const records = (await store.list()).filter((record) => record.feedback);
-  assert.equal(records.length, 1, "同 messageId 重复调用只落账一次");
-  assert.equal(records[0].feedback, "useful");
-  assert.equal(bridge.effectVersion(), 1, "效应收据只前进一次");
-  assert.equal(resultContext.threadKey, "main");
 });

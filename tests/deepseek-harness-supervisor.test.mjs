@@ -152,8 +152,8 @@ test("native syno_* names are used instead of MCP prefixes", () => {
 });
 
 test("core chat tool set is shared by the DSH plugin and excludes hidden domain tools", () => {
-  // #21（2026-09-03）实证摘除后保留 6 件：知识三件套 + today.read + capture.start + inspiration.record_feedback；
-  // 2026-10-16 再摘 image.read（B5 后不在任何模型面，提示词却还指向它）；已摘工具不得回流。
+  // 2026-10-17 工具面重设计：核心只剩受控知识三件套；收录/任务/今日/反馈全部改为确定性路由或主动推送。
+  // 已摘工具不得回流。
   const knowledgeLoopTools = [
     "knowledge.fetch_url",
   ];
@@ -164,6 +164,12 @@ test("core chat tool set is shared by the DSH plugin and excludes hidden domain 
     "jobs.list",
     "jobs.submit",
     "image.read",
+    "capture.start",
+    "capture.status",
+    "capture.list_pending",
+    "jobs.list",
+    "today.read",
+    "inspiration.record_feedback",
   ];
   assert.deepEqual(CORE_CHAT_TOOL_NAMES.filter((name) => knowledgeLoopTools.includes(name)), knowledgeLoopTools);
   assert.deepEqual(CORE_CHAT_TOOL_NAMES.filter((name) => evictedTools.includes(name)), []);
@@ -187,7 +193,8 @@ test("Syno agent instructions match the shared core chat tool set", async () => 
   assert.match(instructions, /web_search/);
   assert.match(instructions, /不可信数据/);
   assert.match(instructions, /具体 URL.*syno_knowledge_fetch_url/);
-  assert.match(instructions, /不得.*web_fetch.*绕过/);
+  // 2026-10-17 工具面重设计：web_fetch 已从会话移除，提示词改为「不得用通用抓取/终端绕过」
+  assert.match(instructions, /不得.*(?:通用抓取|web_fetch).*绕过/);
   assert.match(instructions, /blocked.*未取得正文/);
   // 2026-10-16：浏览器升级接回插件路径，提示词口径改为「活聊天命中反爬墙自动改用本机浏览器」
   assert.match(instructions, /命中反爬验证墙.*自动改用本机浏览器/);

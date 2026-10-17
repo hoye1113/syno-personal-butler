@@ -52,11 +52,11 @@ async function callTool({ name, outputSchema, stub }) {
 
 // 2026-10-16：goals.list 已从 ToolRegistry/桥目录摘除（任何模型面都到不了），fixture 换成仍在
 // 目录里的数组返回工具，故意保留多个覆盖面。
+// 2026-10-17 工具面重设计后，桥目录只剩受控知识三件套；数组契约仍逐个覆盖。
 const ARRAY_TOOLS = [
   ["knowledge.search", [{ path: "vault/n.md", score: 0.9 }]],
-  ["capture.list_pending", [{ artifactId: "a" }]],
-  ["capture.status", [{ artifactId: "b" }]],
-  ["jobs.list", [{ jobId: "j" }]],
+  ["knowledge.read_snippet", [{ path: "vault/m.md", text: "片段" }]],
+  ["knowledge.fetch_url", [{ via: "direct", content: "正文" }]],
 ];
 
 test("复刻 z.record schema 以 invalid_type 拒绝裸数组（复现原 bug，证明校验有效）", () => {

@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
-import { createOpsRuntime } from "./ops-tools.mjs";
 import { KNOWLEDGE_READ_SNIPPET_TOOL_NAME, KNOWLEDGE_SEARCH_TOOL_NAME } from "./knowledge-tools.mjs";
 import { canonicalToolName } from "./tool-args.mjs";
 

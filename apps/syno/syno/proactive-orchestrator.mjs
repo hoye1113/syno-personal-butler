@@ -346,17 +346,6 @@ class ProactiveOrchestrator {
       await this.recordEvent?.("inspiration.delivered_mark_failed", { inspirationId, eventId, error: { code: error?.code || "INSPIRATION_MARK_FAILED", message: String(error?.message || error).slice(0, 300) } }, { level: "error" });
       return;
     }
-    if (targetChannel !== "weixin" || !this.channelContinuations) return;
-    try {
-      await this.channelContinuations.open({
-        ownerKey: "local-user", channel: targetChannel, threadKey: "main", type: "inspiration_feedback",
-        correlationId: inspirationId, expiresAt: new Date(this.clock().getTime() + 24 * 60 * 60 * 1_000),
-        payload: { inspirationId },
-      });
-    } catch (error) {
-      // markDelivered 已成功——此处失败的只是反馈续办创建，事件名必须与事实相符。
-      await this.recordEvent?.("inspiration.feedback_continuation_failed", { inspirationId, eventId, error: { code: error?.code || "CONTINUATION_OPEN_FAILED", message: String(error?.message || error).slice(0, 300) } }, { level: "warning" });
-    }
   }
 
   // L2（2026-09-04，#17）：投递成功后的主会话回写——取 outbox 真实 payload（主人所见即所得，

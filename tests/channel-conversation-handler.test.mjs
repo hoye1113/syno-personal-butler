@@ -25,136 +25,6 @@ test("ChannelConversationHandler routes ordinary cross-channel messages to one O
   assert.deepEqual(runs.map((item) => [item.context.ownerKey, item.context.threadKey]), [["owner", "main"], ["owner", "main"]]);
 });
 
-test("ChannelConversationHandler handles a bare continue through the scoped link continuation", async () => {
-  const calls = [];
-  const handler = new ChannelConversationHandler({
-    runtime: { async run(request, context) { calls.push({ request, context }); return { text: "链接已重试" }; } }, core: {}, ingest: {}, pendingDecisions: {},
-    channelContinuations: { async resolve(context) { return context.type === "link_read" ? { id: "c-1", payload: { url: "https://example.test/a" } } : null; } },
-  });
-  assert.deepEqual(await handler.handle({ id: "wx-continue", ownerKey: "owner", channel: "weixin", text: "继续" }), { text: "链接已重试" });
-  assert.match(calls[0].request.text, /https:\/\/example\.test\/a/);
-  assert.match(calls[0].request.text, /不得要求主人打开网页/);
-});
-
-// 灵感反馈直达回执（2026-09-22）：精确的「有用/没用/一般」由 handler 出固定回执，
-// 重复评价只读事实不覆盖；显式 ID 指代旧卡不受 24h 续办窗口限制；泛谈不拦截。
-async function feedbackFixture(t, { ownerKey = "owner" } = {}) {
-  const root = await mkdtemp(path.join(os.tmpdir(), "syno-handler-feedback-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const inspirationStore = new InspirationStore({ opsRoot: root, clock: () => new Date("2026-09-22T08:00:00.000Z") });
-  const card = await inspirationStore.create({ date: "2026-09-22", sampledRefs: ["vault/a.md", "vault/b.md"], text: "串联" });
-  await inspirationStore.markDelivered(card.id, "event-1", { ownerKey, channel: "weixin", threadKey: "main" });
-  return { inspirationStore, card };
-}
-
-function fakeContinuations(current) {
-  return {
-    current, settled: [],
-    async resolve() { return this.current; },
-    async settle(id, options) { this.settled.push({ id, ...options }); return { id, ...options }; },
-  };
-}
-
-test("ChannelConversationHandler receipts an exact feedback reply and never overwrites a recorded card", async (t) => {
-  const { inspirationStore, card } = await feedbackFixture(t);
-  const continuations = fakeContinuations({ id: "c-fb", payload: { inspirationId: card.id } });
-  const runs = [];
-  const handler = new ChannelConversationHandler({
-    runtime: { async run(request) { runs.push(request); return { text: "模型回复" }; } },
-    core: {}, ingest: {}, pendingDecisions: {},
-    channelContinuations: continuations,
-    inspirationStore,
-  });
-  assert.deepEqual(await handler.handle({ id: "wx-fb-1", ownerKey: "owner", channel: "weixin", text: "没用" }), { text: "已记下：这张灵感卡标为没用。" });
-  assert.deepEqual(continuations.settled, [{ id: "c-fb", status: "resolved" }]);
-  assert.equal((await inspirationStore.list()).find((item) => item.id === card.id).feedback, "not_useful");
-  // 续办尚未结案时同一卡被再次评价：只返回既有事实，不覆盖、不结案第二次、不落模型。
-  assert.deepEqual(await handler.handle({ id: "wx-fb-2", ownerKey: "owner", channel: "weixin", text: "有用" }), { text: "这张灵感卡已经标记为没用，没有覆盖原记录。" });
-  assert.equal((await inspirationStore.list()).find((item) => item.id === card.id).feedback, "not_useful");
-  assert.equal(runs.length, 0);
-});
-
-test("ChannelConversationHandler backfills an explicitly referenced old card beyond the 24h continuation window", async (t) => {
-  const { inspirationStore, card } = await feedbackFixture(t);
-  const continuations = fakeContinuations(null); // 24h 续办已过期
-  const handler = new ChannelConversationHandler({
-    runtime: { async run() { return { text: "模型回复" }; } },
-    core: {}, ingest: {}, pendingDecisions: {},
-    channelContinuations: continuations,
-    inspirationStore,
-  });
-  assert.deepEqual(
-    await handler.handle({ id: "wx-fb-old", ownerKey: "owner", channel: "weixin", text: `${card.id} 一般` }),
-    { text: "已记下：这张灵感卡标为一般。" },
-  );
-  assert.equal((await inspirationStore.list()).find((item) => item.id === card.id).feedback, "neutral");
-  // 他人名下的卡不可被当前 Owner 回填。
-  const foreign = await inspirationStore.create({ date: "2026-09-22", sampledRefs: ["vault/c.md", "vault/d.md"], text: "别人的卡" });
-  await inspirationStore.markDelivered(foreign.id, "event-2", { ownerKey: "someone-else", channel: "weixin", threadKey: "main" });
-  assert.deepEqual(
-    await handler.handle({ id: "wx-fb-foreign", ownerKey: "owner", channel: "weixin", text: `${foreign.id} 有用` }),
-    { text: "这张灵感卡当前不能回填反馈；我没有改动任何历史记录。" },
-  );
-  assert.equal((await inspirationStore.list()).find((item) => item.id === foreign.id).feedback, undefined);
-});
-
-test("ChannelConversationHandler leaves generic usefulness talk to the model", async (t) => {
-  const { inspirationStore, card } = await feedbackFixture(t);
-  const runs = [];
-  const handler = new ChannelConversationHandler({
-    runtime: { async run(request) { runs.push(request); return { text: "模型回复" }; } },
-    core: {}, ingest: {}, pendingDecisions: {},
-    channelContinuations: fakeContinuations({ id: "c-fb", payload: { inspirationId: card.id } }),
-    inspirationStore,
-  });
-  assert.deepEqual(await handler.handle({ id: "wx-fb-talk", ownerKey: "owner", channel: "weixin", text: "这篇文章有用吗" }), { text: "模型回复" });
-  assert.equal(runs.length, 1);
-  assert.equal((await inspirationStore.list()).find((item) => item.id === card.id).feedback, undefined);
-});
-
-// 并发重放（恢复 worker 与实时消息同卡竞争）：recordFeedback 撞终态时复查事实，
-// 回报既有记录而非把冲突误讲成「尚未投递」。
-test("ChannelConversationHandler reports the recorded fact when a concurrent path wins the feedback race", async () => {
-  let targetCalls = 0;
-  const inspirationStore = {
-    async feedbackTarget(id) {
-      targetCalls += 1;
-      if (targetCalls === 1) return { found: true, alreadyRecorded: false, record: { id } };
-      return { found: true, alreadyRecorded: true, record: { id, feedback: "not_useful" } };
-    },
-    async recordFeedback() { throw new Error("灵感卡片尚未投递，不能回填反馈"); },
-  };
-  const handler = new ChannelConversationHandler({
-    runtime: { async run() { return { text: "模型回复" }; } },
-    core: {}, ingest: {}, pendingDecisions: {},
-    channelContinuations: fakeContinuations({ id: "c-fb", payload: { inspirationId: "inspiration-20260922-abcdef12" } }),
-    inspirationStore,
-  });
-  assert.deepEqual(
-    await handler.handle({ id: "wx-fb-race", ownerKey: "owner", channel: "weixin", text: "也没用" }),
-    { text: "这张灵感卡已经标记为没用，没有覆盖原记录。" },
-  );
-});
-
-// settle 是附属动作：反馈已落账时结案失败只记观测，回执仍是成功事实。
-test("ChannelConversationHandler receipts the recorded feedback even when settling the continuation fails", async (t) => {
-  const { inspirationStore, card } = await feedbackFixture(t);
-  const continuations = fakeContinuations({ id: "c-fb", payload: { inspirationId: card.id } });
-  continuations.settle = async () => { throw new Error("state dir read-only"); };
-  const journal = [];
-  const handler = new ChannelConversationHandler({
-    runtime: { async run() { return { text: "模型回复" }; } },
-    core: {}, ingest: {}, pendingDecisions: {},
-    journal: { async record(event, data, settings) { journal.push({ event, data, level: settings?.level }); return true; } },
-    channelContinuations: continuations,
-    inspirationStore,
-  });
-  assert.deepEqual(await handler.handle({ id: "wx-fb-settle", ownerKey: "owner", channel: "weixin", text: "一般" }), { text: "已记下：这张灵感卡标为一般。" });
-  assert.equal((await inspirationStore.list()).find((item) => item.id === card.id).feedback, "neutral");
-  assert.equal(journal.some((entry) => entry.event === "channel.continuation.settle_failed" && entry.level === "warning"), true);
-  assert.equal(journal.some((entry) => entry.event === "inspiration.feedback.recorded"), true);
-});
-
 test("ChannelConversationHandler persists accepted requests before model execution without changing reply flow", async () => {
   const accepted = [];
   const runs = [];
@@ -390,7 +260,7 @@ test("ChannelConversationHandler supports natural-language new conversation and 
     runtime: {
       async run() { throw new Error("not called"); },
       async newConversation(context) { created = context; return { openCodeSessionId: "new-session" }; },
-      capabilities() { return { tools: ["syno_capture_start"] }; },
+      capabilities() { return { tools: ["收录确定性路由"] }; },
       async health() { return { ready: true }; },
     },
     core: {},
@@ -401,7 +271,7 @@ test("ChannelConversationHandler supports natural-language new conversation and 
   assert.deepEqual(created, { ownerKey: "owner", threadKey: "main" });
   const capabilities = await handler.handle({ ownerKey: "owner", channel: "weixin", text: "你能做什么" });
   assert.match(capabilities.text, /当前有 1 项收录/);
-  assert.doesNotMatch(capabilities.text, /syno_capture_start/);
+  assert.doesNotMatch(capabilities.text, /收录确定性路由/);
 });
 
 test("ChannelConversationHandler releases a consumed decision when the authoritative action fails", async () => {

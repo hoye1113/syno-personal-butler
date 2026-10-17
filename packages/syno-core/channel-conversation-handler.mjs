@@ -15,8 +15,6 @@ const EXPLICIT_INGEST_PATTERN = /(?:收录|保存到知识库|记下来|存进�
 // pi-ai 目录给 kimi-coding 的单图预算是 4.5MB（base64 膨胀 4/3），留出安全余量。
 const MAX_INLINE_IMAGE_BYTES = 3 * 1024 * 1024;
 const BARE_URL_PATTERN = /^https?:\/\/[^\s⺀-鿿豈-﫿＀-￯　-〿]+$/i;
-const FEEDBACK_REPLY = /^(?:(?:这张|上一张|刚才(?:那张)?|也)\s*|(?:inspiration-\d{8}-[a-f0-9]{8})\s*)?(有用|没用|一般)(?:[。！!～~]?|\s*)$/u;
-const FEEDBACK_BY_TEXT = Object.freeze({ 有用: "useful", 没用: "not_useful", 一般: "neutral" });
 function feedbackFactText(record) {
   const label = record.feedback === "not_useful" ? "没用" : record.feedback === "useful" ? "有用" : "一般";
   return `这张灵感卡已经标记为${label}，没有覆盖原记录。`;
@@ -358,40 +356,6 @@ class ChannelConversationHandler {
     return { deferredDelivery: true, requestId: request.requestId };
   }
 
-  async #handleFeedback(text, { ownerKey, channel, threadKey }) {
-    const match = FEEDBACK_REPLY.exec(text);
-    if (!match || !this.channelContinuations || !this.inspirationStore) return null;
-    const feedback = FEEDBACK_BY_TEXT[match[1]];
-    const explicitId = /\b(inspiration-\d{8}-[a-f0-9]{8})\b/i.exec(text)?.[1];
-    const continuation = explicitId
-      ? { payload: { inspirationId: explicitId } }
-      : await this.channelContinuations.resolve({ ownerKey, channel, threadKey, type: "inspiration_feedback" });
-    const inspirationId = continuation?.payload?.inspirationId;
-    if (!inspirationId) return null;
-    const target = await this.inspirationStore.feedbackTarget(inspirationId, { ownerKey });
-    if (!target.found) return { text: "这张灵感卡当前不能回填反馈；我没有改动任何历史记录。" };
-    if (target.alreadyRecorded) return { text: feedbackFactText(target.record) };
-    let updated;
-    try {
-      updated = await this.inspirationStore.recordFeedback(inspirationId, feedback);
-    } catch (error) {
-      // TOCTOU：check 与 act 之间另一路径（如恢复 worker 重放）可能已落账同一卡。
-      // 复查事实状态并如实回报，不把并发冲突误讲成「尚未投递」。
-      const rechecked = await this.inspirationStore.feedbackTarget(inspirationId, { ownerKey }).catch(() => null);
-      if (rechecked?.alreadyRecorded) return { text: feedbackFactText(rechecked.record) };
-      throw error;
-    }
-    if (continuation?.id) {
-      // 结案是附属动作：反馈已落账，settle 失败只记观测，不把已完成的操作说成失败。
-      await this.channelContinuations.settle(continuation.id, { status: "resolved" })
-        .catch((error) => this.#record("channel.continuation.settle_failed", {
-          ownerKey, channel, continuationId: continuation.id,
-          error: { code: error?.code || "CONTINUATION_SETTLE_FAILED", message: String(error?.message || error).slice(0, 300) },
-        }, { level: "warning" }));
-    }
-    await this.#record("inspiration.feedback.recorded", { ownerKey, channel, inspirationId: updated.id, feedback });
-    return { text: `已记下：这张灵感卡标为${match[1]}。` };
-  }
 
   async #continueLinkRead({ ownerKey, channel, threadKey }) {
     if (!this.channelContinuations) return null;
@@ -451,10 +415,6 @@ class ChannelConversationHandler {
       if (!pendingChatImages && /^(?:继续|恢复)(?:\s*(?:刚才|刚刚)?(?:的)?(?:链接|读取))?[。！!～~]?$/u.test(text)) {
         const continued = await this.#continueLinkRead({ ownerKey, channel: message.channel, threadKey });
         if (continued) return continued;
-      }
-      if (!pendingChatImages) {
-        const feedback = await this.#handleFeedback(text, { ownerKey, channel: message.channel, threadKey });
-        if (feedback) return feedback;
       }
       const recentReference = pendingChatImages ? null : parseRecentReference(text);
       if (recentReference && this.recentInteractions) {

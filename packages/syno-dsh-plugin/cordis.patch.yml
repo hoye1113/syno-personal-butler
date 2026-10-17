@@ -25,24 +25,28 @@
             config:
               maxBytes: 65536
 
+          # 2026-10-17 工具面重设计：聊天只保留受控知识读取。shell、文件系统、后台作业
+          # 在当前产品里没有被任何流程使用，属于纯粹的额外攻击面，全部关闭。
+          # 真正的文件能力走 syno_knowledge_read_snippet（路径策略 + 敏感拒读）。
           - id: tool-bash
             name: '@deepseek-ai/dsh-tool-bash'
-            disabled: !!js process.platform === 'win32'
+            disabled: true
 
           - id: tool-pwsh
             name: '@deepseek-ai/dsh-tool-pwsh'
-            disabled: !!js process.platform !== 'win32'
+            disabled: true
 
           - id: tool-fs
             name: '@deepseek-ai/dsh-tool-fs'
+            disabled: true
 
           - id: tool-fs-search
             name: '@deepseek-ai/dsh-tool-fs-search'
-            config:
-              sampleOverCapGlobResults: false
+            disabled: true
 
           - id: tool-jobs
             name: '@deepseek-ai/dsh-tool-jobs'
+            disabled: true
 
           - id: skill-filesystem
             name: '@deepseek-ai/dsh-skill-filesystem'
@@ -73,15 +77,20 @@
                   headChars: 4096
                   tailChars: 1024
 
+          # 读网页只保留受控路径（syno_knowledge_fetch_url：SSRF 防护、脱敏、反爬浏览器升级）。
+          # 通用 web_fetch 是另一套绕过受控读取的入口，2026-10-17 关闭；搜索保留。
           - id: tool-web
             name: '@deepseek-ai/dsh-tool-web'
             config:
-              fetch: true
+              fetch: false
               search: true
               searchTimeoutMs: 60000
 
+    # 会话内定时任务与 Host 主动运营是两套调度；后者已覆盖晨间/灵感/晚间/周报，
+    # 2026-10-17 关闭 DSH 这一套，避免同一件事有两个调度器。
     - id: schedule
       name: '@deepseek-ai/dsh-schedule'
+      disabled: true
     - id: syno-tool-bridge
       name: '@syno/dsh-plugin'
       config:

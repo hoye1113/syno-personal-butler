@@ -4,6 +4,10 @@
 > 已执行（第一轮）：`image.read` 已摘除（commit `8cfc9d3`）。
 > 已执行（第二轮，2026-10-16，主人「按顺序执行下一轮推荐方案」）：B 隐藏工具面收缩、C 五个历史批次脚本删除、E `docs/plans/` 纳入索引分类并把无引用 devlog 移入 `docs/archive/`。
 > D 按结论保留（回滚面仍在用）。以下保留原始判定依据供追溯。
+> 第六轮（2026-10-17，主人「全部删除，重新设计」）：聊天工具面 10 → **3**（`knowledge.search/read_snippet/fetch_url`）；
+> 删除 `capture.start/status/list_pending`、`jobs.list/submit`、`today.read`、`inspiration_record_feedback` 及其
+> 插件模块/测试/eval；灵感反馈机制整体下线（确定性口令 + 微信专属续办 + Host 工具一起删）；
+> DSH 侧关闭 `bash`/`pwsh`/`fs`/`fs-search`/`jobs`/`schedule` 与通用 `web_fetch`（读网页只留受控路径）。
 > 第五轮（2026-10-16，主人「Zen → 自带 Kimi 和删除微信栈先做了」）：**收录图片转写改用模型链**
 > （`image-transcriber.mjs`，capability/capture sidecar 无工具），删除 Zen 视觉客户端与密钥装载；
 > **微信通道栈物理删除**（iLink 客户端、DSH channel-weixin 插件、`/api/syno/weixin/*`、维护页、
