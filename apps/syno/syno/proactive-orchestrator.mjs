@@ -72,7 +72,8 @@ function inspirationPrompt(notes) {
 
 function inspirationCardMessage(record, notes, bundleId) {
   const list = notes.map((note, index) => `${index + 1}. ${note.title}`).join("\n");
-  const body = `${record.text}\n\n涉及笔记：\n${list}\n\n回复「有用」或「没用」帮我调准`;
+  // 2026-10-17：灵感反馈机制已下线（工具/口令/续办全删），卡片不再引导回复评价。
+  const body = `${record.text}\n\n涉及笔记：\n${list}`;
   return {
     title: "Syno · 今日灵感",
     body,

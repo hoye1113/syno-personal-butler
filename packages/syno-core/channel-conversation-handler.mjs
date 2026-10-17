@@ -16,10 +16,6 @@ const EXPLICIT_INGEST_PATTERN = /(?:收录|保存到知识库|记下来|存进�
 // pi-ai 目录给 kimi-coding 的单图预算是 4.5MB（base64 膨胀 4/3），留出安全余量。
 const MAX_INLINE_IMAGE_BYTES = 3 * 1024 * 1024;
 const BARE_URL_PATTERN = /^https?:\/\/[^\s⺀-鿿豈-﫿＀-￯　-〿]+$/i;
-function feedbackFactText(record) {
-  const label = record.feedback === "not_useful" ? "没用" : record.feedback === "useful" ? "有用" : "一般";
-  return `这张灵感卡已经标记为${label}，没有覆盖原记录。`;
-}
 const WORKFLOW_STATUS_LABELS = Object.freeze({
   received: "已接收",
   extracting: "正在直接抓取",
@@ -476,7 +472,6 @@ class ChannelConversationHandler {
         return { text: resolution.text };
       }
       // 决策口令（「同意/拒绝」等）走 PendingDecision 私聊闸门。它与上面的灵感反馈口令
-      // 互不重叠：反馈口令是全句式精确匹配且由 #handleFeedback 出固定回执，不落模型。
       if (!pendingChatImages && isDecisionReply(text)) {
         await this.#record("channel.decision.requested", { ...trace });
         if (message.privateConversation !== true) {

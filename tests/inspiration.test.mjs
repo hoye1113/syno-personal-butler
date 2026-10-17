@@ -343,7 +343,7 @@ test("orchestrator generates and delivers the daily inspiration card, then marks
   assert.match(messages[0].text, /Syno · 今日灵感/);
   assert.match(messages[0].text, /笔记甲与笔记乙/);
   assert.match(messages[0].text, /涉及笔记/);
-  assert.match(messages[0].text, /回复「有用」或「没用」/);
+  assert.doesNotMatch(messages[0].text, /回复「有用」|帮我调准/, "反馈机制已下线，卡片不得再引导评价");
   const cards = await store.list();
   assert.equal(cards.length, 1);
   assert.equal(cards[0].status, "delivered");
