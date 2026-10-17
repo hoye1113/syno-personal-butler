@@ -337,7 +337,70 @@ class ChannelConversationHandler {
     }
   }
 
+  // 2026-10-17：同步回复成功后把受理记录收口为 delivered（原先只有 v2 的 outbox 会收口，
+  // 于是 legacy 下记录永远是非终态——恢复器一旦启用就会重放全部历史消息）。
   async handle(message) {
+    const response = await this.#handleMessage(message);
+    await this.#settleAcceptedReply(message, response);
+    return response;
+  }
+
+  async #settleAcceptedReply(message, response) {
+    const requestId = message?.__acceptedRequestId;
+    if (!requestId || !response?.text || response?.deferredDelivery === true) return;
+    if (typeof this.acceptedRequests?.update !== "function") return;
+    try {
+      await this.acceptedRequests.update(requestId, { status: "delivered", claim: null });
+      await this.#record("accepted_request.settled", { requestId, channel: String(message.channel || "") });
+    } catch (error) {
+      await this.#record("accepted_request.settle_failed", {
+        requestId,
+        error: { code: error?.code || "ACCEPTED_REQUEST_SETTLE_FAILED", message: String(error?.message || error).slice(0, 200) },
+      }, { level: "warning" });
+    }
+  }
+
+  // 崩溃恢复入口：重跑一次该请求并把结果投递到原渠道（不经模型侧的 v2 ACK，也不自动收口，
+  // 由 ChannelDeliveryOutbox 投递成功后把记录标 delivered）。
+  async processAcceptedRequest(request) {
+    if (!request?.requestId || !request.payload) throw new Error("AcceptedRequest 恢复载荷不完整");
+    if (!this.acceptedRequests || !this.channelDeliveryOutbox) {
+      return { status: "waiting_provider", lastErrorCode: "ACCEPTED_REQUEST_STORE_UNAVAILABLE" };
+    }
+    const deliveryTarget = request.payload.deliveryTarget || {};
+    const message = {
+      channel: request.originChannel,
+      id: request.platformMessageId,
+      ownerKey: request.ownerKey,
+      threadKey: request.threadKey,
+      text: String(request.payload.text || ""),
+      senderId: deliveryTarget.toUserId || request.ownerKey,
+      chatId: deliveryTarget.chatId,
+      privateConversation: true,
+    };
+    const response = await this.#handleMessage(message);
+    const text = String(response?.text || "Syno 已处理，但没有生成可显示的文本。");
+    const final = await this.channelDeliveryOutbox.enqueue({
+      sourceType: "accepted_request",
+      sourceId: request.requestId,
+      ownerKey: request.ownerKey,
+      targetChannel: request.originChannel,
+      deliveryTargetRef: deliveryTarget,
+      responseKind: "final",
+      businessVersion: 1,
+      payload: { text },
+      deliveryKey: `${request.requestId}:final:v1`,
+    });
+    await this.acceptedRequests.update(request.requestId, {
+      status: "final_pending",
+      finalEventId: final.event.eventId,
+      claim: null,
+    });
+    this.wakeDelivery?.();
+    return { status: "final_pending", finalEventId: final.event.eventId };
+  }
+
+  async #handleMessage(message) {
     const trace = {
       channel: String(message.channel || "unknown"),
       messageId: String(message.id || ""),
@@ -350,7 +413,8 @@ class ChannelConversationHandler {
       const threadKey = String(message.threadKey || "main");
       const localOnly = /(?:^|\s)仅本地(?:\s|$)/u.test(text);
       if (this.acceptedRequests && trace.messageId) {
-        await this.#persistAccepted(message, trace, text);
+        const accepted = await this.#persistAccepted(message, trace, text);
+        if (accepted?.request?.requestId) message.__acceptedRequestId = accepted.request.requestId;
       }
       await this.#record("channel.message.received", {
         ...trace,

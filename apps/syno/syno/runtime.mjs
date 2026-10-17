@@ -60,6 +60,7 @@ import { WindowsServiceManager } from "./windows-service-manager.mjs";
 import { WorkflowContextCompiler } from "./workflow-context-compiler.mjs";
 import { WorkflowOutbox } from "./workflow-outbox.mjs";
 import { AcceptedRequestStore } from "../../../packages/syno-core/accepted-request-store.mjs";
+import { AcceptedRequestRecoveryWorker } from "../../../packages/syno-core/accepted-request-recovery.mjs";
 import { ChannelDeliveryOutbox, aggregateDeliveryFailures } from "../../../packages/syno-core/channel-delivery-outbox.mjs";
 import { OwnerChannelTargetStore } from "../../../packages/syno-core/proactive-reliability.mjs";
 import { EffectReceiptStore } from "./effect-receipt-store.mjs";
@@ -225,6 +226,23 @@ function createSynoRuntime(options = {}) {
   const workflowContextCompiler = options.workflowContextCompiler || new WorkflowContextCompiler();
   const workflowOutbox = options.workflowOutbox || new WorkflowOutbox();
   const acceptedRequests = options.acceptedRequests || (process.env.NODE_ENV === "test" ? null : new AcceptedRequestStore());
+  // 2026-10-17：恢复器接回非 v2 路径——崩溃重启后补投未完成回复的受理请求。
+  // 前置已就位：同步回复成功即把记录收口为 delivered（handler 的 #settleAcceptedReply），
+  // 因此恢复器只会看到真正没答完的消息（含 v2 时代遗留的非终态记录）。
+  const acceptedRecovery = acceptedRequests
+    ? (options.acceptedRecovery || new AcceptedRequestRecoveryWorker({
+      store: acceptedRequests,
+      recordEvent,
+      onEscalation: async (request) => {
+        await recordEvent("accepted.request.recovery_escalation", {
+          requestId: request?.requestId,
+          ownerKey: request?.ownerKey,
+          originChannel: request?.originChannel,
+          attempts: Number(request?.attempts || 0),
+        }, { level: "warning" });
+      },
+    }))
+    : null;
   const channelDeliveryOutbox = options.channelDeliveryOutbox || (process.env.NODE_ENV === "test" ? null : new ChannelDeliveryOutbox());
   const ownerChannelTargets = options.ownerChannelTargets || (process.env.NODE_ENV === "test" ? null : new OwnerChannelTargetStore());
   const effectReceipts = options.effectReceipts || (process.env.NODE_ENV === "test" ? null : new EffectReceiptStore());
@@ -600,6 +618,7 @@ function createSynoRuntime(options = {}) {
     captureChunks,
     captureScheduler,
     acceptedRequests,
+    acceptedRecovery,
     reconciliationCases,
   });
   const channelConversationHandler = options.channelConversationHandler || new ChannelConversationHandler({
@@ -914,6 +933,9 @@ function createSynoRuntime(options = {}) {
     quarantineRoot: path.join(PATHS.runtimeRoot, "quarantine", "feishu"),
   });
   const channels = options.channels || new ChannelHub({ feishu });
+  if (acceptedRecovery && typeof channelConversationHandler.processAcceptedRequest === "function") {
+    acceptedRecovery.processRequest = (request) => channelConversationHandler.processAcceptedRequest(request);
+  }
   // proactive 主动通道连续投递失败计数（drain 回调增/重投成功清零）；health 探活 O(1) 读，避免每探活扫 outbox。
   let proactiveDeliveryConsecutiveFailures = 0;
   const systemAlertLastSentAt = new Map();
@@ -1323,6 +1345,9 @@ function createSynoRuntime(options = {}) {
             }
             await drainWorkflowOutbox();
             await drainChannelDeliveryOutbox();
+            // 崩溃恢复：先把非终态的受理请求补投一次，再常驻轮询（自愈，不依赖重启）
+            await acceptedRecovery?.runOnce().catch((error) => recordEvent("accepted_request.recovery_failed", { error }, { level: "error" }));
+            acceptedRecovery?.start();
           })
           .catch(async (error) => {
             if (lifecycleState === "stopping") return;
@@ -1392,6 +1417,7 @@ function createSynoRuntime(options = {}) {
         if (workflowRetryTimer) clearInterval(workflowRetryTimer);
         workflowRetryTimer = null;
         await reconciliationWorker?.stop().catch(() => {});
+        await acceptedRecovery?.stop().catch(() => {});
         await channels.stop().catch(() => {});
         try { await harnessSupervisor.stop(); }
         catch (error) {

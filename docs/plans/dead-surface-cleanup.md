@@ -8,6 +8,9 @@
 > 删除 `capture.start/status/list_pending`、`jobs.list/submit`、`today.read`、`inspiration_record_feedback` 及其
 > 插件模块/测试/eval；灵感反馈机制整体下线（确定性口令 + 微信专属续办 + Host 工具一起删）；
 > DSH 侧关闭 `bash`/`pwsh`/`fs`/`fs-search`/`jobs`/`schedule` 与通用 `web_fetch`（读网页只留受控路径）。
+> 第十轮（2026-10-17，主人「按推荐执行」）：**崩溃恢复接回**——handler 的 `#settleAcceptedReply`
+> （同步回复成功即收口 delivered）＋ `processAcceptedRequest`（重跑→Outbox 补投→final_pending），
+> runtime 恢复构造/接线/启动 `runOnce()+start()`/close 停止；恢复器与其测试从第九轮删除中恢复。
 > 第九轮（2026-10-17，主人「可以删除」）：**移动 v2 投递链路删除**——`mobile-delivery-mode.mjs`、
 > `accepted-request-recovery.mjs`、`scripts/cutover-mobile-delivery.mjs`、`tests/mobile-delivery-mode.test.mjs`、
 > `tests/accepted-request-recovery.test.mjs`；handler 的 `#handleV2`/`#runV2`/`processAcceptedRequest` 与
