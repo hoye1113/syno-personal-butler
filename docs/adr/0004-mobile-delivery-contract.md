@@ -1,9 +1,13 @@
 ---
-status: accepted
+status: superseded
 review_baseline: 567f23d2d9b423a98d0e88868c6cc2eb3859d16f
 ---
 
 # 微信与飞书移动可靠交付
+
+> **SUPERSEDED（2026-10-17）**：移动 v2 投递链路已整体删除（`mobile-delivery-mode`、`accepted-request-recovery`、
+> `cutover-mobile-delivery`、`/api/syno/mobile-delivery` 及其测试）。受理记录（AcceptedRequestStore）保留为
+> 落盘审计与幂等件。本 ADR 仅作历史设计追溯。
 
 微信与飞书是主要日常入口；Web 是配置、诊断、完整审计和桌面接管入口。
 

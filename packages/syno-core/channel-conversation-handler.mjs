@@ -53,7 +53,7 @@ function captureReceiptText(receipt, { attachment = false } = {}) {
 }
 
 class ChannelConversationHandler {
-  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelContinuations, channelDeliveryOutbox, mobileDeliveryMode, ownerChannelTargets, wakeDelivery, imageStore = null, imageTranscriber = null, today = null } = {}) {
+  constructor({ runtime, core, ingest, ingestWorkflows, pendingDecisions, attachmentToPayload, journal, intentRouter, capabilityPresenter, browserCapture, acceptedRequests, recentInteractions, channelContinuations, channelDeliveryOutbox, ownerChannelTargets, wakeDelivery, imageStore = null, imageTranscriber = null, today = null } = {}) {
     if (!runtime || !core || (!ingest && !ingestWorkflows) || !pendingDecisions) throw new Error("ChannelConversationHandler 缺少 Runtime、Core、IngestWorkflow 或 PendingDecision Store");
     this.runtime = runtime;
     this.core = core;
@@ -69,7 +69,6 @@ class ChannelConversationHandler {
     this.recentInteractions = recentInteractions;
     this.channelContinuations = channelContinuations;
     this.channelDeliveryOutbox = channelDeliveryOutbox;
-    this.mobileDeliveryMode = mobileDeliveryMode;
     this.ownerChannelTargets = ownerChannelTargets;
     this.wakeDelivery = wakeDelivery;
     this.imageStore = imageStore;
@@ -276,84 +275,6 @@ class ChannelConversationHandler {
     }
   }
 
-  async #runV2(request, message) {
-    const response = await this.handle({
-      ...message,
-      __synoV2Worker: true,
-    });
-    const text = String(response?.text || "Syno 已处理，但没有生成可显示的文本。");
-    const deliveryTarget = request.payload?.deliveryTarget || this.#deliveryTarget(message);
-    const final = await this.channelDeliveryOutbox.enqueue({
-      sourceType: "accepted_request",
-      sourceId: request.requestId,
-      ownerKey: request.ownerKey,
-      targetChannel: request.originChannel,
-      deliveryTargetRef: deliveryTarget,
-      responseKind: "final",
-      businessVersion: 1,
-      payload: { text },
-      deliveryKey: `${request.requestId}:final:v1`,
-    });
-    await this.acceptedRequests.update(request.requestId, {
-      status: "final_pending",
-      route: { kind: "mobile", mode: "v2" },
-      finalEventId: final.event.eventId,
-      claim: null,
-    });
-    this.wakeDelivery?.();
-    return { status: "final_pending", finalEventId: final.event.eventId };
-  }
-
-  async processAcceptedRequest(request) {
-    if (!request?.requestId || !request.payload) throw new Error("AcceptedRequest 恢复载荷不完整");
-    if (!this.channelDeliveryOutbox || !this.acceptedRequests) return { status: "waiting_provider", lastErrorCode: "MOBILE_V2_STORE_UNAVAILABLE" };
-    const deliveryTarget = request.payload.deliveryTarget || {};
-    const message = {
-      channel: request.originChannel,
-      id: request.platformMessageId,
-      ownerKey: request.ownerKey,
-      threadKey: request.threadKey,
-      text: String(request.payload.text || ""),
-      senderId: deliveryTarget.toUserId || request.ownerKey,
-      contextToken: deliveryTarget.contextToken,
-      chatId: deliveryTarget.chatId,
-      privateConversation: true,
-    };
-    return this.#runV2(request, message);
-  }
-
-  async #handleV2(message, trace, text) {
-    if (!this.acceptedRequests || !this.channelDeliveryOutbox) {
-      throw Object.assign(new Error("移动 v2 需要 AcceptedRequest 与 ChannelDeliveryOutbox"), { code: "MOBILE_V2_UNAVAILABLE" });
-    }
-    const accepted = await this.#persistAccepted(message, trace, text);
-    const request = accepted.request;
-    const target = request.payload?.deliveryTarget || this.#deliveryTarget(message);
-    const ack = await this.channelDeliveryOutbox.enqueue({
-      sourceType: "accepted_request",
-      sourceId: request.requestId,
-      ownerKey: request.ownerKey,
-      targetChannel: request.originChannel,
-      deliveryTargetRef: target,
-      responseKind: "ack",
-      payload: { text: "已接收，正在处理。" },
-      deliveryKey: `${request.requestId}:ack:v1`,
-    });
-    await this.acceptedRequests.update(request.requestId, {
-      ackEventId: ack.event.eventId,
-      route: { kind: "mobile", mode: "v2" },
-    });
-    if (accepted.created) queueMicrotask(() => this.#runV2(request, message).catch(async (error) => {
-      await this.#record("accepted_request.v2_failed", {
-        requestId: request.requestId,
-        error: { code: error.code || "MOBILE_V2_PROCESS_FAILED", message: error.message },
-      }, { level: "error" });
-    }));
-    this.wakeDelivery?.();
-    return { deferredDelivery: true, requestId: request.requestId };
-  }
-
-
   // 确定性路由：今日快照（不进模型、不花 token）
   async #todaySnapshot() {
     if (typeof this.today?.snapshot !== "function") return { text: "今日快照暂时不可用，稍后再试。" };
@@ -424,22 +345,11 @@ class ChannelConversationHandler {
       threadKey: String(message.threadKey || "main"),
     };
     let text = String(message.text || "").trim();
-    if (!message.__synoV2Worker && this.mobileDeliveryMode?.is?.("v2")) {
-      try {
-        return await this.#handleV2(message, trace, text);
-      } catch (error) {
-        await this.#record("channel.message.failed", {
-          ...trace,
-          error: { code: error.code || "CHANNEL_MESSAGE_FAILED", message: error.message },
-        }, { level: "error" });
-        return { text: `未能接收：${error.message}` };
-      }
-    }
     try {
       const ownerKey = String(message.ownerKey || "local-user");
       const threadKey = String(message.threadKey || "main");
       const localOnly = /(?:^|\s)仅本地(?:\s|$)/u.test(text);
-      if (!message.__synoV2Worker && this.acceptedRequests && trace.messageId) {
+      if (this.acceptedRequests && trace.messageId) {
         await this.#persistAccepted(message, trace, text);
       }
       await this.#record("channel.message.received", {

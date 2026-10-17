@@ -5,7 +5,6 @@ import path from "node:path";
 import test from "node:test";
 
 import { AcceptedRequestStore } from "../packages/syno-core/accepted-request-store.mjs";
-import { AcceptedRequestRecoveryWorker } from "../packages/syno-core/accepted-request-recovery.mjs";
 import { runDpapi } from "../packages/syno-core/provider-credential-store.mjs";
 
 async function fixture() {
@@ -116,22 +115,4 @@ test("Windows DPAPI payload does not persist message text in metadata or ciphert
   assert.doesNotMatch(metadata, /DPAPI PRIVATE MESSAGE/);
   assert.doesNotMatch(ciphertext, /DPAPI PRIVATE MESSAGE/);
   assert.equal((await store.get(accepted.request.requestId, { includePayload: true })).payload.text, "DPAPI PRIVATE MESSAGE");
-});
-
-test("AcceptedRequestRecoveryWorker claims durable requests and never retries an unknown write itself", async (t) => {
-  const { root, store } = await fixture();
-  t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const accepted = await store.accept({ ownerKey: "owner-a", originChannel: "feishu", platformMessageId: "recover-1", payload: { text: "recovery" } });
-  const seen = [];
-  const worker = new AcceptedRequestRecoveryWorker({
-    store,
-    processRequest: async (request) => {
-      seen.push(request.payload.text);
-      return { status: "waiting_provider" };
-    },
-  });
-  const report = await worker.runOnce();
-  assert.deepEqual(report, { scanned: 1, claimed: 1, completed: 0, retryable: 1, unavailable: 0 });
-  assert.deepEqual(seen, ["recovery"]);
-  assert.equal((await store.get(accepted.request.requestId)).status, "waiting_provider");
 });

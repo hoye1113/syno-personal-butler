@@ -8,6 +8,10 @@
 > 删除 `capture.start/status/list_pending`、`jobs.list/submit`、`today.read`、`inspiration_record_feedback` 及其
 > 插件模块/测试/eval；灵感反馈机制整体下线（确定性口令 + 微信专属续办 + Host 工具一起删）；
 > DSH 侧关闭 `bash`/`pwsh`/`fs`/`fs-search`/`jobs`/`schedule` 与通用 `web_fetch`（读网页只留受控路径）。
+> 第九轮（2026-10-17，主人「可以删除」）：**移动 v2 投递链路删除**——`mobile-delivery-mode.mjs`、
+> `accepted-request-recovery.mjs`、`scripts/cutover-mobile-delivery.mjs`、`tests/mobile-delivery-mode.test.mjs`、
+> `tests/accepted-request-recovery.test.mjs`；handler 的 `#handleV2`/`#runV2`/`processAcceptedRequest` 与
+> `__synoV2Worker` 守卫、runtime 的模式装配/端点/恢复启动。保留 `AcceptedRequestStore` 落盘与 `#persistAccepted`。
 > 第八轮（2026-10-17，主人「把灵感卡都删了吧，我都没想过看」）：**今日灵感功能整体下线**——删除
 > `inspiration-sampler.mjs`、`inspiration-store.mjs`、编排器里的灵感链路（提示词/成卡/终态预检/compose/commit/
 > markDelivered）、signal-engine 的 12:30 灵感日程、`tests/inspiration.test.mjs` 与 `ops/content/inspirations/` 23 份存档；

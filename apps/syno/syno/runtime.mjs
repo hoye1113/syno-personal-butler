@@ -60,9 +60,7 @@ import { WindowsServiceManager } from "./windows-service-manager.mjs";
 import { WorkflowContextCompiler } from "./workflow-context-compiler.mjs";
 import { WorkflowOutbox } from "./workflow-outbox.mjs";
 import { AcceptedRequestStore } from "../../../packages/syno-core/accepted-request-store.mjs";
-import { AcceptedRequestRecoveryWorker } from "../../../packages/syno-core/accepted-request-recovery.mjs";
 import { ChannelDeliveryOutbox, aggregateDeliveryFailures } from "../../../packages/syno-core/channel-delivery-outbox.mjs";
-import { MobileDeliveryMode } from "../../../packages/syno-core/mobile-delivery-mode.mjs";
 import { OwnerChannelTargetStore } from "../../../packages/syno-core/proactive-reliability.mjs";
 import { EffectReceiptStore } from "./effect-receipt-store.mjs";
 import { EffectReconciliationCaseStore } from "./effect-reconciliation-case-store.mjs";
@@ -227,35 +225,8 @@ function createSynoRuntime(options = {}) {
   const workflowContextCompiler = options.workflowContextCompiler || new WorkflowContextCompiler();
   const workflowOutbox = options.workflowOutbox || new WorkflowOutbox();
   const acceptedRequests = options.acceptedRequests || (process.env.NODE_ENV === "test" ? null : new AcceptedRequestStore());
-  const acceptedRecovery = acceptedRequests
-    ? (options.acceptedRecovery || new AcceptedRequestRecoveryWorker({
-      store: acceptedRequests,
-      // R1：把 tick 内 runOnce 的异常落 journal（与启动期 bootstrap 的 accepted_request.recovery_failed 同事件）。
-      recordEvent,
-      onEscalation: async (request) => {
-        await recordEvent("accepted.request.recovery_escalation", {
-          requestId: request?.requestId,
-          ownerKey: request?.ownerKey,
-          originChannel: request?.originChannel,
-          attempts: Number(request?.attempts || 0),
-          lastErrorCode: request?.lastErrorCode || null,
-        }, { level: "warning" });
-        // C7：升级此前只落 journal（用户看不到）。notifySystemAlert 把"静默无限重试"触达到人。
-        // level:warning 与 effect terminal(error) 分桶互不抑制；升级每 request 仅触发一次（attempts===threshold），
-        // 30min 去重只在多 request 短时集中升级时合并，可接受。
-        notifySystemAlert({
-          title: "请求恢复重试已达阈值",
-          body: `${request?.requestId || "?"} 已重试 ${Number(request?.attempts || 0)} 次：${request?.lastErrorCode || "未知"}`,
-          level: "warning",
-        }).catch(() => {});
-      },
-    }))
-    : null;
   const channelDeliveryOutbox = options.channelDeliveryOutbox || (process.env.NODE_ENV === "test" ? null : new ChannelDeliveryOutbox());
   const ownerChannelTargets = options.ownerChannelTargets || (process.env.NODE_ENV === "test" ? null : new OwnerChannelTargetStore());
-  const mobileDeliveryMode = options.mobileDeliveryMode instanceof MobileDeliveryMode
-    ? options.mobileDeliveryMode
-    : new MobileDeliveryMode({ mode: options.mobileDeliveryMode || "legacy" });
   const effectReceipts = options.effectReceipts || (process.env.NODE_ENV === "test" ? null : new EffectReceiptStore());
   const reconciliationCases = options.reconciliationCases || (process.env.NODE_ENV === "test" ? null : new EffectReconciliationCaseStore());
   const reconciliationWorker = reconciliationCases
@@ -648,16 +619,12 @@ function createSynoRuntime(options = {}) {
     channelContinuations,
     channelDeliveryOutbox,
     ownerChannelTargets,
-    mobileDeliveryMode,
     wakeDelivery: () => drainChannelDeliveryOutbox().catch((error) => recordEvent("channel.outbox.drain_failed", { error }, { level: "error" })),
     imageStore,
     imageTranscriber,
     // today 服务在本函数后半段才构造（依赖 host/goals），这里给惰性代理，避免 TDZ
     today: { snapshot: (options = {}) => today.snapshot(options) },
   });
-  if (acceptedRecovery && typeof channelConversationHandler.processAcceptedRequest === "function") {
-    acceptedRecovery.processRequest = (request) => channelConversationHandler.processAcceptedRequest(request);
-  }
   async function onDuplicateWorkflow({ workflow, context = {} } = {}) {
     const targetChannel = String(context.channel || workflow?.originChannel || "");
     if (!workflow || targetChannel !== "feishu") return;
@@ -1246,10 +1213,8 @@ function createSynoRuntime(options = {}) {
     workflowContextCompiler,
     workflowOutbox,
     acceptedRequests,
-    acceptedRecovery,
     channelDeliveryOutbox,
     ownerChannelTargets,
-    mobileDeliveryMode,
     effectReceipts,
     reconciliationCases,
     reconciliationWorker,
@@ -1296,17 +1261,6 @@ function createSynoRuntime(options = {}) {
       };
     },
     restartHarness: () => startHarnessSecurely({ restart: true }),
-    async commitMobileDeliveryV2({ ownerAcceptance = false, ingressFrozen = false, evidenceRef = null } = {}) {
-      const records = await acceptedRequests?.list({ ownerKey: "local-user", limit: 1000 }) || [];
-      const terminal = new Set(["delivered", "canceled", "failed_terminal"]);
-      const legacyNonTerminal = records.filter((record) => !terminal.has(record.status)).length;
-      return mobileDeliveryMode.commit("v2", {
-        ownerAcceptance,
-        ingressFrozen,
-        legacyNonTerminal,
-        evidenceRef,
-      });
-    },
     developmentMode: options.developmentMode === true || process.env.SYNO_DEVELOPMENT_MODE === "true",
     async initialize({ worker = false } = {}) {
       if (initializePromise) return initializePromise;
@@ -1324,10 +1278,6 @@ function createSynoRuntime(options = {}) {
         await host.recover();
         await captureChunks.recoverRunning();
         await ingestWorkflows.recover();
-        if (typeof mobileDeliveryMode.load === "function") {
-          await mobileDeliveryMode.load();
-          await recordEvent("syno.mobile_delivery.mode_loaded", mobileDeliveryMode.snapshot());
-        }
         if (lifecycleState === "stopping") throw Object.assign(new Error("Syno Runtime 正在停止"), { code: "RUNTIME_STOPPING" });
         componentState.store = "ready";
         await recordEvent("syno.host.recovered");
@@ -1373,10 +1323,6 @@ function createSynoRuntime(options = {}) {
             }
             await drainWorkflowOutbox();
             await drainChannelDeliveryOutbox();
-            if (mobileDeliveryMode.is("v2")) {
-              await acceptedRecovery?.runOnce().catch((error) => recordEvent("accepted_request.recovery_failed", { error }, { level: "error" }));
-              acceptedRecovery?.start();
-            }
           })
           .catch(async (error) => {
             if (lifecycleState === "stopping") return;
@@ -1445,7 +1391,6 @@ function createSynoRuntime(options = {}) {
         channelDeliveryOutboxTimer = null;
         if (workflowRetryTimer) clearInterval(workflowRetryTimer);
         workflowRetryTimer = null;
-        await acceptedRecovery?.stop().catch(() => {});
         await reconciliationWorker?.stop().catch(() => {});
         await channels.stop().catch(() => {});
         try { await harnessSupervisor.stop(); }
@@ -1580,25 +1525,6 @@ async function routeSynoApi(runtime, req, url, readBody) {
         releaseEvidenceVerified: true,
       });
     });
-  }
-  if (method === "GET" && url.pathname === "/api/syno/mobile-delivery") {
-    const [accepted, outbox, unknownCases] = await Promise.all([
-      runtime.acceptedRequests?.list({ ownerKey: "local-user", limit: 1000 }) || [],
-      runtime.channelDeliveryOutbox?.list({ limit: 1000 }) || [],
-      runtime.reconciliationCases?.list({ ownerKey: "local-user", limit: 1000 }) || [],
-    ]);
-    const aggregate = (items) => items.reduce((counts, item) => {
-      const key = String(item.status || "unknown");
-      counts[key] = (counts[key] || 0) + 1;
-      return counts;
-    }, {});
-    return {
-      ...runtime.mobileDeliveryMode.snapshot(),
-      acceptedRequests: { total: accepted.length, byStatus: aggregate(accepted) },
-      outbox: { total: outbox.length, byStatus: aggregate(outbox) },
-      unknownCases: { total: unknownCases.length, byStatus: aggregate(unknownCases) },
-      proactive: await runtime.proactive?.getDiagnostics?.() || { eligibleSignals: 0, pendingBundles: 0, deliveryUnknown: 0, homeChannel: null, homeTargetAvailable: false, lastDeliveredAt: null },
-    };
   }
   if (method === "GET" && url.pathname === "/api/syno/recent-interactions") return runtime.recentInteractions.snapshot({ ownerKey: "local-user", channel: url.searchParams.get("channel") || undefined, threadKey: url.searchParams.get("thread") || "main" });
   if (method === "GET" && url.pathname === "/api/syno/effect-cases") return { cases: (await runtime.reconciliationCases?.list({ ownerKey: "local-user", limit: 100 }) || []).map((item) => ({ caseId: item.caseId, toolName: item.toolName, status: item.status, attempts: item.attempts, nextReconcileAt: item.nextReconcileAt, lastErrorCode: item.lastErrorCode, ownerResolution: item.ownerResolution, systemResolution: item.systemResolution, createdAt: item.createdAt, updatedAt: item.updatedAt })) };
