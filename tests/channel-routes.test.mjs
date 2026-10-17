@@ -71,6 +71,7 @@ test("「今天有什么」直接读 TodayService 快照，不调用模型", asy
   assert.match(response.text, /^今天（\d{4}-\d{2}-\d{2}）/);
   assert.match(response.text, /首要：写完 Syno 工具面重设计/);
   assert.match(response.text, /回复飞书消息/);
+  assert.equal(response.text.match(/写完 Syno 工具面重设计/g).length, 1, "首要与待办不重复同一条");
   assert.doesNotMatch(response.text, /第四条不该出现/, "只列前 3 条");
   assert.doesNotMatch(response.text, /孤立笔记|维护知识/, "建议类信号不进快照展示（2026-10-18 主人「不显示」）");
   assert.match(response.text, /待你确认：2 项（含收录 1）/);
