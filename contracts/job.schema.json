@@ -16,6 +16,7 @@
     "request": { "type": "object" },
     "changedPaths": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
     "advice": { "type": "object", "description": "收录澄清顾问懒加载生成的说明（可选缓存；仅用于系统歧义澄清卡片；含 whatIsIt/recommendation/recommendationLabel/reason/caveat/detail/via/generatedAt）" },
+    "privateConversation": { "type": "boolean", "description": "由已认证的 Host 渠道入口提供，用于恢复聊天时维持业务工具权限；缺省不授权写工具。" },
     "ownerKey": { "type": "string" },
     "threadKey": { "type": "string" },
     "projectRef": { "type": "string", "pattern": "^project-\\d{8}-[a-f0-9]{8}$" }

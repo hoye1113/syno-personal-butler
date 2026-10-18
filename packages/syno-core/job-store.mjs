@@ -18,7 +18,7 @@ const TRANSITIONS = Object.freeze({
   canceled: new Set(),
 });
 
-const SAFE_REQUEST_FIELDS = new Set(["kind", "operation", "sourceType", "expectsJson"]);
+const SAFE_REQUEST_FIELDS = new Set(["kind", "operation", "sourceType", "expectsJson", "sourceMessageId"]);
 
 function sanitizeRequest(request = {}) {
   const serialized = JSON.stringify(request);
@@ -47,7 +47,7 @@ class JobStore {
     this.clock = clock;
   }
 
-  async create({ request, decision, channel = "web", senderId = "local-user", ownerKey = "local-user", threadKey = "main", conversationId = "", requestKey = "" }) {
+  async create({ request, decision, channel = "web", senderId = "local-user", privateConversation = false, ownerKey = "local-user", threadKey = "main", conversationId = "", requestKey = "" }) {
     if (requestKey) {
       const existing = (await this.list({ limit: 2_000 })).find((job) =>
         job.requestKey === requestKey && String(job.ownerKey || "local-user") === String(ownerKey || "local-user"));
@@ -68,6 +68,7 @@ class JobStore {
       risk: decision.risk,
       channel,
       senderId,
+      privateConversation,
       ownerKey,
       threadKey,
       conversationId: conversationId || undefined,

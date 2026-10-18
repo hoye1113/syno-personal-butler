@@ -39,8 +39,9 @@ test("AgentHost auto-executes read and write intents and audits high-risk diffs"
   assert.equal(host.processLockRoot.startsWith(path.dirname(opsRoot)), true);
 
   // 只读直接完成
-  const read = await host.receive({ intent: "search", text: "查找知识" });
+  const read = await host.receive({ intent: "search", text: "查找知识" }, { privateConversation: true });
   assert.equal(read.job.status, "completed");
+  assert.equal((await store.get(read.job.id)).privateConversation, true);
 
   // 普通写入默认自动执行（approval:none，不再 awaiting_approval）
   currentChanges = [{ status: "??", path: "ops/content/new.md", kind: "added" }];

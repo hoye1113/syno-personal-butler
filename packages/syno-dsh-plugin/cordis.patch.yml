@@ -25,7 +25,7 @@
             config:
               maxBytes: 65536
 
-          # 2026-10-17 工具面重设计：聊天只保留受控知识读取。shell、文件系统、后台作业
+          # 2026-10-17 工具面重设计：聊天通过受控知识与业务工具执行。shell、文件系统、后台作业
           # 在当前产品里没有被任何流程使用，属于纯粹的额外攻击面，全部关闭。
           # 真正的文件能力走 syno_knowledge_read_snippet（路径策略 + 敏感拒读）。
           - id: tool-bash
@@ -95,8 +95,7 @@
       name: '@syno/dsh-plugin'
       config:
         toolSet: core
-    # B5 双轨：in-process capabilities 与微信通道骨架（全部门控默认关闭，
-    # 不设 env 时既不注册工具也不建通道；`SYNO_CHAT_TOOLS=plugin` 时 bridge 静默）。
+    # 知识读取默认由 in-process capabilities 注册；业务工具始终通过 Host Bridge。
     - id: syno-capabilities
       name: './plugins/capabilities/index.mjs'
     # Syno 组合搜索 provider（豆包 → Tavily → Exa → Parallel 匿名备用，按查询语言路由）。

@@ -67,6 +67,18 @@ class ChannelContinuationStore {
       await fs.mkdir(this.payloadRoot, { recursive: true });
       await atomicWrite(payloadFile(this.payloadRoot, id), await this.protect(JSON.stringify(payload)));
       await this.#write(record);
+      if (record.type === "chat_attachments") {
+        for (const previous of await this.#listUnlocked()) {
+          if (previous.id === record.id || previous.type !== "chat_attachments") continue;
+          const expired = Date.parse(previous.expiresAt) <= this.clock().getTime();
+          const replaced = previous.ownerKey === record.ownerKey && previous.channel === record.channel && previous.threadKey === record.threadKey;
+          if (!expired && !replaced) continue;
+          previous.status = expired ? "expired" : "settled";
+          previous.updatedAt = this.clock().toISOString();
+          await this.#write(previous);
+          await fs.rm(payloadFile(this.payloadRoot, previous.id), { force: true });
+        }
+      }
       return record;
     });
   }
@@ -85,6 +97,7 @@ class ChannelContinuationStore {
         record.status = "expired";
         record.updatedAt = this.clock().toISOString();
         await this.#write(record);
+        if (record.type === "chat_attachments") await fs.rm(payloadFile(this.payloadRoot, record.id), { force: true });
         return null;
       }
       const encrypted = await fs.readFile(payloadFile(this.payloadRoot, record.id), "utf8");

@@ -47,3 +47,21 @@ test("ChannelContinuationStore settles a record out of the active set and keeps 
   assert.equal(persisted.status, "resolved");
   assert.equal(persisted.correlationId, "inspiration-20260922-abcdef12");
 });
+
+test("temporary attachment replacement and expiry remove encrypted payloads without affecting link continuations", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-attachment-retention-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  let now = new Date("2026-10-18T00:00:00Z");
+  const payloadRoot = path.join(root, "payloads");
+  const store = new ChannelContinuationStore({ root: path.join(root, "records"), payloadRoot, lockFile: path.join(root, "lock"), clock: () => now, protect: async (text) => Buffer.from(text).toString("base64"), unprotect: async (text) => Buffer.from(text, "base64").toString("utf8") });
+  const input = { ownerKey: "owner", channel: "feishu", threadKey: "main", expiresAt: "2026-10-19T00:00:00Z" };
+  const link = await store.open({ ...input, type: "link_read", payload: { url: "https://example.com" } });
+  const old = await store.open({ ...input, type: "chat_attachments", payload: { attachments: ["old"] } });
+  const current = await store.open({ ...input, type: "chat_attachments", payload: { attachments: ["current"] } });
+  await assert.rejects(fs.access(path.join(payloadRoot, `${old.id}.dpapi`)), { code: "ENOENT" });
+  assert.deepEqual((await store.resolve({ ...input, type: "chat_attachments" })).payload.attachments, ["current"]);
+  now = new Date("2026-10-20T00:00:00Z");
+  assert.equal(await store.resolve({ ...input, type: "chat_attachments" }), null);
+  await assert.rejects(fs.access(path.join(payloadRoot, `${current.id}.dpapi`)), { code: "ENOENT" });
+  await fs.access(path.join(payloadRoot, `${link.id}.dpapi`));
+});

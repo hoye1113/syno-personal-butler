@@ -375,7 +375,7 @@ test("SynoToolBridge binds Owner thread and idempotency identity while tracking 
   await bridge.handle(call);
   await bridge.handle({ ...call, body: { ...call.body, id: 2 } });
   release();
-  assert.equal(bridge.effectVersion(), 1);
+  assert.equal(bridge.effectVersion(), 2, "重放已完成写入也要阻止后续模型回退");
   assert.equal(executions, 1);
   assert.equal(receivedContext.ownerId, "owner-1");
   assert.equal(receivedContext.channel, "feishu");

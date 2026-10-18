@@ -1,3 +1,4 @@
+import { BUSINESS_TOOL_NAMES } from "../../../packages/syno-core/business-tools.mjs";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { inspectRemoteContent } from "../../../packages/syno-core/sensitive-content.mjs";
 import { serializeForMcp } from "./tool-result-serializer.mjs";
@@ -38,6 +39,7 @@ function normalizeExposedToolName(name) {
 }
 
 const BRIDGE_TOOL_NAMES = new Set([
+  ...BUSINESS_TOOL_NAMES,
   "knowledge.search",
   "knowledge.read_snippet",
   "knowledge.fetch_url",
@@ -49,9 +51,10 @@ const BRIDGE_TOOL_NAMES = new Set([
 ]);
 
 class SynoToolBridge {
-  constructor({ tools, token, exposedToolNames = null, ownerKey = "local-user", onResult = async () => {}, isRuntimeReady = () => true, effectReceipts = null, reconciliationCases = null, charLimit = null, recordEvent = null } = {}) {
+  constructor({ tools, token, resolveWebContext = null, exposedToolNames = null, ownerKey = "local-user", onResult = async () => {}, isRuntimeReady = () => true, effectReceipts = null, reconciliationCases = null, charLimit = null, recordEvent = null } = {}) {
     if (!tools || !token) throw new Error("SynoToolBridge 缺少 ToolRegistry 或进程级 Token");
     this.tools = tools;
+    this.resolveWebContext = resolveWebContext;
     this.charLimit = charLimit;
     this.token = token;
     this.ownerKey = ownerKey;
@@ -85,6 +88,11 @@ class SynoToolBridge {
       channel: String(context.channel || "harness"),
       messageId: String(context.messageId || context.runId || ""),
       runId: String(context.runId || ""),
+      harnessSessionId: context.harnessSessionId,
+      attachments: context.attachments || [],
+      replyTarget: context.replyTarget,
+      senderId: context.senderId,
+      privateConversation: context.privateConversation === true,
       allowedTools: new Set((context.allowedTools || []).map(normalizeAllowedToolName)),
       ...(context.browserWorkflowId ? { browserWorkflowId: String(context.browserWorkflowId) } : {}),
       ...(context.browserCloseAuthorized === true ? { browserCloseAuthorized: true } : {}),
@@ -144,14 +152,20 @@ class SynoToolBridge {
     const name = String(request.params?.name || "");
     const definition = this.exposed.get(name);
     if (!definition) return { ...response, error: { code: -32601, message: "Tool not found" } };
-    if (!this.activeContext) {
+    const resolvedWeb = !this.activeContext && BUSINESS_TOOL_NAMES.includes(definition.name)
+      ? await this.resolveWebContext?.(request.params || {}) : null;
+    if (!this.activeContext && !resolvedWeb) {
       this.recordEvent?.("bridge.context.rejected", { reason: "context_required", method: request.method }).catch(() => {});
       return {
         ...response,
         error: { code: -32001, message: "SYNO_BRIDGE_CONTEXT_REQUIRED: 工具调用没有绑定 Syno 会话" },
       };
     }
-    const active = this.activeContext;
+    const active = this.activeContext || { ...resolvedWeb, allowedTools: new Set(resolvedWeb.allowedTools), attachments: [] };
+    const business = BUSINESS_TOOL_NAMES.includes(definition.name);
+    if (business && (!active.harnessSessionId || request.params?.sessionId !== active.harnessSessionId || !active.messageId || active.privateConversation !== true)) {
+      return { ...response, error: { code: -32003, message: "BUSINESS_CONTEXT_REQUIRED: 业务工具必须来自已绑定主人的私聊回合" } };
+    }
     if (!active.allowedTools.has(name)) {
       this.recordEvent?.("bridge.context.rejected", { runId: active.runId || null, messageId: active.messageId || null, reason: "tool_not_allowed", tool: name }).catch(() => {});
       return {
@@ -162,12 +176,19 @@ class SynoToolBridge {
     const idempotencyKey = definition.retry === "idempotent" && active.messageId
       ? `${active.ownerKey}\0${active.threadKey}\0${active.messageId}\0<none>\0${name}\0${JSON.stringify(request.params?.arguments || {})}`
       : "";
-    if (idempotencyKey && this.idempotentResults.has(idempotencyKey)) return this.idempotentResults.get(idempotencyKey);
-    const toolInvocation = active.messageId ? toolInvocationKey({ ownerKey: active.ownerKey, threadKey: active.threadKey, messageId: active.messageId, toolName: name }) : "";
+    if (idempotencyKey && this.idempotentResults.has(idempotencyKey)) {
+      if (definition.risk !== "read") this.effectCounter += 1;
+      return { ...this.idempotentResults.get(idempotencyKey), id: response.id };
+    }
+    const rawArguments = request.params?.arguments || {};
+    const stable = (value) => Array.isArray(value) ? value.map(stable) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])])) : value;
+    const businessDigest = createHash("sha256").update(JSON.stringify(stable(rawArguments))).digest("hex");
+    const invocationMessage = business ? `${active.messageId}:${businessDigest}` : active.messageId;
+    const toolInvocation = active.messageId ? toolInvocationKey({ ownerKey: active.ownerKey, threadKey: active.threadKey, messageId: invocationMessage, toolName: name }) : "";
     try {
       const toolArguments = request.params?.arguments || {};
       this.tools.validateInput(definition.name, toolArguments);
-      const argumentsDigest = createHash("sha256").update(JSON.stringify(request.params?.arguments || {})).digest("hex");
+      const argumentsDigest = createHash("sha256").update(JSON.stringify(business ? stable(rawArguments) : rawArguments)).digest("hex");
       const requestIdentity = active.messageId
         ? `${active.messageId}:<none>:${name}:${argumentsDigest.slice(0, 16)}`
         : "";
@@ -175,6 +196,7 @@ class SynoToolBridge {
       if (this.effectReceipts && toolInvocation && definition.risk !== "read") {
         const begun = await this.effectReceipts.begin({ toolInvocationKey: toolInvocation, toolName: name, ownerKey: active.ownerKey, argumentsDigest });
         durableReceipt = begun.receipt;
+        if (!begun.created) this.effectCounter += 1;
         if (!begun.created && durableReceipt.status === "committed") {
           const stored = await this.effectReceipts.get(toolInvocation, { includePayload: true });
           const cached = stored?.payload?.result;
@@ -200,6 +222,12 @@ class SynoToolBridge {
       if (definition.risk !== "read") this.effectCounter += 1;
       const result = await this.tools.execute(definition.name, toolArguments, {
         channel: active.channel,
+        senderId: active.senderId,
+        originalMessageId: active.messageId,
+        messageId: requestIdentity,
+        harnessSessionId: active.harnessSessionId,
+        attachments: active.attachments,
+        replyTarget: active.replyTarget,
         ownerId: active.ownerKey,
         threadKey: active.threadKey,
         conversationId: requestIdentity,
@@ -238,7 +266,7 @@ class SynoToolBridge {
       }
       if (this.effectReceipts && toolInvocation && definition.risk !== "read" && error.effectReceipt) {
         const toolArguments = request.params?.arguments || {};
-        const argumentsDigest = createHash("sha256").update(JSON.stringify(toolArguments)).digest("hex");
+        const argumentsDigest = createHash("sha256").update(JSON.stringify(business ? stable(toolArguments) : toolArguments)).digest("hex");
         const directEffect = { ...error.effectReceipt.directEffect, toolInvocationKey: toolInvocation, occurredAt: new Date().toISOString() };
         const businessOutcome = error.effectReceipt.businessOutcome;
         const result = { directEffect, businessOutcome, result: error.effectOutput };

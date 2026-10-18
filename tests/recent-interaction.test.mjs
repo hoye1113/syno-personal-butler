@@ -4,17 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { PendingDecisionStore } from "../packages/syno-core/pending-decision.mjs";
-import { RecentInteractionView, parseRecentReference } from "../packages/syno-core/recent-interaction.mjs";
-
-test("recent references parse deterministically without asking the model", () => {
-  assert.deepEqual(parseRecentReference("刚才那个"), { kind: "recent_reference", action: "inspect", confidence: 1, text: "刚才那个" });
-  assert.deepEqual(parseRecentReference("取消刚才的"), { kind: "recent_reference", action: "cancel", confidence: 1, text: "取消刚才的" });
-  assert.deepEqual(parseRecentReference("继续第 2 项"), { kind: "recent_reference", action: "continue", confidence: 1, text: "继续第 2 项", index: 2 });
-  assert.deepEqual(parseRecentReference("确认未执行"), { kind: "unknown_resolution", action: "resolve_unknown", result: "confirmed_not_started", confidence: 1, text: "确认未执行" });
-  assert.deepEqual(parseRecentReference("确定已执行第 2 项"), { kind: "unknown_resolution", action: "resolve_unknown", result: "confirmed_committed", confidence: 1, text: "确定已执行第 2 项", index: 2 });
-  assert.equal(parseRecentReference("帮我想个标题"), null);
-});
+import { PendingDecisionStore, decisionVersion } from "../packages/syno-core/pending-decision.mjs";
+import { RecentInteractionView } from "../packages/syno-core/recent-interaction.mjs";
 
 test("RecentInteractionView asks for an index when a recent reference has multiple candidates", async () => {
   const view = new RecentInteractionView({
@@ -23,7 +14,7 @@ test("RecentInteractionView asks for an index when a recent reference has multip
       { id: "job-1", ownerKey: "owner", channel: "weixin", threadKey: "main", status: "pending", created: "2026-07-29T00:01:00.000Z", updated: "2026-07-29T00:01:00.000Z" },
     ]; } } },
   });
-  const result = await view.resolve(parseRecentReference("取消刚才的"), { ownerKey: "owner", channel: "weixin" });
+  const result = await view.resolve({ action: "cancel" }, { ownerKey: "owner", channel: "weixin" });
   assert.equal(result.kind, "ambiguous");
   assert.match(result.text, /job-2/);
   assert.match(result.text, /job-1/);
@@ -39,7 +30,7 @@ test("RecentInteractionView cancels only the explicitly selected recent Job", as
       async cancel(id) { canceled.push(id); return { job: { id, status: "canceled" } }; },
     },
   });
-  const result = await view.resolve(parseRecentReference("取消刚才的"), { ownerKey: "owner", channel: "feishu" });
+  const result = await view.resolve({ action: "cancel" }, { ownerKey: "owner", channel: "feishu" });
   assert.equal(result.kind, "resolved");
   assert.deepEqual(canceled, ["job-2"]);
 });
@@ -53,7 +44,7 @@ test("RecentInteractionView resolves one Unknown Case from mobile without retryi
       async resolveOwner(id, resolution) { resolutions.push({ id, resolution }); return { caseId: id, ownerResolution: { source: "owner", ...resolution } }; },
     },
   });
-  const result = await view.resolve(parseRecentReference("确认未执行"), { ownerKey: "owner", channel: "weixin" });
+  const result = await view.resolve({ action: "resolve_unknown", result: "confirmed_not_started" }, { ownerKey: "owner", channel: "weixin" });
   assert.equal(result.kind, "resolved");
   assert.match(result.text, /重新发起新请求/);
   assert.deepEqual(resolutions, [{ id: "case-unknown-1", resolution: { result: "confirmed_not_started", resolvedBy: "owner", channel: "weixin" } }]);
@@ -71,6 +62,6 @@ test("PendingDecision presentation fixes ordered IDs, channel and version across
   assert.deepEqual(presentation.orderedDecisionIds, [first.id, second.id]);
   assert.equal(presentation.channel, "weixin");
   assert.equal(presentation.version, 1);
-  const resolved = await store.parse("确认 2", { ownerKey: "owner", threadKey: "main", channel: "weixin", presentationId: presentation.presentationId });
-  assert.equal(resolved.decision.id, second.id);
+  const resolved = await store.reserve(second.id, { ownerKey: "owner", threadKey: "main", version: decisionVersion(second) });
+  assert.equal(resolved.id, second.id);
 });

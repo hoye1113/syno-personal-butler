@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
+import { createBusinessTools } from "../../../packages/syno-core/business-tools.mjs";
 import { AgentHost } from "../../../packages/syno-core/agent-host.mjs";
 import { ApprovalAdvisor, minimalAdvice } from "./approval-advisor.mjs";
 import { BrowserCaptureAdapter } from "../../../packages/syno-core/browser-capture-adapter.mjs";
@@ -327,6 +328,7 @@ function createSynoRuntime(options = {}) {
       },
     },
     ...createBrowserCaptureTools(browserCapture),
+    ...createBusinessTools(() => ({ core, ingestWorkflows, pendingDecisions, imageStore, imageTranscriber })),
   ]);
   // 旧 ContextManager 尚保留到 R6；它提取的候选也必须进入唯一的可恢复 Workflow。
   const onExtractValuable = async (items, { conversationId } = {}) => {
@@ -359,6 +361,14 @@ function createSynoRuntime(options = {}) {
   const toolBridge = options.toolBridge || new SynoToolBridge({
     tools,
     token: bridgeToken,
+    // Authenticated production plugin supplies DSH-owned human message identity,
+    // outside model arguments. Local DSH Web is the same privileged owner shell.
+    resolveWebContext: async ({ sessionId, userMessageId }) => {
+      if (typeof sessionId !== "string" || typeof userMessageId !== "string" || !sessionId || !userMessageId || /^(?:syno-)?(?:capture|ephemeral|proactive)/u.test(sessionId)) return null;
+      const binding = (await harnessBindings.list()).find((item) => item.harnessSessionId === sessionId);
+      if (binding && binding.lifecycle !== "available") return null;
+      return { ownerKey: binding?.ownerKey || "local-user", threadKey: binding?.threadKey || `web:${sessionId}`, channel: "harness", harnessSessionId: sessionId, messageId: `web:${sessionId}:${userMessageId}`, privateConversation: true, allowedTools: tools.list().filter((t) => !t.name.startsWith("browser.")).map((t) => t.name.replaceAll(".", "_")) };
+    },
     effectReceipts,
     reconciliationCases,
     recordEvent,
@@ -522,7 +532,7 @@ function createSynoRuntime(options = {}) {
       if (operation === "knowledge.profile.generate") return profile.persist({ opsRoot: path.join(root, "ops") });
       if (operation === "vault.migration.content") return migration.apply(payload.id, { phase: "content", expectedDigest: payload.digest, workspace: root });
       if (operation === "vault.migration.integration") return migration.apply(payload.id, { phase: "integration", expectedDigest: payload.digest, workspace: root });
-      const domain = await executeDomainOperation(operation, payload, { workspace: root });
+      const domain = await executeDomainOperation(operation, payload, { workspace: root, job });
       if (domain) return domain;
       if (operation === "reports.create") {
         return reports.create(payload.kind || "manual", {
@@ -592,6 +602,7 @@ function createSynoRuntime(options = {}) {
   });
   const channelConversationHandler = options.channelConversationHandler || new ChannelConversationHandler({
     runtime: cognitiveRuntime,
+    intake: sourceIntake,
     core: channelCore,
     ingest,
     ingestWorkflows,

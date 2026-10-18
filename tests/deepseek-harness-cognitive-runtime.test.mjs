@@ -87,8 +87,8 @@ test("DeepSeekHarnessCognitiveRuntime declares locked v3 capabilities", () => {
   assert.equal(report.version, 3);
   assert.equal(report.adapter, HARNESS_ADAPTER);
   assert.deepEqual(report.models, [...HARNESS_MODEL_CHAIN]);
-  assert.equal(report.terminal, true);
-  assert.equal(report.directFileAccess, true);
+  assert.equal(report.terminal, false);
+  assert.equal(report.directFileAccess, false);
   assert.equal(report.sourceWrite, false);
   assert.equal(report.dynamicMcp, false);
   assert.equal(report.agentSelectableModel, false);
@@ -295,4 +295,26 @@ test("run delivers owner images as image content blocks alongside the text", asy
     { ownerKey: "owner", threadKey: "main", channel: "weixin" },
   );
   assert.deepEqual(prompts[0].map((block) => block.type), ["text"]);
+});
+
+
+test("a write followed by an empty response disables model fallback and whole-message retry", async (t) => {
+  const file = await temporaryFile(t);
+  let effects = 0;
+  let attempts = 0;
+  let bound;
+  const tools = {
+    list: () => [{ name: "actions.create" }],
+    effectVersion: () => effects,
+    bindContext(context) { bound = context; return () => {}; },
+  };
+  const runtime = new DeepSeekHarnessCognitiveRuntime({
+    tools, bindings: new DeepSeekHarnessSessionBindingStore({ file }),
+    supervisor: { async ensure() { attempts += 1; return { async runTurn() { effects += 1; return { finalResponse: "" }; } }; }, async stop() { throw new Error("must not switch model after a write"); } },
+  });
+  await assert.rejects(runtime.run({ text: "创建待办" }, { ownerKey: "owner", messageId: "real-message", privateConversation: true }), (error) => error.irreversibleEffect === true && error.retryable === false);
+  assert.equal(attempts, 1);
+  assert.equal(bound.messageId, "real-message");
+  assert.equal(bound.privateConversation, true);
+  assert.match(bound.harnessSessionId, /^syno-main-/);
 });

@@ -316,8 +316,8 @@ class DeepSeekHarnessCognitiveRuntime {
       models: this.models,
       agentSelectableModel: false,
       providerFallback: false,
-      directFileAccess: true,
-      terminal: true,
+      directFileAccess: false,
+      terminal: false,
       sourceWrite: false,
       memoryWrite: false,
       dynamicMcp: false,
@@ -538,6 +538,11 @@ class DeepSeekHarnessCognitiveRuntime {
             const releaseContext = this.tools?.bindContext?.({
               ownerKey,
               threadKey,
+              harnessSessionId: binding.harnessSessionId,
+              attachments: context.attachments || [],
+              replyTarget: context.replyTarget,
+              senderId: context.senderId,
+              privateConversation: context.privateConversation === true,
               channel: context.channel,
               messageId: context.messageId,
               runId,
@@ -629,7 +634,8 @@ class DeepSeekHarnessCognitiveRuntime {
           const unknown = run.status === "cancel_unknown";
           const exhausted = Object.assign(new Error(unknown ? "Harness Session 状态未知" : "DeepSeek Harness 模型尝试全部失败"), {
             code: unknown ? "HARNESS_ABORT_UNKNOWN" : "HARNESS_ATTEMPTS_EXHAUSTED",
-            retryable: unknown ? false : retryableFailure(lastError),
+            retryable: unknown || lastError?.irreversibleEffect ? false : retryableFailure(lastError),
+            irreversibleEffect: lastError?.irreversibleEffect === true,
             attempts,
             cause: lastError,
             sessionStateKnown: run.sessionStateKnown,

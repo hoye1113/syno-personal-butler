@@ -1,3 +1,4 @@
+import { BUSINESS_TOOL_SPECS, BUSINESS_TOOL_NAMES } from "../../packages/syno-core/business-tools.mjs";
 /**
  * Out-of-tree Cordis plugin: register Syno Tool Bridge tools under native
  * `syno_*` names (not `mcp__syno__*`). Loaded by dsh-jsonrpc-agent from
@@ -22,6 +23,8 @@ const FALLBACK_TOOLS = Object.freeze([
 function selectToolDefinitions(definitions, toolSet = "all") {
   const selected = String(toolSet || "all").trim() || "all";
   if (selected === "all") return [...definitions];
+  if (selected === "business") return definitions.filter((d) => BUSINESS_TOOL_NAMES.some((n) => n.replaceAll(".", "_") === toBridgeName(d.name)));
+  if (selected === "browser") return definitions.filter((d) => toBridgeName(d.name).startsWith("browser_"));
   if (selected === "core") return definitions.filter((definition) => isCoreChatToolName(definition?.name));
   throw new Error(`syno-tool-bridge: unknown toolSet ${selected}`);
 }
@@ -34,6 +37,14 @@ export function publicSynoToolName(bridgeName) {
 export function toBridgeName(publicName) {
   const value = String(publicName || "").replaceAll(".", "_");
   return value.startsWith("syno_") ? value.slice("syno_".length) : value;
+}
+
+function humanTurn(exec) {
+  const events = exec?.agent?.session?.snapshotEvents?.() || [];
+  let start = -1;
+  for (const event of events) if (event.type === "turn/start") start = event.seq;
+  const message = events.findLast((event) => event.seq > start && event.type === "user/message" && event.data?.source?.kind === "user");
+  return message?.data?.id;
 }
 
 async function rpc(origin, token, method, params, id) {
@@ -75,22 +86,21 @@ function registerTool(ctx, origin, token, definition) {
       schema: { type: "object", additionalProperties: true },
       render: renderOutput,
     },
-    async execute(args) {
-      const payload = await rpc(origin, token, "tools/call", { name: bridgeName, arguments: args || {} }, `call-${Date.now()}`);
+    async execute(args, exec) {
+      const payload = await rpc(origin, token, "tools/call", { name: bridgeName, arguments: args || {}, sessionId: exec?.agent?.id, userMessageId: humanTurn(exec) }, `call-${Date.now()}`);
       if (payload?.error) {
         throw new Error(payload.error.message || "Syno Tool Bridge 调用失败");
       }
+      if (payload?.result?.isError) throw new Error(payload.result.content?.map((b) => b.text || "").join("\n") || "Syno 工具执行失败");
       return payload?.result || {};
     },
   });
 }
 
 export async function apply(ctx, config = {}) {
-  // B5 工具面双轨：默认由 in-process capabilities 注册 canonical syno_* 工具，桥保持静默；
-  // 只有显式 `SYNO_CHAT_TOOLS=bridge`（回滚）或独立构图（收录 sidecar / JSON-RPC 回退，
-  // config.allowWhenPluginMode=true）才启用桥。
+  // Knowledge reads stay in-process; business tools always use the trusted Host.
   const chatTools = String(process.env.SYNO_CHAT_TOOLS || "").trim();
-  if (chatTools !== "bridge" && config.allowWhenPluginMode !== true) return;
+  const toolSet = chatTools !== "bridge" && config.allowWhenPluginMode !== true ? "business" : config.toolSet;
   const origin = String(process.env.SYNO_BRIDGE_ORIGIN || "").trim();
   const token = String(process.env.SYNO_BRIDGE_TOKEN || "").trim();
   if (!origin || !token) {
@@ -111,7 +121,10 @@ export async function apply(ctx, config = {}) {
       inputSchema: { type: "object", properties: {}, additionalProperties: true },
     }));
   }
-  for (const tool of selectToolDefinitions(listed, config.toolSet)) registerTool(ctx, origin, token, tool);
+  if (!listed.some((d) => BUSINESS_TOOL_NAMES.some((n) => n.replaceAll(".", "_") === toBridgeName(d.name)))) {
+    listed.push(...BUSINESS_TOOL_SPECS.map(({ name, description, inputSchema }) => ({ name: name.replaceAll(".", "_"), description, inputSchema })));
+  }
+  for (const tool of selectToolDefinitions(listed, toolSet)) registerTool(ctx, origin, token, tool);
 }
 
 export { selectToolDefinitions };

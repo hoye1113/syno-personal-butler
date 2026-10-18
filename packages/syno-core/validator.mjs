@@ -178,7 +178,7 @@ function contractForPath(relative) {
   if (/^ops\/content\/briefs\/.*\.md$/.test(relative)) return "content-brief";
   if (/^ops\/content\/ideas\/.*\.md$/.test(relative)) return "content-idea";
   if (/^ops\/actions\/.*\.md$/.test(relative)) return "action";
-  if (/^ops\/memory\/proposals\/.*\.md$/.test(relative)) return "memory-proposal";
+  if (/^ops\/memory\/.*\.md$/.test(relative)) return "memory-proposal";
   return null;
 }
 

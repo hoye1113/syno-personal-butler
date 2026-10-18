@@ -66,56 +66,15 @@ test("mobile write leg: write intents auto-execute (pending, approval none) and 
   });
 });
 
-test("mobile clarification leg: private-chat confirmation drives the canonical Job to completed with no second gate, identically for weixin and feishu", async () => {
-  await withStore(async (store) => {
-    const decision = evaluate({ intent: "curate_note" });
-
-    // core.approve 把 canonical 状态机一路推到 completed（模拟 agent-host 收到确认后执行 worktree commit）。
-    const driveToCompleted = async (jobId, input) => {
-      const live = await store.get(jobId);
-      await store.approve(live, { channel: input.channel, senderId: input.senderId });
-      await store.transition(live, "running", { approvalActors: [`${input.channel}:${input.senderId}`], approvalsReceived: 1 });
-      await store.transition(live, "validating", { result: { merged: true } });
-      await store.transition(live, "completed", { result: { merged: true } });
-      return { job: live, requiresApproval: false };
-    };
-
-    for (const channel of ["weixin", "feishu"]) {
-      // 每个通道各自一条冲突澄清 Job（现实里每次澄清本就是独立 Job）。
-      const job = await store.create({ request: { intent: "curate_note", text: `收录一条撞重的链接-${channel}` }, decision, channel, senderId: `${channel}-owner`, ownerKey: "owner", threadKey: "main" });
-      // 收录冲突暂停的 Job：写意图先入 pending，再被收录层按系统歧义推到 awaiting_approval。
-      await store.transition(job, "awaiting_approval", { phase: "clarification" });
-      assert.equal(job.status, "awaiting_approval");
-
-      const handler = new ChannelConversationHandler({
-        runtime: { async run() { throw new Error("model must not parse confirmations"); } },
-        core: { approve: driveToCompleted },
-        ingest: {},
-        pendingDecisions: { async parse(text, ctx) { assert.equal(ctx.threadKey, "main"); return { action: "approve", code: "ABC123", decision: { jobId: job.id, id: `dec-${channel}` } }; }, async update() {} },
-      });
-      const reply = await handler.handle({ id: `${channel}-confirm`, ownerKey: "owner", senderId: `${channel}-owner`, channel, text: "可以", privateConversation: true });
-      // trust-but-clarify：确认后任务已完成，不会回到「仍需澄清」二次闸门。
-      assert.match(reply.text, /已确认任务/);
-      assert.match(reply.text, /completed/);
-      assert.doesNotMatch(reply.text, /仍需澄清/);
-      const finished = await store.get(job.id);
-      assert.equal(finished.status, "completed");
-      assert.ok(finished.approvalActors.some((actor) => actor.startsWith(`${channel}:`)), `${channel} 应记入审批主体`);
-    }
+test("mobile clarification text enters the model; business authority is passed separately", async () => {
+  const contexts = [];
+  const handler = new ChannelConversationHandler({
+    core: {},
+    runtime: { async run(request, context) { contexts.push(context); return { text: `理解并处理：${request.text}` }; } },
   });
-});
-
-test("mobile clarification leg never resolves outside an explicit private conversation on either channel", async () => {
-  for (const channel of ["weixin", "feishu"]) {
-    let parsed = false;
-    const handler = new ChannelConversationHandler({
-      runtime: { async run() { throw new Error("model must not run"); } },
-      core: {},
-      ingest: {},
-      pendingDecisions: { async parse() { parsed = true; } },
-    });
-    const reply = await handler.handle({ ownerKey: "owner", senderId: `${channel}-owner`, channel, text: "可以", privateConversation: false });
-    assert.match(reply.text, /明确私聊/);
-    assert.equal(parsed, false);
+  for (const privateConversation of [true, false]) {
+    const reply = await handler.handle({ id: "confirm", ownerKey: "owner", channel: "feishu", threadKey: "main", text: "可以，但不要追加来源", privateConversation });
+    assert.match(reply.text, /可以，但不要追加来源/);
+    assert.equal(contexts.at(-1).privateConversation, privateConversation);
   }
 });

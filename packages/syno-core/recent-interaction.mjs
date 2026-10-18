@@ -1,29 +1,5 @@
 const ACTIVE_JOB_STATUSES = new Set(["pending", "awaiting_approval", "running", "waiting_provider", "validating"]);
 
-function normalizeRecentText(value) {
-  return String(value || "").trim().replace(/[\u3000\t ]+/gu, " ");
-}
-
-function parseRecentReference(value) {
-  const text = normalizeRecentText(value);
-  const unknownResolution = /^(?:确认|确定)(?:该事项|这项|这个)?\s*(未执行|没有执行|已执行|已经执行)(?:\s*(?:第\s*)?(\d+)\s*(?:项|个)?)?$/u.exec(text);
-  if (unknownResolution) {
-    return {
-      kind: "unknown_resolution",
-      action: "resolve_unknown",
-      result: /未执行|没有执行/u.test(unknownResolution[1]) ? "confirmed_not_started" : "confirmed_committed",
-      confidence: 1,
-      text,
-      ...(unknownResolution[2] ? { index: Number(unknownResolution[2]) } : {}),
-    };
-  }
-  if (/^(?:刚才那个|刚才的那个|刚刚那个)(?:吧|呢)?$/u.test(text)) return { kind: "recent_reference", action: "inspect", confidence: 1, text };
-  if (/^(?:取消|停止)(?:刚才|刚刚)(?:的)?(?:任务|请求)?(?:吧|呢)?$/u.test(text)) return { kind: "recent_reference", action: "cancel", confidence: 1, text };
-  const continuation = /^(?:继续|恢复)\s*(?:(?:刚才|刚刚)(?:的)?)?\s*(?:第\s*)?(\d+)?\s*(?:项|个)?(?:请求|任务|收录)?(?:吧|呢)?$/u.exec(text);
-  if (continuation) return { kind: "recent_reference", action: "continue", confidence: 1, text, ...(continuation[1] ? { index: Number(continuation[1]) } : {}) };
-  return null;
-}
-
 function recentSort(left, right) {
   return String(right.updatedAt || right.createdAt || "").localeCompare(String(left.updatedAt || left.createdAt || ""));
 }
@@ -111,4 +87,4 @@ class RecentInteractionView {
   }
 }
 
-export { ACTIVE_JOB_STATUSES, RecentInteractionView, normalizeRecentText, parseRecentReference };
+export { ACTIVE_JOB_STATUSES, RecentInteractionView };

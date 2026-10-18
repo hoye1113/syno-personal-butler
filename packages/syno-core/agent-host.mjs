@@ -51,6 +51,7 @@ class AgentHost {
       decision,
       channel: mergedContext.channel || "web",
       senderId: mergedContext.senderId || "local-user",
+      privateConversation: mergedContext.privateConversation === true,
       ownerKey,
       threadKey: mergedContext.threadKey || "main",
       conversationId: mergedContext.conversationId || "",

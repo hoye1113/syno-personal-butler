@@ -200,10 +200,9 @@ test("Syno agent instructions match the shared core chat tool set", async () => 
   assert.match(instructions, /命中反爬验证墙.*自动改用本机浏览器/);
   assert.doesNotMatch(instructions, /默认插件仅支持直抓/);
   assert.doesNotMatch(instructions, /告知主人完成后回复|先.*web_search.*再.*web_fetch/);
-  // 2026-10-17 工具面重设计：今日/记忆走确定性路由，模型不得假装算快照或写记忆
-  assert.match(instructions, /确定性路由/);
+  assert.match(instructions, /不要求固定口令/);
   assert.match(instructions, /不得编造快照/);
-  assert.doesNotMatch(instructions, /syno_(?:capture|jobs|today|inspiration)/);
+  assert.match(instructions, /同一回合不得自行批准/);
 });
 
 test("cordis configs live in the Syno repo and never inline API keys", async () => {
@@ -218,7 +217,7 @@ test("cordis configs live in the Syno repo and never inline API keys", async () 
   assert.match(chat, /id: llm-pi-ai[\s\S]*kimi-coding[\s\S]*apiKeyEnv: KIMI_API_KEY/);
   assert.doesNotMatch(chat, /deepseek-v4|deepseek-chat|deepseek-v4-pro/);
   assert.doesNotMatch(chat, /dsh-web-search-exa|dsh-web-search-perplexity/);
-  assert.match(capture, /toolSet: all/);
+  assert.match(capture, /toolSet: browser/);
   assert.match(capture, /id: persistent-bash\s+disabled: true/);
   assert.match(capture, /id: persistent-pwsh\s+disabled: true/);
   assert.match(capture, /name: '@deepseek-ai\/dsh-llm-pi-ai'[\s\S]*kimi-coding[\s\S]*apiKeyEnv: KIMI_API_KEY/);

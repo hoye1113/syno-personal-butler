@@ -56,6 +56,7 @@ class ToolLoopExecutor {
     const baseContext = {
       conversationId: job.conversationId || job.request?.conversationId,
       channel: job.channel,
+      privateConversation: job.privateConversation === true,
       ownerId: job.senderId,
       ownerKey: job.ownerKey || "local-user",
       threadKey: job.threadKey || "main",

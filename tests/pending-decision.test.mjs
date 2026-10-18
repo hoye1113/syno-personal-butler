@@ -3,201 +3,61 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-
-import { DECISION_RESERVATION_TTL_MS, PendingDecisionStore } from "../packages/syno-core/pending-decision.mjs";
+import { DECISION_RESERVATION_TTL_MS, PendingDecisionStore, decisionVersion } from "../packages/syno-core/pending-decision.mjs";
 
 async function setup(t) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-pending-decision-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-decision-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
-  let now = new Date("2026-07-28T08:00:00.000Z");
-  return {
-    store: new PendingDecisionStore({ file: path.join(root, "pending.json"), clock: () => now }),
-    advance(ms) { now = new Date(now.getTime() + ms); },
-  };
+  let now = new Date("2026-10-18T08:00:00Z");
+  return { store: new PendingDecisionStore({ file: path.join(root, "pending.json"), clock: () => now }), advance(ms) { now = new Date(now.getTime() + ms); } };
 }
+const input = (jobId = "job-1") => ({ jobId, ownerKey: "owner", threadKey: "main", summary: "收录方案", options: ["create", "reject"], businessVersion: "v1" });
+const scope = (decision) => ({ ownerKey: "owner", threadKey: "main", version: decisionVersion(decision) });
 
-test("republishing the same Job reuses one pending decision", async (t) => {
+test("republishing a Job keeps one active decision", async (t) => {
   const { store } = await setup(t);
-  const input = {
-    jobId: "job-20260728-stable",
-    ownerKey: "owner",
-    threadKey: "main",
-    kind: "single",
-    phase: "execution",
-    summary: "收录方案",
-    approvalCode: "ABC123",
-  };
-  const first = await store.add(input);
-  const replay = await store.add(input);
-  assert.equal(replay.id, first.id);
-  assert.equal((await store.list({ ownerKey: "owner", threadKey: "main" })).length, 1);
+  const first = await store.add(input());
+  assert.equal((await store.add(input())).id, first.id);
+  assert.equal((await store.list({ ownerKey: "owner" })).length, 1);
 });
 
-test("one bound low-risk decision accepts natural confirmation and rejects cross-owner replay", async (t) => {
+test("structured decisions require exact ID and reject cross-owner/thread/consumed access", async (t) => {
   const { store } = await setup(t);
-  const decision = await store.add({
-    jobId: "job-20260728-12345678",
-    ownerKey: "owner-1",
-    threadKey: "main",
-    kind: "single",
-    phase: "execution",
-    summary: "收录这篇文章",
-    approvalCode: "ABC123",
-  });
-  const resolved = await store.parse("可以", { ownerKey: "owner-1", threadKey: "main" });
-  assert.equal(resolved.action, "approve");
-  assert.equal(resolved.decision.id, decision.id);
-  assert.equal(resolved.code, "ABC123");
-  await store.update(decision.id, { reservedAt: null, consumedAt: "2026-07-28T08:00:01.000Z" });
-  await assert.rejects(store.parse("可以", { ownerKey: "owner-2", threadKey: "main" }), (error) => error.code === "PENDING_DECISION_NOT_FOUND");
-  await assert.rejects(store.parse("可以", { ownerKey: "owner-1", threadKey: "main" }), (error) => error.code === "PENDING_DECISION_REPLAYED");
+  const first = await store.add(input("job-1"));
+  const second = await store.add(input("job-2"));
+  for (const patch of [{ ownerKey: "stranger" }, { threadKey: "other" }]) await assert.rejects(store.reserve(first.id, { ...scope(first), ...patch }), { code: "PENDING_DECISION_EXPIRED" });
+  assert.equal((await store.reserve(second.id, scope(second))).jobId, "job-2");
+  await store.update(second.id, { reservedAt: null, consumedAt: "2026-10-18T08:01:00Z" });
+  await assert.rejects(store.reserve(second.id, scope(second)), { code: "PENDING_DECISION_EXPIRED" });
+  assert.equal((await store.reserve(first.id, scope(first))).jobId, "job-1");
 });
 
-test("multiple pending decisions require an index or explicit code", async (t) => {
+test("current proposal version includes its bound diff digest and declared options", async (t) => {
   const { store } = await setup(t);
-  for (const [jobId, approvalCode] of [["job-20260728-11111111", "AAA111"], ["job-20260728-22222222", "BBB222"]]) {
-    await store.add({ jobId, ownerKey: "owner", threadKey: "main", kind: "single", phase: "execution", summary: jobId, approvalCode });
-  }
-  await assert.rejects(store.parse("确认", { ownerKey: "owner", threadKey: "main" }), (error) => error.code === "PENDING_DECISION_AMBIGUOUS");
-  const second = await store.parse("确认 2", { ownerKey: "owner", threadKey: "main" });
-  assert.equal(second.decision.jobId, "job-20260728-22222222");
-  const first = await store.parse("拒绝 1", { ownerKey: "owner", threadKey: "main" });
-  assert.equal(first.action, "reject");
-  assert.equal(first.decision.jobId, "job-20260728-11111111");
+  const decision = await store.add({ ...input(), diffDigest: "digest-v1" });
+  await store.update(decision.id, { diffDigest: "digest-v2" });
+  await assert.rejects(store.reserve(decision.id, scope(decision)), { code: "PENDING_DECISION_VERSION_CHANGED" });
+  const [fresh] = await store.list({ ownerKey: "owner" });
+  const reserved = await store.reserve(fresh.id, scope(fresh));
+  assert.equal(reserved.diffDigest, "digest-v2");
+  assert.deepEqual(reserved.options, ["create", "reject"]);
 });
 
-test("a clarification decision bound to a diff digest verifies the authoritative digest before confirming", async (t) => {
-  const { store } = await setup(t);
-  const decision = await store.add({
-    jobId: "job-20260728-12345678",
-    ownerKey: "owner",
-    threadKey: "main",
-    summary: "覆盖已有笔记（带差异指纹）",
-    diffDigest: "digest-v1",
-    approvalCode: "ABC123",
-  });
-  assert.equal(decision.kind, "single");
-  // 权威摘要一致 → 允许确认（getDiffDigest 优先于静态 diffDigest）
-  const ok = await store.parse("可以", {
-    ownerKey: "owner",
-    threadKey: "main",
-    getDiffDigest: async (jobId) => {
-      assert.equal(jobId, "job-20260728-12345678");
-      return "digest-v1";
-    },
-  });
-  assert.equal(ok.action, "approve");
-  assert.equal(ok.decision.id, decision.id);
-  // 权威摘要变化 → 拒绝（防伪：diff 变了必须重新确认）
-  await store.update(decision.id, { reservedAt: null });
-  await assert.rejects(
-    store.parse("可以", { ownerKey: "owner", threadKey: "main", getDiffDigest: async () => "digest-v2" }),
-    (error) => error.code === "PENDING_DECISION_DIGEST_CHANGED",
-  );
-  // 未绑定 digest 的澄清事项不触发防伪校验，直接确认
-  await store.update(decision.id, { reservedAt: null, diffDigest: null });
-  const unbound = await store.parse("可以", { ownerKey: "owner", threadKey: "main" });
-  assert.equal(unbound.action, "approve");
-});
-
-test("expired decisions and changed diff digests fail closed", async (t) => {
+test("concurrent reservations have one winner, leases recover and expired decisions stay rejected", async (t) => {
   const { store, advance } = await setup(t);
-  const decision = await store.add({
-    jobId: "job-20260728-12345678",
-    ownerKey: "owner",
-    threadKey: "main",
-    summary: "带指纹的澄清",
-    diffDigest: "digest-v1",
-    approvalCode: "ABC123",
-    ttlMs: 1_000,
-  });
-  // 摘要变化 → 拒绝
-  await assert.rejects(
-    store.parse("可以", { ownerKey: "owner", threadKey: "main", getDiffDigest: async () => "digest-v2" }),
-    (error) => error.code === "PENDING_DECISION_DIGEST_CHANGED",
-  );
-  advance(2_000);
-  // 过期 → 拒绝（过期检查先于摘要检查）
-  await assert.rejects(
-    store.parse("可以", { ownerKey: "owner", threadKey: "main", getDiffDigest: async () => decision.diffDigest }),
-    (error) => error.code === "PENDING_DECISION_EXPIRED",
-  );
-});
-
-test("an interrupted approval reservation becomes available again without permitting a replay", async (t) => {
-  const { store, advance } = await setup(t);
-  const decision = await store.add({
-    jobId: "job-20260728-reserved",
-    ownerKey: "owner",
-    threadKey: "main",
-    kind: "single",
-    summary: "待恢复审批",
-    approvalCode: "ABC123",
-  });
-  await store.parse("可以", { ownerKey: "owner", threadKey: "main" });
-  await assert.rejects(
-    store.parse("可以", { ownerKey: "owner", threadKey: "main" }),
-    (error) => error.code === "PENDING_DECISION_REPLAYED",
-  );
+  const decision = await store.add(input());
+  const results = await Promise.allSettled([store.reserve(decision.id, scope(decision)), store.reserve(decision.id, scope(decision))]);
+  assert.equal(results.filter((r) => r.status === "fulfilled").length, 1);
+  assert.equal(results.find((r) => r.status === "rejected").reason.code, "PENDING_DECISION_BUSY");
   advance(DECISION_RESERVATION_TTL_MS + 1);
-  const recovered = await store.parse("可以", { ownerKey: "owner", threadKey: "main" });
-  assert.equal(recovered.decision.id, decision.id);
-  await store.update(decision.id, { reservedAt: null, consumedAt: "2026-07-28T08:06:00.000Z" });
-  await assert.rejects(
-    store.parse("可以", { ownerKey: "owner", threadKey: "main" }),
-    (error) => error.code === "PENDING_DECISION_REPLAYED",
-  );
+  assert.equal((await store.reserve(decision.id, scope(decision))).id, decision.id);
+  advance(24 * 3600_000);
+  await assert.rejects(store.reserve(decision.id, scope(decision)), { code: "PENDING_DECISION_EXPIRED" });
 });
 
-test("an ingest decision accepts only a declared human-readable proposal option", async (t) => {
+test("same-millisecond presentations remain in insertion order across repeated reads", async (t) => {
   const { store } = await setup(t);
-  await store.add({
-    jobId: "job-20260728-options",
-    ownerKey: "owner",
-    threadKey: "main",
-    kind: "single",
-    summary: "处理重复来源",
-    options: ["keep-separate", "append-source", "link-only", "reject"],
-    approvalCode: "ABC123",
-  });
-  const selected = await store.parse("仅关联", { ownerKey: "owner", threadKey: "main" });
-  assert.equal(selected.action, "select");
-  assert.equal(selected.option, "link-only");
-  await store.update(selected.decision.id, { reservedAt: null });
-  await assert.rejects(
-    store.parse("覆盖原文", { ownerKey: "owner", threadKey: "main" }),
-    (error) => error.code === "PENDING_DECISION_NOT_A_REPLY",
-  );
-});
-
-test("replaying proposal publication reuses the same active PendingDecision", async (t) => {
-  const { store } = await setup(t);
-  const input = {
-    jobId: "job-20260728-idempotent",
-    ownerKey: "owner",
-    threadKey: "main",
-    kind: "single",
-    phase: "execution",
-    summary: "同一收录方案",
-    options: ["create", "reject"],
-    approvalCode: "ABC123",
-    artifactId: "artifact-1",
-  };
-  const first = await store.add(input);
-  const replay = await store.add(input);
-  assert.equal(replay.id, first.id);
-  assert.equal((await store.list({ ownerKey: "owner", threadKey: "main" })).length, 1);
-});
-
-// 2026-10-16 flaky 回归：同一毫秒创建的两条 decision 曾用随机 id 兜底排序，
-// present 顺序约 1/5 概率反向。现在必须按插入顺序且反复读取稳定。
-test("同一毫秒创建的两条 decision 按插入顺序展示且反复读取稳定", async (t) => {
-  const { store } = await setup(t);
-  const first = await store.add({ jobId: "job-a", ownerKey: "owner", threadKey: "main", phase: "clarification", summary: "one" });
-  const second = await store.add({ jobId: "job-b", ownerKey: "owner", threadKey: "main", phase: "clarification", summary: "two" });
-  assert.equal(first.createdAt, second.createdAt, "前提：两条 decision 的 createdAt 相同");
-  for (let round = 1; round <= 20; round += 1) {
-    const presentation = await store.present({ ownerKey: "owner", threadKey: "main", channel: "weixin", businessVersion: "1" });
-    assert.deepEqual(presentation.orderedDecisionIds, [first.id, second.id], `第 ${round} 次读取顺序必须与插入序一致`);
-  }
+  const first = await store.add(input("job-1"));
+  const second = await store.add(input("job-2"));
+  for (let i = 0; i < 10; i += 1) assert.deepEqual((await store.present({ ownerKey: "owner", threadKey: "main", channel: "feishu" })).orderedDecisionIds, [first.id, second.id]);
 });

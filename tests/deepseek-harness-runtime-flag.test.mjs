@@ -42,7 +42,7 @@ test("createSynoRuntime selects Harness when SYNO_COGNITIVE_RUNTIME is deepseek-
   assert.equal(runtime.cognitiveRuntime, runtime.harnessCognitiveRuntime);
   const report = runtime.cognitiveRuntime.capabilities();
   assert.equal(assertCognitiveCapabilities(report).adapter, HARNESS_ADAPTER);
-  assert.equal(report.terminal, true);
+  assert.equal(report.terminal, false);
   assert.equal(report.sourceWrite, false);
 });
 
