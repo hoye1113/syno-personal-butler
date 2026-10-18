@@ -545,6 +545,33 @@ test("decide binds an Owner decision to the durable Workflow", async (t) => {
   assert.equal(decisions[0].code, "ABC123");
 });
 
+test("selecting the proposed keep-separate approves instead of cancelling the Job and re-analysing", async (t) => {
+  const { scheduled, ingest, store } = await fixture(t);
+  ingest.status = async () => ({ proposal: { risk: "merge" }, candidate: { id: "candidate-1" } });
+  const decisions = [];
+  let proposed = 0;
+  const coordinator = new IngestWorkflowCoordinator({
+    ingest,
+    store,
+    schedule: (work) => scheduled.push(work),
+    async decisionExecutor(input) { decisions.push(input.decision); return { job: { id: "job-1", status: "completed" } }; },
+    async onProposed() { proposed += 1; },
+  });
+  const receipt = await coordinator.receive(
+    { kind: "text", value: "keep separate body" },
+    { ownerKey: "owner", channel: "web", messageId: "keep-separate-1" },
+  );
+  await scheduled.shift()();
+  await store.update(receipt.workflow.id, { stage: "awaiting_decision", jobId: "job-1" });
+  proposed = 0;
+  decisions.length = 0;
+
+  const result = await coordinator.decide(receipt.workflow.id, { action: "select", option: "keep-separate" }, { ownerKey: "owner" });
+  assert.equal(proposed, 0, "选择当前方案不应触发重算");
+  assert.equal(decisions.length, 1, "只调用一次执行器（批准），不取消 Job");
+  assert.equal(result.workflow.stage, "approved");
+});
+
 test("reject persists the Artifact before making the Workflow terminal", async (t) => {
   const { scheduled, ingest, store } = await fixture(t);
   let attempts = 0;

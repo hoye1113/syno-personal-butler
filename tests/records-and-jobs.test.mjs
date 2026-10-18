@@ -161,6 +161,22 @@ test("channel message request keys deduplicate retried jobs", async (t) => {
   assert.equal(second.job.id, first.job.id);
 });
 
+test("a canceled job no longer blocks a new attempt with the same request key", async (t) => {
+  const opsRoot = path.join(PATHS.runtimeRoot, "tests", `dedupe-canceled-${Date.now()}`);
+  t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));
+  const store = new JobStore({ opsRoot });
+  const decision = {
+    intent: "curate_note", allowed: true, approval: "single", risk: "low",
+    profile: "syno-curate", needsWorktree: true, allowedRoots: ["vault", "ops"],
+    validators: ["changed-paths", "ops-contracts", "markdown", "vault-contract"],
+  };
+  const first = await store.create({ request: { intent: "curate_note", text: "原方案" }, decision, requestKey: "same-request" });
+  await store.requestModification(first, "调整方案");
+  const second = await store.create({ request: { intent: "curate_note", text: "修订方案" }, decision, requestKey: "same-request" });
+  assert.notEqual(second.id, first.id, "已取消的 Job 不能被当成同一请求复用");
+  assert.equal(second.deduplicated, undefined);
+});
+
 test("requesting a proposal modification invalidates the original approvable Job", async (t) => {
   const opsRoot = path.join(PATHS.runtimeRoot, "tests", `job-revision-${Date.now()}`);
   t.after(() => fs.rm(opsRoot, { recursive: true, force: true }));

@@ -808,7 +808,8 @@ function createSynoRuntime(options = {}) {
           retryable: false,
         });
       }
-      const result = existingJob ? { job: existingJob } : await host.receive(buildOperationRequest("ingest.apply", {
+      const reusableJob = existingJob && !["canceled", "rejected", "failed"].includes(existingJob.status) ? existingJob : null;
+      const result = reusableJob ? { job: reusableJob } : await host.receive(buildOperationRequest("ingest.apply", {
           artifactId: workflow.artifactId,
           decision: { action },
         }), {

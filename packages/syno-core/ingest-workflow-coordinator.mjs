@@ -809,7 +809,7 @@ class IngestWorkflowCoordinator {
       throw Object.assign(new Error("不能处理其他 Owner 的收录"), { code: "INGEST_WORKFLOW_OWNER_MISMATCH" });
     }
     if (!this.decisionExecutor) throw Object.assign(new Error("收录审批执行器尚未配置"), { code: "INGEST_DECISION_NOT_READY" });
-    const action = String(decision.action || "");
+    let action = String(decision.action || "");
     if (action === "select") {
       const selected = String(decision.option || "");
       const state = await this.ingest.status(workflow.artifactId);
@@ -820,14 +820,20 @@ class IngestWorkflowCoordinator {
       if (!allowed.has(selected)) {
         throw Object.assign(new Error(`当前方案不支持 ${selected}`), { code: "INGEST_DECISION_INVALID" });
       }
-      await this.decisionExecutor({
-        workflow,
-        decision: { action: "modify", modification: `主人选择处理方式：${selected}` },
-        context,
-      });
-      workflow = await this.store.update(workflow.id, { stage: "proposed", jobId: undefined });
-      await this.onProposed?.({ workflow, candidate: state.candidate, proposal: state.proposal, action: selected });
-      return { workflow: await this.store.get(workflow.id), selected };
+      // 当前方案本来就是「分开保存」：选择它就等于批准，不需要取消 Job 再重算
+      //（2026-10-18：旧行为把 keep-separate 当 modify，取消 Job 后决策悬空，收录卡死）。
+      if (selected === "keep-separate") {
+        action = "approve";
+      } else {
+        await this.decisionExecutor({
+          workflow,
+          decision: { action: "modify", modification: `主人选择处理方式：${selected}` },
+          context,
+        });
+        workflow = await this.store.update(workflow.id, { stage: "proposed", jobId: undefined });
+        await this.onProposed?.({ workflow, candidate: state.candidate, proposal: state.proposal, action: selected });
+        return { workflow: await this.store.get(workflow.id), selected };
+      }
     }
     if (action === "approve" && workflow.rulesDigest && this.contextCompiler) {
       const currentBundle = await this.contextCompiler.compile({

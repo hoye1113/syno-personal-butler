@@ -54,8 +54,13 @@ class JobStore {
 
   async create({ request, decision, channel = "web", senderId = "local-user", privateConversation = false, ownerKey = "local-user", threadKey = "main", conversationId = "", requestKey = "" }) {
     if (requestKey) {
+      // 只有「成功完成」的同一请求才复用；已取消/拒绝/失败的任务不能再挡住新的尝试
+      //（2026-10-18：方案重算取消 Job 后，同 requestKey 的 onProposed 被旧 Job 去重，
+      // 导致决策指向一个已取消的 Job，收录永久卡在 awaiting_decision）。
       const existing = (await this.list({ limit: 2_000 })).find((job) =>
-        job.requestKey === requestKey && String(job.ownerKey || "local-user") === String(ownerKey || "local-user"));
+        job.requestKey === requestKey
+        && String(job.ownerKey || "local-user") === String(ownerKey || "local-user")
+        && !["canceled", "rejected", "failed"].includes(job.status));
       if (existing) return { ...existing, deduplicated: true };
     }
     const now = this.clock().toISOString();
