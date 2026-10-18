@@ -200,6 +200,39 @@ test("Git porcelain rename parsing keeps both destination and source", () => {
   assert.deepEqual(parsePorcelainZ("R  new.md\0old.md\0"), ["new.md", "old.md"]);
 });
 
+test("GitGuard ignores uncommitted product job/event audit files when merging", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-git-audit-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await exec("git", ["init", "-b", "main"], { cwd: root });
+  await exec("git", ["config", "user.name", "Syno Test"], { cwd: root });
+  await exec("git", ["config", "user.email", "syno-test@localhost"], { cwd: root });
+  await fs.writeFile(path.join(root, ".gitignore"), ".worktrees/\n");
+  await fs.writeFile(path.join(root, "base.md"), "base\n");
+  await exec("git", ["add", "--", ".gitignore", "base.md"], { cwd: root });
+  await exec("git", ["commit", "-m", "base"], { cwd: root });
+  const guard = new GitGuard({ repoRoot: root, worktreeRoot: path.join(root, ".worktrees") });
+  const worktree = await guard.prepareWorktree("audit-dirty");
+  await fs.mkdir(path.join(worktree.directory, "vault"), { recursive: true });
+  await fs.writeFile(path.join(worktree.directory, "vault", "new.md"), "approved\n");
+  await guard.commitPaths(["vault/new.md"], "approved", worktree.directory);
+  const approved = await guard.pinWorktree(worktree);
+  await fs.mkdir(path.join(root, "ops", "jobs", "2026", "10"), { recursive: true });
+  await fs.writeFile(path.join(root, "ops/jobs/2026/10/job-failed.md"), "uncommitted audit\n");
+  const merged = await guard.mergeWorktree({ ...worktree, commit: approved.commit, diffHash: approved.diffHash });
+  assert.equal(merged.merged, true);
+  await guard.removeWorktree(worktree);
+
+  // 真正的主人改动仍然会拦住合并。
+  await fs.writeFile(path.join(root, "user-edit.md"), "owner edit\n");
+  const second = await guard.prepareWorktree("user-dirty");
+  await fs.mkdir(path.join(second.directory, "vault"), { recursive: true });
+  await fs.writeFile(path.join(second.directory, "vault", "second.md"), "approved\n");
+  await guard.commitPaths(["vault/second.md"], "approved", second.directory);
+  const pinned = await guard.pinWorktree(second);
+  await assert.rejects(guard.mergeWorktree({ ...second, commit: pinned.commit, diffHash: pinned.diffHash }), /未提交变更/);
+  await guard.removeWorktree(second);
+});
+
 test("GitGuard rejects a branch changed after its diff approval", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-git-pin-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));

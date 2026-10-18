@@ -9,12 +9,47 @@ const MAX_INLINE_IMAGE_BYTES = 3 * 1024 * 1024;
 // Only explicit session controls bypass the model. Business intent belongs to
 // the chat loop; quarantined attachments never imply permission to capture.
 class ChannelConversationHandler {
-  constructor({ runtime, core, attachmentToPayload, intake = new IntakeService(), journal, channelContinuations, imageStore } = {}) {
+  constructor({ runtime, core, attachmentToPayload, intake = new IntakeService(), journal, channelContinuations, imageStore, pendingDecisions = null, ingestWorkflows = null } = {}) {
     if (!runtime || !core) throw new Error("ChannelConversationHandler 缺少 Runtime 或 Core");
-    Object.assign(this, { runtime, core, attachmentToPayload, intake, journal, channelContinuations, imageStore });
+    Object.assign(this, { runtime, core, attachmentToPayload, intake, journal, channelContinuations, imageStore, pendingDecisions, ingestWorkflows });
     this.activeRuns = new Map();
   }
   #record(event, data) { return this.journal?.record?.(event, data)?.catch(() => null) || Promise.resolve(); }
+
+  async #resolveCaptureDecision(text, message, ctx) {
+    if (message.privateConversation !== true) return null;
+    if (Array.isArray(message.artifacts) && message.artifacts.length) return null;
+    if (!this.pendingDecisions?.list || !this.ingestWorkflows?.decide) return null;
+    const confirm = /^(?:确认|同意|可以|收录|分开保存)$/u.test(text);
+    const reject = /^拒绝$/u.test(text);
+    const select = text === "追加来源" ? "append-source" : text === "仅关联" ? "link-only" : null;
+    if (!confirm && !reject && !select) return null;
+    const live = (await this.pendingDecisions.list({ ownerKey: ctx.ownerKey, threadKey: ctx.threadKey }))
+      .filter((item) => !item.consumedAt && !item.reservedAt && Date.parse(item.expiresAt) > Date.now());
+    if (live.length !== 1) return null;
+    const decision = live[0];
+    // 删除/合并需要模型+判官的另一道授权，确定性快路径不碰。
+    if (decision.kind === "knowledge" || !decision.artifactId) return null;
+    try {
+      const workflow = await this.ingestWorkflows.status(decision.artifactId, { ownerKey: ctx.ownerKey });
+      if (!workflow) return null;
+      const action = select ? "select" : reject ? "reject" : "approve";
+      const result = await this.ingestWorkflows.decide(workflow.id, {
+        action,
+        ...(select ? { option: select } : {}),
+        code: decision.approvalCode,
+        diffDigest: decision.diffDigest,
+      }, { ownerKey: ctx.ownerKey, threadKey: ctx.threadKey, channel: ctx.channel, senderId: message.senderId });
+      await this.#record("channel.decision.fastpath", { ...ctx, decisionId: decision.id, action });
+      if (reject) return { text: `已拒绝收录 ${workflow.id}，不会写入。` };
+      if (select) return { text: `已选择「${select}」，正在重新生成方案；完成后请你确认。` };
+      const job = result?.result?.job || result?.job;
+      return { text: `已确认收录 ${workflow.id}，当前状态：${job?.status || "processing"}。` };
+    } catch (error) {
+      await this.#record("channel.decision.fastpath_failed", { ...ctx, decisionId: decision.id, code: error.code || "DECISION_FASTPATH_FAILED" });
+      return { text: `确认操作未能执行：${String(error.message || error)}` };
+    }
+  }
   async handle(message) {
     const text = String(message.text || "").trim();
     const ownerKey = String(message.ownerKey || "local-user");
@@ -34,6 +69,10 @@ class ChannelConversationHandler {
         }
         return { text: active ? "已请求停止当前操作；已完成的写入会保留。" : "当前没有运行中的对话操作。" };
       }
+      // 2026-10-18：单条收录决策 + 明确「确认/拒绝」走确定性快路径——
+      // 不再让模型查 ID/版本，也避免把「分开保存」误当成 select 重算。
+      const confirmed = await this.#resolveCaptureDecision(text, message, { ownerKey, threadKey, channel });
+      if (confirmed) return confirmed;
       await this.#record("channel.message.received", trace);
       const attachments = [];
       const images = [];

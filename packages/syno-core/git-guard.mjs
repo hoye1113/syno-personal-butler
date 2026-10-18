@@ -204,7 +204,9 @@ class GitGuard {
   async #mergeWorktree({ branch, commit, base, diffHash: expectedDiffHash }) {
     // D13.4 同一闸门：合回也只在 productBranch 主检出进行，堵「job 合入功能分支」的旁路
     await this.#assertProductBranch(this.repoRoot);
-    const dirty = await this.changedPaths(this.repoRoot);
+    // 产品自有的 Job/事件审计记录不算「主人工作区脏」：失败或取消的 Job 会留下这些文件，
+    // 若把它们当成阻塞条件，一次失败就会让后续所有收录都无法合并（2026-10-18 实测）。
+    const dirty = (await this.changedPaths(this.repoRoot)).filter((file) => !/^ops\/(?:jobs|events)\//u.test(file));
     if (dirty.length) throw new Error(`主工作区存在未提交变更，拒绝自动合并：${dirty.join(", ")}`);
     const pinned = await this.pinWorktree({ branch, base });
     if (!commit || pinned.commit !== commit || (expectedDiffHash && pinned.diffHash !== expectedDiffHash)) {

@@ -122,6 +122,14 @@ test('capture is explicit and references safe attachments', async (t) => {
     assert.equal((await f.raw('capture.submit', { kind: 'attachment', attachmentId: 'forged' })).result.isError, true);
     assert.equal((await f.raw('capture.submit', { kind: 'attachment', attachmentId: 'file-1', path: '/secret' })).error.code, -32602);
 });
+test('capture.get reports retryable failures as retrying, not failed', async (t) => {
+    const f = await fixture(t);
+    f.services.ingestWorkflows.status = async (id) => ({ id, stage: 'failed_retryable', artifactId: 'a', lastError: { message: 'bridge busy' } });
+    const result = await f.call('capture.get', { id: 'wf-1' });
+    assert.equal(result.retrying, true);
+    assert.match(result.userMessage, /正在重试/);
+    assert.doesNotMatch(result.userMessage, /失败/);
+});
 test('session, private chat and identity guards', async (t) => {
     const f = await fixture(t);
     assert.equal((await f.raw('actions.create', { title: 'x', ownerKey: 'victim' })).error.code, -32602);

@@ -42,7 +42,18 @@ const BUSINESS_TOOL_NAMES = Object.freeze(BUSINESS_TOOL_SPECS.map((spec) => spec
 function publicRecord({ record, version }) { return { ...record, version }; }
 function workflowSummary(item) {
   if (!item) throw new Error("收录流程不存在");
-  return { id: item.id, stage: item.stage, artifactId: item.artifactId, updatedAt: item.updatedAt, browserStatus: item.browserStatus, error: item.lastError?.message, jobId: item.jobId };
+  const stage = String(item.stage || "");
+  // 对主人的状态说明用确定性文案：重试中不是失败，模型不得把内部 stage 当结论。
+  const userMessage = stage === "failed_retryable"
+    ? "后台正在重试这一条，不需要重新提交；完成后会给出最终结果。"
+    : stage === "failed_terminal"
+      ? "收录失败；可以换来源或稍后重新提交。"
+      : stage === "awaiting_decision"
+        ? "方案已生成，等你确认。"
+        : stage === "reported" || stage === "committed"
+          ? "本地已保存；云端发布未启用。"
+          : "正在后台处理。";
+  return { id: item.id, stage, retrying: stage === "failed_retryable", userMessage, artifactId: item.artifactId, updatedAt: item.updatedAt, browserStatus: item.browserStatus, error: item.lastError?.message, jobId: item.jobId };
 }
 function trustedContext(context) {
   if (!context.ownerId || !context.originalMessageId || !context.harnessSessionId) throw Object.assign(new Error("业务工具必须绑定主人的真实聊天回合"), { code: "BUSINESS_CONTEXT_REQUIRED" });

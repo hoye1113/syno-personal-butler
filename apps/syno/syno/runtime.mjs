@@ -8,6 +8,7 @@ import { RecoveryJournal } from "../../../packages/syno-core/recovery-journal.mj
 import { KnowledgePublisher } from "../../../packages/syno-core/knowledge-publisher.mjs";
 import { KnowledgeChanges } from "../../../packages/syno-core/knowledge-changes.mjs";
 import { MemoryStore } from "../../../packages/syno-core/memory-store.mjs";
+import { captureHasBlockingConflict, shouldNotifyWorkflowEvent } from "../../../packages/syno-core/capture-conflict.mjs";
 import { createBusinessTools } from "../../../packages/syno-core/business-tools.mjs";
 import { AgentHost } from "../../../packages/syno-core/agent-host.mjs";
 import { ApprovalAdvisor, minimalAdvice } from "./approval-advisor.mjs";
@@ -798,7 +799,8 @@ function createSynoRuntime(options = {}) {
       const action = selectedAction || (proposal.risk === "additive" ? "create" : "keep-separate");
       // trust-but-clarify：只有系统歧义（撞重复=merge / 有未决事项）才回到人在环；
       // additive 且无未决事项 = 无冲突，直接自动收录，不产 PendingDecision。
-      const hasConflict = proposal.risk === "merge" || (Array.isArray(proposal.unresolved) && proposal.unresolved.length > 0);
+      // 2026-10-18：只有同源/同内容的真重复才澄清；弱关联与标签建议自动按 keep-separate 执行。
+      const hasConflict = captureHasBlockingConflict(proposal);
       const existingJob = workflow.jobId
         ? await host.inspect(workflow.jobId, { ownerKey: workflow.ownerKey })
         : null;
@@ -937,7 +939,7 @@ function createSynoRuntime(options = {}) {
           ...(Array.isArray(error.attempts) && error.attempts.length ? { attempts: error.attempts } : {}),
         } : undefined,
       }, error ? { level: "error" } : undefined);
-      if (type === "workflow.failed" || type === "workflow.reported") {
+      if (shouldNotifyWorkflowEvent(type, workflow, error)) {
         const attemptSummary = Array.isArray(error?.attempts) && error.attempts.length
           ? `\n诊断：${error.attempts.map((item) => `${item.modelId}→${item.failureCode || item.status}(${item.elapsedMs}ms)`).join("；").slice(0, 200)}`
           : "";

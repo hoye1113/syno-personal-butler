@@ -398,7 +398,7 @@ class IngestService {
     const mocChanges = Array.isArray(analysis.mocChanges) ? analysis.mocChanges : state.proposal.mocChanges;
     const unresolved = [
       ...(Array.isArray(analysis.unresolved) ? analysis.unresolved.map(String) : state.proposal.unresolved),
-      ...tags.candidates.map((tag) => `新标签候选（需双审批）：${tag}`),
+      ...tags.candidates.map((tag) => `新标签候选：${tag}`),
     ];
     const proposalBase = {
       ...state.proposal,
