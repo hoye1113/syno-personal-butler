@@ -188,3 +188,26 @@ test("direct privileged DSH Web uses the bound Owner/thread and cannot resurrect
     assert.equal((await call({ userMessageId: "human-turn" })).error.code, -32001);
     assert.equal(await runtime.toolBridge.resolveWebContext({ sessionId: "syno-capture-artifact-1", userMessageId: "human-turn" }), null);
 });
+
+test('overview ignores directory guides and reads existing frontmatter memory proposals', async (t) => {
+    const f = await fixture(t);
+    await f.call('actions.create', { title: '真实目录结构验证' });
+    for (const kind of ['actions', 'memory']) {
+        await fs.mkdir(path.join(f.opsRoot, kind), { recursive: true });
+        await fs.writeFile(path.join(f.opsRoot, kind, 'README.md'), '# Directory guide\n');
+    }
+    await fs.mkdir(path.join(f.opsRoot, 'memory', 'proposals'));
+    await fs.writeFile(path.join(f.opsRoot, 'memory', 'proposals', 'memory-legacy.md'), '---\nid: memory-legacy\nstatement: "旧格式长期约定"\nreason: "主人提出"\nstatus: proposed\nownerKey: owner\n---\n# Memory proposal\n');
+    assert.equal((await f.call('actions.list')).actions.length, 1);
+    const view = await f.call('work.overview');
+    assert.equal(view.actions.length, 1);
+    assert.equal(view.decisions[0].id, 'memory-legacy');
+    assert.equal(view.decisions[0].summary, '旧格式长期约定');
+    assert.equal((await listDomainRecords(f.opsRoot, 'memory', 'stranger')).length, 0);
+});
+test('domain listing still rejects malformed business records', async (t) => {
+    const f = await fixture(t);
+    await fs.mkdir(path.join(f.opsRoot, 'memory'), { recursive: true });
+    await fs.writeFile(path.join(f.opsRoot, 'memory', 'memory-broken.md'), '<!-- syno:json:start -->\n```json\n{broken}\n```\n<!-- syno:json:end -->');
+    await assert.rejects(listDomainRecords(f.opsRoot, 'memory', 'owner'), SyntaxError);
+});

@@ -2,6 +2,8 @@ import { promises as fs } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { parseRecord } from "./markdown-record.mjs";
+import { frontmatterData } from "./validator.mjs";
+import { validateContractRecord } from "./schema-registry.mjs";
 
 const RECORD_KINDS = new Set(["actions", "memory"]);
 function recordVersion(record) { return createHash("sha256").update(JSON.stringify(record)).digest("hex"); }
@@ -15,8 +17,13 @@ async function listDomainRecords(opsRoot, kind, ownerKey = "local-user") {
     for (const entry of entries) {
       const file = path.join(directory, entry.name);
       if (entry.isDirectory()) await walk(file);
-      else if (entry.isFile() && entry.name.endsWith(".md")) {
-        const record = parseRecord(await fs.readFile(file, "utf8"));
+      else if (entry.isFile() && entry.name.endsWith(".md") && entry.name.toLowerCase() !== "readme.md") {
+        const text = await fs.readFile(file, "utf8");
+        // Older memory proposals use frontmatter only; reads leave their bytes unchanged.
+        const record = kind === "memory" && !text.includes("<!-- syno:json:")
+          ? frontmatterData(text).values
+          : parseRecord(text);
+        await validateContractRecord(kind === "actions" ? "action" : "memory-proposal", record);
         if ((record.ownerKey || "local-user") === ownerKey) records.push({ record, file, version: recordVersion(record) });
       }
     }
