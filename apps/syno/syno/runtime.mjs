@@ -698,6 +698,7 @@ function createSynoRuntime(options = {}) {
     ingest,
     ingestWorkflows,
     pendingDecisions,
+    memoryStore,
     // 附件隔离区：飞书专属目录；转换器在该目录内做越界与大小校验
     attachmentToPayload: (artifact) => artifactToIntakePayload(artifact, {
       quarantineRoot: path.join(PATHS.runtimeRoot, "quarantine", "feishu"),
@@ -804,6 +805,15 @@ function createSynoRuntime(options = {}) {
       // 主人已明确选了 append-source / link-only / create 时不再二次澄清（目标存在是这些动作的前提）。
       const explicitChoice = ["append-source", "link-only", "create"].includes(String(selectedAction || ""));
       const hasConflict = explicitChoice ? false : (captureHasBlockingConflict(proposal) || targetExists);
+      // 「追加来源」预览：告诉主人会追加多少正文，避免整篇内容无预警地进已有笔记。
+      let appendPreview = "";
+      if (targetExists || proposal.existingNoteRef) {
+        try {
+          const artifact = await ingest.readArtifact(workflow.artifactId);
+          const bodyLength = String(artifact?.body || "").length;
+          if (bodyLength) appendPreview = `追加来源会把本篇正文（约 ${bodyLength} 字）追加到已有笔记；「仅关联」只记录来源链接。`;
+        } catch { /* 读取失败时不给规模，仍保留追加选项 */ }
+      }
       const existingJob = workflow.jobId
         ? await host.inspect(workflow.jobId, { ownerKey: workflow.ownerKey })
         : null;
@@ -893,7 +903,9 @@ function createSynoRuntime(options = {}) {
       if (proposal.risk === "additive") {
         footerLines.push("回复「确认」新建笔记", "「修改：…」调整　·　「拒绝」放弃");
       } else {
-        footerLines.push(`方式：${action}（可回复「分开保存」「追加来源」「仅关联」切换）`, "确定后回复「确认」");
+        footerLines.push(`方式：${action}（可回复「分开保存」「追加来源」「仅关联」切换）`);
+        if (appendPreview) footerLines.push(appendPreview);
+        footerLines.push("确定后回复「确认」");
       }
       if (decisionPresentation.decisions.length > 1) {
         footerLines.push(`待确认编号：${decisionPresentation.decisions.map((item, index) => `${index + 1}.${item.jobId}`).join("、")} → 回复「确认 1/2…」`);

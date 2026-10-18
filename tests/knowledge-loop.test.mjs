@@ -532,9 +532,12 @@ test("concurrent append-source rejects a stale preview without overwriting the f
     service.apply(r2.artifact.id, { workspace: root, decision: { action: "append-source" } }),
   ]);
   const merged = await fs.readFile(path.join(root, "vault", "02-Resources", "existing.md"), "utf8");
-  assert.match(merged, /第一条补充/);
+  // 两个并发 apply 的 state 读取顺序不确定，谁先拿到目标锁谁写入；真正的不变量是
+  // 「恰好一条补充落盘、另一条以 OBJECT_VERSION_CHANGED 拒绝」，而不是固定第一条。
+  const additions = ["第一条补充", "第二条补充"].filter((text) => merged.includes(text));
+  assert.equal(additions.length, 1, "恰好一条补充落盘");
   assert.equal(results.filter(r => r.status === "rejected" && r.reason.code === "OBJECT_VERSION_CHANGED").length, 1);
-  assert.doesNotMatch(merged, /第二条补充/);
+  assert.equal(results.filter(r => r.status === "fulfilled").length, 1);
 });
 
 test("append completion checks old and new image references together",async t=>{

@@ -502,14 +502,20 @@ class IngestWorkflowCoordinator {
         // 不再把整个收录流程锁进 failed_terminal（历史 10 条 workflow 都是这一形态），而是降级：
         // 基础方案 + unresolved 说明一起经 onProposed → awaiting_decision 回到主人，人工决定
         // 收录/修改/拒绝；不进入失败状态机，也不再继续消耗 prepare 次数（剩余重试被放弃）。
-        const degraded = result?.proposal && MODEL_CAPABILITY_ERRORS.has(String(error.code || ""))
+        // R2：attempts.prepare 已在上方 started 自增并持久；读其值判上限，达阈值升终态（不重复自增）。
+        const prepareAttempts = Number(started.attempts?.prepare || 0);
+        const contractInvalid = String(error.code || "") === "CAPTURE_INVALID_CONTRACT";
+        // 分析输出坏 JSON 先 5 秒快重试一次；第二次仍坏就把基础方案降级落盘，
+        // 不再让主人等 60 秒退避（2026-10-18 真机：Haiku 首轮坏 JSON、第二轮成功）。
+        const quickRetry = contractInvalid && prepareAttempts < 2;
+        const degradable = !quickRetry && result?.proposal
+          && (MODEL_CAPABILITY_ERRORS.has(String(error.code || "")) || contractInvalid);
+        const degraded = degradable
           ? await this.#degradeAfterModelCapabilityFailure(id, started, result, error)
           : null;
         if (degraded) return degraded;
         const retryable = error.retryable === true;
         const degradeNote = error._degradeFailed ? `（且降级收录本身失败：${error._degradeFailed}）` : "";
-        // R2：attempts.prepare 已在上方 started 自增并持久；读其值判上限，达阈值升终态（不重复自增）。
-        const prepareAttempts = Number(started.attempts?.prepare || 0);
         const exhausted = retryable && prepareAttempts >= this.maxPrepareAttempts;
         const failed = await this.store.update(id, {
           stage: exhausted ? "failed_terminal" : (retryable ? "failed_retryable" : "failed_terminal"),
@@ -518,7 +524,7 @@ class IngestWorkflowCoordinator {
           ...(error.browserSessionId ? { browserSessionId: error.browserSessionId } : {}),
           ...(error.requestedUrl ? { requestedUrl: error.requestedUrl } : {}),
           ...(error.finalUrl ? { finalUrl: error.finalUrl } : {}),
-          ...(retryable && !exhausted ? { nextRetryAt: new Date(this.clock().getTime() + 60_000).toISOString() } : {}),
+          ...(quickRetry ? { nextRetryAt: new Date(this.clock().getTime() + 5_000).toISOString() } : (retryable && !exhausted ? { nextRetryAt: new Date(this.clock().getTime() + 60_000).toISOString() } : {})),
         });
         await this.onEvent?.({ type: "workflow.failed", workflow: failed, error });
         return failed;
@@ -533,7 +539,10 @@ class IngestWorkflowCoordinator {
   }
 
   async #degradeAfterModelCapabilityFailure(id, started, base, error) {
-    const note = `远程语义分析因模型不可用未完成（${error.code}），请人工确认是否收录`;
+    const invalid = String(error.code || "") === "CAPTURE_INVALID_CONTRACT";
+    const note = invalid
+      ? "远程语义分析输出无效（CAPTURE_INVALID_CONTRACT），已按基础方案收录；请核对分类、摘要与关系"
+      : `远程语义分析因模型不可用未完成（${error.code}），请人工确认是否收录`;
     try {
       const degraded = await this.ingest.enrichProposal(started.artifactId, {
         unresolved: [...new Set([...(base.proposal.unresolved || []), note])],
@@ -552,7 +561,7 @@ class IngestWorkflowCoordinator {
         type: "workflow.degraded",
         workflow: schema,
         error,
-        data: { reason: "model_capability", proposalId: degraded.proposal.id },
+        data: { reason: invalid ? "analysis_invalid" : "model_capability", proposalId: degraded.proposal.id },
       });
       await this.onProposed?.({ workflow: schema, candidate: degraded.candidate || base.candidate, proposal: degraded.proposal });
       return schema;

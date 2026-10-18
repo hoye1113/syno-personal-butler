@@ -229,6 +229,40 @@ test("remote analysis receives compiled context while local-only capture never c
   assert.equal((await coordinator.listPending("owner")).length, 2);
 });
 
+test("invalid analysis JSON retries once in 5s, then degrades to the base proposal", async (t) => {
+  const { scheduled, ingest, store } = await fixture(t);
+  let degradedAnalysis = null;
+  ingest.propose = async (artifactId) => ({
+    candidate: { id: `candidate-${artifactId}` },
+    proposal: { id: `proposal-${artifactId}`, sourceType: "text", sourceDigest: "a".repeat(64), proposalDigest: "b".repeat(64), unresolved: ["基础方案"] },
+  });
+  ingest.readArtifact = async () => ({ id: "artifact", body: "safe body" });
+  ingest.enrichProposal = async (artifactId, analysis, options) => {
+    if (Array.isArray(analysis.unresolved) && analysis.unresolved.some((item) => String(item).includes("CAPTURE_INVALID_CONTRACT"))) degradedAnalysis = analysis;
+    return {
+      candidate: { id: `candidate-${artifactId}` },
+      proposal: { id: `proposal-degraded-${artifactId}`, sourceType: "text", sourceDigest: "a".repeat(64), proposalDigest: "c".repeat(64), rulesDigest: options.rulesDigest, unresolved: analysis.unresolved || [] },
+    };
+  };
+  let proposed = 0;
+  const coordinator = new IngestWorkflowCoordinator({
+    ingest, store, schedule: (work) => scheduled.push(work),
+    async analyze() { throw Object.assign(new Error("invalid json"), { code: "CAPTURE_INVALID_CONTRACT", retryable: true }); },
+    async onProposed() { proposed += 1; },
+  });
+  const receipt = await coordinator.receive({ kind: "text", value: "bad json" }, { ownerKey: "owner", channel: "web", messageId: "badjson-1" });
+  await scheduled.shift()();
+  const first = await store.get(receipt.workflow.id);
+  assert.equal(first.stage, "failed_retryable");
+  assert.ok(Date.parse(first.nextRetryAt) - Date.now() < 15_000, "首次坏 JSON 是 5 秒快重试，不是 60 秒");
+
+  const second = await coordinator.retry(receipt.workflow.id);
+  assert.equal(second.stage, "proposed");
+  assert.equal(proposed, 1);
+  assert.ok(degradedAnalysis, "第二次失败走了基础方案降级");
+  assert.match(degradedAnalysis.unresolved.join("；"), /CAPTURE_INVALID_CONTRACT/);
+});
+
 test("URL preparation automatically uses BSK after direct HTTP is forbidden", async (t) => {
   const { scheduled, store } = await fixture(t);
   let proposes = 0;

@@ -3,15 +3,16 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { isImageMime } from "./image-mime.mjs";
 import { IntakeService } from "./intake.mjs";
+import { buildOperationRequest } from "./operation-registry.mjs";
 
 const MAX_INLINE_IMAGE_BYTES = 3 * 1024 * 1024;
 
 // Only explicit session controls bypass the model. Business intent belongs to
 // the chat loop; quarantined attachments never imply permission to capture.
 class ChannelConversationHandler {
-  constructor({ runtime, core, attachmentToPayload, intake = new IntakeService(), journal, channelContinuations, imageStore, pendingDecisions = null, ingestWorkflows = null } = {}) {
+  constructor({ runtime, core, attachmentToPayload, intake = new IntakeService(), journal, channelContinuations, imageStore, pendingDecisions = null, ingestWorkflows = null, memoryStore = null } = {}) {
     if (!runtime || !core) throw new Error("ChannelConversationHandler 缺少 Runtime 或 Core");
-    Object.assign(this, { runtime, core, attachmentToPayload, intake, journal, channelContinuations, imageStore, pendingDecisions, ingestWorkflows });
+    Object.assign(this, { runtime, core, attachmentToPayload, intake, journal, channelContinuations, imageStore, pendingDecisions, ingestWorkflows, memoryStore });
     this.activeRuns = new Map();
   }
   #record(event, data) { return this.journal?.record?.(event, data)?.catch(() => null) || Promise.resolve(); }
@@ -19,37 +20,65 @@ class ChannelConversationHandler {
   async #resolveCaptureDecision(text, message, ctx) {
     if (message.privateConversation !== true) return null;
     if (Array.isArray(message.artifacts) && message.artifacts.length) return null;
-    if (!this.pendingDecisions?.list || !this.ingestWorkflows?.decide) return null;
     const confirm = /^(?:确认|同意|可以|收录|分开保存)$/u.test(text);
-    const reject = /^拒绝$/u.test(text);
+    const reject = /^(?:拒绝|丢弃)$/u.test(text);
     const select = text === "追加来源" ? "append-source" : text === "仅关联" ? "link-only" : null;
     if (!confirm && !reject && !select) return null;
-    const live = (await this.pendingDecisions.list({ ownerKey: ctx.ownerKey, threadKey: ctx.threadKey }))
-      .filter((item) => !item.consumedAt && !item.reservedAt && Date.parse(item.expiresAt) > Date.now());
-    if (live.length !== 1) return null;
-    const decision = live[0];
-    // 删除/合并需要模型+判官的另一道授权，确定性快路径不碰。
-    if (decision.kind === "knowledge" || !decision.artifactId) return null;
+    const live = this.pendingDecisions?.list
+      ? (await this.pendingDecisions.list({ ownerKey: ctx.ownerKey, threadKey: ctx.threadKey }))
+        .filter((item) => !item.consumedAt && !item.reservedAt && Date.parse(item.expiresAt) > Date.now())
+      : [];
+    if (live.length > 1) return null;
+    if (live.length === 1) {
+      if (!this.ingestWorkflows?.decide) return null;
+      const decision = live[0];
+      // 删除/合并需要模型+判官的另一道授权，确定性快路径不碰。
+      if (decision.kind === "knowledge" || !decision.artifactId) return null;
+      try {
+        const workflow = await this.ingestWorkflows.status(decision.artifactId, { ownerKey: ctx.ownerKey });
+        if (!workflow) return null;
+        const action = select ? "select" : reject ? "reject" : "approve";
+        const result = await this.ingestWorkflows.decide(workflow.id, {
+          action,
+          ...(select ? { option: select } : {}),
+          code: decision.approvalCode,
+          diffDigest: decision.diffDigest,
+        }, { ownerKey: ctx.ownerKey, threadKey: ctx.threadKey, channel: ctx.channel, senderId: message.senderId });
+        // 决策已被这次真实消息消费；否则它会一直挂在待确认里。
+        await this.pendingDecisions.update?.(decision.id, { consumedAt: new Date().toISOString(), reservedAt: null }).catch(() => {});
+        await this.#record("channel.decision.fastpath", { ...ctx, decisionId: decision.id, action });
+        if (reject) return { text: `已拒绝收录 ${workflow.id}，不会写入。` };
+        if (select) return { text: `已选择「${select}」，正在按该方式处理；完成后会发结果。` };
+        const job = result?.result?.job || result?.job;
+        return { text: `已确认收录 ${workflow.id}，当前状态：${job?.status || "processing"}。` };
+      } catch (error) {
+        await this.#record("channel.decision.fastpath_failed", { ...ctx, decisionId: decision.id, code: error.code || "DECISION_FASTPATH_FAILED" });
+        return { text: `确认操作未能执行：${String(error.message || error)}` };
+      }
+    }
+    // 没有收录决策时，单条记忆候选也走确定性确认/丢弃（不再依赖模型查 decisions.list）。
+    const memoryConfirm = /^(?:确认|同意|可以)$/u.test(text);
+    if ((!memoryConfirm && !reject) || !this.memoryStore?.records) return null;
     try {
-      const workflow = await this.ingestWorkflows.status(decision.artifactId, { ownerKey: ctx.ownerKey });
-      if (!workflow) return null;
-      const action = select ? "select" : reject ? "reject" : "approve";
-      const result = await this.ingestWorkflows.decide(workflow.id, {
-        action,
-        ...(select ? { option: select } : {}),
-        code: decision.approvalCode,
-        diffDigest: decision.diffDigest,
-      }, { ownerKey: ctx.ownerKey, threadKey: ctx.threadKey, channel: ctx.channel, senderId: message.senderId });
-      // 决策已被这次真实消息消费；否则它会一直挂在待确认里。
-      await this.pendingDecisions.update?.(decision.id, { consumedAt: new Date().toISOString(), reservedAt: null }).catch(() => {});
-      await this.#record("channel.decision.fastpath", { ...ctx, decisionId: decision.id, action });
-      if (reject) return { text: `已拒绝收录 ${workflow.id}，不会写入。` };
-      if (select) return { text: `已选择「${select}」，正在按该方式处理；完成后会发结果。` };
-      const job = result?.result?.job || result?.job;
-      return { text: `已确认收录 ${workflow.id}，当前状态：${job?.status || "processing"}。` };
+      const proposals = (await this.memoryStore.records(ctx.ownerKey))
+        .filter(({ record }) => record.schemaVersion === 2 && record.status === "proposed");
+      if (proposals.length !== 1) return null;
+      const { record, version } = proposals[0];
+      const operation = reject ? "memory.reject" : "memory.promote";
+      const result = await this.core.execute(buildOperationRequest(operation, {
+        id: record.id,
+        version,
+        ...(reject ? {} : { confirmationMessageId: message.id }),
+      }), { ownerKey: ctx.ownerKey, threadKey: ctx.threadKey, channel: ctx.channel, senderId: message.senderId, messageId: message.id });
+      await this.#record("channel.memory.fastpath", { ...ctx, memoryId: record.id, operation });
+      return {
+        text: reject
+          ? `已丢弃记忆候选 ${record.id}。`
+          : `已确认长期记忆 ${record.id}（${result.job?.status || "completed"}）。`,
+      };
     } catch (error) {
-      await this.#record("channel.decision.fastpath_failed", { ...ctx, decisionId: decision.id, code: error.code || "DECISION_FASTPATH_FAILED" });
-      return { text: `确认操作未能执行：${String(error.message || error)}` };
+      await this.#record("channel.memory.fastpath_failed", { ...ctx, code: error.code || "MEMORY_FASTPATH_FAILED" });
+      return { text: `记忆操作未能执行：${String(error.message || error)}` };
     }
   }
   async handle(message) {
