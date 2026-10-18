@@ -1,3 +1,4 @@
+import { MemoryStore } from "./memory-store.mjs";
 import { decisionVersion } from "./pending-decision.mjs";
 import { buildOperationRequest } from "./operation-registry.mjs";
 import { listDomainRecords, findDomainRecord, assertRecordVersion, recordVersion } from "./domain-records.mjs";
@@ -11,6 +12,7 @@ const id = string("查询工具返回的准确 ID", 120);
 const limit = { type: "integer", minimum: 1, maximum: 50, description: "返回条数，默认 20" };
 const dateTime = { type: "string", format: "date-time", description: "带时区的 ISO 时间" };
 const schema = (properties = {}, required = []) => ({ type: "object", properties, required, additionalProperties: false });
+const memoryFields = { statement: string("主人原意，不得推断", 500), reason: string("长期保存的依据", 200), kind: { type: "string", enum: ["preference", "background", "standing_instruction"] }, scope: string("global 或主人明确表达的主题", 120), triggers: { type: "array", maxItems: 20, items: string("原意有依据的触发词", 80) } };
 const BUSINESS_TOOL_SPECS = Object.freeze([
   { name: "work.overview", description: "按需查询主人的待办、待决策项与后台执行状态；不会生成计划或主动消息。", inputSchema: schema({ limit }) },
   { name: "attachments.read", description: "按当前会话附件 ID 分段读取临时文件正文，不收录、不读取任意本地路径。图片直接查看 image 输入。", inputSchema: schema({ attachmentId: string("系统提供的附件 ID", 120), offset: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER }, maxChars: { type: "integer", minimum: 200, maximum: 8000 } }, ["attachmentId"]) },
@@ -21,7 +23,18 @@ const BUSINESS_TOOL_SPECS = Object.freeze([
   { name: "actions.create", description: "记录主人需要完成的待办行动；系统后台收录流程不是主人待办。排期只记录时间，不承诺主动提醒。", write: true, inputSchema: schema({ title: string("待办内容"), scheduledStart: dateTime }, ["title"]) },
   { name: "actions.list", description: "查询主人的待办行动及版本；默认仅返回未完成项。", inputSchema: schema({ status: { type: "string", enum: ["active", "all", "completed", "archived"] }, limit }) },
   { name: "actions.update", description: "修改、完成或归档指定待办；必须使用查询结果的 ID 和 version。", write: true, inputSchema: schema({ id, version, title: string("新的待办内容"), status: { type: "string", enum: ["pending", "scheduled", "completed", "archived"] }, scheduledStart: { ...dateTime, type: ["string", "null"] } }, ["id", "version"]) },
-  { name: "memory.propose", description: "主人明确表达长期偏好、个人背景或长期约定时提出记忆候选；不保存一般资料或临时任务。候选生成后需要主人另行确认，不能本轮自动批准。", write: true, inputSchema: schema({ statement: string("主人原意，不得推断或扩展", 500), reason: string("为何需要长期记住", 200) }, ["statement"]) },
+  { name: "memory.propose", description: "主人明确表达长期偏好、个人背景或长期约定时提出记忆候选；不保存一般资料或临时任务。候选生成后需要主人另行确认，不能本轮自动批准。", write: true, inputSchema: schema(memoryFields, ["statement"]) },
+  { name: "knowledge.sync_status", description: "查询既有知识发布的本地、Wiki、目录和图片真实状态。", inputSchema: schema({ id }, ["id"]) },
+  { name: "knowledge.sync_retry", description: "恢复已登记发布请求，仅补失败端；人工冲突先展示差异和覆盖预览，后续确认才恢复。不重新抓取或收录。", write: true, inputSchema: schema({ id }, ["id"]) },
+  { name: "knowledge.update", description: "按明确要求修改单条知识正文，保留身份与来源；不能用来删除或隐式合并多条笔记。", write: true, inputSchema: schema({ id, version, body: string("完整的新正文（不含 frontmatter）", 1000000) }, ["id", "version", "body"]) },
+  { name: "knowledge.move", description: "移动明确笔记到指定 PARA 分类，稳定 ID 不变。", write: true, inputSchema: schema({ id, version, destination: { type: "string", enum: ["inbox", "areas", "resources", "archive"] } }, ["id", "version", "destination"]) },
+  { name: "knowledge.delete", description: "仅生成删除预览；主人另条消息明确确认后才能执行。", write: true, inputSchema: schema({ id, version }, ["id", "version"]) },
+  { name: "knowledge.merge", description: "仅生成合并预览；指定保留目标，主人另条消息确认后保留所有来源原文并合并。", write: true, inputSchema: schema({ targetId: id, targetVersion: version, sources: { type: "array", minItems: 1, maxItems: 19, items: schema({ id, version }, ["id", "version"]) } }, ["targetId", "targetVersion", "sources"]) },
+  { name: "knowledge.maintenance", description: "只读检查知识维护问题与证据，不自动清理。", inputSchema: schema() },
+  { name: "memory.search", description: "按当前问题查询主人已确认的独立记忆，返回来源、版本与命中原因。", inputSchema: schema({ query: string("当前问题", 4000), limit }, ["query"]) },
+  { name: "memory.get", description: "查看一条个人记忆的状态与当前有效内容；失效记录不返回事实正文。", inputSchema: schema({ id }, ["id"]) },
+  { name: "memory.correct", description: "根据明确纠正要求创建替换候选；另条消息确认前旧事实仍有效。", write: true, inputSchema: schema({ id, version, ...memoryFields }, ["id", "version", "statement"]) },
+  { name: "memory.forget", description: "主人明确要求忘记指定记忆时撤销并清理当前正文；不会擦除历史 Git 或聊天。", write: true, inputSchema: schema({ id, version }, ["id", "version"]) },
   { name: "decisions.list", description: "查询当前会话待处理的收录方案和长期记忆候选；返回准确 ID、version、内容与可用选项。", inputSchema: schema({ limit }) },
   { name: "decisions.resolve", description: "根据主人本轮对具体方案的明确选择执行确认、拒绝、修改或选择收录方式。存在多个可能对象时先澄清；不要自行批准记忆。", write: true, inputSchema: schema({ id, version, action: { type: "string", enum: ["approve", "reject", "modify", "select"] }, modification: string("主人要求怎样修改", 1000), option: { type: "string", enum: ["create", "keep-separate", "append-source", "link-only"] } }, ["id", "version", "action"]) },
 ]);
@@ -36,12 +49,20 @@ function trustedContext(context) {
   return { ownerKey: context.ownerId, threadKey: context.threadKey, channel: context.channel, senderId: context.senderId || context.ownerId, messageId: context.messageId, conversationId: context.conversationId };
 }
 function createBusinessTools(getServices, { opsRoot = PATHS.opsRoot, clock = () => new Date() } = {}) {
+  const memoryStore = new MemoryStore({ opsRoot });
   async function pending(s, ctx) {
-    const decisions = (await s.pendingDecisions.list({ ownerKey: ctx.ownerKey, threadKey: ctx.threadKey })).filter((d) => Date.parse(d.expiresAt) > clock().getTime());
+    let decisions = (await s.pendingDecisions.list({ ownerKey: ctx.ownerKey, threadKey: ctx.threadKey })).filter((d) => Date.parse(d.expiresAt) > clock().getTime());
+    for (const d of decisions.filter(d => d.kind === "knowledge" && d.executingJob)) {
+      const job = await s.core.inspect(d.executingJob, { ownerKey: ctx.ownerKey });
+      if (job && ["completed", "failed", "rejected", "canceled"].includes(job.status)) {
+        await s.pendingDecisions.update(d.id, { consumedAt: clock().toISOString(), resolutionStatus: job.status });
+        decisions = decisions.filter(x => x.id !== d.id);
+      }
+    }
     const memories = (await listDomainRecords(opsRoot, "memory", ctx.ownerKey)).filter(({ record }) => record.status === "proposed");
     return [
-      ...decisions.map((d) => ({ id: d.id, version: decisionVersion(d), kind: "capture", summary: d.summary, options: d.options, expiresAt: d.expiresAt })),
-      ...memories.map(({ record, version }) => ({ id: record.id, version, kind: "memory", summary: record.statement, reason: record.reason, options: ["approve", "reject"] })),
+      ...decisions.map((d) => ({ id: d.id, version: decisionVersion(d), kind: d.kind === "knowledge" ? "knowledge" : "capture", summary: d.summary, options: d.options, expiresAt: d.expiresAt })),
+      ...memories.map(({ record, version }) => ({ id: record.id, version, kind: "memory", summary: record.statement, reason: record.reason, kindOfMemory: record.kind, scope: record.scope, triggers: record.triggers, supersedes: record.supersedes, options: ["approve", "reject"] })),
     ];
   }
   async function operate(s, operation, payload, ctx, originalMessageId) {
@@ -59,12 +80,31 @@ function createBusinessTools(getServices, { opsRoot = PATHS.opsRoot, clock = () 
       const [actions, decisions, jobs, captures] = await Promise.all([
         listDomainRecords(opsRoot, "actions", ctx.ownerKey), pending(s, ctx), s.core.host.list({ ownerKey: ctx.ownerKey, limit: 100 }), s.ingestWorkflows.listPending(ctx.ownerKey),
       ]);
-      return { generatedAt: clock().toISOString(), localDate: new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai" }).format(clock()), actions: actions.filter(({ record }) => ["pending", "scheduled"].includes(record.status)).slice(0, count).map(publicRecord), decisions: decisions.slice(0, count), captures: captures.slice(0, count).map(workflowSummary), jobs: jobs.filter((j) => !["completed", "rejected", "canceled"].includes(j.status)).slice(0, count).map((j) => ({ id: j.id, status: j.status, operation: j.request?.operation, error: j.error?.message })) };
+      return { generatedAt: clock().toISOString(), localDate: new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai" }).format(clock()), actions: actions.filter(({ record }) => ["pending", "scheduled"].includes(record.status)).slice(0, count).map(publicRecord), decisions: decisions.slice(0, count), captures: captures.slice(0, count).map(workflowSummary), jobs: jobs.filter((j) => !["completed", "failed", "rejected", "canceled"].includes(j.status)).slice(0, count).map((j) => ({ id: j.id, status: j.status, operation: j.request?.operation, error: j.error?.message })) };
     }
     if (name === "actions.list") return { actions: (await listDomainRecords(opsRoot, "actions", ctx.ownerKey)).filter(({ record }) => input.status === "all" || (!input.status || input.status === "active" ? ["pending", "scheduled"].includes(record.status) : record.status === input.status)).slice(0, count).map(publicRecord) };
     if (name === "actions.create" || name === "actions.update") {
       if (name === "actions.update") assertRecordVersion(await findDomainRecord(opsRoot, "actions", input.id, ctx.ownerKey), input.version);
       return operate(s, name, input, ctx, context.originalMessageId);
+    }
+    if (name === "knowledge.sync_status") return s.publisher.status(ctx.ownerKey, input.id);
+    if (name === "knowledge.sync_retry") {
+      const status = await s.publisher.status(ctx.ownerKey, input.id);
+      if (["disabled", "not_registered"].includes(status.status)) throw new Error("没有可恢复的已登记发布请求");
+      if (Object.values(status.targets || {}).some(t => t.errorCode === "SYNC_REMOTE_CONFLICT")) return s.publisher.conflictPreview(ctx.ownerKey, input.id, { ...ctx, messageId: context.originalMessageId });
+      s.ingestWorkflows.schedule(() => s.publisher.retry(ctx.ownerKey, input.id));
+      return { id: input.id, status: "queued", targets: status.targets };
+    }
+    if (["knowledge.update", "knowledge.move"].includes(name)) return operate(s, name === "knowledge.update" ? "notes.edit" : "notes.move", input, ctx, context.originalMessageId);
+    if (["knowledge.delete", "knowledge.merge"].includes(name)) return s.knowledgeChanges.preview(name === "knowledge.delete" ? "notes.delete" : "notes.merge", input, { ...ctx, messageId: context.originalMessageId });
+    if (name === "knowledge.maintenance") return s.knowledgeMaintenance.weeklySummary();
+    if (name === "memory.search") return { memories: await memoryStore.search(ctx.ownerKey, input.query, { limit: input.limit }) };
+    if (name === "memory.get") return { record: await memoryStore.get(ctx.ownerKey, input.id) };
+    if (name === "memory.correct") return operate(s, "memory.proposals.correct", input, ctx, context.originalMessageId);
+    if (name === "memory.forget") {
+      const result = await operate(s, "memory.forget", input, ctx, context.originalMessageId);
+      await s.forgetMemoryPayloads?.(ctx.ownerKey, input.id);
+      return result;
     }
     if (name === "memory.propose") return operate(s, "memory.proposals.create", input, ctx, context.originalMessageId);
     if (name === "capture.list") return { workflows: (await s.ingestWorkflows.listPending(ctx.ownerKey)).slice(0, count).map(workflowSummary) };
@@ -73,7 +113,7 @@ function createBusinessTools(getServices, { opsRoot = PATHS.opsRoot, clock = () 
       const summary = workflowSummary(workflow);
       const job = workflow.jobId ? await s.core.inspect(workflow.jobId, { ownerKey: ctx.ownerKey }) : null;
       const result = job?.result?.operationResult;
-      return { ...summary, jobStatus: job?.status, ...(result ? { result: { path: result.path, completionStatus: result.completionStatus, source: result.source, unverifiedIssues: result.unverifiedIssues } } : {}) };
+      return { ...summary, jobStatus: job?.status, ...(result?.id && s.publisher ? { sync: await s.publisher.status(ctx.ownerKey, result.id) } : {}), ...(result ? { result: { path: result.path, completionStatus: result.completionStatus, resources: result.resourceManifest, source: result.source, unverifiedIssues: result.unverifiedIssues } } : {}) };
     }
     if (name === "capture.resume") {
       const current = await s.ingestWorkflows.status(input.id, ctx);
@@ -98,7 +138,10 @@ function createBusinessTools(getServices, { opsRoot = PATHS.opsRoot, clock = () 
           const registered = s.imageStore.register(attachment.image);
           const vision = await s.imageTranscriber.read({ artifactId: registered.artifactId, question: "提取图中可见文字并概述画面，作为知识收录素材。" });
           payload = visionResultToIntakePayload(vision, { name: attachment.name });
-        } else payload = attachment.payload;
+        } else {
+          payload = { ...attachment.payload };
+          if (payload.kind === "markdown") payload.attachments = (context.attachments || []).flatMap(a => a.resource ? [a.resource] : []);
+        }
       } else {
         if (!input.value?.trim()) throw new Error("缺少收录正文或网址");
         payload = { kind: input.kind, value: input.value, ...(input.title ? { title: input.title } : {}) };
@@ -117,6 +160,15 @@ function createBusinessTools(getServices, { opsRoot = PATHS.opsRoot, clock = () 
         return operate(s, input.action === "approve" ? "memory.promote" : "memory.reject", { id: input.id, version: input.version, confirmationMessageId: context.originalMessageId }, ctx, context.originalMessageId);
       }
       const decision = await s.pendingDecisions.reserve(input.id, { ...ctx, version: input.version });
+      if (decision.kind === "knowledge") {
+        try {
+          if (input.action === "reject") { await s.pendingDecisions.update(input.id, { consumedAt: clock().toISOString(), reservedAt: null }); return { id: input.id, status: "rejected" }; }
+          if (input.action !== "approve" || decision.authorization?.messageId !== context.originalMessageId) throw Object.assign(new Error("需要主人在另一条消息中明确确认具体预览"), { code: "OWNER_CONFIRMATION_REQUIRED" });
+          const result = await operate(s, decision.plan.operation, { decisionId: input.id }, ctx, context.originalMessageId);
+          await s.pendingDecisions.update(input.id, { consumedAt: clock().toISOString(), reservedAt: null });
+          return result;
+        } catch (error) { await s.pendingDecisions.update(input.id, { reservedAt: null }); throw error; }
+      }
       try {
         const job = await s.core.inspect(decision.jobId, { ownerKey: ctx.ownerKey });
         if (decision.diffDigest && job?.result?.diffHash !== decision.diffDigest) throw new Error("方案差异已变化，请重新查询");

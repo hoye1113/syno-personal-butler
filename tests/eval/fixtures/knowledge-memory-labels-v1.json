@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "reviewedByOwner": false,
+  "frozen": false,
+  "datasets": {
+    "memory-recall-v1.jsonl": "195437e1e5791d3a898a6dd5c9faf83d476d6b07213d450b161f5e8eb55975e2",
+    "memory-recall-calibration-v1.jsonl": "82c52b174bd2bb81b63d6f2a6854d8b791d6ebcef0713a93d6706238c76acbce",
+    "knowledge-memory-dialogues-v1.jsonl": "39b7b3344ad00cd7477b3b7044117c72dee834f3e5801c6a8026cda967f123f6"
+  },
+  "ruleClarification": "词元命中必须来自查询中互不重叠的位置，避免三字泛词的两个重叠双字词造成误召回；正式标签未改。"
+}

@@ -1,4 +1,5 @@
 import test from "node:test";
+import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
@@ -86,10 +87,7 @@ test("Bilibili ingest requires and renders the canonical v2 source profile", asy
   });
   const receipt = await service.receive({ kind: "url", value: "https://www.bilibili.com/opus/123456" });
   await service.propose(receipt.artifact.id);
-  await assert.rejects(
-    service.apply(receipt.artifact.id, { workspace: root, decision: { action: "create" } }),
-    { code: "INGEST_BILIBILI_PROFILE_INCOMPLETE" },
-  );
+  // Default capture keeps the source, without requiring an editorial rewrite.
   await service.enrichProposal(receipt.artifact.id, {
     quality: { status: "accepted", reasons: [] },
     materialTier: "S",
@@ -125,18 +123,11 @@ test("Bilibili ingest requires and renders the canonical v2 source profile", asy
   });
   const applied = await service.apply(receipt.artifact.id, { workspace: root, decision: { action: "create" } });
   const note = await fs.readFile(path.join(root, applied.path), "utf8");
-  assert.match(note, /^ingest_workflow: bilibili_opus_ingest_v2$/m);
-  assert.match(note, /^source_type: bilibili_opus$/m);
-  assert.match(note, /^opus_id: "123456"$/m);
-  assert.match(note, /^content_form: dialogue$/m);
-  assert.match(note, /^question_source: editorial$/m);
-  assert.match(note, /^verification_scope: column_only$/m);
-  assert.match(note, /^## 03 有什么取舍$/m);
-  assert.equal(applied.completionStatus, "incomplete");
+  assert.match(note, /专栏正文/);
+  assert.doesNotMatch(note, /编者问|## 03 有什么取舍/);
   const state = await service.status(receipt.artifact.id);
-  assert.equal(state.proposal.sourceReport.status, "incomplete");
-  assert.equal(state.proposal.sourceReport.checks.semanticReview, false);
-  assert.deepEqual(state.proposal.sourceReport.sourcesRead, ["column"]);
+  assert.equal(state.proposal.captureFormat, "full_body_v1");
+  assert.equal(state.proposal.sourceReport, undefined);
 });
 
 test("a quality-rejected proposal cannot create a write Job", () => {
@@ -282,7 +273,7 @@ test("dedupe matches force merge review instead of silent overwrite", async (t) 
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const service = new IngestService({
     intake: { async prepare() { return { sourceType: "text", text: "重复素材" }; } },
-    knowledge: { async search() { return [{ path: "vault/existing.md" }]; } },
+    knowledge: { async search() { return [{ path: "vault/existing.md", version: createHash("sha256").update("# Existing\n").digest("hex") }]; } },
     opsRoot: path.join(root, "ops"), stateRoot: path.join(root, "state"),
   });
   const receipt = await service.receive({ kind: "text", value: "重复素材" });
@@ -520,7 +511,7 @@ test("ingest create writes the vault note atomically with no leftover temp file 
   assert.deepEqual(leftovers, []);
 });
 
-test("concurrent append-source to the same existing note keep both additions (R3)", async (t) => {
+test("concurrent append-source rejects a stale preview without overwriting the first addition", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-ingest-r3lock-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   await fs.mkdir(path.join(root, "vault", "02-Resources"), { recursive: true });
@@ -528,7 +519,7 @@ test("concurrent append-source to the same existing note keep both additions (R3
   // 单实例 IngestService：生产中同一实例处理并发请求，按目标文件串行化靠的就是实例级锁。
   const service = new IngestService({
     intake: { async prepare(payload) { return { sourceType: "text", text: payload.value }; } },
-    knowledge: { async search() { return [{ path: "vault/02-Resources/existing.md" }]; } },
+    knowledge: { async search() { return [{ path: "vault/02-Resources/existing.md", version: createHash("sha256").update(await fs.readFile(path.join(root, "vault/02-Resources/existing.md"))).digest("hex") }]; } },
     opsRoot: path.join(root, "ops"), stateRoot: path.join(root, "state"),
     clock: () => new Date("2026-08-02T00:00:00.000Z"),
   });
@@ -536,11 +527,21 @@ test("concurrent append-source to the same existing note keep both additions (R3
   await service.propose(r1.artifact.id);
   const r2 = await service.receive({ kind: "text", value: "第二条补充" });
   await service.propose(r2.artifact.id);
-  await Promise.all([
+  const results = await Promise.allSettled([
     service.apply(r1.artifact.id, { workspace: root, decision: { action: "append-source" } }),
     service.apply(r2.artifact.id, { workspace: root, decision: { action: "append-source" } }),
   ]);
   const merged = await fs.readFile(path.join(root, "vault", "02-Resources", "existing.md"), "utf8");
   assert.match(merged, /第一条补充/);
-  assert.match(merged, /第二条补充/);
+  assert.equal(results.filter(r => r.status === "rejected" && r.reason.code === "OBJECT_VERSION_CHANGED").length, 1);
+  assert.doesNotMatch(merged, /第二条补充/);
+});
+
+test("append completion checks old and new image references together",async t=>{
+ const root=await fs.mkdtemp(path.join(tmpdir(),"syno-append-complete-"));t.after(()=>fs.rm(root,{recursive:true,force:true}));
+ const original="# Existing\n\n![missing](missing.png)\n",target="vault/00-Inbox/existing.md";
+ await fs.mkdir(path.join(root,"vault/00-Inbox"),{recursive:true});await fs.writeFile(path.join(root,target),original);
+ const service=new IngestService({stateRoot:path.join(root,"state"),opsRoot:path.join(root,"ops"),intake:{async prepare(){return{sourceType:"text",content:"补充的有效正文"}}},knowledge:{async search(){return[{path:target,version:createHash("sha256").update(original).digest("hex")}]}}});
+ const receipt=await service.receive({kind:"text",value:"补充的有效正文"});await service.propose(receipt.artifact.id);const result=await service.apply(receipt.artifact.id,{workspace:root,decision:{action:"append-source"}});
+ assert.equal(result.completionStatus,"incomplete");assert.equal(result.resourceManifest.complete,false);assert.equal(result.resourceManifest.items[0].downloadStatus,"failed");
 });

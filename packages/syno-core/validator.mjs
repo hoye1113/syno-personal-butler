@@ -184,6 +184,11 @@ function contractForPath(relative) {
 
 async function validateOpsContracts(repoRoot, changedPaths) {
   for (const relative of changedPaths) {
+    const jsonContract = /^ops\/knowledge\/resources\/[^/]+\.json$/u.test(relative) ? "source-resource-manifest" : /^ops\/knowledge\/publish-map\/[a-f0-9]{64}\.json$/u.test(relative) ? "publish-map" : null;
+    if (jsonContract) {
+      try { await validateContractRecord(jsonContract, JSON.parse(await fs.readFile(path.join(repoRoot, relative), "utf8"))); } catch (error) { if (error.code !== "ENOENT") throw error; }
+      continue;
+    }
     const contract = contractForPath(relative);
     if (!contract) continue;
     let text;

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/source-resource-manifest.schema.json",
+  "title": "SourceResourceManifest",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "noteId",
+    "noteVersion",
+    "version",
+    "complete",
+    "items"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "enum": [
+        1
+      ]
+    },
+    "noteId": {
+      "type": "string"
+    },
+    "noteVersion": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "complete": {
+      "type": "boolean"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "index",
+          "role",
+          "downloadStatus"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "role": {
+            "type": "string"
+          },
+          "downloadStatus": {
+            "enum": [
+              "succeeded",
+              "failed",
+              "skipped",
+              "pending"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

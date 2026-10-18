@@ -53,6 +53,7 @@ function mergeCaptureAnalyses(analyses) {
       ...quality,
       reasons: unique(items.flatMap((item) => item.quality?.reasons || [])),
     },
+    ...(first.guide ? { guide: first.guide } : {}),
     materialTier: first.materialTier,
     suggestedPath: first.suggestedPath,
     canonicalTags: unique(items.flatMap((item) => item.canonicalTags || [])),

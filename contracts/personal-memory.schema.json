@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PersonalMemory",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "ownerKey",
+    "kind",
+    "scope",
+    "triggers",
+    "status",
+    "sourceMessageId",
+    "created",
+    "updated"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "ownerKey": {
+      "type": "string"
+    },
+    "statement": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "sourceMessageId": {
+      "type": "string"
+    },
+    "confirmationMessageId": {
+      "type": "string"
+    },
+    "created": {
+      "type": "string"
+    },
+    "updated": {
+      "type": "string"
+    },
+    "confirmedAt": {
+      "type": "string"
+    },
+    "invalidatedAt": {
+      "type": "string"
+    },
+    "supersedes": {
+      "type": "string"
+    },
+    "supersedesVersion": {
+      "type": "string"
+    },
+    "forgottenVersion": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "enum": [
+        2
+      ]
+    },
+    "kind": {
+      "enum": [
+        "preference",
+        "background",
+        "standing_instruction"
+      ]
+    },
+    "scope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "triggers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "status": {
+      "enum": [
+        "proposed",
+        "active",
+        "rejected",
+        "superseded",
+        "forgotten"
+      ]
+    },
+    "testData": {
+      "type": "boolean"
+    },
+    "sensitive": {
+      "type": "boolean"
+    },
+    "title": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "$id": "https://syno.local/contracts/personal-memory.schema.json"
+}

@@ -5,6 +5,7 @@
 // BrowserCaptureAdapter（BSK 后台 Agent Window，复用已有浏览器登录态）；scheduler 等主动任务绝不升级，
 // 主人发送链接的聊天与显式收录任务才允许创建不抢焦点的临时 Agent Window。
 
+import { sourceValidity } from "./source-validity.mjs";
 import { createHash } from "node:crypto";
 
 import { fetchSourceText, MAX_SOURCE_TEXT } from "./source-fetcher.mjs";
@@ -22,23 +23,9 @@ const LIVE_CHAT_CHANNELS = new Set(["feishu", "web", "chat"]);
 // 反爬墙签名（2026-09-03 生产实证：mp.weixin.qq.com 直抓被重定向到 wappoc_appmsgcaptcha
 // 验证码页，正文为"当前环境异常，完成验证后即可继续访问"）。故意比 adapter 的
 // INTERACTION_PATTERN 窄——普通文章里出现"登录"等词不应误判为墙。
-const WALL_URL_PATTERN = /appmsgcaptcha/iu;
-const WALL_BODY_STRONG = [
-  /当前环境异常[，,]?\s*完成验证/u,
-  /完成验证后即可继续访问/u,
-  /验证后继续访问/u,
-];
-const WALL_BODY_HINT = /(?:验证码|captcha|人机验证|环境异常)/iu;
-const WALL_SHORT_BODY_CHARS = 800;
-
-function detectAntiBotWall({ sourceUrl, text } = {}) {
-  if (WALL_URL_PATTERN.test(String(sourceUrl || ""))) return "verification_redirect";
-  const body = String(text || "");
-  for (const pattern of WALL_BODY_STRONG) {
-    if (pattern.test(body)) return "verification_page";
-  }
-  if (body.length > 0 && body.length < WALL_SHORT_BODY_CHARS && WALL_BODY_HINT.test(body)) return "short_verification_page";
-  return null;
+function detectAntiBotWall({ sourceUrl, text, title, html } = {}) {
+  const result = sourceValidity({ url: sourceUrl, text, title, html });
+  return result.code === "SOURCE_VERIFICATION_REQUIRED" ? result.reason : null;
 }
 
 // 直抓在 HTTP 层被挡（401/403/429）同样是墙信号；source-fetcher 的错误消息形如"来源返回 HTTP 403"。
@@ -143,6 +130,8 @@ async function escalateViaBrowser({ url, browserCapture, context, wall, maxText,
     // 与直抓同口径的截断（代码审查 Optional①）：adapter 上限 100k 不等于调用方要的 maxChars，
     // 超长如实标 truncated，不把 100k 灌进聊天上下文。
     const full = String(observation.content || "");
+    const validity = sourceValidity({ text: full, title: observation.title, url: observation.finalUrl || url });
+    if (!validity.valid) throw Object.assign(new Error(validity.reason), { code: validity.code });
     const clipped = full.length > maxText;
     return wrapUntrusted({
       sourceUrl: observation.finalUrl || url,
@@ -204,7 +193,7 @@ async function fetchUrlForChat({ url, maxChars = DEFAULT_MAX_CHARS, fetcher = fe
   try {
     snapshot = await fetcher(target, { maxText });
   } catch (error) {
-    if (httpBlockStatus(error)) httpBlocked = error;
+    if (httpBlockStatus(error) || error.code === "SOURCE_VERIFICATION_REQUIRED") httpBlocked = error;
     else throw error;
   }
   const wall = httpBlocked
@@ -218,10 +207,10 @@ async function fetchUrlForChat({ url, maxChars = DEFAULT_MAX_CHARS, fetcher = fe
       reportEscalation(recordEvent, { url: target, wall, outcome: "escalation_error" });
       if (httpBlocked) throw httpBlocked;
       return wrapUntrusted({
-        sourceUrl: snapshot.url,
-        contentType: snapshot.contentType,
+        sourceUrl: snapshot?.url || target,
+        contentType: snapshot?.contentType || "text/html",
         text: "直抓得到登录或人机验证页面，尚未取得文章正文。可查找公开替代来源；不得请求主人接管或绕过验证。",
-        truncated: snapshot.truncated,
+        truncated: snapshot?.truncated === true,
         via: "direct",
         extra: { blocked: wall, browserError: String(error?.code || "BROWSER_ESCALATION_FAILED") },
       });
@@ -235,7 +224,7 @@ async function fetchUrlForChat({ url, maxChars = DEFAULT_MAX_CHARS, fetcher = fe
     sourceUrl: snapshot.url,
     contentType: snapshot.contentType,
     text: wall ? "直抓得到登录或人机验证页面，尚未取得文章正文。可查找公开替代来源；不得请求主人接管或绕过验证。" : snapshot.text,
-    truncated: snapshot.truncated,
+    truncated: snapshot?.truncated === true,
     via: "direct",
     ...(wall ? { extra: { blocked: wall } } : {}),
   });

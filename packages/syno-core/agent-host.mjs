@@ -28,7 +28,7 @@ function diffAssessment(decision, changes = []) {
 }
 
 class AgentHost {
-  constructor({ store, executor, gitGuard, policy = evaluate, validator = validateRepositoryChange, onCommitted = async () => {}, processLockRoot } = {}) {
+  constructor({ store, executor, gitGuard, policy = evaluate, validator = validateRepositoryChange, onCommitted = async () => {}, beforeMerge = async () => {}, processLockRoot } = {}) {
     if (!store || !executor || !gitGuard) throw new Error("AgentHost 缺少必要 Adapter");
     this.store = store;
     this.executor = executor;
@@ -36,6 +36,7 @@ class AgentHost {
     this.policy = policy;
     this.validator = validator;
     this.onCommitted = onCommitted;
+    this.beforeMerge = beforeMerge;
     this.activeRuns = new Map();
     this.jobLocks = new Map();
     this.mergeTail = Promise.resolve();
@@ -156,7 +157,15 @@ class AgentHost {
     return results;
   }
 
-  async #execute(job, { alreadyRunning = false } = {}) {
+  async #execute(job, options = {}) {
+    if (job.decision.needsWorktree && job.decision.allowedRoots?.includes("vault")) {
+      const lock = new ProcessFileLock({ file: path.join(this.processLockRoot, "knowledge-write.lock"), timeoutMs: 120_000 });
+      return lock.run(() => this.#executeUnlocked(job, options));
+    }
+    return this.#executeUnlocked(job, options);
+  }
+
+  async #executeUnlocked(job, { alreadyRunning = false } = {}) {
     let workspace = PATHS.knowledgeRoot;
     try {
       if (!alreadyRunning) await this.store.transition(job, "running");
@@ -267,7 +276,8 @@ class AgentHost {
       job.changedPaths = validation.changedPaths;
 
       if (job.decision.needsWorktree) {
-        const commit = await this.gitGuard.commitPaths(job.changedPaths, `syno: execute ${job.id}`, workspace);
+        const auditPaths = this.store.project ? await this.store.project(job, { workspace }) : [];
+        const commit = await this.gitGuard.commitPaths([...job.changedPaths, ...auditPaths], `syno: execute ${job.id}`, workspace);
         if (!commit.committed) {
           const cleanup = await this.#cleanupWorktree(job);
           await this.store.transition(job, "completed", { result: { ...execution, validation, commit, cleanup } });
@@ -276,6 +286,7 @@ class AgentHost {
         }
         const pinned = await this.gitGuard.pinWorktree(job.worktree);
         job.worktree = { ...job.worktree, commit: pinned.commit, diffHash: pinned.diffHash };
+        await this.store.save(job);
         const assessment = diffAssessment(job.decision, pinned.changes);
         if (assessment.level === "reject") {
           // D3：源码根越界硬拒绝。不合并，清理 worktree，记审计，落到 rejected。
@@ -290,7 +301,7 @@ class AgentHost {
 
         // audit：记审计（含 diffHash 完整性指纹），worktree commit/merge 照常推进。
         await this.#commitSystemRecords(job, `syno: audit merge ${job.id} [${assessment.reason}]`);
-        const merge = await this.#serializeMerge(() => this.gitGuard.mergeWorktree(job.worktree));
+        const merge = await this.#serializeMerge(async () => { await this.beforeMerge(job); return this.gitGuard.mergeWorktree(job.worktree); });
         const cleanup = await this.#cleanupWorktree(job);
         const result = { ...execution, validation, commit, merge, cleanup, preview: pinned.preview, assessment, diffHash: pinned.diffHash };
         const sideEffects = await this.#runCommittedSideEffects(job, { result, merge, execution });
@@ -300,6 +311,7 @@ class AgentHost {
       }
 
       await this.store.transition(job, "completed", { result: { ...execution, validation } });
+      if (this.store.project) { await this.#commitSystemRecords(job, `syno: complete ${job.id}`); return { job }; }
       const allChanged = await this.gitGuard.changedPaths(PATHS.knowledgeRoot);
       const commitPaths = [...new Set([...job.changedPaths, ...allChanged.filter(isSystemPath)])];
       if (commitPaths.length) {
@@ -335,7 +347,7 @@ class AgentHost {
   async #merge(job) {
     try {
       await this.#commitSystemRecords(job, `syno: approve merge ${job.id}`);
-      const merge = await this.#serializeMerge(() => this.gitGuard.mergeWorktree(job.worktree));
+      const merge = await this.#serializeMerge(async () => { await this.beforeMerge(job); return this.gitGuard.mergeWorktree(job.worktree); });
       await this.store.transition(job, "validating", { phase: "merge" });
       let cleanup = { removed: true };
       try {
@@ -361,6 +373,13 @@ class AgentHost {
   }
 
   async #commitSystemRecords(job, message) {
+    if (this.store.project) {
+      if (["running", "validating", "pending"].includes(job.status)) return { committed: false, reason: "durable_journal" };
+      const paths = await this.store.project(job);
+      const commit = await this.gitGuard.commitPaths(paths, message, PATHS.knowledgeRoot);
+      await this.store.projectionCommitted?.(job, commit);
+      return commit;
+    }
     const changed = await this.gitGuard.changedPaths(PATHS.knowledgeRoot);
     const records = changed.filter(isSystemPath);
     return this.gitGuard.commitPaths(records, message, PATHS.knowledgeRoot);
@@ -428,8 +447,8 @@ class AgentHost {
         if (merged) {
           if (job.status === "running") await this.store.transition(job, "validating", { phase: "recovery" });
           const cleanup = await this.#cleanupWorktree(job);
-          const result = { ...(job.result || {}), cleanup, recoveredAfterRestart: true };
-          const sideEffects = await this.#runCommittedSideEffects(job, { result, merge: result.merge, execution: job.result });
+          const result = { ...(job.result || job.execution || {}), cleanup, recoveredAfterRestart: true };
+          const sideEffects = await this.#runCommittedSideEffects(job, { result, merge: result.merge, execution: job.result || job.execution });
           await this.store.transition(job, "completed", { result: { ...result, sideEffects } });
         } else {
           await this.store.transition(job, "failed", {

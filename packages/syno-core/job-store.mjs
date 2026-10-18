@@ -1,3 +1,5 @@
+import { RecoveryJournal } from "./recovery-journal.mjs";
+import { protectSecret, unprotectSecret } from "./secret-protector.mjs";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -34,17 +36,20 @@ function sanitizeRequest(request = {}) {
 }
 
 function timestampParts(iso) {
-  const date = new Date(iso);
-  return [String(date.getUTCFullYear()), String(date.getUTCMonth() + 1).padStart(2, "0")];
+  const date = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai" }).format(new Date(iso));
+  return [date.slice(0, 4), date.slice(5, 7)];
 }
 
 class JobStore {
-  constructor({ opsRoot = PATHS.opsRoot, payloadRoot, clock = () => new Date() } = {}) {
+  constructor({ opsRoot = PATHS.opsRoot, payloadRoot, protect = protectSecret, unprotect = unprotectSecret, clock = () => new Date() } = {}) {
     this.opsRoot = opsRoot;
+    this.protect = protect; this.unprotect = unprotect;
     this.payloadRoot = payloadRoot || (path.resolve(opsRoot) === path.resolve(PATHS.opsRoot)
       ? path.join(PATHS.stateRoot, "job-payloads")
       : path.join(path.dirname(opsRoot), ".syno-state", "job-payloads"));
     this.clock = clock;
+    this.shadowRoot = path.join(path.dirname(this.payloadRoot), "job-state", createHash("sha256").update(path.resolve(opsRoot)).digest("hex").slice(0, 16));
+    this.journalFor = id => new RecoveryJournal({ file: path.join(this.shadowRoot, "journal", `${id}.jsonl`), clock });
   }
 
   async create({ request, decision, channel = "web", senderId = "local-user", privateConversation = false, ownerKey = "local-user", threadKey = "main", conversationId = "", requestKey = "" }) {
@@ -54,7 +59,7 @@ class JobStore {
       if (existing) return { ...existing, deduplicated: true };
     }
     const now = this.clock().toISOString();
-    const id = `job-${now.slice(0, 10).replaceAll("-", "")}-${randomUUID().slice(0, 8)}`;
+    const id = `job-${new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai" }).format(new Date(now)).replaceAll("-", "")}-${randomUUID().slice(0, 8)}`;
     await this.#savePayload(id, request);
     const job = {
       id,
@@ -100,11 +105,19 @@ class JobStore {
 
   async save(job) {
     job.updated = this.clock().toISOString();
-    await writeRecord(this.filePath(job), job, {
+    const projection = structuredClone(job);
+    for (const field of ["result", "execution"]) {
+      const record = projection[field]?.operationResult?.record;
+      if (record?.schemaVersion === 2) projection[field].operationResult.record = { id: record.id, schemaVersion: 2, status: record.status, ownerKey: record.ownerKey };
+    }
+    const shadow = path.join(this.shadowRoot, "jobs", `${job.id}.md`);
+    await writeRecord(shadow, projection, {
       schema: "job",
       title: `Job ${job.id}`,
       summaryKeys: ["id", "intent", "status", "profile", "approval", "approvalsReceived", "phase", "risk", "channel", "ownerKey", "threadKey", "created", "updated"],
     });
+    const handle = await fs.open(shadow, "r"); try { await handle.sync(); } finally { await handle.close(); }
+    await this.journalFor(job.id).append("job.saved", { id: job.id, status: job.status, phase: job.phase, snapshotDigest: createHash("sha256").update(JSON.stringify(projection)).digest("hex"), commit: job.worktree?.commit || null });
     job.recordPath = this.#logicalPath(this.filePath(job));
     return job;
   }
@@ -114,7 +127,7 @@ class JobStore {
     const target = files.find((file) => path.basename(file) === `${id}.md`);
     if (!target) return null;
     const job = await readRecord(target);
-    job.recordPath = this.#logicalPath(target);
+    job.recordPath = this.#logicalPath(this.filePath(job));
     return job;
   }
 
@@ -130,7 +143,7 @@ class JobStore {
         if (ownerKey !== undefined && String(job.ownerKey || "local-user") !== String(ownerKey || "local-user")) continue;
         if (status !== undefined && job.status !== status) continue;
         if (retryCutoff !== null && job.nextRetryAt && !(new Date(job.nextRetryAt).getTime() <= retryCutoff)) continue;
-        job.recordPath = this.#logicalPath(file);
+        job.recordPath = this.#logicalPath(this.filePath(job));
         jobs.push(job);
       } catch {
         // Invalid records are surfaced by repository verification, not hidden in list failures.
@@ -139,10 +152,53 @@ class JobStore {
     return jobs.sort((a, b) => b.created.localeCompare(a.created)).slice(0, limit);
   }
 
+  async projectionCommitted(job, commit) { await this.journalFor(job.id).append("job.projection_committed", { id: job.id, status: job.status, commit: commit?.commit || null }); }
+  async prune() {
+    const now = this.clock().getTime(); let payloads = 0, journals = 0;
+    for (const job of await this.list({ limit: Number.MAX_SAFE_INTEGER })) {
+      if (!TERMINAL.has(job.status) || job.result?.sideEffects?.status === "pending") continue;
+      const age = now - Date.parse(job.updated || job.created);
+      if (age >= 30 * 86400_000 && job.payloadRef) { await fs.rm(path.join(this.payloadRoot, `${job.payloadRef}.json`), { force: true }); payloads++; }
+      if (age >= 90 * 86400_000) {
+        const journal = this.journalFor(job.id), entries = await journal.read();
+        if (entries.some(e => e.event === "job.projection_committed" && e.metadata.status === job.status && e.metadata.commit)) {
+          await fs.rm(journal.file, { force: true }); await fs.rm(path.join(this.shadowRoot, "jobs", `${job.id}.md`), { force: true }); await fs.rm(path.join(this.shadowRoot, "events", job.id), { recursive: true, force: true }); journals++;
+        }
+      }
+    }
+    return { payloads, journals };
+  }
+
+  async project(job, { workspace } = {}) {
+    const target = workspace ? path.join(workspace, "ops/jobs", ...timestampParts(job.created), `${job.id}.md`) : this.filePath(job);
+    const projection = await readRecord(path.join(this.shadowRoot, "jobs", `${job.id}.md`)).catch(e => { if (e.code === "ENOENT") return job; throw e; });
+    await writeRecord(target, projection, { schema: "job", title: `Job ${job.id}`, summaryKeys: ["id", "intent", "status", "phase", "ownerKey", "created", "updated"] });
+    const paths = [workspace ? path.relative(workspace, target).replaceAll("\\", "/") : this.#logicalPath(target)];
+    const eventRoot = path.join(this.shadowRoot, "events", job.id);
+    for (const name of await fs.readdir(eventRoot).catch(e => { if (e.code === "ENOENT") return []; throw e; })) {
+      const event = await readRecord(path.join(eventRoot, name));
+      const file = workspace ? path.join(workspace, "ops/events", ...timestampParts(event.at), name) : path.join(this.opsRoot, "events", ...timestampParts(event.at), name);
+      await writeRecord(file, event, { schema: "event", title: `${event.type} · ${job.id}`, summaryKeys: ["id", "type", "at", "subjectId"] });
+      paths.push(workspace ? path.relative(workspace, file).replaceAll("\\", "/") : this.#logicalPath(file));
+    }
+    await this.journalFor(job.id).append("job.projection_prepared", { id: job.id, status: job.status, phase: job.phase });
+    return paths;
+  }
+
+  async forgetMemoryPayloads(ownerKey, id) {
+    for (const job of await this.list({ ownerKey, limit: Number.MAX_SAFE_INTEGER })) {
+      if (!TERMINAL.has(job.status) || !String(job.request?.operation || "").startsWith("memory.")) continue;
+      const ref = job.result?.operationResult?.record?.id;
+      const request = await this.loadRequest(job).catch(() => null);
+      if (ref === id || request?.payload?.id === id) await this.#savePayload(job.payloadRef, { kind: "forgotten", memoryId: id, operation: "memory.forget" });
+    }
+  }
+
   async loadRequest(job) {
     if (!job?.payloadRef) return job?.request || {};
     try {
-      return JSON.parse(await fs.readFile(path.join(this.payloadRoot, `${job.payloadRef}.json`), "utf8"));
+      const envelope = JSON.parse(await fs.readFile(path.join(this.payloadRoot, `${job.payloadRef}.json`), "utf8"));
+      return envelope.encrypted === true ? JSON.parse(await this.unprotect(envelope.ciphertext)) : envelope;
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
       const missing = new Error(`Job 本地载荷不存在：${job.id}`);
@@ -207,7 +263,7 @@ class JobStore {
       subjectId: job.id,
       data,
     };
-    const file = path.join(this.opsRoot, "events", year, month, `${event.id}.md`);
+    const file = path.join(this.shadowRoot, "events", job.id, `${event.id}.md`);
     await writeRecord(file, event, {
       schema: "event",
       title: `${type} · ${job.id}`,
@@ -232,14 +288,17 @@ class JobStore {
       }
     }
     await walk(root);
-    return output.sort();
+    await walk(path.join(this.shadowRoot, "jobs"));
+    const byId = new Map(output.map(file => [path.basename(file), file]));
+    return [...byId.values()].sort();
   }
 
   async #savePayload(id, request) {
     await fs.mkdir(this.payloadRoot, { recursive: true });
     const file = path.join(this.payloadRoot, `${id}.json`);
     const temporary = `${file}.${process.pid}.${randomUUID()}.tmp`;
-    await fs.writeFile(temporary, `${JSON.stringify(request)}\n`, { encoding: "utf8", mode: 0o600 });
+    const stored = (String(request.operation || "").startsWith("memory.") || typeof request.payload?.body === "string") ? { encrypted: true, ciphertext: await this.protect(JSON.stringify(request)) } : request;
+    await fs.writeFile(temporary, `${JSON.stringify(stored)}\n`, { encoding: "utf8", mode: 0o600 });
     await fs.rename(temporary, file);
   }
 }

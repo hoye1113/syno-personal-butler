@@ -9,10 +9,10 @@
 ## 权限边界（trust-but-clarify）
 
 1. 读取、搜索与所有写入（新增笔记、写 `ops/`、覆盖、删除、移动、新 MOC、新 tag）默认自动执行（`approval:none`），在隔离 worktree 内合并；不要求审批确认。
-2. 只有"系统歧义"才回到人在环：收录撞重复、多方案（新建/分开/追加/关联）、信息不足时暂停澄清。明确指派的覆盖/删除/移动不算歧义，直接执行。
+2. 只有"系统歧义"才回到人在环：收录撞重复、多方案（新建/分开/追加/关联）、信息不足时暂停澄清。明确指派的覆盖/移动直接执行；知识删除与合并必须先展示绑定目标版本的预览，经主人后续真实消息确认后执行。
 3. 管家能力内**不存在**修改项目代码与本机生命周期控制（2026-09-01 D9）：`code_change`/`system_control` 意图无条件拒绝，不存在可开启的开关；装卸 Windows 后台服务由主人手动运行脚本。
 4. D9 仅限制 Syno 产品运行时：产品产生的任何 diff 触及源码根（`apps/contracts/config/scripts/tests`）= 无条件硬拒绝。主人明确授权的开发 Agent 可以在独立分支修改源码，遵循下文源码修改与交付原则；不得因此放开产品运行时的源码写入或系统控制能力。（Owner 2026-10-18 明确授权澄清）
-5. 长期记忆只能先写为 `MemoryProposal`，确认后才能进入 `vault/`。
+5. 长期记忆只能先写为候选，经主人后续消息确认后在 `ops/memory/` 生效；不进入 `vault/`、普通知识索引、Wiki 或目录表。遗忘清理当前正文，不重写 Git、聊天和备份历史。开发期知识发布默认关闭，隔离验收与发布授权后正式启用。
 6. 自动提交只能暂存 Job 声明的精确路径；禁止 `git add -A`，禁止自动 Push。
 7. 不读取、输出或提交 Token、Cookie、密钥和 `%LOCALAPPDATA%\Syno` 下的凭据。
 8. Web、微信 iLink、飞书同权限：已绑定 Owner 即可直接指挥，澄清确认不要求六位审批码。
@@ -23,7 +23,7 @@
 - 模型链固定为 Kimi Code 两档：`kimi-coding/kimi-for-coding` → `kimi-coding/k3-256k`（经 DSH 内置 pi-ai 适配器的 `kimi-coding` 目录路由，Base URL `https://api.kimi.com/coding`）。Adapter 为 `deepseek-harness-sdk`（CognitiveRuntime v3）。key 来源 = host 环境变量 `KIMI_API_KEY` 优先，缺省时 supervisor 读仓库根 `.env`（gitignored）的 `KIMI_API_KEY` 注入子进程。DSH 根路径缺省使用本仓 Git Submodule `vendor/deepseek-harness`（推荐，无需环境变量）；也可用 `SYNO_DSH_ROOT` 指向外部克隆（说明见 `docs/OPERATIONS.md`）；不要把 Harness 源码 vendoring 进本仓库。
 - 仅在不可用、限流、连接失败、超时、5xx、空响应或契约校验失败，且本次尝试尚未产生不可逆副作用时，才由 Syno 按上述顺序确定性回退。
 - Agent 不得选择模型、Provider 或回退目标；全部失败时进入 `waiting_provider`。禁止动态 MCP。
-- Harness 聊天会话**没有**终端、文件系统或通用抓取工具：模型只能使用受控知识三件套（`syno_knowledge_search`/`syno_knowledge_read_snippet`/`syno_knowledge_fetch_url`）、`web_search` 与 `skill`（2026-10-17 工具面重设计）。`web_search` 由自研 `syno-search` 链提供（豆包 → Tavily → Exa → Parallel 匿名备用，按查询语言路由，免费额度；key 走 `.env` 注入，见 ADR 0009），不安装社区 hub 插件或动态 MCP。主人发来的图片直接作为 image 内容块投给模型（模型链 `kimi-for-coding`/`k3-256k` 自身声明支持 image 输入，2026-10-16 起；Host `image.read` 工具已摘除）；只有明确「收录」的图片才额外做一次结构化转写（同一模型链、capture sidecar 且无任何工具）作为 Intake 正文；转写失败如实回报，禁止猜图。生产 chat 是受控 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（与渠道会话同一 session；`dsh web` 是 `--profile web` 别名，不是生产）。通道只有飞书（微信栈已于 2026-10-16 物理删除）；入站图片直投模型、文件落隔离区后走收录。收录分析 / 浏览器兜底仍用 `syno-capture.cordis.yml` jsonrpc（无 bash/fs/web）。8888 是控制面。知识写入与覆盖 canonical 笔记仍走 Job / Proposal；改 `apps/` 源码不属于管家能力（D9），只有开发 Agent 的人工开发流程能改。生产 profile 禁止 `dsh plugin add`，禁止把 `danger-full-access` 写进 `@syno/dsh-plugin` 的 permission 表。DSH 根必须 `pnpm run build`；事件通道是 WebSocket 不是 SSE。踩坑清单见 `docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」。
+- Harness 聊天会话**没有**终端、文件系统或通用抓取工具：模型只能使用受控业务工具（保留 capture.*，记忆和知识维护由 Host 受控执行）、受控知识三件套（`syno_knowledge_search`/`syno_knowledge_read_snippet`/`syno_knowledge_fetch_url`）、`web_search` 与 `skill`（2026-10-17 工具面重设计）。`web_search` 由自研 `syno-search` 链提供（豆包 → Tavily → Exa → Parallel 匿名备用，按查询语言路由，免费额度；key 走 `.env` 注入，见 ADR 0009），不安装社区 hub 插件或动态 MCP。主人发来的图片直接作为 image 内容块投给模型（模型链 `kimi-for-coding`/`k3-256k` 自身声明支持 image 输入，2026-10-16 起；Host `image.read` 工具已摘除）；只有明确「收录」的图片才额外做一次结构化转写（同一模型链、capture sidecar 且无任何工具）作为 Intake 正文；转写失败如实回报，禁止猜图。生产 chat 是受控 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（与渠道会话同一 session；`dsh web` 是 `--profile web` 别名，不是生产）。通道只有飞书（微信栈已于 2026-10-16 物理删除）；入站图片直投模型、文件落隔离区后走收录。收录分析 / 浏览器兜底仍用 `syno-capture.cordis.yml` jsonrpc（无 bash/fs/web）。8888 是控制面。知识写入与覆盖 canonical 笔记仍走 Job / Proposal；改 `apps/` 源码不属于管家能力（D9），只有开发 Agent 的人工开发流程能改。生产 profile 禁止 `dsh plugin add`，禁止把 `danger-full-access` 写进 `@syno/dsh-plugin` 的 permission 表。DSH 根必须 `pnpm run build`；事件通道是 WebSocket 不是 SSE。踩坑清单见 `docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」。
 
 ## 源码修改原则
 

@@ -1,49 +1,8 @@
-import process from "node:process";
-import { FeishuBitableSyncEngine } from "../packages/syno-core/feishu-bitable-sync.mjs";
-
-function getArgValue(flag) {
-  const idx = process.argv.indexOf(flag);
-  if (idx !== -1 && idx + 1 < process.argv.length) {
-    return process.argv[idx + 1];
-  }
-  return null;
-}
-
-async function runOnce(engine) {
-  console.log(`[${new Date().toLocaleTimeString()}] 正在检查飞书多维表格待收录条目...`);
-  const result = await engine.syncIntakeOnce();
-  if (result.processed > 0) {
-    console.log(`同步完成：处理了 ${result.processed} 条新收录。`);
-    for (const item of result.items) {
-      console.log(`- [${item.title}] -> ${item.relPath}`);
-    }
-  } else {
-    console.log("多维表格收录池当前无待处理条目。");
-  }
-  return result;
-}
-
-async function main() {
-  const isWatch = process.argv.includes("--watch");
-  const intervalArg = getArgValue("--interval") || "15";
-  const intervalMs = Math.max(1, parseInt(intervalArg, 10)) * 60 * 1000;
-
-  const engine = new FeishuBitableSyncEngine();
-  await runOnce(engine);
-
-  if (isWatch) {
-    console.log(`已进入定时轮询模式，每 ${intervalArg} 分钟检查一次（按 Ctrl+C 退出）...`);
-    setInterval(async () => {
-      try {
-        await runOnce(engine);
-      } catch (err) {
-        console.error("定时轮询同步异常:", err);
-      }
-    }, intervalMs);
-  }
-}
-
-main().catch((err) => {
-  console.error("同步失败:", err);
-  process.exitCode = 1;
-});
+// Resume registered publishing only. Capture still enters through capture.submit.
+const origin = process.env.SYNO_HOST_ORIGIN || "http://127.0.0.1:8888";
+const url = new URL(origin);
+if (!["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)) throw new Error("只允许本机受控 Host");
+if (process.argv.includes("--watch")) throw new Error("不再支持独立轮询；恢复由 Host 的发布队列负责");
+const response = await fetch(new URL("/api/syno/knowledge/sync/recover", url), { method: "POST", headers: { "Content-Type": "application/json", Origin: url.origin }, body: "{}" });
+if (!response.ok) throw new Error(`受控恢复失败：HTTP ${response.status}`);
+console.log(JSON.stringify(await response.json(), null, 2));

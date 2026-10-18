@@ -21,6 +21,7 @@ function validateValue(value, schema, location, errors) {
   }
   if (schema.enum && !schema.enum.includes(value)) errors.push(`${location} 不在允许枚举中`);
   if (typeof value === "string") {
+    if (schema.maxLength !== undefined && value.length > schema.maxLength) errors.push(`${location} 超过最大长度`);
     if (schema.minLength !== undefined && value.length < schema.minLength) errors.push(`${location} 长度不足`);
     if (schema.pattern && !new RegExp(schema.pattern).test(value)) errors.push(`${location} 格式不匹配`);
     if (schema.format === "date-time" && Number.isNaN(Date.parse(value))) errors.push(`${location} 不是合法 date-time`);
@@ -30,6 +31,8 @@ function validateValue(value, schema, location, errors) {
     if (schema.maximum !== undefined && value > schema.maximum) errors.push(`${location} 大于最大值`);
   }
   if (Array.isArray(value)) {
+    if (schema.minItems !== undefined && value.length < schema.minItems) errors.push(`${location} 条目不足`);
+    if (schema.maxItems !== undefined && value.length > schema.maxItems) errors.push(`${location} 条目超限`);
     if (schema.uniqueItems && new Set(value.map((item) => JSON.stringify(item))).size !== value.length) errors.push(`${location} 含重复项`);
     if (schema.items) value.forEach((item, index) => validateValue(item, schema.items, `${location}[${index}]`, errors));
   }
@@ -69,9 +72,17 @@ async function loadContract(name) {
 }
 
 async function validateContractRecord(name, value) {
+  if (name === "memory-proposal" && value?.schemaVersion === 2) return validateContractRecord("personal-memory", value);
   const schema = await loadContract(name);
   const errors = [];
   validateValue(value, schema, "$", errors);
+  if (name === "personal-memory") {
+    if (value.status !== "forgotten" && !String(value.statement || "").trim()) errors.push("$.statement 非遗忘记忆必须包含原文");
+    if (value.status === "active" && (!value.confirmationMessageId || value.confirmationMessageId === value.sourceMessageId)) errors.push("$.confirmationMessageId 必须为后续确认消息");
+    if (value.status === "forgotten" && Object.hasOwn(value, "statement")) errors.push("$.statement 遗忘 tombstone 不得包含正文");
+    if (value.scope !== "global" && !value.triggers?.length) errors.push("$.triggers 主题记忆须有触发依据");
+    if (value.supersedes && !value.supersedesVersion) errors.push("$.supersedesVersion 缺失");
+  }
   if (name === "claim" && value?.stability === "volatile" && !value.reviewAfter) {
     errors.push("$.reviewAfter 时效主张必须安排复核时间");
   }

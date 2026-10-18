@@ -18,6 +18,7 @@ const exec = promisify(execFile);
 const root = PATHS.repoRoot;
 const git = (args) => exec("git", args, { cwd: root, encoding: "utf8" });
 const source = path.resolve(import.meta.dirname, "../..");
+if (!process.env.SYNO_RECOVERY_ONLY) {
 await fs.cp(path.join(source, "contracts"), path.join(root, "contracts"), { recursive: true });
 await fs.mkdir(path.join(root, "config"));
 await fs.copyFile(path.join(source, "config/vault-contract.json"), path.join(root, "config/vault-contract.json"));
@@ -27,11 +28,23 @@ await git(["config", "user.name", "Syno test"]);
 await git(["config", "user.email", "syno-test@example.invalid"]);
 await git(["add", "--", ".gitignore", "contracts", "config"]);
 await git(["commit", "-m", "test fixture"]);
+}
 const executor = new OperationExecutor({
   fallback: { async submit() { throw new Error("No model in transaction test"); } },
   execute: (operation, payload, { workspace, job }) => executeDomainOperation(operation, payload, { workspace, job }),
 });
-const host = new AgentHost({ store: new JobStore(), executor, gitGuard: new GitGuard({ productBranch: "main" }) });
+const guard = new GitGuard({ productBranch: "main" });
+if (process.env.SYNO_CRASH_AFTER_MERGE === "1") {
+  const merge = guard.mergeWorktree.bind(guard);
+  guard.mergeWorktree = async worktree => { await merge(worktree); process.exit(77); };
+}
+const host = new AgentHost({ store: new JobStore({ protect: async v => Buffer.from(v).toString("base64"), unprotect: async v => Buffer.from(v, "base64").toString("utf8") }), executor, gitGuard: guard });
+if (process.env.SYNO_RECOVERY_ONLY === "1") {
+  await host.recover();
+  const jobs = await host.list({ ownerKey: "owner" });
+  process.stdout.write(JSON.stringify({ jobs: jobs.map(j => ({ id:j.id,status:j.status,record:j.result?.operationResult?.record })), dirty:(await git(["status","--porcelain"])).stdout }));
+  process.exit(0);
+}
 const core = { host, execute: (request, context) => host.receive(request, context) };
 const tools = new ToolRegistry(createBusinessTools(() => ({ core, pendingDecisions: new PendingDecisionStore(), ingestWorkflows: { async listPending() { return []; } } })));
 const bridge = new SynoToolBridge({ tools, token: "fixture" });
@@ -48,10 +61,11 @@ async function call(name, args = {}) {
 }
 bind("first-message");
 const action = await call("actions.create", { title: "周五阅读文章" });
+const firstCommitCount = Number((await git(["rev-list", "--count", "HEAD"])).stdout.trim());
 const memory = await call("memory.propose", { statement: "以后回答优先用中文实例" });
 bind("later-message");
 const completed = await call("actions.update", { id: action.record.id, version: action.version, status: "completed" });
 const [choice] = (await call("decisions.list")).decisions;
 const approved = await call("decisions.resolve", { id: choice.id, version: choice.version, action: "approve" });
 release();
-process.stdout.write(JSON.stringify({ completed: completed.record.status, memory: approved.record.status, note: await fs.readFile(path.join(root, approved.record.notePath), "utf8"), dirty: (await git(["status", "--porcelain"])).stdout, proposed: memory.record.status }), "utf8");
+process.stdout.write(JSON.stringify({ firstJobCommits: firstCommitCount - 1, completed: completed.record.status, memory: approved.record.status, note: approved.record.statement, vaultExists: await fs.access(path.join(root, "vault")).then(() => true, () => false), dirty: (await git(["status", "--porcelain"])).stdout, proposed: memory.record.status }), "utf8");

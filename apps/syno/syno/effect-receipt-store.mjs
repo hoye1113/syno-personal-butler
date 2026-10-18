@@ -126,6 +126,7 @@ class EffectReceiptStore {
         directEffect,
         businessOutcome,
         payloadDigest,
+        ...(result?.memoryRef ? { memoryRef: result.memoryRef } : {}),
         updatedAt: this.clock().toISOString(),
       };
       await atomicWrite(metadataFile(this.root, key), `${JSON.stringify(next, null, 2)}\n`);
@@ -139,6 +140,32 @@ class EffectReceiptStore {
     if (!record) return null;
     if (!includePayload || !record.payloadDigest) return record;
     return { ...record, payload: await this.#readPayload(record) };
+  }
+
+  async prune() {
+    return this.processLock.run(async () => {
+      let removed = 0;
+      for (const record of await this.list({ limit: Number.MAX_SAFE_INTEGER })) {
+        if (record.status !== "committed" || !record.payloadDigest || this.clock().getTime() - Date.parse(record.updatedAt) < 30 * 86400_000) continue;
+        await fs.rm(payloadFile(this.payloadRoot, record.payloadRef), { force: true });
+        await atomicWrite(metadataFile(this.root, record.payloadRef), JSON.stringify({ ...record, payloadDigest: null, payloadExpiredAt: this.clock().toISOString() })); removed++;
+      }
+      return { removed };
+    });
+  }
+
+  async forgetMemory(ownerKey, id) {
+    return this.processLock.run(async () => {
+      const records = await this.list({ limit: Number.MAX_SAFE_INTEGER });
+      for (const record of records) {
+        if (record.ownerKey !== ownerKey || record.status !== "committed" || !record.payloadDigest) continue;
+        const payload = await this.#readPayload(record);
+        if (payload.result?.record?.id !== id) continue;
+        payload.result = { id: payload.result.id, memoryRef: id, status: "forgotten" };
+        const payloadDigest = await this.#writePayload(record.payloadRef, payload);
+        await atomicWrite(metadataFile(this.root, record.payloadRef), JSON.stringify({ ...record, payloadDigest }));
+      }
+    });
   }
 
   async list({ status, limit = 100 } = {}) {

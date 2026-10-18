@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://syno.local/contracts/publish-map.schema.json",
+  "title": "KnowledgePublishMap",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "ownerKey",
+    "sourceVersion",
+    "resourceVersion",
+    "targetKey",
+    "targets"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "enum": [
+        1
+      ]
+    },
+    "id": {
+      "type": "string"
+    },
+    "ownerKey": {
+      "type": "string"
+    },
+    "sourceVersion": {
+      "type": "string"
+    },
+    "resourceVersion": {
+      "type": "string"
+    },
+    "targetKey": {
+      "type": "string"
+    },
+    "targets": {
+      "type": "object",
+      "required": [
+        "wiki",
+        "catalog",
+        "images"
+      ],
+      "properties": {
+        "wiki": {
+          "type": "object",
+          "required": [
+            "status",
+            "expectedVersion"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "pending",
+                "running",
+                "succeeded",
+                "retryable_failed",
+                "blocked",
+                "unknown"
+              ]
+            },
+            "expectedVersion": {
+              "type": "string"
+            },
+            "appliedVersion": {
+              "type": "string"
+            },
+            "attempts": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "catalog": {
+          "type": "object",
+          "required": [
+            "status",
+            "expectedVersion"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "pending",
+                "running",
+                "succeeded",
+                "retryable_failed",
+                "blocked",
+                "unknown"
+              ]
+            },
+            "expectedVersion": {
+              "type": "string"
+            },
+            "appliedVersion": {
+              "type": "string"
+            },
+            "attempts": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "images": {
+          "type": "object",
+          "required": [
+            "status",
+            "expectedVersion"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "pending",
+                "running",
+                "succeeded",
+                "retryable_failed",
+                "blocked",
+                "unknown"
+              ]
+            },
+            "expectedVersion": {
+              "type": "string"
+            },
+            "appliedVersion": {
+              "type": "string"
+            },
+            "attempts": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    }
+  }
+}

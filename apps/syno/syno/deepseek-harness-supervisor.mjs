@@ -19,15 +19,17 @@ import {
 
 const execFileAsync = promisify(execFile);
 const REPO_CONFIG_DIR = path.join(PATHS.repoRoot, "config", "deepseek-harness");
-const HARNESS_PROFILES = Object.freeze(["chat", "capture"]);
-const JSONRPC_RUNTIME_PROFILES = Object.freeze(["capture", "chat"]);
+const HARNESS_PROFILES = Object.freeze(["chat", "capture", "confirmation"]);
+const JSONRPC_RUNTIME_PROFILES = Object.freeze(["capture", "chat", "confirmation"]);
 const CONFIG_FILES = Object.freeze({
   chat: "syno-chat.cordis.yml",
   capture: "syno-capture.cordis.yml",
+  confirmation: "syno-confirmation.cordis.yml",
 });
 const JSONRPC_DSH_PROFILES = Object.freeze({
   chat: { profile: "sdk", bundles: ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-sdk-app"] },
   capture: { profile: "sdk-minimal", bundles: ["@deepseek-ai/dsh-sdk-minimal"] },
+  confirmation: { profile: "sdk-minimal", bundles: ["@deepseek-ai/dsh-sdk-minimal"] },
 });
 const JSONRPC_BOOTSTRAP_PACKAGES = Object.freeze([
   "@deepseek-ai/dsh-app-boot",
@@ -576,7 +578,7 @@ function configPathFor(profile, { configDir = REPO_CONFIG_DIR } = {}) {
 }
 
 function personaPath(profile, { configDir = REPO_CONFIG_DIR } = {}) {
-  return path.join(configDir, profile === "capture" ? "syno-capture-agent.md" : "syno-agent.md");
+  return path.join(configDir, profile === "confirmation" ? "syno-confirmation-agent.md" : profile === "capture" ? "syno-capture-agent.md" : "syno-agent.md");
 }
 
 class DeepSeekHarnessSupervisor {

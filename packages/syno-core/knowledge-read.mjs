@@ -1,6 +1,17 @@
+import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { inspectRemoteContent } from "./sensitive-content.mjs";
 import { frontmatterData } from "./validator.mjs";
 
+const QUARANTINE = JSON.parse(readFileSync(new URL("../../config/knowledge-quarantine.json", import.meta.url), "utf8")).entries;
+function quarantineReason(notePath, markdown) {
+  const entry = QUARANTINE.find(item => item.path === notePath && item.contentDigest === createHash("sha256").update(markdown).digest("hex"));
+  return entry ? { code: entry.code, reason: entry.reason } : null;
+}
+function isExcludedKnowledge(markdown) {
+  const { values } = frontmatterData(markdown);
+  return Boolean(values.memory_proposal || values.personal_memory_id || values.knowledge_excluded === "true" || ["deleted", "merged", "quarantined"].includes(values.knowledge_state));
+}
 function isSensitiveKnowledgeNote(markdown) {
   const { values } = frontmatterData(markdown);
   const normalized = (key) => String(values[key] || "").toLocaleLowerCase("en-US");
@@ -12,6 +23,7 @@ function isSensitiveKnowledgeNote(markdown) {
 }
 
 function assertKnowledgeNotSensitive(markdown) {
+  if (isExcludedKnowledge(markdown)) throw Object.assign(new Error("个人记忆或失效知识不属于普通检索"), { code: "KNOWLEDGE_EXCLUDED" });
   if (isSensitiveKnowledgeNote(markdown)) {
     const error = new Error("该笔记标记为敏感内容，禁止发送给远程模型");
     error.code = "KNOWLEDGE_SENSITIVE_DENIED";
@@ -39,4 +51,4 @@ async function readKnowledgeSnippet(knowledge, notePath, maxChars = 6_000, offse
   return { path: note.path, title: note.title, ...sliceKnowledgeText(note.markdown, offset, limit) };
 }
 
-export { assertKnowledgeNotSensitive, isSensitiveKnowledgeNote, readKnowledgeSnippet, sliceKnowledgeText };
+export { quarantineReason, isExcludedKnowledge, assertKnowledgeNotSensitive, isSensitiveKnowledgeNote, readKnowledgeSnippet, sliceKnowledgeText };

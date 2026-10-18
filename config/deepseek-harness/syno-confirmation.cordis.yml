@@ -1,0 +1,45 @@
+# DSH sdk-minimal overlay for isolated Owner confirmation (no tools).
+# sdk-minimal supplies the JSON-RPC server and agent runtime; this overlay adds
+# the Kimi Code LLM route (pi-ai twin). No Bridge plugin is loaded. Shell tools stay
+# disabled, and no filesystem or web tool is added. Credentials stay in the
+# child environment, never here.
+
+- id: sandbox-policy
+  config:
+    mode: workspace-write
+    workspaceRoot: !!js process.env.DSH_CWD ?? process.cwd()
+
+- id: terminal-bash
+  disabled: true
+
+- id: terminal-pwsh
+  disabled: true
+
+- id: persistent-bash
+  disabled: true
+
+- id: persistent-pwsh
+  disabled: true
+
+- id: sessions
+  config:
+    root: !!js process.env.DSH_SESSION_ROOT ?? './.sessions'
+    compression: none
+
+- insert:
+    - id: llm-pi-ai
+      name: '@deepseek-ai/dsh-llm-pi-ai'
+      config:
+        providers:
+          kimi-coding:
+            apiKeyEnv: KIMI_API_KEY
+            reasoning: low
+            modelOverrides:
+              kimi-for-coding:
+                reasoningEfforts:
+                  low: low
+                  high: high
+                  max: max
+            requestImagePixelBudget: 1048576
+            requestImageMaxBytes: 786432
+            maxRequestImageBytes: 1400000

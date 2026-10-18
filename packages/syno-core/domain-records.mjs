@@ -7,7 +7,7 @@ import { validateContractRecord } from "./schema-registry.mjs";
 
 const RECORD_KINDS = new Set(["actions", "memory"]);
 function recordVersion(record) { return createHash("sha256").update(JSON.stringify(record)).digest("hex"); }
-async function listDomainRecords(opsRoot, kind, ownerKey = "local-user") {
+async function listDomainRecords(opsRoot, kind, ownerKey = "local-user", { onInvalidRecord } = {}) {
   if (!RECORD_KINDS.has(kind)) throw new Error("未知记录类型");
   const records = [];
   async function walk(directory) {
@@ -18,13 +18,15 @@ async function listDomainRecords(opsRoot, kind, ownerKey = "local-user") {
       const file = path.join(directory, entry.name);
       if (entry.isDirectory()) await walk(file);
       else if (entry.isFile() && entry.name.endsWith(".md") && entry.name.toLowerCase() !== "readme.md") {
+        try {
         const text = await fs.readFile(file, "utf8");
         // Older memory proposals use frontmatter only; reads leave their bytes unchanged.
         const record = kind === "memory" && !text.includes("<!-- syno:json:")
           ? frontmatterData(text).values
           : parseRecord(text);
-        await validateContractRecord(kind === "actions" ? "action" : "memory-proposal", record);
+        await validateContractRecord(kind === "actions" ? "action" : record.schemaVersion === 2 ? "personal-memory" : "memory-proposal", record);
         if ((record.ownerKey || "local-user") === ownerKey) records.push({ record, file, version: recordVersion(record) });
+        } catch (error) { if (!onInvalidRecord) throw error; await onInvalidRecord({ id: path.basename(file, ".md"), code: error.code || "MEMORY_RECORD_INVALID" }); }
       }
     }
   }
@@ -37,6 +39,6 @@ async function findDomainRecord(opsRoot, kind, id, ownerKey) {
   return found;
 }
 function assertRecordVersion(found, version) {
-  if (!version || found.version !== version) throw Object.assign(new Error("记录已变化，请重新查询后再操作"), { code: "DOMAIN_RECORD_VERSION_CHANGED" });
+  if (!version || found.version !== version) throw Object.assign(new Error("记录已变化，请重新查询后再操作"), { code: "OBJECT_VERSION_CHANGED" });
 }
 export { listDomainRecords, findDomainRecord, recordVersion, assertRecordVersion };

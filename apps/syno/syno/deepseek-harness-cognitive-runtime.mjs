@@ -277,6 +277,7 @@ function contentBlocks(text, system, images = []) {
 }
 
 function profileFor(context) {
+  if (context.channel === "confirmation") return "confirmation";
   if (context.ephemeralSession === true) return "capture";
   if (String(context.channel || "") === "capture") return "capture";
   if (String(context.threadKey || "").startsWith("capture:")) return "capture";
@@ -540,6 +541,7 @@ class DeepSeekHarnessCognitiveRuntime {
               threadKey,
               harnessSessionId: binding.harnessSessionId,
               attachments: context.attachments || [],
+              ownerMessage: context.ownerMessage,
               replyTarget: context.replyTarget,
               senderId: context.senderId,
               privateConversation: context.privateConversation === true,

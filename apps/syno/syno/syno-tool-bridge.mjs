@@ -1,3 +1,4 @@
+import { MemoryStore } from "../../../packages/syno-core/memory-store.mjs";
 import { BUSINESS_TOOL_NAMES } from "../../../packages/syno-core/business-tools.mjs";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { inspectRemoteContent } from "../../../packages/syno-core/sensitive-content.mjs";
@@ -51,9 +52,12 @@ const BRIDGE_TOOL_NAMES = new Set([
 ]);
 
 class SynoToolBridge {
-  constructor({ tools, token, resolveWebContext = null, exposedToolNames = null, ownerKey = "local-user", onResult = async () => {}, isRuntimeReady = () => true, effectReceipts = null, reconciliationCases = null, charLimit = null, recordEvent = null } = {}) {
+  constructor({ tools, token, resolveWebContext = null, memoryStore = new MemoryStore(), prepareOwnerTurn = async () => {}, exposedToolNames = null, ownerKey = "local-user", onResult = async () => {}, isRuntimeReady = () => true, effectReceipts = null, reconciliationCases = null, charLimit = null, recordEvent = null } = {}) {
     if (!tools || !token) throw new Error("SynoToolBridge 缺少 ToolRegistry 或进程级 Token");
     this.tools = tools;
+    this.memoryStore = memoryStore;
+    this.prepareOwnerTurn = prepareOwnerTurn;
+    this.preparedTurns = new Set();
     this.resolveWebContext = resolveWebContext;
     this.charLimit = charLimit;
     this.token = token;
@@ -90,6 +94,7 @@ class SynoToolBridge {
       runId: String(context.runId || ""),
       harnessSessionId: context.harnessSessionId,
       attachments: context.attachments || [],
+      ownerMessage: context.ownerMessage,
       replyTarget: context.replyTarget,
       senderId: context.senderId,
       privateConversation: context.privateConversation === true,
@@ -140,7 +145,7 @@ class SynoToolBridge {
     }
     if (request.method === "ping") return { ...response, result: {} };
     if (request.method === "tools/list") return { ...response, result: { tools: this.definitions() } };
-    if (request.method !== "tools/call") {
+    if (!["tools/call", "memory/context", "turn/prepare"].includes(request.method)) {
       return { ...response, error: { code: -32601, message: "Method not found" } };
     }
     if (!this.isRuntimeReady()) {
@@ -148,6 +153,19 @@ class SynoToolBridge {
         ...response,
         error: { code: -32004, message: "RUNTIME_NOT_READY: Syno Runtime 尚未就绪" },
       };
+    }
+    if (["memory/context", "turn/prepare"].includes(request.method)) {
+      const active = this.activeContext || await this.resolveWebContext?.(request.params || {});
+      if (!active?.privateConversation || active.harnessSessionId !== request.params?.sessionId) return { ...response, error: { code: -32003, message: "MEMORY_CONTEXT_DENIED" } };
+      if (request.method === "turn/prepare") {
+        const key = `${active.ownerKey}:${active.threadKey}:${active.messageId}`;
+        if (!this.preparedTurns.has(key)) {
+          await this.prepareOwnerTurn({ ownerKey: active.ownerKey, threadKey: active.threadKey, messageId: active.messageId, text: active.ownerMessage ?? String(request.params?.query || "") });
+          this.preparedTurns.add(key);
+          if (this.preparedTurns.size > 1000) this.preparedTurns.delete(this.preparedTurns.values().next().value);
+        }
+      }
+      return { ...response, result: { text: await this.memoryStore.context(active.ownerKey, String(active.ownerMessage ?? request.params?.query ?? "").slice(0, 8000)) } };
     }
     const name = String(request.params?.name || "");
     const definition = this.exposed.get(name);
@@ -176,7 +194,7 @@ class SynoToolBridge {
     const idempotencyKey = definition.retry === "idempotent" && active.messageId
       ? `${active.ownerKey}\0${active.threadKey}\0${active.messageId}\0<none>\0${name}\0${JSON.stringify(request.params?.arguments || {})}`
       : "";
-    if (idempotencyKey && this.idempotentResults.has(idempotencyKey)) {
+    if (!definition.name.startsWith("memory.") && definition.name !== "decisions.resolve" && idempotencyKey && this.idempotentResults.has(idempotencyKey)) {
       if (definition.risk !== "read") this.effectCounter += 1;
       return { ...this.idempotentResults.get(idempotencyKey), id: response.id };
     }
@@ -199,7 +217,11 @@ class SynoToolBridge {
         if (!begun.created) this.effectCounter += 1;
         if (!begun.created && durableReceipt.status === "committed") {
           const stored = await this.effectReceipts.get(toolInvocation, { includePayload: true });
-          const cached = stored?.payload?.result;
+          let cached = stored?.payload?.result || (stored?.memoryRef ? { memoryRef: stored.memoryRef, status: stored.businessOutcome?.status } : { status: stored.businessOutcome?.status, payloadUnavailable: true, code: "EFFECT_PAYLOAD_EXPIRED" });
+          if (cached?.memoryRef) {
+            const record = await this.memoryStore.get(active.ownerKey, cached.memoryRef);
+            cached = { ...cached, record, version: record.version };
+          }
           const replay = {
             ...response,
             result: {
@@ -245,7 +267,7 @@ class SynoToolBridge {
         ? { status: "no_effect", type: definition.name, sourceType: null, sourceId: null, toolInvocationKey: toolInvocation || null, occurredAt: null }
         : { status: "committed", type: result?.directEffect?.type || definition.name, sourceType: result?.directEffect?.sourceType || (result?.job?.id ? "job" : "tool"), sourceId: result?.directEffect?.sourceId || result?.job?.id || result?.id || null, toolInvocationKey: toolInvocation || null, occurredAt: new Date().toISOString() };
       const businessOutcome = result?.businessOutcome || { status: result?.status || (definition.risk === "read" ? "returned" : "accepted") };
-      if (this.effectReceipts && toolInvocation && definition.risk !== "read") await this.effectReceipts.commit({ toolInvocationKey: toolInvocation, toolName: name, ownerKey: active.ownerKey, argumentsDigest, result, directEffect, businessOutcome });
+      if (this.effectReceipts && toolInvocation && definition.risk !== "read") await this.effectReceipts.commit({ toolInvocationKey: toolInvocation, toolName: name, ownerKey: active.ownerKey, argumentsDigest, result: result?.record?.schemaVersion === 2 ? { id: result.id, status: result.status, memoryRef: result.record.id } : result, directEffect, businessOutcome });
       const success = {
         ...response,
         result: {
@@ -255,7 +277,7 @@ class SynoToolBridge {
           isError: false,
         },
       };
-      if (idempotencyKey) {
+      if (idempotencyKey && !result?.record?.schemaVersion && !definition.name.startsWith("memory.")) {
         this.idempotentResults.set(idempotencyKey, success);
         if (this.idempotentResults.size > 1_000) this.idempotentResults.delete(this.idempotentResults.keys().next().value);
       }

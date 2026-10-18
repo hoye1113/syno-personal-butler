@@ -48,7 +48,7 @@ class ChannelConversationHandler {
             if (bytes.length > MAX_INLINE_IMAGE_BYTES) throw new Error("图片超过 3 MB 上限");
             if (registered.size !== null && registered.size !== bytes.length) throw new Error("隔离图片大小发生变化");
             images.push({ mediaType: registered.mime, data: bytes.toString("base64") });
-            attachments.push({ id, name: path.basename(registered.path), image: artifact });
+            attachments.push({ id, name: path.basename(artifact.name || artifact.originalFilename || registered.path), image: artifact, resource: { name: path.basename(artifact.name || artifact.originalFilename || registered.path), base64: bytes.toString("base64"), mime: registered.mime } });
             descriptions.push({ id, name: path.basename(registered.path), kind: "image" });
           } else {
             if (!this.attachmentToPayload) throw new Error("附件安全转换器未就绪");
@@ -74,7 +74,7 @@ class ChannelConversationHandler {
       let currentRun;
       try {
         const result = await this.runtime.run({ text: requestText, ...(images.length ? { images } : {}) }, {
-          ...trace, senderId: message.senderId, privateConversation: message.privateConversation === true,
+          ...trace, ownerMessage: text, senderId: message.senderId, privateConversation: message.privateConversation === true,
           attachments: availableAttachments,
           replyTarget: channel === "feishu" ? { chatId: String(message.chatId || ""), replyTo: String(message.id || "") } : undefined,
           onStart: (id) => { currentRun = id; this.activeRuns.set(key, id); },

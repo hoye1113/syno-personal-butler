@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { createBusinessTools, BUSINESS_TOOL_NAMES } from "../packages/syno-core/business-tools.mjs";
 import { executeDomainOperation } from "../packages/syno-core/domain-operations.mjs";
 import { listDomainRecords } from "../packages/syno-core/domain-records.mjs";
+import { MemoryStore } from "../packages/syno-core/memory-store.mjs";
 import { PendingDecisionStore } from "../packages/syno-core/pending-decision.mjs";
 import { ToolRegistry } from "../apps/syno/syno/tool-registry.mjs";
 import { SynoToolBridge } from "../apps/syno/syno/syno-tool-bridge.mjs";
@@ -48,7 +49,7 @@ async function fixture(t) {
             } } };
     const tools = new ToolRegistry(createBusinessTools(() => services, { opsRoot }));
     const effects = new EffectReceiptStore({ root: path.join(root, 'effects'), payloadRoot: path.join(root, 'payloads'), lockFile: path.join(root, 'lock'), protect: async (x) => Buffer.from(x).toString('base64'), unprotect: async (x) => Buffer.from(x, 'base64').toString('utf8') });
-    const make = () => new SynoToolBridge({ tools, token: 'test', effectReceipts: effects });
+    const make = () => new SynoToolBridge({ tools, token: 'test', effectReceipts: effects, memoryStore: new MemoryStore({ opsRoot }) });
     let bridge = make(), release;
     const sessionId = 'syno-main-' + 'a'.repeat(32);
     function bind(messageId = 'turn-1', extra = {}) {
@@ -96,8 +97,8 @@ test('memory proposes then waits for later confirmation and validates note', asy
     assert.equal((await f.raw('decisions.resolve', { id: d.id, version: d.version, action: 'approve' })).result.isError, true);
     f.bind('later-confirm');
     const done = await f.call('decisions.resolve', { id: d.id, version: d.version, action: 'approve' });
-    assert.equal(done.record.status, 'approved');
-    assert.match(await fs.readFile(path.join(f.root, done.record.notePath), 'utf8'), /中文实例/);
+    assert.equal(done.record.status, 'active');
+    await assert.rejects(fs.access(path.join(f.root, 'vault')), { code: 'ENOENT' });
     assert.equal((await f.call('decisions.list')).decisions.length, 0);
 });
 test('memory rejection never creates vault and owner is enforced', async (t) => {
@@ -210,4 +211,18 @@ test('domain listing still rejects malformed business records', async (t) => {
     await fs.mkdir(path.join(f.opsRoot, 'memory'), { recursive: true });
     await fs.writeFile(path.join(f.opsRoot, 'memory', 'memory-broken.md'), '<!-- syno:json:start -->\n```json\n{broken}\n```\n<!-- syno:json:end -->');
     await assert.rejects(listDomainRecords(f.opsRoot, 'memory', 'owner'), SyntaxError);
+});
+
+test("forgetting prevents durable tool replay from returning obsolete memory text", async (t) => {
+  const f = await fixture(t);
+  const proposed = await f.call("memory.propose", { statement: "只在本测试使用的旧偏好正文" });
+  f.bind("confirm-memory");
+  const active = await f.call("decisions.resolve", { id: proposed.record.id, version: proposed.version, action: "approve" });
+  f.bind("forget-memory");
+  await f.call("memory.forget", { id: active.record.id, version: active.version });
+  f.restart();
+  const replay = await f.call("memory.propose", { statement: "只在本测试使用的旧偏好正文" });
+  assert.equal(replay.record.status, "forgotten");
+  assert.equal(replay.record.statement, undefined);
+  assert.doesNotMatch(JSON.stringify(replay), /旧偏好正文/);
 });

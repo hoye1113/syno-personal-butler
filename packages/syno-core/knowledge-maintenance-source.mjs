@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { walkMarkdown, titleOf } from "./knowledge-store.mjs";
 import { PATHS } from "./paths.mjs";
+import { isExcludedKnowledge, isSensitiveKnowledgeNote, quarantineReason } from "./knowledge-read.mjs";
 
 const COOLDOWN_DAYS = 7;
 const COOLDOWN_MS = COOLDOWN_DAYS * 86_400_000;
@@ -48,7 +49,8 @@ class KnowledgeMaintenanceSource {
   // 取当前 vault 的全部孤岛。fingerprint 命中时复用缓存、跳过全量读盘；inspect 与 weeklySummary 共享。
   async #orphansForCurrentVault() {
     const files = await walkMarkdown(this.vaultRoot);
-    const fingerprint = fingerprintVault(files.map((f) => path.relative(this.vaultRoot, f)));
+    const metadata = await Promise.all(files.map(async f => { const stat = await fs.stat(f, { bigint: true }); return `${path.relative(this.vaultRoot, f)}:${stat.mtimeNs}:${stat.size}`; }));
+    const fingerprint = fingerprintVault(metadata);
     if (this._cache && this._cachedFingerprint === fingerprint) {
       return this._cache;
     }
@@ -66,6 +68,8 @@ class KnowledgeMaintenanceSource {
     for (const file of files) {
       const markdown = await fs.readFile(file, "utf8");
       const relative = path.relative(this.vaultRoot, file).replace(/\\/g, "/");
+
+      if (isExcludedKnowledge(markdown) || isSensitiveKnowledgeNote(markdown) || quarantineReason(`vault/${relative}`, markdown)) continue;
 
       // 收集全库（含 MOC 及系统文件）中所有有效的 WikiLink 目标，支持 [[target|alias]]、[[target#heading]] 及带路径链接
       for (const match of markdown.matchAll(/\[\[([^\]|#]+)/g)) {
@@ -107,7 +111,14 @@ class KnowledgeMaintenanceSource {
       if (!byTopic.has(topic)) byTopic.set(topic, []);
       byTopic.get(topic).push({ path: orphan.path, title: orphan.title, topic: orphan.topic });
     }
+    const quarantined = [];
+    for (const file of await walkMarkdown(this.vaultRoot)) {
+      const logical = `vault/${path.relative(this.vaultRoot, file).replaceAll("\\", "/")}`;
+      const reason = quarantineReason(logical, await fs.readFile(file, "utf8"));
+      if (reason) quarantined.push({ path: logical, ...reason, nextStep: "需明确修复决策；当前仅排除检索和发布" });
+    }
     return {
+      quarantined,
       generatedAt: this.clock().toISOString(),
       totalOrphans: orphans.length,
       topics: [...byTopic.entries()].map(([topic, items]) => ({ topic, count: items.length, items })),

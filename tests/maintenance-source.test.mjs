@@ -149,3 +149,8 @@ test("excludes 99-System, 03-Archive, and recognizes pipe aliases and MOC refere
   assert.equal(findings[0].path, "vault/real-orphan.md");
 });
 
+
+test("maintenance excludes personal memories and refreshes after edits without path changes",async t=>{
+ const {maintenance,vaultRoot}=await setup(t,{"a.md":"# A","private.md":"---\nmemory_proposal: memory-1\n---\n私人事实"});
+ assert.equal((await maintenance.weeklySummary()).totalOrphans,1);await fs.writeFile(path.join(vaultRoot,"a.md"),"# A\n\n[[target]]");assert.equal((await maintenance.weeklySummary()).totalOrphans,0);
+});

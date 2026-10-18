@@ -37,7 +37,7 @@ test("compile returns a bounded canonical bundle without accepting model-selecte
 
   await validateContractRecord("workflow-context-bundle", bundle);
   assert.deepEqual(bundle.budget, { rules: 0.15, knowledge: 0.1, source: 0.55, output: 0.2 });
-  assert.equal(bundle.canonicalSources.length, 3);
+  assert.equal(bundle.canonicalSources.length, 2);
   assert.doesNotMatch(bundle.instructions, /B站图文/);
   await assert.rejects(
     () => compiler.compile({ workflow: "capture", sourceType: "../../secret", stage: "classifying" }),
@@ -50,9 +50,9 @@ test("Bilibili context includes only the fixed specialized canonical source", as
   const compiler = new WorkflowContextCompiler({ repoRoot: root });
   const bundle = await compiler.compile({ workflow: "capture", sourceType: "bilibili-opus", stage: "classifying" });
 
-  assert.equal(bundle.canonicalSources.length, 4);
+  assert.equal(bundle.canonicalSources.length, 3);
   assert.match(bundle.instructions, /bilibili rules/);
-  assert.ok(bundle.constraints.includes("不扫描UP主空间，不读取图片，不自动进入ASR"));
+  assert.ok(bundle.constraints.includes("不扫描UP主空间，保留正文配图，不自动进入ASR"));
 });
 
 test("rulesDigest changes when a canonical rule changes", async (t) => {

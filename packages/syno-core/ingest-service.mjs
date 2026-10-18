@@ -1,4 +1,6 @@
+import { SourceResources } from "./source-resources.mjs";
 import { createHash, randomUUID } from "node:crypto";
+import { assertValidSource } from "./source-validity.mjs";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -217,8 +219,9 @@ class IngestService {
   // 按目标笔记路径串行化 append/link 的读-改-写，避免并发收录决策互相覆盖丢失（R3）。
   #targetLocks = new Map();
 
-  constructor({ intake = new IntakeService(), knowledge, opsRoot = PATHS.opsRoot, stateRoot = path.join(PATHS.stateRoot, "ingest"), clock = () => new Date() } = {}) {
+  constructor({ intake = new IntakeService(), knowledge, opsRoot = PATHS.opsRoot, stateRoot = path.join(PATHS.stateRoot, "ingest"), resources, clock = () => new Date() } = {}) {
     if (!knowledge) throw new Error("IngestService 缺少 KnowledgeStore");
+    this.resources = resources || new SourceResources({ cacheRoot: path.join(stateRoot, "resources") });
     this.intake = intake; this.knowledge = knowledge; this.opsRoot = opsRoot; this.stateRoot = stateRoot; this.clock = clock;
   }
 
@@ -255,13 +258,16 @@ class IngestService {
     if (state.payload?.kind !== "url") throw Object.assign(new Error("只有 URL 收录可以使用浏览器正文"), { code: "INGEST_BROWSER_SOURCE_INVALID" });
     const text = String(snapshot.content || snapshot.text || "").trim();
     if (!text) throw Object.assign(new Error("浏览器没有返回可读取正文"), { code: "INGEST_BROWSER_CONTENT_EMPTY" });
+    assertValidSource({ text, title: snapshot.title, url: snapshot.finalUrl || snapshot.url, truncated: snapshot.truncated });
     if (hasSourceNoise(text)) throw Object.assign(new Error("浏览器正文疑似 CSS 噪声，低质量"), { code: "INGEST_BROWSER_CONTENT_NOISE", retryable: false });
     if (Buffer.byteLength(text, "utf8") > 2 * 1024 * 1024) throw Object.assign(new Error("浏览器正文超过 2 MB 限制"), { code: "INGEST_BROWSER_CONTENT_TOO_LARGE" });
     const browserSnapshot = {
       url: String(snapshot.finalUrl || snapshot.url || state.payload.value || ""),
       contentType: String(snapshot.contentType || "text/html"),
       text: text.slice(0, 100_000),
-      truncated: text.length > 100_000,
+      truncated: snapshot.truncated === true || text.length > 100_000,
+      resources: snapshot.resources,
+      resourceDiscoveryComplete: Array.isArray(snapshot.resources),
       method: "bsk",
       contentDigest: String(snapshot.contentDigest || ""),
     };
@@ -283,6 +289,12 @@ class IngestService {
       const prepared = await this.intake.prepare(state.browserSnapshot
         ? { ...state.payload, browserSnapshot: state.browserSnapshot }
         : state.payload);
+    assertValidSource({ text: prepared.content || prepared.text, url: prepared.sourceSnapshot?.url || prepared.sourceUrl, truncated: prepared.sourceSnapshot?.truncated });
+    prepared.resourceManifest = await this.resources.prepare(prepared.content || prepared.text, { resources: prepared.resources, attachments: state.payload.attachments });
+    if (prepared.resourceDiscoveryComplete === false || ["pdf", "docx"].includes(prepared.sourceType)) {
+      prepared.resourceManifest.complete = false;
+      prepared.resourceManifest.limitations = [prepared.resourceDiscoveryComplete === false ? "浏览器快照未提供完整图片清单" : "此格式首版只保证文字读取"];
+    }
     const title = titleFromPrepared(prepared, state.payload);
     const titleMatches = await this.knowledge.search(title, { limit: 5 });
     const now = this.clock().toISOString();
@@ -308,6 +320,7 @@ class IngestService {
       suggestedPath: `vault/00-Inbox/${noteFilenameBase(title, id)}.md`, suggestedTags: [],
       suggestedLinks: matches.slice(0, 3).map((item) => item.path), risk: matches.length ? "merge" : "additive", created: now,
       sourceDescriptor,
+      captureFormat: "full_body_v1",
       sourceType: String(prepared.sourceType || state.payload.kind || "text"),
       ...(prepared.sourceProfile ? { sourceProfile: prepared.sourceProfile } : {}),
       quality: { status: "pending", reasons: [] },
@@ -324,7 +337,7 @@ class IngestService {
       ],
       validators: ["source-traceability", "duplicate", "frontmatter", "vault-contract"],
       sourceDigest,
-      ...(matches[0] ? { existingNoteRef: matches[0].path } : {}),
+      ...(matches[0] ? { existingNoteRef: matches[0].path, ...(matches[0].version ? { existingNoteVersion: matches[0].version } : {}) } : {}),
     };
     const proposal = { ...proposalBase, proposalDigest: objectDigest(proposalBase) };
     await validateContractRecord("ingest-proposal", proposal);
@@ -393,6 +406,7 @@ class IngestService {
       quality: analysis.quality && ["accepted", "limited", "rejected"].includes(analysis.quality.status)
         ? { status: analysis.quality.status, reasons: (analysis.quality.reasons || []).map(String) }
         : state.proposal.quality,
+      ...(analysis.guide ? { guide: String(analysis.guide).slice(0, 800) } : {}),
       materialTier: ["S", "A", "B"].includes(analysis.materialTier) ? analysis.materialTier : state.proposal.materialTier,
       canonicalTags: tags.approved,
       suggestedTags: tags.approved,
@@ -416,7 +430,7 @@ class IngestService {
       risk: mocChanges.length ? "high" : state.proposal.risk,
       ...(rulesDigest ? { rulesDigest } : {}),
     };
-    if (proposalBase.sourceType === "bilibili-opus" && proposalBase.canonicalBody) {
+    if (proposalBase.captureFormat !== "full_body_v1" && proposalBase.sourceType === "bilibili-opus" && proposalBase.canonicalBody) {
       const profile = completeBilibiliProfile(proposalBase, { requireCanonical: false });
       proposalBase.sourceReport = buildBilibiliReport({
         proposal: proposalBase,
@@ -508,6 +522,7 @@ class IngestService {
     } else if (action === "append-source" || action === "link-only") {
       if (!isAllowedExistingVaultPath(relative)) throw Object.assign(new Error(`收录目标不在 vault 内：${relative}`), { code: "INGEST_TARGET_PATH_DENIED" });
     }
+    if (action !== "reject") assertValidSource({ text: state.prepared?.content || state.prepared?.text, url: state.prepared?.sourceSnapshot?.url || state.prepared?.sourceUrl, truncated: state.prepared?.sourceSnapshot?.truncated });
     const target = relative ? path.join(workspace, relative) : null;
     const descriptor = state.proposal.sourceDescriptor || state.artifact?.sourceDescriptor || buildSourceDescriptor({ payload: state.payload, prepared: state.prepared, channel: state.channel, messageId: state.messageId, now: state.created });
     const sourceUrl = descriptor.canonicalUrl ? `source_url: ${JSON.stringify(descriptor.canonicalUrl)}\n` : "";
@@ -515,19 +530,33 @@ class IngestService {
     const sourceFileDigest = descriptor.contentSha256 ? `source_file_sha256: ${descriptor.contentSha256}\n` : "";
     const canonicalTags = state.proposal.canonicalTags?.length ? state.proposal.canonicalTags : ["notes"];
     const relations = state.proposal.relations || [];
-    const bilibiliProfile = completeBilibiliProfile(state.proposal);
+    const bilibiliProfile = state.proposal.captureFormat === "full_body_v1" ? null : completeBilibiliProfile(state.proposal);
     const sourceRef = descriptor.canonicalUrl || descriptor.originalFilename || descriptor.kind || "unknown";
     const description = String(state.candidate.summary || state.candidate.title).replace(/\s+/gu, " ").trim().slice(0, 180);
     const factualStatus = bilibiliProfile?.factualStatus || (descriptor.verificationStatus === "verified" ? "partial" : "unverified");
     const specialized = renderBilibiliFrontmatter(bilibiliProfile, state.proposal.materialTier);
     const genericSource = bilibiliProfile ? "" : `factual_status: ${factualStatus}\n`;
-    const noteBody = bilibiliProfile ? state.proposal.canonicalBody : (state.prepared.content || state.prepared.text);
-    const content = `---\ntitle: ${JSON.stringify(state.candidate.title)}\ntags: ${JSON.stringify(canonicalTags)}\ncreated: ${String(state.created).slice(0, 10)}\nsource: ${JSON.stringify(sourceRef)}\ndescription: ${JSON.stringify(description)}\nknowledge_state: captured\nlink_status: ${relations.length ? "connected" : "orphan"}\n${genericSource}${specialized}source_kind: ${descriptor.kind}\nsource_reliability: ${descriptor.reliability}\nsource_verification: ${descriptor.verificationStatus}\n${sourceUrl}${sourceDigest}${sourceFileDigest}---\n\n# ${state.candidate.title}\n\n${noteBody}\n\n## 关系状态\n\n${renderRelations(relations)}\n`;
+    const guide = state.proposal.guide || `来源摘要：${description}`;
+    const noteBody = bilibiliProfile ? state.proposal.canonicalBody : `## 导读\n\n${guide}\n\n## 来源正文\n\n${state.prepared.content || state.prepared.text}`;
+    let content = `---\nnote_id: note-${id}\ntitle: ${JSON.stringify(state.candidate.title)}\ntags: ${JSON.stringify(canonicalTags)}\ncreated: ${new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai" }).format(new Date(state.created))}\nsource: ${JSON.stringify(sourceRef)}\ndescription: ${JSON.stringify(description)}\nknowledge_state: captured\nlink_status: ${relations.length ? "connected" : "orphan"}\n${genericSource}${specialized}source_kind: ${descriptor.kind}\nsource_reliability: ${descriptor.reliability}\nsource_verification: ${descriptor.verificationStatus}\n${sourceUrl}${sourceDigest}${sourceFileDigest}---\n\n# ${state.candidate.title}\n\n${noteBody}\n\n## 关系状态\n\n${renderRelations(relations)}\n`;
     const changedPaths = [];
+    const manifest = state.prepared?.resourceManifest || { schemaVersion: 1, items: [], complete: false, version: "legacy-unverified" };
+    let appliedManifest = manifest;
+    let noteId = `note-${id}`;
+    const applyResources = async (text, currentId, knownItems = []) => {
+      const combined = await this.resources.prepare(text, { knownItems: [...knownItems, ...manifest.items], notePath: relative });
+      for (const item of manifest.items) if (!combined.items.some(x => x.source === item.source && x.role === item.role)) combined.items.push(item);
+      if (!manifest.complete) combined.complete = false;
+      if (manifest.limitations) combined.limitations = manifest.limitations;
+      const result = await this.resources.apply(combined, { workspace, noteId: currentId, notePath: relative, content: text });
+      appliedManifest = JSON.parse(await fs.readFile(path.join(workspace, result.manifestPath), "utf8"));
+      changedPaths.push(...result.changedPaths); return result.content;
+    };
     if (action === "create" || action === "keep-separate") {
       // 「存在性检查 + 写」也按目标串行化，避免并发同路径新建的 TOCTOU（两者都见 ENOENT 后互相覆盖）（R3 补齐）。
       await this.#serializeTarget(target, async () => {
         try { await fs.access(target); throw Object.assign(new Error("目标笔记已存在，需要重新查重"), { code: "INGEST_TARGET_EXISTS" }); } catch (error) { if (error.code !== "ENOENT") throw error; }
+        content = await applyResources(content, noteId);
         await atomicText(target, content);
       });
       changedPaths.push(relative);
@@ -535,22 +564,29 @@ class IngestService {
       // 读-改-写需按目标串行化，避免并发收录决策互相覆盖（R3）。
       await this.#serializeTarget(target, async () => {
         const existing = await fs.readFile(target, "utf8");
+        const currentVersion = createHash("sha256").update(existing).digest("hex");
+        if (!state.proposal.existingNoteVersion || currentVersion !== state.proposal.existingNoteVersion) throw Object.assign(new Error("目标笔记已变化，需要重新查重确认"), { code: "OBJECT_VERSION_CHANGED" });
+        noteId = /^note_id:\s*["']?([^"'\n]+)["']?$/mu.exec(existing)?.[1] || `note-${createHash("sha256").update(relative).digest("hex").slice(0, 24)}`;
+        const knownFile = path.join(workspace, "ops/knowledge/resources", `${noteId}-${currentVersion}.json`);
+        const knownItems = await fs.readFile(knownFile, "utf8").then(text => JSON.parse(text).items, e => { if (e.code === "ENOENT") return []; throw e; });
         const addition = action === "append-source"
           ? `\n\n## 收录补充 · ${state.candidate.title}\n\n${state.prepared.content || state.prepared.text}\n`
           : `\n\n## 候选关联\n\n- 收录候选：${state.candidate.title}（Artifact ${id}）\n`;
-        await atomicText(target, `${existing.trimEnd()}${addition}`);
+        const combined = await applyResources(`${existing.trimEnd()}${addition}`, noteId, knownItems);
+        await atomicText(target, combined);
       });
       changedPaths.push(relative);
     }
 
     const lifecycle = await this.#writeLifecycle(state, { workspace, action, applied: action !== "reject" });
     changedPaths.push(...lifecycle.changedPaths);
-    const completionStatus = state.proposal.quality?.status === "accepted"
+    const completionStatus = appliedManifest.complete && !["pdf", "docx"].includes(state.prepared?.sourceType) && state.proposal.quality?.status === "accepted"
       && !(state.proposal.unresolved || []).length
       && (!bilibiliProfile || state.proposal.sourceReport?.status === "complete")
       ? "complete"
       : "incomplete";
     return {
+      id: noteId,
       artifactId: id,
       applied: action !== "reject",
       action,
@@ -570,6 +606,7 @@ class IngestService {
       ],
       knowledgeState: "captured",
       completionStatus,
+      resourceManifest: appliedManifest,
       lifecycle,
       changedPaths: [...new Set(changedPaths)],
     };

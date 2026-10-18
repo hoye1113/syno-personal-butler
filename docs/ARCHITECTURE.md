@@ -85,3 +85,11 @@ Harness conversation bindings expire after 30 days; confirmed raw voice remains 
 
 
 飞书是当前唯一日常入口（微信通道栈已于 2026-10-16 删除）。用户可见 ACK 只表示消息已收到并开始处理；最终结果默认回到原始渠道。系统不发主动消息，也不在重启后补发历史回复。Web 是配置、诊断、桌面接管和完整审计入口，不是普通对话、写入或歧义决策的必经界面。完整边界见 ADR 0003–0005。
+
+## 知识与记忆 v0.2（开发分支）
+
+MemoryStore 独立读取 ops/memory，按 Owner、有效状态、范围和触发词筛选，稳定排序后最多五条／3000 字符。受控 Web 与飞书通过同一 Host 的 turn/prepare 上下文接缝注入；旧快照失效，素材不参与删除合并确认。KnowledgeChanges 负责稳定 ID、版本、变更预览与一次性授权，OperationExecutor 执行后在合并前再次校验规范版本。
+
+Source validity 在读取、浏览器、分析前和写入前共用；SourceResources 维护图片摘要与持久引用清单。KnowledgePublisher 通过受控 Job 投影 publish-map，外部效果前后写恢复 journal，使用单写者租约、未知结果对账和远端指纹冲突阻断。FeishuPublisher 只使用经确认的 Host 配置与 SDK 凭据机制。开发默认 disabled，不产生生产云端写入。
+
+JobStore 的中间状态保存在 fsync 快照与按 Job 分片的恢复 journal。Git 仅记录内容与初始审计、固定 SHA 合并、终态投影；投影在 Git 提交后才标为已验证。

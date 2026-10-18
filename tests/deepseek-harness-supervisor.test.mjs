@@ -113,6 +113,7 @@ async function writeDshLaunchFixture(root, { missingRuntime = [] } = {}) {
         : {},
     });
   }
+  await fs.writeFile(path.join(configDir, "syno-confirmation.cordis.yml"), "[]\n");
   return configDir;
 }
 

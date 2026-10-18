@@ -11,6 +11,9 @@
     "proposalDigest", "created"
   ],
   "properties": {
+    "captureFormat": { "enum": ["full_body_v1"] },
+    "guide": { "type": "string" },
+    "existingNoteVersion": { "type": "string" },
     "id": { "type": "string" },
     "candidateId": { "type": "string" },
     "status": { "enum": ["proposed", "approved", "rejected", "applied", "failed"] },

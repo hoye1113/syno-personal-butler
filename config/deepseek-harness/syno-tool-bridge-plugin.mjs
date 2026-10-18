@@ -39,12 +39,12 @@ export function toBridgeName(publicName) {
   return value.startsWith("syno_") ? value.slice("syno_".length) : value;
 }
 
-function humanTurn(exec) {
+function humanTurn(exec, whole = false) {
   const events = exec?.agent?.session?.snapshotEvents?.() || [];
   let start = -1;
   for (const event of events) if (event.type === "turn/start") start = event.seq;
   const message = events.findLast((event) => event.seq > start && event.type === "user/message" && event.data?.source?.kind === "user");
-  return message?.data?.id;
+  return whole ? message?.data : message?.data?.id;
 }
 
 async function rpc(origin, token, method, params, id) {
@@ -106,6 +106,21 @@ export async function apply(ctx, config = {}) {
   if (!origin || !token) {
     throw new Error("syno-tool-bridge: SYNO_BRIDGE_ORIGIN and SYNO_BRIDGE_TOKEN are required");
   }
+  if (toolSet !== "browser" && typeof ctx.inject === "function") ctx.inject(["systemPrompt"], (inner) => {
+    const snapshots = new WeakMap();
+    inner.systemPrompt.context({ name: "syno:personal-memory", order: 130, text: ({ scope }) => (snapshots.get(scope) || "").replaceAll("{{", "\\u007b\\u007b").replaceAll("}}", "\\u007d\\u007d") });
+    inner.on("agent/pre-step", async ({ agent }, next) => {
+      const message = humanTurn({ agent }, true);
+      if (message) {
+        const query = (message.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
+        try {
+          const result = await rpc(origin, token, "turn/prepare", { sessionId: agent.id, userMessageId: message.id, query }, `memory-${message.id}`);
+          snapshots.set(agent, result.result?.text || "个人记忆不可用；旧快照已失效。");
+        } catch { snapshots.set(agent, "个人记忆查询失败；旧快照已失效。"); }
+      }
+      return next();
+    });
+  });
   let listed = [];
   try {
     await rpc(origin, token, "initialize", {}, "init");

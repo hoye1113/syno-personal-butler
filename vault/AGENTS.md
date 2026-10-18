@@ -45,16 +45,16 @@ PREFLIGHT -> ADMISSION -> INVENTORY -> CLASSIFY -> TRANSFORM
 ```
 
 - 写入前按 BV、opus ID、cv ID、`source_url` 查重。
-- B 站新收录只接受用户提供的单篇 opus/cv；不自动扫描空间，不读取图片。
+- B 站新收录只接受用户提供的单篇 opus/cv；不自动扫描空间，完整保留正文配图。
 - B站专栏同时区分 `source_tier`、`material_tier`、`source_form` 与最终 `content_form`。
-- S级默认以对谈或圆桌出版：真实问答使用 `source/column`，演讲重构使用 `reconstructed/editorial` 和“编者问”。
+- 默认保留完整来源正文与简要导读，不强制对谈、圆桌、金句或固定空行；深度写作只按主人要求执行。
 - 第三方总结使用“专栏整理”，不得把转述写进真实人物口中。
 - 1 BV = 1 篇 canonical 笔记；禁止额外生成 `- 对谈稿.md`。
 - S级笔记必须用“支持、补充、反驳、限制、依赖、应用于、示例”说明知识关系；不得只放裸 `[[wikilink]]`。
 - 找不到真实关系时标 `status: orphan` 并说明缺口，不得凑数。
-- 已有 MOC 可随收录更新；新建 MOC、新 tag、覆盖已有 canonical 笔记必须先取得用户确认。
+- 已有 MOC 可随收录更新；明确且无歧义的更新与移动直接执行；知识删除、合并必须展示绑定 ID、版本和范围的预览，等待主人另条真实消息确认。
 - 校验未通过或 `unresolved` 非空时，不得报告“收录完成”。
-- 新 B站专栏必须声明 `ingest_workflow: bilibili_opus_ingest_v2`、来源/成稿形态、声音依据、核验范围与事实状态；不要求 transcript、Recastory 或 Spot Check。
+- 新 B站单篇图文默认 full_body_v1，保留真实来源与未核验状态；旧 bilibili_opus_ingest_v2 仅按历史契约解释。
 - 基于 vault 回答时，verified 可附来源引用；partial 使用保守措辞；unverified 只作为检索线索。
 
 ## 修改边界
@@ -67,4 +67,6 @@ PREFLIGHT -> ADMISSION -> INVENTORY -> CLASSIFY -> TRANSFORM
 
 ## 完成定义
 
-收录完成必须同时满足：目标路径正确、frontmatter 合法、tag 合法、来源可回溯、无重复 source/BV、正文符合密度契约、反向链或 orphan 已声明、已有 MOC 已处理、专项校验通过，并向用户披露路径、路由、变更和未解决项。
+收录完成必须同时满足：目标路径正确、frontmatter 合法、tag 合法、来源可回溯、无重复 source/BV、完整正文与配图已核验、反向链或 orphan 已声明、已有 MOC 已处理、专项校验通过，并向用户披露路径、路由、变更和未解决项。
+
+个人记忆仅存 ops/memory，经主人后续确认后生效，不属于本 vault 普通知识检索或云端发布。同步开发默认关闭，隔离验收与发布授权完成后正式启用。删除与遗忘只影响当前有效内容，不承诺擦除历史。

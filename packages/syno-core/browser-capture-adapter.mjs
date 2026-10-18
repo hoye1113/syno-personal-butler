@@ -1,3 +1,6 @@
+import { sourceValidity } from "./source-validity.mjs";
+import { htmlImageReferences } from "./source-resources.mjs";
+import { extractReadableText } from "./source-fetcher.mjs";
 import { createHash } from "node:crypto";
 import net from "node:net";
 
@@ -8,8 +11,6 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_SESSION_TTL_MS = 2 * 60 * 60 * 1_000;
 const MAX_CONTENT_CHARS = 100_000;
 const ALLOWED_ACTIONS = Object.freeze(new Set(["navigate", "snapshot", "list_tabs", "close_session"]));
-const INTERACTION_PATTERN = /(?:请.{0,12}(?:登录|登入|验证)|log\s*in|sign\s*in|验证码|captcha|人机验证|verify\s+(?:you|that)|access\s+denied|访问被拒绝)/iu;
-const INTERACTION_URL_PATTERN = /(?:login|signin|captcha|challenge|verify|verification)/iu;
 
 function adapterError(code, message, details = {}) {
   return Object.assign(new Error(message), { code, ...details });
@@ -90,9 +91,7 @@ function browserList(value) {
 }
 
 function requiresInteraction({ finalUrl, title, content }) {
-  const body = `${title || ""}\n${content || ""}`;
-  return INTERACTION_URL_PATTERN.test(String(finalUrl || ""))
-    || (body.length < 4_000 && INTERACTION_PATTERN.test(body));
+  return sourceValidity({ url: finalUrl, title, text: content }).code === "SOURCE_VERIFICATION_REQUIRED";
 }
 
 class BrowserCaptureAdapter {
@@ -139,7 +138,13 @@ class BrowserCaptureAdapter {
     }
     if (action === "snapshot") {
       const session = await this.#ensureSession(id, task);
-      return this.#run(["observe", "--session", session, "--max-tokens", "25000", "--json"]);
+      const observed = await this.#run(["observe", "--session", session, "--max-tokens", "25000", "--json"]);
+      const raw = observed.observation ?? observed.snapshot ?? observed.content ?? observed.text;
+      const finalUrl = firstString(observed, ["url", "final_url", "finalUrl"]) || task.requestedUrl;
+      if (!requiresInteraction({ finalUrl, title: observed.title, content: flattenSnapshotTree(raw) })) {
+        try { const page = await this.#run(["get-html", "--session", session, "--max-bytes", "2000000", "--json"]); return { ...observed, html: page.html, htmlTruncated: page.truncated }; } catch { /* Unsupported HTML extraction is reported as incomplete resources. */ }
+      }
+      return observed;
     }
     if (action === "list_tabs") {
       const session = await this.#ensureSession(id, task);
@@ -307,9 +312,11 @@ class BrowserCaptureAdapter {
     const requested = assertSafeUrl(requestedUrl);
     if (final.origin !== requested.origin) throw adapterError("BROWSER_REDIRECT_ORIGIN_DENIED", "浏览器页面跳转到了未签发的站点");
     const raw = result?.observation ?? result?.snapshot ?? result?.tree ?? result?.content ?? result?.text ?? result?.data;
-    const content = flattenSnapshotTree(raw).replace(/\u0000/gu, " ").trim().slice(0, this.maxContentChars);
+    const images = result.html ? htmlImageReferences(result.html, final.toString()) : null;
+    const fullContent = images ? extractReadableText(images.html, "text/html") : flattenSnapshotTree(raw).replace(/\u0000/gu, " ").trim();
+    const content = fullContent.slice(0, this.maxContentChars);
     const title = firstString(result, ["title", "page_title", "pageTitle"]);
-    const base = { requestedUrl, finalUrl: final.toString(), title, content, contentDigest: digest(content), usedActions: ["navigate", "observe"], browserSessionId: this.sessions.get(id)?.logicalSession };
+    const base = { requestedUrl, finalUrl: final.toString(), title, content, truncated: result.htmlTruncated === true || fullContent.length > this.maxContentChars, resources: images?.refs, resourceDiscoveryComplete: Boolean(images) && result.htmlTruncated !== true, contentDigest: digest(content), usedActions: ["navigate", "observe"], browserSessionId: this.sessions.get(id)?.logicalSession };
     const observation = requiresInteraction(base)
       ? { ...base, status: "failed", blocked: "unattended_auth", error: { code: "BROWSER_BLOCKED_UNATTENDED", message: "页面要求登录或人机验证；无人值守读取已停止，且不会绕过验证" } }
       : !content

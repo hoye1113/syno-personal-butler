@@ -1,10 +1,11 @@
+import { sourceValidity } from "./source-validity.mjs";
 import crypto from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { PATHS, relativeToRoot, resolveInside } from "./paths.mjs";
 import { frontmatterData } from "./validator.mjs";
-import { assertKnowledgeNotSensitive, isSensitiveKnowledgeNote, sliceKnowledgeText } from "./knowledge-read.mjs";
+import { quarantineReason, isExcludedKnowledge, assertKnowledgeNotSensitive, isSensitiveKnowledgeNote, sliceKnowledgeText } from "./knowledge-read.mjs";
 
 function plainText(markdown) {
   return String(markdown).replace(/^---[\s\S]*?---\s*/m, "").replace(/!\[.*?\]\(.*?\)/g, "")
@@ -83,6 +84,8 @@ class KnowledgeStore {
     const { metadata, fingerprint } = await this.#inventory(); const notes = [];
     for (const entry of metadata) {
       const markdown = await this.#readMarkdown(entry.file); const text = plainText(markdown); const frontmatter = frontmatterData(markdown);
+      const body = markdown.replace(/^---[\s\S]*?---\s*/u, "").replace(/^# .*$/mu, "").replace(/## 关系状态[\s\S]*$/u, "").trim();
+      if (quarantineReason(this.#logicalPath(entry.file), markdown) || isExcludedKnowledge(markdown) || sourceValidity({ text: body }).code === "SOURCE_VERIFICATION_REQUIRED") continue;
       const title = titleOf(markdown, entry.file); const legacyTags = arrayValue(frontmatter.values.legacy_tags);
       const source = frontmatter.values.source_url || frontmatter.values.source || "";
       const sourceDigest = frontmatter.values.source_content_sha256 || "";
@@ -92,7 +95,7 @@ class KnowledgeStore {
       const sensitive = isSensitiveKnowledgeNote(markdown);
       // D13.6 修正：逻辑路径（vault/...）对本实例 vaultRoot 的父目录求相对——PATHS 只供默认值，
       // 显式根（测试夹具/非常规 vault）不得被进程级 KNOWLEDGE_ROOT 边界误杀。
-      notes.push({ path: this.#logicalPath(entry.file), title, excerpt: sensitive ? "" : text.slice(0, 280), tags: frontmatter.tags, legacyTags, source, sourceDigest, sourceFileDigest, stability, date, searchable: isContentNote(this.vaultRoot, entry.file), sensitive,
+      notes.push({ id: frontmatter.values.note_id || `note-${crypto.createHash("sha256").update(this.#logicalPath(entry.file)).digest("hex").slice(0, 24)}`, version: crypto.createHash("sha256").update(markdown).digest("hex"), path: this.#logicalPath(entry.file), title, excerpt: sensitive ? "" : text.slice(0, 280), tags: frontmatter.tags, legacyTags, source, sourceDigest, sourceFileDigest, stability, date, searchable: isContentNote(this.vaultRoot, entry.file), sensitive,
         knowledgeState: frontmatter.values.knowledge_state || "", linkStatus: frontmatter.values.link_status || "",
         qualityStatus: frontmatter.values.quality_status || (frontmatter.values.source || frontmatter.values.source_url ? "traceable" : "needs_source"),
         index: { title: tokens(title), tags: tokens(frontmatter.tags.join(" ")), legacyTags: tokens(legacyTags.join(" ")), body: sensitive ? [] : tokens(text), source: tokens(source) } });
@@ -144,6 +147,12 @@ class KnowledgeStore {
     if (!relative.startsWith("vault/") || !relative.endsWith(".md")) throw new Error("只允许读取 vault 内 Markdown");
     const candidate = resolveInside(this.vaultRoot, relative.slice("vault/".length));
     const markdown = await this.#readMarkdown(candidate);
+    const quarantine = quarantineReason(relative, markdown);
+    if (quarantine) throw Object.assign(new Error(quarantine.reason), { code: quarantine.code });
+    if (isExcludedKnowledge(markdown)) throw Object.assign(new Error("个人记忆或失效知识不属于普通读取"), { code: "KNOWLEDGE_EXCLUDED" });
+    const body = markdown.replace(/^---[\s\S]*?---\s*/u, "").replace(/^# .*$/mu, "").replace(/## 关系状态[\s\S]*$/u, "").trim();
+    const validity = sourceValidity({ text: body });
+    if (validity.code === "SOURCE_VERIFICATION_REQUIRED") throw Object.assign(new Error("待修复的验证页不属于有效知识"), { code: validity.code });
     return { path: relative, title: titleOf(markdown, candidate), markdown };
   }
   async findBySource({ canonicalUrl = "", contentSha256 = "" } = {}) {
@@ -163,4 +172,4 @@ class KnowledgeStore {
   }
 }
 
-export { KnowledgeStore, plainText, titleOf, walkMarkdown };
+export { tokens, KnowledgeStore, plainText, titleOf, walkMarkdown };

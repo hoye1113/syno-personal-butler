@@ -1,3 +1,4 @@
+import { sourceValidity } from "./source-validity.mjs";
 import { lookup as dnsLookup } from "node:dns/promises";
 import http from "node:http";
 import https from "node:https";
@@ -255,7 +256,12 @@ async function fetchSourceText(value, options = {}) {
     if (contentType && !/^text\//.test(contentType) && !["application/json", "application/xhtml+xml", "application/xml"].includes(contentType)) {
       throw new Error(`不支持的来源类型：${contentType}`);
     }
-    const readable = extractReadableText(response.body.toString("utf8"), contentType);
+    const html = response.body.toString("utf8");
+    const title = /<title[^>]*>([\s\S]*?)<\/title>/iu.exec(html)?.[1] || "";
+    const images = /html/iu.test(contentType) ? (await import("./source-resources.mjs")).htmlImageReferences(html, url.toString()) : { html, refs: undefined };
+    const readable = extractReadableText(images.html, contentType);
+    const validity = sourceValidity({ text: readable, html, title, url: url.toString() });
+    if (!validity.valid) throw Object.assign(new Error(`来源需要处理：${validity.reason}`), { code: validity.code, retryable: false });
     if (!readable) throw new Error("来源没有可读取正文");
     if (hasSourceNoise(readable)) throw new Error("来源正文疑似 CSS 噪声，低质量");
     return {
@@ -263,6 +269,7 @@ async function fetchSourceText(value, options = {}) {
       contentType: contentType || "text/plain",
       text: readable.slice(0, options.maxText ?? MAX_SOURCE_TEXT),
       truncated: readable.length > (options.maxText ?? MAX_SOURCE_TEXT),
+      resources: images.refs,
     };
   }
   throw new Error("来源抓取失败");
