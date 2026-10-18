@@ -572,6 +572,19 @@ test("selecting the proposed keep-separate approves instead of cancelling the Jo
   assert.equal(result.workflow.stage, "approved");
 });
 
+test("a proposal that auto-applies may move from proposed straight to committed", async (t) => {
+  const { scheduled, store, coordinator } = await fixture(t);
+  const receipt = await coordinator.receive(
+    { kind: "text", value: "auto commit body" },
+    { ownerKey: "owner", channel: "web", messageId: "auto-commit-1" },
+  );
+  await scheduled.shift()();
+  const proposed = await store.get(receipt.workflow.id);
+  assert.equal(proposed.stage, "proposed");
+  const committed = await store.update(receipt.workflow.id, { stage: "committed" });
+  assert.equal(committed.stage, "committed");
+});
+
 test("reject persists the Artifact before making the Workflow terminal", async (t) => {
   const { scheduled, ingest, store } = await fixture(t);
   let attempts = 0;

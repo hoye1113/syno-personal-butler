@@ -44,7 +44,7 @@ class ChannelConversationHandler {
       await this.pendingDecisions.update?.(decision.id, { consumedAt: new Date().toISOString(), reservedAt: null }).catch(() => {});
       await this.#record("channel.decision.fastpath", { ...ctx, decisionId: decision.id, action });
       if (reject) return { text: `已拒绝收录 ${workflow.id}，不会写入。` };
-      if (select) return { text: `已选择「${select}」，正在重新生成方案；完成后请你确认。` };
+      if (select) return { text: `已选择「${select}」，正在按该方式处理；完成后会发结果。` };
       const job = result?.result?.job || result?.job;
       return { text: `已确认收录 ${workflow.id}，当前状态：${job?.status || "processing"}。` };
     } catch (error) {

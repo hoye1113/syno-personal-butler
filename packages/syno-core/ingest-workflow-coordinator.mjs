@@ -29,7 +29,9 @@ const TRANSITIONS = new Map([
   ["received", new Set(["extracting", "failed_retryable", "failed_terminal", "rejected"])],
   ["extracting", new Set(["classifying", "proposed", "failed_retryable", "failed_terminal"])],
   ["classifying", new Set(["proposed", "failed_retryable", "failed_terminal"])],
-  ["proposed", new Set(["awaiting_decision", "superseded", "rejected", "failed_retryable", "failed_terminal"])],
+  // 无冲突自动收录在同一次 prepare 内同步执行 apply，proposed 直接落 committed；
+  // 缺这一条会让「已写入」的收录在状态更新处失败（2026-10-18 真机）。
+  ["proposed", new Set(["awaiting_decision", "committed", "superseded", "rejected", "failed_retryable", "failed_terminal"])],
   ["awaiting_decision", new Set(["approved", "proposed", "superseded", "rejected", "failed_retryable", "failed_terminal"])],
   ["approved", new Set(["executing", "failed_retryable", "failed_terminal"])],
   ["executing", new Set(["validating", "failed_retryable", "failed_terminal"])],
