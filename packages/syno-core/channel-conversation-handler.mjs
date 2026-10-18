@@ -28,7 +28,25 @@ class ChannelConversationHandler {
       ? (await this.pendingDecisions.list({ ownerKey: ctx.ownerKey, threadKey: ctx.threadKey }))
         .filter((item) => !item.consumedAt && !item.reservedAt && Date.parse(item.expiresAt) > Date.now())
       : [];
-    if (live.length > 1) return null;
+    let memories = [];
+    if (this.memoryStore?.records) {
+      try {
+        memories = (await this.memoryStore.records(ctx.ownerKey))
+          .filter(({ record }) => record.schemaVersion === 2 && record.status === "proposed");
+      } catch { memories = []; }
+    }
+    // 口令只是「全局恰好一条待确认」时的快路径；多条一律不猜，避免把收录/记忆搞混。
+    const total = live.length + memories.length;
+    if (total === 0) return null;
+    if (total > 1) {
+      const lines = [
+        ...live.map((item, index) => `${index + 1}. 收录：${String(item.summary || item.id)}`),
+        ...memories.map(({ record }, index) => `${live.length + index + 1}. 记忆：${String(record.statement || record.id)}`),
+      ];
+      return {
+        text: `现在有 ${total} 项待确认，我不能替你猜：\n${lines.join("\n")}\n请指名要处理哪一项（例如「确认第 1 条」「拒绝那条记忆」）。`,
+      };
+    }
     if (live.length === 1) {
       if (!this.ingestWorkflows?.decide) return null;
       const decision = live[0];
@@ -44,7 +62,6 @@ class ChannelConversationHandler {
           code: decision.approvalCode,
           diffDigest: decision.diffDigest,
         }, { ownerKey: ctx.ownerKey, threadKey: ctx.threadKey, channel: ctx.channel, senderId: message.senderId });
-        // 决策已被这次真实消息消费；否则它会一直挂在待确认里。
         await this.pendingDecisions.update?.(decision.id, { consumedAt: new Date().toISOString(), reservedAt: null }).catch(() => {});
         await this.#record("channel.decision.fastpath", { ...ctx, decisionId: decision.id, action });
         if (reject) return { text: `已拒绝收录 ${workflow.id}，不会写入。` };
@@ -56,14 +73,11 @@ class ChannelConversationHandler {
         return { text: `确认操作未能执行：${String(error.message || error)}` };
       }
     }
-    // 没有收录决策时，单条记忆候选也走确定性确认/丢弃（不再依赖模型查 decisions.list）。
+    // 恰好一条记忆候选；只接受确认/拒绝（选择收录方式不适用）。
     const memoryConfirm = /^(?:确认|同意|可以)$/u.test(text);
-    if ((!memoryConfirm && !reject) || !this.memoryStore?.records) return null;
+    if ((!memoryConfirm && !reject) || memories.length !== 1) return null;
     try {
-      const proposals = (await this.memoryStore.records(ctx.ownerKey))
-        .filter(({ record }) => record.schemaVersion === 2 && record.status === "proposed");
-      if (proposals.length !== 1) return null;
-      const { record, version } = proposals[0];
+      const { record, version } = memories[0];
       const operation = reject ? "memory.reject" : "memory.promote";
       const result = await this.core.execute(buildOperationRequest(operation, {
         id: record.id,
