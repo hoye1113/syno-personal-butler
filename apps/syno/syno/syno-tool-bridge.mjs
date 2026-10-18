@@ -68,7 +68,10 @@ class SynoToolBridge {
     this.reconciliationCases = reconciliationCases;
     this.recordEvent = recordEvent;
     this.effectCounter = 0;
-    this.activeContext = null;
+    // 2026-10-18 修复：聊天回合与收录分析是两个并发会话（capture 并发度为 2），
+    // 单槽 activeContext 会让第二个会话直接撞「桥忙」并把收录标 failed_retryable。
+    // 会话上下文按 harnessSessionId 隔离；同一会话仍只允许一个活动回合。
+    this.contexts = new Map();
     this.idempotentResults = new Map();
     const exposedNames = Array.isArray(exposedToolNames)
       ? new Set(exposedToolNames.map(normalizeExposedToolName).filter(Boolean))
@@ -81,12 +84,23 @@ class SynoToolBridge {
 
   effectVersion() { return this.effectCounter; }
 
+  contextFor(request) {
+    const sessionId = String(request?.params?.sessionId || "");
+    if (sessionId && this.contexts.has(sessionId)) return this.contexts.get(sessionId);
+    // 兼容旧调用：只绑了一个上下文时沿用单槽语义（部分只读工具调用不带会话 id）。
+    // 多于一个时不做猜测，交给会话身份校验，避免把 A 会话的工具结果交给 B。
+    if (this.contexts.size === 1) return this.contexts.values().next().value;
+    return null;
+  }
+
   bindContext(context) {
-    // 桥忙是瞬时条件（持有方 release 即恢复）：必须挂 retryable。coordinator 主路径只对
+    // 无会话身份的调用方沿用旧的单槽语义（内部测试/一次性工具调用）；有身份的按会话隔离。
+    const sessionId = String(context.harnessSessionId || "sessionless");
+    // 同一会话并发回合仍是冲突：必须挂 retryable。coordinator 主路径只对
     // retryable === true 走 failed_retryable + 60s 退避（maxPrepareAttempts=8 封顶升终态）；
     // 未挂标记时收录撞槽一次即 failed_terminal（2026-08-07 生产事故）。
-    if (this.activeContext) throw Object.assign(bridgeError("SYNO_BRIDGE_CONTEXT_BUSY", "Syno Tool Bridge 正在处理另一个会话"), { retryable: true });
-    this.activeContext = Object.freeze({
+    if (this.contexts.has(sessionId)) throw Object.assign(bridgeError("SYNO_BRIDGE_CONTEXT_BUSY", "Syno Tool Bridge 正在处理另一个会话"), { retryable: true });
+    const bound = Object.freeze({
       ownerKey: String(context.ownerKey || this.ownerKey),
       threadKey: String(context.threadKey || "main"),
       channel: String(context.channel || "harness"),
@@ -102,10 +116,13 @@ class SynoToolBridge {
       ...(context.browserWorkflowId ? { browserWorkflowId: String(context.browserWorkflowId) } : {}),
       ...(context.browserCloseAuthorized === true ? { browserCloseAuthorized: true } : {}),
     });
-    this.recordEvent?.("bridge.context.bound", { runId: this.activeContext.runId || null, messageId: this.activeContext.messageId || null, channel: this.activeContext.channel }).catch(() => {});
+    this.contexts.set(sessionId, bound);
+    this.recordEvent?.("bridge.context.bound", { runId: bound.runId || null, messageId: bound.messageId || null, channel: bound.channel }).catch(() => {});
     return () => {
-      this.recordEvent?.("bridge.context.released", { runId: this.activeContext?.runId || null, messageId: this.activeContext?.messageId || null }).catch(() => {});
-      this.activeContext = null;
+      // 只释放自己绑定的那一个：迟到的旧 release 不能把同会话的新回合踢掉。
+      if (this.contexts.get(sessionId) !== bound) return;
+      this.contexts.delete(sessionId);
+      this.recordEvent?.("bridge.context.released", { runId: bound.runId || null, messageId: bound.messageId || null, channel: bound.channel }).catch(() => {});
     };
   }
 
@@ -155,7 +172,7 @@ class SynoToolBridge {
       };
     }
     if (["memory/context", "turn/prepare"].includes(request.method)) {
-      const active = this.activeContext || await this.resolveWebContext?.(request.params || {});
+      const active = this.contextFor(request) || await this.resolveWebContext?.(request.params || {});
       if (!active?.privateConversation || active.harnessSessionId !== request.params?.sessionId) return { ...response, error: { code: -32003, message: "MEMORY_CONTEXT_DENIED" } };
       if (request.method === "turn/prepare") {
         const key = `${active.ownerKey}:${active.threadKey}:${active.messageId}`;
@@ -170,16 +187,17 @@ class SynoToolBridge {
     const name = String(request.params?.name || "");
     const definition = this.exposed.get(name);
     if (!definition) return { ...response, error: { code: -32601, message: "Tool not found" } };
-    const resolvedWeb = !this.activeContext && BUSINESS_TOOL_NAMES.includes(definition.name)
+    const bound = this.contextFor(request);
+    const resolvedWeb = !bound && BUSINESS_TOOL_NAMES.includes(definition.name)
       ? await this.resolveWebContext?.(request.params || {}) : null;
-    if (!this.activeContext && !resolvedWeb) {
+    if (!bound && !resolvedWeb) {
       this.recordEvent?.("bridge.context.rejected", { reason: "context_required", method: request.method }).catch(() => {});
       return {
         ...response,
         error: { code: -32001, message: "SYNO_BRIDGE_CONTEXT_REQUIRED: 工具调用没有绑定 Syno 会话" },
       };
     }
-    const active = this.activeContext || { ...resolvedWeb, allowedTools: new Set(resolvedWeb.allowedTools), attachments: [] };
+    const active = bound || { ...resolvedWeb, allowedTools: new Set(resolvedWeb.allowedTools), attachments: [] };
     const business = BUSINESS_TOOL_NAMES.includes(definition.name);
     if (business && (!active.harnessSessionId || request.params?.sessionId !== active.harnessSessionId || !active.messageId || active.privateConversation !== true)) {
       return { ...response, error: { code: -32003, message: "BUSINESS_CONTEXT_REQUIRED: 业务工具必须来自已绑定主人的私聊回合" } };
