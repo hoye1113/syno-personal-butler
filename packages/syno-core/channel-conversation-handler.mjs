@@ -3,98 +3,20 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { isImageMime } from "./image-mime.mjs";
 import { IntakeService } from "./intake.mjs";
-import { buildOperationRequest } from "./operation-registry.mjs";
 
 const MAX_INLINE_IMAGE_BYTES = 3 * 1024 * 1024;
 
 // Only explicit session controls bypass the model. Business intent belongs to
 // the chat loop; quarantined attachments never imply permission to capture.
 class ChannelConversationHandler {
-  constructor({ runtime, core, attachmentToPayload, intake = new IntakeService(), journal, channelContinuations, imageStore, pendingDecisions = null, ingestWorkflows = null, memoryStore = null } = {}) {
+  constructor({ runtime, core, attachmentToPayload, intake = new IntakeService(), journal, channelContinuations, imageStore } = {}) {
     if (!runtime || !core) throw new Error("ChannelConversationHandler 缺少 Runtime 或 Core");
-    Object.assign(this, { runtime, core, attachmentToPayload, intake, journal, channelContinuations, imageStore, pendingDecisions, ingestWorkflows, memoryStore });
+    Object.assign(this, { runtime, core, attachmentToPayload, intake, journal, channelContinuations, imageStore });
     this.activeRuns = new Map();
   }
   #record(event, data) { return this.journal?.record?.(event, data)?.catch(() => null) || Promise.resolve(); }
 
-  async #resolveCaptureDecision(text, message, ctx) {
-    if (message.privateConversation !== true) return null;
-    if (Array.isArray(message.artifacts) && message.artifacts.length) return null;
-    const confirm = /^(?:确认|同意|可以|收录|分开保存)$/u.test(text);
-    const reject = /^(?:拒绝|丢弃)$/u.test(text);
-    const select = text === "追加来源" ? "append-source" : text === "仅关联" ? "link-only" : null;
-    if (!confirm && !reject && !select) return null;
-    const live = this.pendingDecisions?.list
-      ? (await this.pendingDecisions.list({ ownerKey: ctx.ownerKey, threadKey: ctx.threadKey }))
-        .filter((item) => !item.consumedAt && !item.reservedAt && Date.parse(item.expiresAt) > Date.now())
-      : [];
-    let memories = [];
-    if (this.memoryStore?.records) {
-      try {
-        memories = (await this.memoryStore.records(ctx.ownerKey))
-          .filter(({ record }) => record.schemaVersion === 2 && record.status === "proposed");
-      } catch { memories = []; }
-    }
-    // 口令只是「全局恰好一条待确认」时的快路径；多条一律不猜，避免把收录/记忆搞混。
-    const total = live.length + memories.length;
-    if (total === 0) return null;
-    if (total > 1) {
-      const lines = [
-        ...live.map((item, index) => `${index + 1}. 收录：${String(item.summary || item.id)}`),
-        ...memories.map(({ record }, index) => `${live.length + index + 1}. 记忆：${String(record.statement || record.id)}`),
-      ];
-      return {
-        text: `现在有 ${total} 项待确认，我不能替你猜：\n${lines.join("\n")}\n请指名要处理哪一项（例如「确认第 1 条」「拒绝那条记忆」）。`,
-      };
-    }
-    if (live.length === 1) {
-      if (!this.ingestWorkflows?.decide) return null;
-      const decision = live[0];
-      // 删除/合并需要模型+判官的另一道授权，确定性快路径不碰。
-      if (decision.kind === "knowledge" || !decision.artifactId) return null;
-      try {
-        const workflow = await this.ingestWorkflows.status(decision.artifactId, { ownerKey: ctx.ownerKey });
-        if (!workflow) return null;
-        const action = select ? "select" : reject ? "reject" : "approve";
-        const result = await this.ingestWorkflows.decide(workflow.id, {
-          action,
-          ...(select ? { option: select } : {}),
-          code: decision.approvalCode,
-          diffDigest: decision.diffDigest,
-        }, { ownerKey: ctx.ownerKey, threadKey: ctx.threadKey, channel: ctx.channel, senderId: message.senderId });
-        await this.pendingDecisions.update?.(decision.id, { consumedAt: new Date().toISOString(), reservedAt: null }).catch(() => {});
-        await this.#record("channel.decision.fastpath", { ...ctx, decisionId: decision.id, action });
-        if (reject) return { text: `已拒绝收录 ${workflow.id}，不会写入。` };
-        if (select) return { text: `已选择「${select}」，正在按该方式处理；完成后会发结果。` };
-        const job = result?.result?.job || result?.job;
-        return { text: `已确认收录 ${workflow.id}，当前状态：${job?.status || "processing"}。` };
-      } catch (error) {
-        await this.#record("channel.decision.fastpath_failed", { ...ctx, decisionId: decision.id, code: error.code || "DECISION_FASTPATH_FAILED" });
-        return { text: `确认操作未能执行：${String(error.message || error)}` };
-      }
-    }
-    // 恰好一条记忆候选；只接受确认/拒绝（选择收录方式不适用）。
-    const memoryConfirm = /^(?:确认|同意|可以)$/u.test(text);
-    if ((!memoryConfirm && !reject) || memories.length !== 1) return null;
-    try {
-      const { record, version } = memories[0];
-      const operation = reject ? "memory.reject" : "memory.promote";
-      const result = await this.core.execute(buildOperationRequest(operation, {
-        id: record.id,
-        version,
-        ...(reject ? {} : { confirmationMessageId: message.id }),
-      }), { ownerKey: ctx.ownerKey, threadKey: ctx.threadKey, channel: ctx.channel, senderId: message.senderId, messageId: message.id });
-      await this.#record("channel.memory.fastpath", { ...ctx, memoryId: record.id, operation });
-      return {
-        text: reject
-          ? `已丢弃记忆候选 ${record.id}。`
-          : `已确认长期记忆 ${record.id}（${result.job?.status || "completed"}）。`,
-      };
-    } catch (error) {
-      await this.#record("channel.memory.fastpath_failed", { ...ctx, code: error.code || "MEMORY_FASTPATH_FAILED" });
-      return { text: `记忆操作未能执行：${String(error.message || error)}` };
-    }
-  }
+
   async handle(message) {
     const text = String(message.text || "").trim();
     const ownerKey = String(message.ownerKey || "local-user");
@@ -114,10 +36,6 @@ class ChannelConversationHandler {
         }
         return { text: active ? "已请求停止当前操作；已完成的写入会保留。" : "当前没有运行中的对话操作。" };
       }
-      // 2026-10-18：单条收录决策 + 明确「确认/拒绝」走确定性快路径——
-      // 不再让模型查 ID/版本，也避免把「分开保存」误当成 select 重算。
-      const confirmed = await this.#resolveCaptureDecision(text, message, { ownerKey, threadKey, channel });
-      if (confirmed) return confirmed;
       await this.#record("channel.message.received", trace);
       const attachments = [];
       const images = [];

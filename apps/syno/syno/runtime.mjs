@@ -695,22 +695,13 @@ function createSynoRuntime(options = {}) {
     runtime: cognitiveRuntime,
     intake: sourceIntake,
     core: channelCore,
-    ingest,
-    ingestWorkflows,
-    pendingDecisions,
-    memoryStore,
     // 附件隔离区：飞书专属目录；转换器在该目录内做越界与大小校验
     attachmentToPayload: (artifact) => artifactToIntakePayload(artifact, {
       quarantineRoot: path.join(PATHS.runtimeRoot, "quarantine", "feishu"),
     }),
     journal,
-    browserCapture,
-    recentInteractions,
     channelContinuations,
     imageStore,
-    imageTranscriber,
-    // today 服务在本函数后半段才构造（依赖 host/goals），这里给惰性代理，避免 TDZ
-    today: { snapshot: (options = {}) => today.snapshot(options) },
   });
   async function onDuplicateWorkflow({ workflow, context = {} } = {}) {
     const targetChannel = String(context.channel || workflow?.originChannel || "");
