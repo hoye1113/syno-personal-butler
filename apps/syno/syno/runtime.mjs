@@ -8,7 +8,7 @@ import { RecoveryJournal } from "../../../packages/syno-core/recovery-journal.mj
 import { KnowledgePublisher } from "../../../packages/syno-core/knowledge-publisher.mjs";
 import { KnowledgeChanges } from "../../../packages/syno-core/knowledge-changes.mjs";
 import { MemoryStore } from "../../../packages/syno-core/memory-store.mjs";
-import { captureHasBlockingConflict, shouldNotifyWorkflowEvent } from "../../../packages/syno-core/capture-conflict.mjs";
+import { captureHasBlockingConflict, captureTargetExists, shouldNotifyWorkflowEvent } from "../../../packages/syno-core/capture-conflict.mjs";
 import { createBusinessTools } from "../../../packages/syno-core/business-tools.mjs";
 import { AgentHost } from "../../../packages/syno-core/agent-host.mjs";
 import { ApprovalAdvisor, minimalAdvice } from "./approval-advisor.mjs";
@@ -800,7 +800,8 @@ function createSynoRuntime(options = {}) {
       // trust-but-clarify：只有系统歧义（撞重复=merge / 有未决事项）才回到人在环；
       // additive 且无未决事项 = 无冲突，直接自动收录，不产 PendingDecision。
       // 2026-10-18：只有同源/同内容的真重复才澄清；弱关联与标签建议自动按 keep-separate 执行。
-      const hasConflict = captureHasBlockingConflict(proposal);
+      const targetExists = captureTargetExists(await knowledge.list({ searchable: true }), proposal.suggestedPath);
+      const hasConflict = captureHasBlockingConflict(proposal) || targetExists;
       const existingJob = workflow.jobId
         ? await host.inspect(workflow.jobId, { ownerKey: workflow.ownerKey })
         : null;
@@ -826,7 +827,7 @@ function createSynoRuntime(options = {}) {
 
       if (!hasConflict && job.status !== "completed") {
         const error = Object.assign(new Error(job.error?.message || "收录写入尚未完成"), { code: job.error?.code || "INGEST_WRITE_NOT_COMPLETED", retryable: job.status === "waiting_provider" });
-        await ingestWorkflows.store.update(workflow.id, { stage: error.retryable ? "failed_retryable" : "failed_terminal", jobId: job.id, lastError: { code: error.code, message: error.message } });
+        await ingestWorkflows.store.update(workflow.id, { stage: error.retryable ? "failed_retryable" : "failed_terminal", jobId: job.id, lastError: { code: error.code, message: error.message, retryable: error.retryable === true } });
         throw error;
       }
       if (!hasConflict) {

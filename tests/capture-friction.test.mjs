@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { captureHasBlockingConflict, shouldNotifyWorkflowEvent } from "../packages/syno-core/capture-conflict.mjs";
+import { captureHasBlockingConflict, captureTargetExists, shouldNotifyWorkflowEvent } from "../packages/syno-core/capture-conflict.mjs";
 
 test("only same-source or same-content duplicates block capture", () => {
   assert.equal(captureHasBlockingConflict({ duplicateAssessment: { sameSource: true } }), true);
@@ -20,4 +20,11 @@ test("retryable workflow failures are not announced as failures", () => {
   assert.equal(shouldNotifyWorkflowEvent("workflow.failed", { stage: "failed_terminal" }, { retryable: false }), true);
   assert.equal(shouldNotifyWorkflowEvent("workflow.reported", { stage: "reported" }), true);
   assert.equal(shouldNotifyWorkflowEvent("workflow.proposed", {}), false);
+});
+
+test("an existing suggested target path is a conflict", () => {
+  const notes = [{ path: "vault/02-Resources/A/n.md" }];
+  assert.equal(captureTargetExists(notes, "vault/02-Resources/A/n.md"), true);
+  assert.equal(captureTargetExists(notes, "vault/02-Resources/A/other.md"), false);
+  assert.equal(captureTargetExists(notes, ""), false);
 });

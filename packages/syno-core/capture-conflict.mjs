@@ -8,6 +8,12 @@ function captureHasBlockingConflict(proposal = {}) {
 }
 
 // 可重试失败不向主人发「未完成」通知：后台会自己重试，等终态再说。
+// 目标路径已存在同样是一次真冲突：弱关联自动 keep-separate 若撞上已有笔记，
+// apply 会以 INGEST_TARGET_EXISTS 失败；必须在 onProposed 前就转为待确认。
+function captureTargetExists(notes = [], suggestedPath = "") {
+  return Boolean(suggestedPath) && notes.some((note) => note.path === suggestedPath);
+}
+
 function shouldNotifyWorkflowEvent(type, workflow = {}, error = null) {
   if (type === "workflow.reported") return true;
   if (type !== "workflow.failed") return false;
@@ -15,4 +21,4 @@ function shouldNotifyWorkflowEvent(type, workflow = {}, error = null) {
   return true;
 }
 
-export { captureHasBlockingConflict, shouldNotifyWorkflowEvent };
+export { captureHasBlockingConflict, captureTargetExists, shouldNotifyWorkflowEvent };
