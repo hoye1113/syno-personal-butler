@@ -50,6 +50,8 @@ class KnowledgeChanges {
   async prepareTurn({ ownerKey, threadKey, messageId, text }) {
     const pending = (await this.decisions.list({ ownerKey, threadKey })).filter(d => d.kind === "knowledge" && !d.executingJob && d.creationMessageId !== messageId && Date.parse(d.expiresAt) > this.clock().getTime());
     if (!pending.length || !text?.trim() || !this.judge) return;
+    // 确定性前置：没有明确的确认/执行词就不进入模型判官，降低破坏性操作的误授权面。
+    if (!/(?:确认|同意|批准|删除|合并|覆盖|执行)/u.test(text)) return;
     const id = await this.judge({ message: text, decisions: pending.map(d => ({ id: d.id, summary: d.summary, targets: d.plan.targets })) });
     const selected = pending.find(d => d.id === id);
     if (!selected) return;

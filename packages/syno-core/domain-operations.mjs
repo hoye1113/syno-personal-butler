@@ -28,7 +28,7 @@ async function executeDomainOperation(operation, payload, { workspace, job, cloc
     }
     const id = `memory-${new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai" }).format(new Date(now)).replaceAll("-", "")}-${randomUUID().slice(0, 8)}`;
     const [year, month] = dateParts(new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai" }).format(new Date(now)));
-    const record = { schemaVersion: 2, id, ownerKey, kind: payload.kind || previous?.record.kind || "preference", scope: payload.scope || previous?.record.scope || "global", triggers: payload.triggers || previous?.record.triggers || [], statement: String(payload.statement || "").trim(), reason: String(payload.reason || "主人明确提出长期保存").trim(), status: "proposed", created: now, updated: now, sourceMessageId: job?.request?.sourceMessageId || "", ...(previous ? { supersedes: previous.record.id, supersedesVersion: previous.version } : {}) };
+    const record = { schemaVersion: 2, id, ownerKey, kind: payload.kind || previous?.record.kind || "background", scope: payload.scope || previous?.record.scope || "global", triggers: payload.triggers || previous?.record.triggers || [], statement: String(payload.statement || "").trim(), reason: String(payload.reason || "主人明确提出长期保存").trim(), status: "proposed", created: now, updated: now, sourceMessageId: job?.request?.sourceMessageId || "", ...(previous ? { supersedes: previous.record.id, supersedesVersion: previous.version } : {}) };
     if (!record.statement || !record.sourceMessageId) throw new Error("缺少记忆原文或主人来源消息");
     const file = path.join(opsRoot, "memory", year, month, `${id}.md`);
     await writeRecord(file, record, { schema: "personal-memory", title: `Memory ${id}` });

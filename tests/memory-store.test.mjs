@@ -13,6 +13,7 @@ test("deterministic recall: global rules, topic triggers, background and inactiv
   assert.deepEqual(recallMemories([memories[1]], "今天下雨吗"), []);
   assert.equal(recallMemories([memories[1]], "游戏引擎哪个好")[0].id, "background");
   assert.deepEqual(recallMemories([memories[2]], "写作"), []);
+  assert.deepEqual(recallMemories([item("plain-background", { kind: "background", scope: "global", triggers: [] })], "今天天气"), [], "漏填字段的 background 不能全局召回");
 });
 test("recall enforces whole-record budget and stable ties", () => {
   const items = Array.from({ length: 10 }, (_, n) => item(`r${n}`));
@@ -20,13 +21,27 @@ test("recall enforces whole-record budget and stable ties", () => {
   assert.equal(recallMemories(items, "问题", { maxChars: 10 }).length, 0);
   assert.ok(JSON.stringify(recallMemories(items, "问题")).length <= 3000);
 });
+test("a proposal without kind/scope defaults to background/global and is not globally recalled", async (t) => {
+  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "syno-memory-default-"));
+  t.after(() => fs.rm(workspace, { recursive: true, force: true }));
+  const opsRoot = path.join(workspace, "ops"), store = new MemoryStore({ opsRoot });
+  let message = "source";
+  const op = (name, payload) => executeDomainOperation(name, payload, { workspace, job: { ownerKey: "owner", request: { sourceMessageId: message } }, clock: () => new Date("2026-10-18T23:59:00Z") });
+  const first = (await op("memory.proposals.create", { statement: "使用中文回答" })).record;
+  assert.equal(first.kind, "background", "未指定 kind 时安全默认 background");
+  assert.equal(first.scope, "global", "未指定 scope 时安全默认 global");
+  message = "confirm";
+  await op("memory.promote", { id: first.id, version: recordVersion(first), confirmationMessageId: message });
+  assert.deepEqual(await store.search("owner", "你好"), [], "background 不能像全局偏好一样每轮注入");
+});
+
 test("propose/confirm/correct/replace/forget stays isolated and versioned across reload", async (t) => {
   const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "syno-memory-中文-"));
   t.after(() => fs.rm(workspace, { recursive: true, force: true }));
   const opsRoot = path.join(workspace, "ops"), store = new MemoryStore({ opsRoot });
   let message = "source";
   const op = (name, payload) => executeDomainOperation(name, payload, { workspace, job: { ownerKey: "owner", request: { sourceMessageId: message } }, clock: () => new Date("2026-10-18T23:59:00Z") });
-  const first = (await op("memory.proposals.create", { statement: "使用中文回答" })).record;
+  const first = (await op("memory.proposals.create", { statement: "使用中文回答", kind: "preference", scope: "global" })).record;
   assert.equal((await store.search("owner", "你好")).length, 0);
   await assert.rejects(op("memory.promote", { id: first.id, version: recordVersion(first), confirmationMessageId: message }));
   message = "confirm";

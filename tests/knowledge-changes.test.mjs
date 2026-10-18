@@ -19,6 +19,22 @@ async function fixture(t) {
   const all = await knowledge.search("", { limit: 20 });
   return { root, changes, decisions, ctx, all, knowledge, execute: (op, payload, messageId = "confirm", ownerKey = "owner", jobId = "job-1") => changes.execute(op, payload, { workspace: root, job: { id: jobId, ownerKey, threadKey: "main", request: { sourceMessageId: messageId } } }) };
 }
+test("prepareTurn only consults the judge for explicit confirmation wording", async (t) => {
+  const f = await fixture(t);
+  let calls = 0;
+  const changes = new KnowledgeChanges({
+    root: f.root, knowledge: f.knowledge, decisions: f.decisions,
+    judge: async ({ decisions }) => { calls += 1; return decisions[0]?.id || null; },
+  });
+  const note = f.all.find((n) => n.path.endsWith("a.md"));
+  const markdown = (await f.knowledge.read(note.path)).markdown;
+  await changes.preview("notes.delete", { id: noteIdentity(markdown, note.path), version: noteVersion(markdown) }, f.ctx);
+  await changes.prepareTurn({ ...f.ctx, messageId: "casual", text: "今天天气怎么样" });
+  assert.equal(calls, 0, "普通聊天不进入破坏性判官");
+  await changes.prepareTurn({ ...f.ctx, messageId: "confirm", text: "确认删除这篇" });
+  assert.equal(calls, 1, "明确确认才进入判官");
+});
+
 test("delete is a preview; model parameters cannot mint authorization; later exact Owner approval executes", async t => {
   const f = await fixture(t), n = f.all[0];
   const d = await f.changes.preview("notes.delete", n, f.ctx);
