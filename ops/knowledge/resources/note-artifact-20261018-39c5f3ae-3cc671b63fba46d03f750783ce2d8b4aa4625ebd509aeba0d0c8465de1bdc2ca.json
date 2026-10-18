@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "items": [
+    {
+      "source": "inline:svg:0",
+      "role": "body_resource",
+      "type": "svg",
+      "basis": "unsupported_inline_graphic",
+      "index": 0,
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "暂不支持 svg 原图提取"
+      }
+    },
+    {
+      "source": "inline:svg:1",
+      "role": "body_resource",
+      "type": "svg",
+      "basis": "unsupported_inline_graphic",
+      "index": 1,
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "暂不支持 svg 原图提取"
+      }
+    },
+    {
+      "source": "inline:svg:2",
+      "role": "body_resource",
+      "type": "svg",
+      "basis": "unsupported_inline_graphic",
+      "index": 2,
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "暂不支持 svg 原图提取"
+      }
+    },
+    {
+      "source": "inline:svg:3",
+      "role": "body_resource",
+      "type": "svg",
+      "basis": "unsupported_inline_graphic",
+      "index": 3,
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "暂不支持 svg 原图提取"
+      }
+    }
+  ],
+  "complete": false,
+  "version": "d6794a808c419b1803d0c37d14317bc37fd6251b6fd8134b95218c42602aa3ce",
+  "noteId": "note-artifact-20261018-39c5f3ae",
+  "noteVersion": "3cc671b63fba46d03f750783ce2d8b4aa4625ebd509aeba0d0c8465de1bdc2ca"
+}
