@@ -40,6 +40,8 @@ class ChannelConversationHandler {
         code: decision.approvalCode,
         diffDigest: decision.diffDigest,
       }, { ownerKey: ctx.ownerKey, threadKey: ctx.threadKey, channel: ctx.channel, senderId: message.senderId });
+      // 决策已被这次真实消息消费；否则它会一直挂在待确认里。
+      await this.pendingDecisions.update?.(decision.id, { consumedAt: new Date().toISOString(), reservedAt: null }).catch(() => {});
       await this.#record("channel.decision.fastpath", { ...ctx, decisionId: decision.id, action });
       if (reject) return { text: `已拒绝收录 ${workflow.id}，不会写入。` };
       if (select) return { text: `已选择「${select}」，正在重新生成方案；完成后请你确认。` };

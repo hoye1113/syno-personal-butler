@@ -801,7 +801,9 @@ function createSynoRuntime(options = {}) {
       // additive 且无未决事项 = 无冲突，直接自动收录，不产 PendingDecision。
       // 2026-10-18：只有同源/同内容的真重复才澄清；弱关联与标签建议自动按 keep-separate 执行。
       const targetExists = captureTargetExists(await knowledge.list({ searchable: true }), proposal.suggestedPath);
-      const hasConflict = captureHasBlockingConflict(proposal) || targetExists;
+      // 主人已明确选了 append-source / link-only / create 时不再二次澄清（目标存在是这些动作的前提）。
+      const explicitChoice = ["append-source", "link-only", "create"].includes(String(selectedAction || ""));
+      const hasConflict = explicitChoice ? false : (captureHasBlockingConflict(proposal) || targetExists);
       const existingJob = workflow.jobId
         ? await host.inspect(workflow.jobId, { ownerKey: workflow.ownerKey })
         : null;
