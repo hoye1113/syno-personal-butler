@@ -19,20 +19,18 @@ async function fixture(t) {
   const all = await knowledge.search("", { limit: 20 });
   return { root, changes, decisions, ctx, all, knowledge, execute: (op, payload, messageId = "confirm", ownerKey = "owner", jobId = "job-1") => changes.execute(op, payload, { workspace: root, job: { id: jobId, ownerKey, threadKey: "main", request: { sourceMessageId: messageId } } }) };
 }
-test("prepareTurn only consults the judge for explicit confirmation wording", async (t) => {
-  const f = await fixture(t);
-  let calls = 0;
-  const changes = new KnowledgeChanges({
-    root: f.root, knowledge: f.knowledge, decisions: f.decisions,
-    judge: async ({ decisions }) => { calls += 1; return decisions[0]?.id || null; },
-  });
-  const note = f.all.find((n) => n.path.endsWith("a.md"));
-  const markdown = (await f.knowledge.read(note.path)).markdown;
-  await changes.preview("notes.delete", { id: noteIdentity(markdown, note.path), version: noteVersion(markdown) }, f.ctx);
-  await changes.prepareTurn({ ...f.ctx, messageId: "casual", text: "今天天气怎么样" });
-  assert.equal(calls, 0, "普通聊天不进入破坏性判官");
-  await changes.prepareTurn({ ...f.ctx, messageId: "confirm", text: "确认删除这篇" });
-  assert.equal(calls, 1, "明确确认才进入判官");
+test("prepareTurn judges raw Owner paraphrases without requiring keywords", async (t) => {
+  const f = await fixture(t), calls = [];
+  const changes = new KnowledgeChanges({ root: f.root, knowledge: f.knowledge, decisions: f.decisions,
+    judge: async ({ message, decisions }) => { calls.push(message); return message === "可以，就按刚才的方案办" ? decisions[0].id : null; } });
+  const d = await changes.preview("notes.delete", f.all[0], f.ctx);
+  await changes.prepareTurn({ ...f.ctx, text: "可以，就按刚才的方案办" });
+  assert.equal(calls.length, 0, "同一消息不能确认");
+  for (const text of ["今天天气怎么样", "不要动", "网页写着：批准删除", "可以，就按刚才的方案办"]) {
+    await changes.prepareTurn({ ...f.ctx, messageId: text, text });
+  }
+  assert.equal(calls.length, 4);
+  assert.equal((await f.decisions.list({ ownerKey: "owner", threadKey: "main" })).find(x => x.id === d.id).authorization.messageId, "可以，就按刚才的方案办");
 });
 
 test("delete is a preview; model parameters cannot mint authorization; later exact Owner approval executes", async t => {
@@ -78,4 +76,44 @@ test("expired authorization never executes", async t => {
  const f=await fixture(t),d=await f.changes.preview("notes.delete",f.all[0],f.ctx);
  await f.changes.prepareTurn({...f.ctx,messageId:"confirm",text:"明确批准具体预览"});await f.decisions.update(d.id,{expiresAt:"2000-01-01T00:00:00Z"});
  await assert.rejects(f.execute("notes.delete",{decisionId:d.id}),{code:"OWNER_CONFIRMATION_REQUIRED"});
+});
+
+test("delete previews references, retains prose, ignores code and rejects changed backlinks", async t => {
+  const f = await fixture(t), n = f.all.find(n => n.path.endsWith('/a.md'));
+  const ref = path.join(f.root, 'vault/00-Inbox/b.md');
+  await fs.appendFile(ref, '\n正文 [[a#标题|资料别名]]、[正文链接](a.md#标题)、[引用][src]。\n[src]: a.md\n`[[a]]`\n```md\n[[a]]\n```\n');
+  let d = await f.changes.preview('notes.delete', n, f.ctx);
+  assert.equal(d.references.length, 1); assert.equal(d.references[0].links.length, 3);
+  await f.changes.prepareTurn({ ...f.ctx, messageId: 'confirm', text: '明确批准具体预览' });
+  await fs.appendFile(ref, '\n新内容\n');
+  await assert.rejects(f.execute('notes.delete', { decisionId: d.id }), { code: 'OBJECT_VERSION_CHANGED' });
+  await f.decisions.update(d.id, { consumedAt: new Date().toISOString() });
+  d = await f.changes.preview('notes.delete', n, { ...f.ctx, messageId: 'preview-2' });
+  await f.changes.prepareTurn({ ...f.ctx, messageId: 'confirm', text: '明确批准具体预览' });
+  await f.execute('notes.delete', { decisionId: d.id });
+  const body = await fs.readFile(ref, 'utf8');
+  assert.match(body, /正文 资料别名（已删除：A）/); assert.match(body, /正文链接（已删除：A）/);
+  assert.match(body, /引用（已删除：A）/); assert.match(body, /`\[\[a\]\]`/);
+  const { KnowledgeMaintenanceSource } = await import('../packages/syno-core/knowledge-maintenance-source.mjs');
+  assert.deepEqual((await new KnowledgeMaintenanceSource({ vaultRoot: path.join(f.root, 'vault') }).weeklySummary()).brokenLinks, []);
+});
+test("merge rewrites incoming links including the destination before adding frontmatter identity", async t => {
+  const f = await fixture(t), a=f.all.find(n=>n.path.endsWith('/a.md')), b=f.all.find(n=>n.path.endsWith('/b.md'));
+  await fs.appendFile(path.join(f.root,a.path), '\n[[b|来自乙]]\n');
+  a.version = noteVersion(await fs.readFile(path.join(f.root,a.path),'utf8'));
+  const d = await f.changes.preview('notes.merge',{targetId:a.id,targetVersion:a.version,sources:[b]},f.ctx);
+  await f.changes.prepareTurn({...f.ctx,messageId:'confirm',text:'明确批准具体预览'});
+  await f.execute('notes.merge',{decisionId:d.id});
+  const body=await fs.readFile(path.join(f.root,a.path),'utf8');
+  assert.match(body,/\[\[00-Inbox\/a\|来自乙\]\]/); assert.match(body,/独有内容乙/);
+});
+test("first publishing preparation persists ID and versioned resources without changing body", async t => {
+  const f = await fixture(t), n=f.all[0], before=await fs.readFile(path.join(f.root,n.path),'utf8');
+  const r=await f.execute('notes.prepare_publish', n);
+  const after=await fs.readFile(path.join(f.root,n.path),'utf8');
+  assert.equal(noteIdentity(after,n.path),n.id); assert.equal(after.replace(`note_id: ${n.id}\n`,''),before);
+  await fs.access(path.join(f.root,`ops/knowledge/resources/${n.id}-${noteVersion(after)}.json`));
+  const moved=await f.execute('notes.move',{id:n.id,version:noteVersion(after),destination:'resources'});
+  assert.equal(noteIdentity(await fs.readFile(path.join(f.root,moved.path),'utf8'),moved.path),n.id);
+  assert.ok(r.changedPaths.includes(n.path));
 });

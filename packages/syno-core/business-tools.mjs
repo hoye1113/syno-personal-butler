@@ -24,6 +24,8 @@ const BUSINESS_TOOL_SPECS = Object.freeze([
   { name: "actions.list", description: "查询主人的待办行动及版本；默认仅返回未完成项。", inputSchema: schema({ status: { type: "string", enum: ["active", "all", "completed", "archived"] }, limit }) },
   { name: "actions.update", description: "修改、完成或归档指定待办；必须使用查询结果的 ID 和 version。", write: true, inputSchema: schema({ id, version, title: string("新的待办内容"), status: { type: "string", enum: ["pending", "scheduled", "completed", "archived"] }, scheduledStart: { ...dateTime, type: ["string", "null"] } }, ["id", "version"]) },
   { name: "memory.propose", description: "主人明确表达长期偏好、个人背景或长期约定时提出记忆候选；不保存一般资料或临时任务。候选生成后需要主人另行确认，不能本轮自动批准。", write: true, inputSchema: schema(memoryFields, ["statement"]) },
+  { name: "feishu.publishing_check", description: "只读检查飞书发布模式、缺失配置、可见知识空间及已配置目标；可读不代表可写，不修改发布开关。", inputSchema: schema() },
+  { name: "knowledge.sync_start", description: "主人明确要求发布已有笔记时，按准确 ID 和 version 登记发布；受控补齐稳定 ID 与资源清单，不重新抓取、不生成新知识。发布未启用时拒绝。", write: true, inputSchema: schema({ id, version }, ["id", "version"]) },
   { name: "knowledge.sync_status", description: "查询既有知识发布的本地、Wiki、目录和图片真实状态。", inputSchema: schema({ id }, ["id"]) },
   { name: "knowledge.sync_retry", description: "恢复已登记发布请求，仅补失败端；人工冲突先展示差异和覆盖预览，后续确认才恢复。不重新抓取或收录。", write: true, inputSchema: schema({ id }, ["id"]) },
   { name: "knowledge.update", description: "按明确要求修改单条知识正文，保留身份与来源；不能用来删除或隐式合并多条笔记。", write: true, inputSchema: schema({ id, version, body: string("完整的新正文（不含 frontmatter）", 1000000) }, ["id", "version", "body"]) },
@@ -81,7 +83,15 @@ function createBusinessTools(getServices, { opsRoot = PATHS.opsRoot, clock = () 
     const job = result.job;
     if (!job || ["failed", "rejected", "canceled"].includes(job.status)) throw new Error(job?.error?.message || "业务操作未完成");
     const record = job.result?.operationResult?.record;
-    return { id: job.id, status: job.status, ...(record ? { record, version: recordVersion(record) } : {}), requiresApproval: result.requiresApproval === true };
+    const note = job.result?.operationResult;
+    let knowledge;
+    if (operation.startsWith("notes.") && note?.id && s.publisher) {
+      const observed = await s.publisher.status(ctx.ownerKey, note.id).catch(error => ({status:"unknown",code:error.code || "SYNC_STATUS_UNAVAILABLE"}));
+      const sync = observed.status === "synced" && (!note.version || observed.sourceVersion !== note.version) ? { ...observed, status: "pending", expectedVersion: note.version, reason: "本次内容版本尚未核验，已有同步结果属于此前版本" } : observed;
+      knowledge = { id: note.id, path: note.path, version: note.version, relatedNoteIds: [...new Set([...(note.retiredIds || []), ...(note.affectedIds || [])])].filter(id => id !== note.id), localStatus: job.status === "completed" ? "completed" : "pending", sync,
+        userMessage: job.status !== "completed" ? "本地操作仍在处理中，不能宣称完成。" : sync.status === "disabled" ? "本地变更已完成；云端发布未启用，Wiki 和目录未因此更新。" : sync.status === "synced" ? "本地变更已完成；请核对同步版本后说明云端结果。" : "本地变更已完成；云端尚未确认完成，请分别说明各端状态。" };
+    }
+    return { id: job.id, status: job.status, ...(record ? { record, version: recordVersion(record) } : {}), ...(knowledge ? { knowledge } : {}), requiresApproval: result.requiresApproval === true };
   }
   async function execute(name, input, context) {
     const ctx = trustedContext(context);
@@ -97,6 +107,11 @@ function createBusinessTools(getServices, { opsRoot = PATHS.opsRoot, clock = () 
     if (name === "actions.create" || name === "actions.update") {
       if (name === "actions.update") assertRecordVersion(await findDomainRecord(opsRoot, "actions", input.id, ctx.ownerKey), input.version);
       return operate(s, name, input, ctx, context.originalMessageId);
+    }
+    if (name === "feishu.publishing_check") return s.publisher.check(ctx.ownerKey);
+    if (name === "knowledge.sync_start") {
+      if (s.publisher.config.mode === "disabled") throw new Error("发布未启用，请先完成隔离配置与验收");
+      return operate(s, "notes.prepare_publish", input, ctx, context.originalMessageId);
     }
     if (name === "knowledge.sync_status") return s.publisher.status(ctx.ownerKey, input.id);
     if (name === "knowledge.sync_retry") {

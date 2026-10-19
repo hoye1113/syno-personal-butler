@@ -196,6 +196,8 @@ class IngestWorkflowCoordinator {
     browserCapture = null,
     browserRuntime = null,
     maxPrepareAttempts = 8,
+    setTimer = setTimeout,
+    clearTimer = clearTimeout,
   } = {}) {
     if (!ingest) throw new Error("IngestWorkflowCoordinator 缺少 IngestService");
     this.ingest = ingest;
@@ -216,6 +218,10 @@ class IngestWorkflowCoordinator {
     // 达上限转 failed_terminal（ingest 工作流的合法终态），封堵本系列自身引入的无界重试。
     this.maxPrepareAttempts = Math.max(1, Number(maxPrepareAttempts) || 8);
     this.inFlight = new Map();
+    this.retryTimers = new Map();
+    this.setTimer = setTimer;
+    this.clearTimer = clearTimer;
+    this.closed = false;
     this.receiveTail = Promise.resolve();
   }
 
@@ -399,7 +405,28 @@ class IngestWorkflowCoordinator {
     }
   }
 
+  #armRetry(workflow) {
+    const id = workflow.id;
+    this.clearTimer(this.retryTimers.get(id));
+    this.retryTimers.delete(id);
+    if (this.closed || workflow.stage !== "failed_retryable" || workflow.browserStatus === "interaction_required") return;
+    const delay = Math.max(1, Date.parse(workflow.nextRetryAt || this.clock().toISOString()) - this.clock().getTime());
+    const timer = this.setTimer(() => {
+      this.retryTimers.delete(id);
+      if (!this.closed) this.schedule(() => this.#prepare(id));
+    }, delay);
+    timer?.unref?.();
+    this.retryTimers.set(id, timer);
+  }
+
+  close() {
+    this.closed = true;
+    for (const timer of this.retryTimers.values()) this.clearTimer(timer);
+    this.retryTimers.clear();
+  }
+
   async #prepare(id) {
+    if (this.closed) return;
     if (this.inFlight.has(id)) return this.inFlight.get(id);
     const operation = (async () => {
       const current = await this.store.get(id);
@@ -514,7 +541,7 @@ class IngestWorkflowCoordinator {
           ? await this.#degradeAfterModelCapabilityFailure(id, started, result, error)
           : null;
         if (degraded) return degraded;
-        const retryable = error.retryable === true;
+        const retryable = quickRetry || error.retryable === true;
         const degradeNote = error._degradeFailed ? `（且降级收录本身失败：${error._degradeFailed}）` : "";
         const exhausted = retryable && prepareAttempts >= this.maxPrepareAttempts;
         const failed = await this.store.update(id, {
@@ -535,6 +562,8 @@ class IngestWorkflowCoordinator {
       return await operation;
     } finally {
       if (this.inFlight.get(id) === operation) this.inFlight.delete(id);
+      const latest = await this.store.get(id);
+      if (latest) this.#armRetry(latest);
     }
   }
 
@@ -687,6 +716,7 @@ class IngestWorkflowCoordinator {
         "approved", "executing", "validating", "committed", "indexed", "failed_retryable",
       ].includes(item.stage) && item.browserStatus !== "interaction_required");
     for (const workflow of workflows) {
+      if (workflow.stage === "failed_retryable" && workflow.pendingAction !== "reject" && Date.parse(workflow.nextRetryAt) > this.clock().getTime()) { this.#armRetry(workflow); continue; }
       const midExecution = ["approved", "executing", "validating", "committed", "indexed"].includes(workflow.stage);
       this.schedule(() => midExecution ? this.#reconcile(workflow.id) : this.#prepare(workflow.id));
     }

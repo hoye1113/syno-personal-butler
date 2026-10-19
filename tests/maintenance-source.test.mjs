@@ -154,3 +154,17 @@ test("maintenance excludes personal memories and refreshes after edits without p
  const {maintenance,vaultRoot}=await setup(t,{"a.md":"# A","private.md":"---\nmemory_proposal: memory-1\n---\n私人事实"});
  assert.equal((await maintenance.weeklySummary()).totalOrphans,1);await fs.writeFile(path.join(vaultRoot,"a.md"),"# A\n\n[[target]]");assert.equal((await maintenance.weeklySummary()).totalOrphans,0);
 });
+
+test("maintenance reports reproducible duplicates, broken links and missing sources without writes", async t => {
+ const {maintenance,vaultRoot}=await setup(t, {
+  '00-Inbox/a.md':'---\ntitle: A\nsource: https://example.com/article\n---\n# A\n[[missing|断链]] [ok](b.md)\n',
+  '00-Inbox/b.md':'---\ntitle: B\nsource: https://example.com/article#part\n---\n# B\n',
+  '00-Inbox/c.md':'# C\n`[[code]]`\n',
+  '00-Inbox/d.md':'# C\n`[[code]]`\n',
+ });
+ const before=await fs.readFile(path.join(vaultRoot,'00-Inbox/a.md'),'utf8');
+ const r=await maintenance.weeklySummary();
+ assert.equal(r.duplicates.length,2);assert.equal(r.brokenLinks.length,1);
+ assert.equal(r.brokenLinks[0].link,'[[missing|断链]]'); assert.equal(r.missingSources.length,2);
+ assert.equal(await fs.readFile(path.join(vaultRoot,'00-Inbox/a.md'),'utf8'),before);
+});

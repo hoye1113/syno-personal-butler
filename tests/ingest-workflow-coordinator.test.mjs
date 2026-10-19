@@ -916,6 +916,7 @@ test("recover republishes a partially published proposal without creating anothe
   });
   await scheduled.shift()();
   assert.equal((await coordinator.status(receipt.workflow.id)).stage, "failed_retryable");
+  await store.update(receipt.workflow.id, { nextRetryAt: new Date(0).toISOString() });
   await coordinator.recover();
   await scheduled.shift()();
   assert.equal((await coordinator.status(receipt.workflow.id)).stage, "awaiting_decision");
@@ -1057,4 +1058,31 @@ test("bridge CONTEXT_BUSY is retryable: failed_retryable first, capped terminal 
   assert.equal(workflow.lastError.code, "INGEST_PREPARE_EXHAUSTED");
   assert.equal(workflow.attempts.prepare, 8);
   assert.equal((await coordinator.retryDue(10)).processed, 0);
+});
+
+test("failed workflow schedules its persisted deadline and recovers without early retry", async t => {
+  let now = Date.now(), timer;
+  const f = await fixture(t, { clock: () => new Date(now),
+    setTimer: (work, ms) => { timer = { work, ms }; return timer; }, clearTimer: () => {} });
+  f.ingest.propose = async () => { throw Object.assign(new Error("temporary"), { retryable: true }); };
+  const receipt = await f.coordinator.receive({ kind: "text", value: "deadline" }, { ownerKey: "owner", messageId: "deadline" });
+  await f.scheduled.shift()();
+  assert.equal(timer?.ms, 60_000);
+  await f.coordinator.recover();
+  assert.equal(f.scheduled.length, 0, "恢复不得越过持久重试期限");
+  now += 60_000; timer.work();
+  await f.scheduled.shift()();
+  assert.equal((await f.store.get(receipt.workflow.id)).attempts.prepare, 2);
+  f.coordinator.close();
+});
+
+test("invalid analysis actively schedules the five-second retry without polling", async t => {
+  let now = Date.now(), timer;
+  const f = await fixture(t, { clock: () => new Date(now), setTimer: (work, ms) => { timer={work,ms};return timer; }, clearTimer: () => {},
+    async analyze() { throw Object.assign(new Error("bad contract"), {code:"CAPTURE_INVALID_CONTRACT"}); } });
+  f.ingest.readArtifact=async()=>({body:"safe"});
+  const receipt=await f.coordinator.receive({kind:"text",value:"fast"},{ownerKey:"owner",messageId:"fast"});
+  await f.scheduled.shift()();assert.equal(timer.ms,5000);assert.equal((await f.store.get(receipt.workflow.id)).stage,"failed_retryable");
+  now+=5000;timer.work();await f.scheduled.shift()();
+  assert.equal((await f.store.get(receipt.workflow.id)).attempts.prepare,2);f.coordinator.close();
 });

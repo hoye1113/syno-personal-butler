@@ -32,3 +32,22 @@ test("image retries reject human text edits before uploading or filling",async()
  const adapter=new FeishuPublisher({client:{docx:{v1:{documentBlockChildren:{async get(){return{code:0,data:{items:[{block_id:"text",block_type:2,text:{elements:[{text_run:{content:"human change"}}]}}]}}}}}},drive:{v1:{media:{async uploadAll(){uploads++;}}}}}});
  await assert.rejects(adapter.apply("images",{note:{body:"original",resources:{items:[]}},state:{},record:{targets:{wiki:{docId:"doc",imageBlocks:[]}}},config:{},effect:async(_,run)=>run()}),{code:"SYNC_REMOTE_CONFLICT"});assert.equal(uploads,0);
 });
+
+test("publishing discovery is read-only, bounded and never claims write or Owner access",async()=>{
+ const calls=[];
+ const adapter = new FeishuPublisher({ client: {
+   wiki: { space: {
+     async list(input) { calls.push(input); return { code: 0, data: { items: [{ space_id: 's', name: '测试空间' }], has_more: true } }; },
+     async getNode() { return { code: 0, data: { node: { node_token: 'p', space_id: 'different', title: '父节点' } } }; },
+   } },
+   bitable: { appTableField: { async list(input) { calls.push(input); return { code: 0, data: { items: [{ field_name: 'ID', type: 1 }], has_more: false } }; } } },
+ } });
+ const result=await adapter.inspect({wikiSpaceId:'s',wikiParentId:'p',appToken:'app',tableId:'table',fields:{id:'ID',version:'Version'}});
+ assert.equal(result.writeAccess,'not_verified_by_read_check');assert.equal(result.ownerAccess,'not_verified');
+ assert.equal(result.checks.wikiSpaces.truncated,true);assert.equal(result.checks.wikiParent.matchesConfiguredSpace,false);
+ assert.deepEqual(result.checks.catalogFields.missingMappings,['version']);assert.equal(calls[0].params.page_size,10);
+});
+test("publishing discovery reports permission failures without leaking raw errors",async()=>{
+ const adapter=new FeishuPublisher({client:{wiki:{space:{async list(){throw new Error('private-token-must-not-leak')}}}}});
+ const result=await adapter.inspect({});assert.equal(result.checks.wikiSpaces.status,'blocked');assert.ok(!JSON.stringify(result).includes('private-token'));
+});

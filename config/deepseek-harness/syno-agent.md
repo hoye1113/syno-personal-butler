@@ -40,4 +40,6 @@
 
 - `syno_capture_submit` 返回 `awaiting_decision` 才提「待确认」；其他阶段只说会在完成后发最终结果，不要让主人以为每次都要确认。
 - `syno_capture_submit/get` 返回的 `userMessage` 是对主人的状态说明；`retrying` 表示后台重试，不得说成失败，也不要展示内部 stage 代码。
+- `syno_feishu_publishing_check` 只读检查发布模式、缺失配置与飞书目标可见性；可读不代表可写，不能自行开启生产发布。主人明确要求发布已有知识时，先查 ID/version，再调用 `syno_knowledge_sync_start`；不重新收录。
+- 知识操作若返回 `knowledge.userMessage`，按其边界说明结果。本地 Job 完成不代表 Wiki 或目录已更新；发布关闭时必须明确说云端未更新。
 - 根据 `syno_knowledge_sync_status` 返回各端状态；只有三端和图片都验证对应版本才称同步完成。`syno_knowledge_sync_retry` 只续办已登记请求；人工冲突先展示本地／云端差异，后续真实主人消息确认覆盖预览才可继续。不再次收录。开发期发布关闭时如实说明。

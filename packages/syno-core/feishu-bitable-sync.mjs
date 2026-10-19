@@ -47,6 +47,26 @@ class FeishuPublisher {
     }
     return this.client;
   }
+  async inspect(config) {
+    const result = { writeAccess: "not_verified_by_read_check", ownerAccess: "not_verified", checks: {} };
+    let client;
+    try { client = await this.api(); } catch (error) { return { ...result, connection: { status: "blocked", code: error.code || "FEISHU_UNAVAILABLE" } }; }
+    async function read(name, run, project) {
+      let timer;
+      try {
+        const data = await Promise.race([run().then(checked), new Promise((_, reject) => { timer = setTimeout(() => reject(Object.assign(new Error("timeout"), { code: "FEISHU_READ_TIMEOUT" })), 10_000); })]);
+        result.checks[name] = { status: "readable", ...project(data) };
+      } catch (error) { result.checks[name] = { status: "blocked", code: error.code || "FEISHU_READ_FAILED" }; }
+      finally { clearTimeout(timer); }
+    }
+    await read("wikiSpaces", () => client.wiki.space.list({ params: { page_size: 10 } }), data => ({ items: (data.items || []).map(s => ({ id: s.space_id, name: s.name })), truncated: !!data.has_more }));
+    if (config.wikiParentId) await read("wikiParent", () => client.wiki.space.getNode({ params: { token: config.wikiParentId } }), data => ({ id: data.node?.node_token, title: data.node?.title, spaceId: data.node?.space_id, matchesConfiguredSpace: data.node?.space_id === config.wikiSpaceId }));
+    if (config.appToken && config.tableId) await read("catalogFields", () => client.bitable.appTableField.list({ path: { app_token: config.appToken, table_id: config.tableId }, params: { page_size: 100 } }), data => {
+      const fields = (data.items || []).map(f => ({ name: f.field_name, type: f.type }));
+      return { items: fields, truncated: !!data.has_more, missingMappings: data.has_more ? null : Object.entries(config.fields || {}).filter(([, name]) => !fields.some(f => f.name === name)).map(([key]) => key), incompatibleMappings: Object.entries(config.fields || {}).filter(([, name]) => fields.some(f => f.name === name && f.type !== 1)).map(([key]) => key) };
+    });
+    return result;
+  }
   async blocks(docId) {
     const client = await this.api(), items = []; let page_token;
     do {

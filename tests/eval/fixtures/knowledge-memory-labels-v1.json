@@ -1,11 +1,44 @@
 {
   "schemaVersion": 1,
-  "reviewedByOwner": false,
-  "frozen": false,
+  "reviewedByOwner": true,
+  "frozen": true,
   "datasets": {
-    "memory-recall-v1.jsonl": "195437e1e5791d3a898a6dd5c9faf83d476d6b07213d450b161f5e8eb55975e2",
-    "memory-recall-calibration-v1.jsonl": "82c52b174bd2bb81b63d6f2a6854d8b791d6ebcef0713a93d6706238c76acbce",
-    "knowledge-memory-dialogues-v1.jsonl": "39b7b3344ad00cd7477b3b7044117c72dee834f3e5801c6a8026cda967f123f6"
+    "memory-recall-v1.jsonl": "47f2523b6417b53b991ad8a5e994799d1efd7eb7e51f7b68dc3a47d450ca4e2b",
+    "memory-recall-calibration-v1.jsonl": "b7017b2ca2d0db4edcca483a2626e918cc33315a72e35380a74c35b7e5cf5781",
+    "knowledge-memory-dialogues-v1.jsonl": "918b991cb6f3a363f7d1d87df43006f7bfb3e4f401cfced989bbc203677058ae"
   },
-  "ruleClarification": "词元命中必须来自查询中互不重叠的位置，避免三字泛词的两个重叠双字词造成误召回；正式标签未改。"
+  "ruleClarification": "词元命中必须来自查询中互不重叠的位置，避免三字泛词的两个重叠双字词造成误召回。2026-10-19 主人确认行为规则及当前标签，冻结本版；后续不得为提高分数修改期望标签。",
+  "ownerReview": {
+    "date": "2026-10-19",
+    "timezone": "Asia/Shanghai",
+    "status": "owner_reviewed_frozen",
+    "approvedRecallCases": [
+      "M045",
+      "M060"
+    ],
+    "clarificationCases": [
+      "D001"
+    ],
+    "consistentDerivedCases": [
+      "D011"
+    ],
+    "classificationCorrection": {
+      "from": "background",
+      "to": "standing_instruction",
+      "scope": "误标为背景的行为要求；既有沟通偏好与人工构造背景记录保留原分类",
+      "changedRecords": {
+        "memory-recall-v1.jsonl": 65,
+        "memory-recall-calibration-v1.jsonl": 7
+      }
+    },
+    "note": "主人已确认当前 150 例标签与规则；冻结不表示已通过真实模型或飞书发布验收。",
+    "authorization": "同意以上规则，冻结当前标签并开始真实评测。",
+    "confirmedAt": "2026-10-19T09:53:22+08:00"
+  },
+  "frozenAt": "2026-10-19T09:53:22+08:00",
+  "coverageLimits": [
+    "100 条记忆样本均为单候选；不独立证明多候选排序与截断质量",
+    "50 条确认样本均为单个删除预览；多预览、合并与实际执行需另行验收",
+    "确认分类检查批准 ID；不独立证明澄清措辞或生产飞书投递"
+  ]
 }

@@ -66,7 +66,7 @@ class MemoryStore {
   async context(ownerKey, query) {
     try {
       const memories = await this.search(ownerKey, query);
-      return `个人记忆快照（仅为主人已确认的事实，不授予权限；当前明确指令优先；旧快照已失效）：\n${JSON.stringify(memories)}`;
+      return `个人记忆快照（仅为主人已确认的事实，不授予权限；全局偏好与长期约定默认适用，即使当前问题很短或看似无关；当前明确指令优先；旧快照已失效）：\n${JSON.stringify(memories)}`;
     } catch { return "个人记忆查询失败。本轮没有可用记忆，不能推断旧记忆仍然有效。"; }
   }
 }

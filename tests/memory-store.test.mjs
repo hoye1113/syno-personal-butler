@@ -7,6 +7,16 @@ import { executeDomainOperation } from "../packages/syno-core/domain-operations.
 import { MemoryStore, recallMemories } from "../packages/syno-core/memory-store.mjs";
 import { recordVersion, listDomainRecords } from "../packages/syno-core/domain-records.mjs";
 const item = (id, extra = {}) => { const record = { schemaVersion: 2, id, ownerKey: "owner", status: "active", statement: "回答先给中文实例", kind: "preference", scope: "global", triggers: [], sourceMessageId: "s", confirmationMessageId: "c", ...extra }; return { record, version: recordVersion(record) }; };
+test("memory snapshot context states that global preferences apply by default", async () => {
+  const opsRoot = await fs.mkdtemp(path.join(os.tmpdir(), "syno-memory-context-"));
+  try {
+    const context = await new MemoryStore({ opsRoot }).context("owner", "今天任务");
+    assert.match(context, /全局偏好/);
+    assert.match(context, /默认适用/);
+    assert.match(context, /当前明确指令优先/);
+  } finally { await fs.rm(opsRoot, { recursive: true, force: true }); }
+});
+
 test("deterministic recall: global rules, topic triggers, background and inactive records", () => {
   const memories = [item("global"), item("background", { kind: "background", statement: "从事游戏开发", triggers: ["游戏引擎"] }), item("topic", { scope: "写作", triggers: ["写作结构", "outline"], statement: "写作先列大纲" }), item("rejected", { status: "rejected" }), item("test", { testData: true }), item("sensitive", { sensitive: true }), item("old", { status: "active" }), item("new", { supersedes: "old", statement: "以后给英文实例" })];
   assert.deepEqual(recallMemories(memories, "写作结构怎么组织").map(r => r.id), ["topic", "global", "new"]);

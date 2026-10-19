@@ -234,3 +234,27 @@ test("forgetting prevents durable tool replay from returning obsolete memory tex
   assert.equal(replay.record.statement, undefined);
   assert.doesNotMatch(JSON.stringify(replay), /旧偏好正文/);
 });
+
+test('publishing diagnostics and first publish use only Host configuration and exact ID/version',async t=>{
+ const f=await fixture(t);let checked=0;
+ f.services.publisher={config:{mode:'disabled'},async check(owner){assert.equal(owner,'owner');checked++;return{mode:'disabled',writeAccess:'not_verified'}}};
+ assert.equal((await f.call('feishu.publishing_check')).mode,'disabled');assert.equal(checked,1);
+ assert.equal((await f.raw('knowledge.sync_start',{id:'note-test',version:'a'.repeat(64)})).result.isError,true);assert.equal(f.requests.length,0);
+ f.services.publisher.config.mode='sandbox';
+ f.services.core.execute=async(request)=>{assert.equal(request.operation,'notes.prepare_publish');assert.equal(request.payload.id,'note-test');return{job:{id:'job-first-publish',status:'completed'}}};
+ f.bind('publish-next');assert.equal((await f.call('knowledge.sync_start',{id:'note-test',version:'a'.repeat(64)})).status,'completed');
+});
+
+test('completed local knowledge writes explicitly report disabled publishing',async t=>{
+ const f=await fixture(t);f.services.publisher={async status(){return{mode:'disabled',status:'disabled'}}};
+ f.services.core.execute=async()=>({job:{id:'local-job',status:'completed',result:{operationResult:{id:'note-test',path:'vault/00-Inbox/test.md'}}}});
+ const r=await f.call('knowledge.update',{id:'note-test',version:'a'.repeat(64),body:'保留正文'});
+ assert.equal(r.knowledge.sync.status,'disabled');assert.match(r.knowledge.userMessage,/Wiki 和目录未因此更新/);
+});
+
+test('a previous synced revision cannot be reported as completion of the new local write',async t=>{
+ const f=await fixture(t);f.services.publisher={async status(){return{status:'synced',sourceVersion:'old'}}};
+ f.services.core.execute=async()=>({job:{id:'local-job',status:'completed',result:{operationResult:{id:'note-test',version:'new',path:'vault/00-Inbox/test.md'}}}});
+ const r=await f.call('knowledge.update',{id:'note-test',version:'a'.repeat(64),body:'新正文'});
+ assert.equal(r.knowledge.version,'new');assert.equal(r.knowledge.sync.status,'pending');assert.equal(r.knowledge.sync.expectedVersion,'new');
+});

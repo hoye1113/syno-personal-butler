@@ -35,6 +35,18 @@ class KnowledgePublisher {
     for (const name of names.filter(n => /^[a-f0-9]{64}\.json$/u.test(n))) { const r = JSON.parse(await fs.readFile(path.join(directory, name), "utf8")); if ((ownerKey === undefined || r.ownerKey === ownerKey) && r.targetKey === this.config.targetKey) maps.push(r); }
     return maps;
   }
+  async check(ownerKey) {
+    const required = ["targetKey", "wikiSpaceId", "wikiParentId", "appToken", "tableId", "fields"];
+    const missing = required.filter(key => !this.config[key]);
+    if (this.config.mode === "sandbox" && !this.config.sandboxConfirmed) missing.push("sandboxConfirmed");
+    const records = await this.list(ownerKey);
+    const counts = {};
+    for (const record of records) for (const state of Object.values(record.targets)) counts[state.status] = (counts[state.status] || 0) + 1;
+    return { mode: this.config.mode, enabled: this.config.mode !== "disabled", missingConfiguration: missing,
+      targetKey: this.config.targetKey || null, registeredNotes: records.length, targetStates: counts,
+      diagnostic: await this.adapter.inspect(this.config),
+      nextStep: missing.length ? "主人确认隔离 Wiki 父节点、测试表格和字段映射后配置 sandbox；只读可见不代表写入权限" : "隔离模式运行受控写权限探针，并由主人验证产物可访问；本工具不修改开关" };
+  }
   async status(ownerKey, id) {
     if (this.config.mode === "disabled") return { mode: "disabled", status: "disabled", reason: "开发期未启用云端发布" };
     const r = (await this.list(ownerKey)).find(x => x.id === id);

@@ -1,3 +1,5 @@
+import { frontmatterData } from "./validator.mjs";
+import { noteLinks, resolveNoteLink } from "./knowledge-links.mjs";
 import { createHash } from "node:crypto";
 import { promises as fs, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
@@ -117,8 +119,31 @@ class KnowledgeMaintenanceSource {
       const reason = quarantineReason(logical, await fs.readFile(file, "utf8"));
       if (reason) quarantined.push({ path: logical, ...reason, nextStep: "需明确修复决策；当前仅排除检索和发布" });
     }
+    const notes = [];
+    for (const file of await walkMarkdown(this.vaultRoot)) {
+      const logical = `vault/${path.relative(this.vaultRoot, file).replaceAll("\\", "/")}`;
+      const markdown = await fs.readFile(file, "utf8");
+      if (isExcludedKnowledge(markdown) || isSensitiveKnowledgeNote(markdown) || quarantineReason(logical, markdown)) continue;
+      if (/^vault\/99-System\//u.test(logical) || /(?:^|\/)(?:README|AGENTS|CLAUDE)\.md$/iu.test(logical)) continue;
+      notes.push({ path: logical, markdown, title: titleOf(markdown, file), metadata: frontmatterData(markdown).values });
+    }
+    const paths = new Set(notes.map(n => n.path)), brokenLinks = [], missingSources = [], duplicateGroups = new Map();
+    for (const note of notes) {
+      for (const link of noteLinks(note.markdown, note.path)) {
+        const targets = resolveNoteLink(link, paths);
+        if (targets.length !== 1) brokenLinks.push({ path: note.path, link: link.text, reason: targets.length ? "ambiguous_target" : "missing_target", candidates: targets });
+      }
+      if (!String(note.metadata.source || "").trim()) missingSources.push({ path: note.path, title: note.title, reason: "frontmatter.source 缺失或为空；不自动补造来源" });
+      const body = note.markdown.replace(/^---[\s\S]*?---\s*/u, "").normalize("NFKC").replace(/\s+/gu, " ").trim();
+      const keys = body ? [`body:${createHash("sha256").update(body).digest("hex")}`] : [];
+      if (note.metadata.note_id) keys.push(`identity:${note.metadata.note_id}`);
+      // Identical source URLs are candidates for review, never proof that content can be deleted.
+      try { const url = new URL(note.metadata.source); if (["http:", "https:"].includes(url.protocol)) { url.hash = ""; keys.push(`source:${url.href}`); } } catch {}
+      for (const key of keys) { if (!duplicateGroups.has(key)) duplicateGroups.set(key, []); duplicateGroups.get(key).push({ path: note.path, title: note.title }); }
+    }
+    const duplicates = [...duplicateGroups].filter(([,items]) => items.length > 1).map(([key, items]) => ({ reason: key.startsWith("body:") ? "identical_body" : key.startsWith("identity:") ? "same_identity" : "same_source", evidence: key, items }));
     return {
-      quarantined,
+      quarantined, duplicates, brokenLinks, missingSources,
       generatedAt: this.clock().toISOString(),
       totalOrphans: orphans.length,
       topics: [...byTopic.entries()].map(([topic, items]) => ({ topic, count: items.length, items })),

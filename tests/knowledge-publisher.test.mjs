@@ -75,3 +75,13 @@ test("conflict retry previews differences; only later Owner approval authorizes 
  const apply=f.adapter.apply;f.adapter.apply=async(target,args)=>{const value=await apply(target,args);if(target==="wiki")f.setEdited(false);return value};assert.equal((await f.publisher.retry("owner","n")).status,"synced");
  await assert.rejects(f.publisher.authorizeRetry({decision:(await decisions.list())[0],job:{...job,id:"replay-other"},workspace}),{code:"OWNER_CONFIRMATION_REQUIRED"});
 });
+
+test("publishing check reports configuration and scoped maps without writes",async t=>{
+ const f=await fixture(t);let reads=0;
+ f.adapter.inspect=async()=>{reads++;return{writeAccess:'not_verified_by_read_check',checks:{}}};
+ await f.publisher.queue('owner',await f.source());
+ const before=await fs.readFile(path.join(f.root,'ops/knowledge/publish-map',`${f.publisher.key('owner','n')}.json`),'utf8');
+ const r=await f.publisher.check('owner');assert.equal(reads,1);assert.equal(r.registeredNotes,1);assert.equal(r.targetStates.pending,3);assert.equal(r.diagnostic.writeAccess,'not_verified_by_read_check');
+ assert.equal((await f.publisher.check('other')).registeredNotes,0);
+ assert.equal(await fs.readFile(path.join(f.root,'ops/knowledge/publish-map',`${f.publisher.key('owner','n')}.json`),'utf8'),before);
+});

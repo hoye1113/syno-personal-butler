@@ -20,6 +20,7 @@ const OPERATION_INTENTS = Object.freeze({
   "notes.delete": "delete",
   "notes.merge": "overwrite_note",
   "notes.edit": "overwrite_note",
+  "notes.prepare_publish": "overwrite_note",
   "content.brief.create": "create_content_brief",
   "memory.promote": "create_memory_proposal",
   "memory.proposals.correct": "create_memory_proposal",
