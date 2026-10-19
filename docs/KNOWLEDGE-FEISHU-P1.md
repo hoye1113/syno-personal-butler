@@ -74,6 +74,14 @@ node scripts/eval-knowledge-memory.mjs --real
 - 主人确认：2026-10-19 已打开父节点、测试节点与目录三个链接并确认可访问。
 - 回滚：`config/knowledge-publishing.json` 改回 `mode: "disabled"` 并重启；本地知识不受影响，云端内容仅作镜像。
 
+### 存量回填 Phase 1（2026-10-19）
+
+- 只读盘点：vault 319 篇有效笔记；旧表 244 条（240 唯一路径）；旧树 246 个文档节点。
+- 路径匹配 240 篇；其中 205 篇复用现有 Wiki 节点登记发布映射，35 篇无链接暂记 pending。
+- 新目录回填 240 条记录：182 条 synced、58 条 pending（23 篇含图片待核验、35 篇尚无 Wiki 节点）。
+- 未修改任何既有 Wiki 正文；旧树 42 个孤儿节点保持历史；无链接笔记与图片核验留待 Phase 2。
+- 运行态：`registeredNotes=240`；目标状态 662 succeeded / 58 pending；0 错误。旧笔记首次同步仍需 `notes.prepare_publish` 补齐资源清单。
+
 ## 开源调研与取舍
 
 - [官方 DSH](https://github.com/deepseek-ai/DeepSeek-Harness)：沿用现有插件注册／工具桥接边界，复用其会话与模型调度。
