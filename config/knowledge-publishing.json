@@ -1,10 +1,14 @@
 {
-  "mode": "disabled",
-  "targetKey": null,
+  "mode": "production",
+  "targetKey": "production-v1",
   "sandboxConfirmed": false,
-  "wikiSpaceId": null,
-  "wikiParentId": null,
-  "appToken": null,
-  "tableId": null,
-  "fields": null
+  "wikiSpaceId": "7694918217688534004",
+  "wikiParentId": "V2NKwFbcliaPXNkLQ29czIjinHd",
+  "appToken": "IVtqbE8ocaEY93sqQ1bciWE5ncg",
+  "tableId": "tblFswdcuKmNR8e7",
+  "fields": {
+    "id": "Note ID", "title": "Title", "summary": "Summary",
+    "category": "Category", "localPath": "Local Path", "version": "Version",
+    "wiki": "Wiki URL", "status": "Sync Status"
+  }
 }
