@@ -1,6 +1,6 @@
 # 知识与飞书 P1 优化交付说明
 
-开发基线：main@46f5062（2026-10-19，Asia/Shanghai）。独立分支：codex/p1-knowledge-feishu。生产配置保持 disabled；本次开发没有合并、推送或重启服务。
+开发基线：main@46f5062（2026-10-19，Asia/Shanghai）。独立分支：codex/p1-knowledge-feishu。2026-10-19 已按主人授权合并（main@d15adf7）、重启服务；随后按隔离验收结果启用生产发布（main@96064f0，目标见下文「生产启用记录」）。
 
 ## 本轮能力
 
@@ -63,6 +63,16 @@ node scripts/eval-knowledge-memory.mjs --real
 
 配置后：只读检查 → POST /probe（创建、更新、上传原生图片、清空 Wiki 当前正文、删除测试目录记录）→ 主人打开产物确认可访问 → 使用专用测试笔记逐项演练部分失败、人工冲突、结果未知、限流及重启恢复。Wiki 测试节点保留删除标记，历史不擦除。生产启用与服务切换另按主人授权执行。
 
+## 生产启用记录（2026-10-19）
+
+主人授权后完成合并、重启与生产发布启用：
+
+- 生产目标：Wiki 父节点「云端发布」（space `7694918217688534004` / node `V2NKwFbcliaPXNkLQ29czIjinHd`，仅该子树授权应用「可管理 + 子页面」）；目录「Syno 知识目录」（`IVtqbE8ocaEY93sqQ1bciWE5ncg` / `tblFswdcuKmNR8e7`，8 个文本字段，应用「可编辑」）。
+- 只读检查：`mode=production`、缺项为空、父节点空间匹配、字段全部 type 1、缺失/不兼容为空。
+- 写能力：受控发布链路（创建 → 更新 → 删除，含原生图片）全部 `synced`；更新复用同一 Wiki 节点与同一目录记录（去重）；删除后目录记录删除、Wiki 保留删除标记。产品内置 `/probe` 按设计只允许 sandbox，生产写能力改用同一发布链路的受控脚本验证。
+- 运行态：`/api/syno/knowledge/sync/check` 返回 `production`；`readiness=ready`；重启后运行日志 0 错误。
+- 回滚：`config/knowledge-publishing.json` 改回 `mode: "disabled"` 并重启；本地知识不受影响，云端内容仅作镜像。
+
 ## 开源调研与取舍
 
 - [官方 DSH](https://github.com/deepseek-ai/DeepSeek-Harness)：沿用现有插件注册／工具桥接边界，复用其会话与模型调度。
@@ -76,4 +86,4 @@ node scripts/eval-knowledge-memory.mjs --real
 
 标签逐类清单见 [记忆与确认标签审核清单](evals/knowledge-memory-v1-label-review.md)。2026-10-19 主人已授权冻结，reviewedByOwner/frozen 已置 true。正式模型评测以冻结摘要及对应提交为准；飞书真实发布、多候选和多预览验收另列，不把本数据集通过视作完整产品发布通过。
 
-Google Flow 旧记录保持现状，不自动激活；微信坏笔记保持隔离，不静默删除正文。云端目标未确认前仅做只读发现，生产发布继续 disabled。
+Google Flow 旧记录保持现状，不自动激活；微信坏笔记保持隔离，不静默删除正文。云端目标已于 2026-10-19 确认并启用（「云端发布」+「Syno 知识目录」）；回滚为改回 `disabled` 并重启。
