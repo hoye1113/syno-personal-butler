@@ -71,6 +71,7 @@ node scripts/eval-knowledge-memory.mjs --real
 - 只读检查：`mode=production`、缺项为空、父节点空间匹配、字段全部 type 1、缺失/不兼容为空。
 - 写能力：受控发布链路（创建 → 更新 → 删除，含原生图片）全部 `synced`；更新复用同一 Wiki 节点与同一目录记录（去重）；删除后目录记录删除、Wiki 保留删除标记。产品内置 `/probe` 按设计只允许 sandbox，生产写能力改用同一发布链路的受控脚本验证。
 - 运行态：`/api/syno/knowledge/sync/check` 返回 `production`；`readiness=ready`；重启后运行日志 0 错误。
+- 主人确认：2026-10-19 已打开父节点、测试节点与目录三个链接并确认可访问。
 - 回滚：`config/knowledge-publishing.json` 改回 `mode: "disabled"` 并重启；本地知识不受影响，云端内容仅作镜像。
 
 ## 开源调研与取舍
