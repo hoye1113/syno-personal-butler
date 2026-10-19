@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "note-cb1b7271055ef4b4567bb633",
+  "ownerKey": "local-user",
+  "sourceVersion": "d9f4d2cdaa6e3a4b72a65c9e6c99e01a5127985b2780389456642f4298274341",
+  "resourceVersion": "migration-v1",
+  "targetKey": "production-v1",
+  "mode": "production",
+  "targets": {
+    "wiki": {
+      "status": "succeeded",
+      "expectedVersion": "d9f4d2cdaa6e3a4b72a65c9e6c99e01a5127985b2780389456642f4298274341",
+      "appliedVersion": "d9f4d2cdaa6e3a4b72a65c9e6c99e01a5127985b2780389456642f4298274341",
+      "attempts": 0,
+      "remoteId": "X5BQwANkwifm0akcRTQcJwCongd",
+      "docId": "G2kPd0UEjol5ZpxvPTHcCyvNn3e",
+      "fingerprint": "5f202d94cdd8cdc5467e9d0bf72ce4cab15b758470cdea1cad729c9b6a3f819d",
+      "link": "https://www.feishu.cn/wiki/X5BQwANkwifm0akcRTQcJwCongd"
+    },
+    "images": {
+      "status": "succeeded",
+      "expectedVersion": "d9f4d2cdaa6e3a4b72a65c9e6c99e01a5127985b2780389456642f4298274341",
+      "appliedVersion": "d9f4d2cdaa6e3a4b72a65c9e6c99e01a5127985b2780389456642f4298274341",
+      "attempts": 0,
+      "receipts": [],
+      "verifiedVersion": "d9f4d2cdaa6e3a4b72a65c9e6c99e01a5127985b2780389456642f4298274341",
+      "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "catalog": {
+      "status": "succeeded",
+      "expectedVersion": "d9f4d2cdaa6e3a4b72a65c9e6c99e01a5127985b2780389456642f4298274341",
+      "appliedVersion": "d9f4d2cdaa6e3a4b72a65c9e6c99e01a5127985b2780389456642f4298274341",
+      "attempts": 0,
+      "remoteId": "reczz28PG5Vd68T3",
+      "fingerprint": "48d8c948a0aa16b890d1c9476f9fc466046803a0ae20f6f99b36f2d0e56c38d0",
+      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PG5Vd68T3"
+    }
+  },
+  "updatedAt": "2026-10-19T11:49:48.471Z"
+}

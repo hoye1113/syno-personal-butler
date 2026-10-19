@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "note-1dab54d6749c999068a8217f",
+  "ownerKey": "local-user",
+  "sourceVersion": "24bfcb17ac362a9083b8a936e2cd094154223b00fbaa410ed60d27fbfeca1ce5",
+  "resourceVersion": "migration-v1",
+  "targetKey": "production-v1",
+  "mode": "production",
+  "targets": {
+    "wiki": {
+      "status": "pending",
+      "expectedVersion": "24bfcb17ac362a9083b8a936e2cd094154223b00fbaa410ed60d27fbfeca1ce5",
+      "attempts": 0
+    },
+    "images": {
+      "status": "succeeded",
+      "expectedVersion": "24bfcb17ac362a9083b8a936e2cd094154223b00fbaa410ed60d27fbfeca1ce5",
+      "appliedVersion": "24bfcb17ac362a9083b8a936e2cd094154223b00fbaa410ed60d27fbfeca1ce5",
+      "attempts": 0,
+      "receipts": [],
+      "verifiedVersion": "24bfcb17ac362a9083b8a936e2cd094154223b00fbaa410ed60d27fbfeca1ce5",
+      "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "catalog": {
+      "status": "succeeded",
+      "expectedVersion": "24bfcb17ac362a9083b8a936e2cd094154223b00fbaa410ed60d27fbfeca1ce5",
+      "appliedVersion": "24bfcb17ac362a9083b8a936e2cd094154223b00fbaa410ed60d27fbfeca1ce5",
+      "attempts": 0,
+      "remoteId": "reczz28PGKkAIe1s",
+      "fingerprint": "46e729a52efd928404e712fe3e82a0f32aa63878eeaa56aab635e9a9f4e75e05",
+      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PGKkAIe1s"
+    }
+  },
+  "updatedAt": "2026-10-19T12:04:13.805Z"
+}
