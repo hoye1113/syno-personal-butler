@@ -3,7 +3,7 @@
   "id": "note-479eee7ade939c21b0641b18",
   "ownerKey": "local-user",
   "sourceVersion": "5fa9880942f67027df260eac5281beba3dd68e543e044ddf8e8b250eeb2d3180",
-  "resourceVersion": "migration-v1",
+  "resourceVersion": "phase2-source-v1",
   "targetKey": "production-v1",
   "mode": "production",
   "targets": {
@@ -11,30 +11,50 @@
       "status": "succeeded",
       "expectedVersion": "5fa9880942f67027df260eac5281beba3dd68e543e044ddf8e8b250eeb2d3180",
       "appliedVersion": "5fa9880942f67027df260eac5281beba3dd68e543e044ddf8e8b250eeb2d3180",
-      "attempts": 0,
+      "attempts": 1,
       "remoteId": "QjcawOCBWi8aX7k5u9ncBQjJnWf",
       "docId": "UVdsd4FyAoCEahxugCjcjA1ZnJe",
-      "fingerprint": "72295cb10fb9c47f494f6f2d5905ffc3b1dcb6bd7b2020be10b4b4377d85e572",
-      "link": "https://www.feishu.cn/wiki/QjcawOCBWi8aX7k5u9ncBQjJnWf"
+      "fingerprint": "08d3e6dc671f19358b6a2014bd62b4ecb0e8dccbc4e1fd9975d852dd14590842",
+      "link": "https://www.feishu.cn/wiki/QjcawOCBWi8aX7k5u9ncBQjJnWf",
+      "imageBlocks": [
+        {
+          "blockId": "doxcnuF4FaUegoB2Ssoc0WEowTd",
+          "digest": "42c3ca2721d978d075fec82bf9ac69359dd411938c1674fa149d9d41e05dda30",
+          "localRef": "vault/99-System/Attachments/Anthropic Agent 工程实战指南/anthropic-01.png"
+        }
+      ],
+      "errorCode": null,
+      "nextRetryAt": null
     },
     "images": {
       "status": "succeeded",
       "expectedVersion": "5fa9880942f67027df260eac5281beba3dd68e543e044ddf8e8b250eeb2d3180",
       "appliedVersion": "5fa9880942f67027df260eac5281beba3dd68e543e044ddf8e8b250eeb2d3180",
-      "attempts": 0,
-      "receipts": [],
+      "attempts": 1,
+      "receipts": [
+        {
+          "blockId": "doxcnuF4FaUegoB2Ssoc0WEowTd",
+          "digest": "42c3ca2721d978d075fec82bf9ac69359dd411938c1674fa149d9d41e05dda30",
+          "token": "XO87bIkmDo5TL7xbsFtctpdQnHd"
+        }
+      ],
       "verifiedVersion": "5fa9880942f67027df260eac5281beba3dd68e543e044ddf8e8b250eeb2d3180",
-      "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      "fingerprint": "cceb6b411a9d3b73f4311848869a28135c06ea65b206ec227f253b1f56ff357f",
+      "wikiFingerprint": "08d3e6dc671f19358b6a2014bd62b4ecb0e8dccbc4e1fd9975d852dd14590842",
+      "errorCode": null,
+      "nextRetryAt": null
     },
     "catalog": {
       "status": "succeeded",
       "expectedVersion": "5fa9880942f67027df260eac5281beba3dd68e543e044ddf8e8b250eeb2d3180",
       "appliedVersion": "5fa9880942f67027df260eac5281beba3dd68e543e044ddf8e8b250eeb2d3180",
-      "attempts": 0,
+      "attempts": 1,
       "remoteId": "reczz28PG9xllKfm",
       "fingerprint": "d0962af5294f9f131acacb4402991a575c9527f570f68f2880f897dade637ae6",
-      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PG9xllKfm"
+      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PG9xllKfm",
+      "errorCode": null,
+      "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-19T11:54:01.351Z"
+  "updatedAt": "2026-10-19T15:26:49.505Z"
 }

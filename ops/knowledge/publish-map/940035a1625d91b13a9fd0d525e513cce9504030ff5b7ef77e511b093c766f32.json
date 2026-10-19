@@ -3,7 +3,7 @@
   "id": "note-450f059116e7446745e31fc6",
   "ownerKey": "local-user",
   "sourceVersion": "2fc8ff803b75826d3cb45604ec4195807351c2c66bcc894e5f44c69a8c8f97ab",
-  "resourceVersion": "migration-v1",
+  "resourceVersion": "phase2-republish-v1",
   "targetKey": "production-v1",
   "mode": "production",
   "targets": {
@@ -11,26 +11,90 @@
       "status": "succeeded",
       "expectedVersion": "2fc8ff803b75826d3cb45604ec4195807351c2c66bcc894e5f44c69a8c8f97ab",
       "appliedVersion": "2fc8ff803b75826d3cb45604ec4195807351c2c66bcc894e5f44c69a8c8f97ab",
-      "attempts": 0,
+      "attempts": 1,
       "remoteId": "BDOgwivUkiZyOIkrX9Ac52NGnkh",
       "docId": "NV7MdRURLog84sxRUuVcQ5Pknmb",
-      "fingerprint": "2b62f975061369d24a70942a43c85395e751a2203cf91ccfdab34547cd36201d",
-      "link": "https://www.feishu.cn/wiki/BDOgwivUkiZyOIkrX9Ac52NGnkh"
+      "fingerprint": "b55fb61549f9907882ffa65b54ffd8748593f0495fed8d65523aab6f1797e33f",
+      "link": "https://www.feishu.cn/wiki/BDOgwivUkiZyOIkrX9Ac52NGnkh",
+      "imageBlocks": [
+        {
+          "blockId": "doxcnF5EGq4pWpsMvJaUU1rnoAb",
+          "digest": "0577bcceb22ddb23606a1eedc629aa49f0cf3882ad26499b16e323c6f10fff86",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/codex-self-improving-prompt/fig-01.jpg"
+        },
+        {
+          "blockId": "doxcnAKoJuT2eEp5NPixmDIjHIc",
+          "digest": "c4c6026f6a02a0d46f11ede8012bacea7fccdb958fdacc927d71166753c8f8ba",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/codex-self-improving-prompt/fig-02.jpg"
+        },
+        {
+          "blockId": "doxcnQA7JckEjVEB3SrHRaOFWhe",
+          "digest": "6abdb998392033d98bcd3d9d28605c02085aaec7c990c3374e86aae88d6cd716",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/codex-self-improving-prompt/fig-03.jpg"
+        },
+        {
+          "blockId": "doxcnibMRbMr3m65WkN1fZPOEVe",
+          "digest": "e0db8ed43fa08115116ea2c1993f6e027b1d26c2b16ed0a754c439e9e3e962fb",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/codex-self-improving-prompt/fig-04.jpg"
+        },
+        {
+          "blockId": "doxcngLIxaBzbbBAf4RncfFzX4b",
+          "digest": "b52b752196441cc0ce6df20653233158bbcb2656567fa66d04db407c5cd6145a",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/codex-self-improving-prompt/fig-05.jpg"
+        }
+      ],
+      "errorCode": null,
+      "nextRetryAt": null
     },
     "images": {
-      "status": "pending",
+      "status": "succeeded",
       "expectedVersion": "2fc8ff803b75826d3cb45604ec4195807351c2c66bcc894e5f44c69a8c8f97ab",
-      "attempts": 0
+      "attempts": 1,
+      "receipts": [
+        {
+          "blockId": "doxcnF5EGq4pWpsMvJaUU1rnoAb",
+          "digest": "0577bcceb22ddb23606a1eedc629aa49f0cf3882ad26499b16e323c6f10fff86",
+          "token": "C0r9bK916oW5RHxM3qgcUpFCnOc"
+        },
+        {
+          "blockId": "doxcnAKoJuT2eEp5NPixmDIjHIc",
+          "digest": "c4c6026f6a02a0d46f11ede8012bacea7fccdb958fdacc927d71166753c8f8ba",
+          "token": "R1TdbYAQ8o0iVOxi2i9cRoSUnBe"
+        },
+        {
+          "blockId": "doxcnQA7JckEjVEB3SrHRaOFWhe",
+          "digest": "6abdb998392033d98bcd3d9d28605c02085aaec7c990c3374e86aae88d6cd716",
+          "token": "ZaV7bhQjLo5gttxHIs0cF6r1nFe"
+        },
+        {
+          "blockId": "doxcnibMRbMr3m65WkN1fZPOEVe",
+          "digest": "e0db8ed43fa08115116ea2c1993f6e027b1d26c2b16ed0a754c439e9e3e962fb",
+          "token": "BIUpbVotLoY7hfxgcJxcGEHvnWg"
+        },
+        {
+          "blockId": "doxcngLIxaBzbbBAf4RncfFzX4b",
+          "digest": "b52b752196441cc0ce6df20653233158bbcb2656567fa66d04db407c5cd6145a",
+          "token": "L0DFb90WIoZ7f2xlxwFcxYLvnLe"
+        }
+      ],
+      "verifiedVersion": "2fc8ff803b75826d3cb45604ec4195807351c2c66bcc894e5f44c69a8c8f97ab",
+      "fingerprint": "f519e039d6e89ba5f6c54e53b3cb761c8e8a9464d6bfcd174c74ab618b30631b",
+      "wikiFingerprint": "b55fb61549f9907882ffa65b54ffd8748593f0495fed8d65523aab6f1797e33f",
+      "appliedVersion": "2fc8ff803b75826d3cb45604ec4195807351c2c66bcc894e5f44c69a8c8f97ab",
+      "errorCode": null,
+      "nextRetryAt": null
     },
     "catalog": {
       "status": "succeeded",
       "expectedVersion": "2fc8ff803b75826d3cb45604ec4195807351c2c66bcc894e5f44c69a8c8f97ab",
       "appliedVersion": "2fc8ff803b75826d3cb45604ec4195807351c2c66bcc894e5f44c69a8c8f97ab",
-      "attempts": 0,
+      "attempts": 1,
       "remoteId": "reczz28PGA2K37Bn",
-      "fingerprint": "9d8be4160d16cbad7fc4280a0f4b3d9ac076bcc9ddb01d71b04d0ad645c5786b",
-      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PGA2K37Bn"
+      "fingerprint": "f781fe572a18647a7492b2649767382b3e886a84a71b7a1703f14303281ad600",
+      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PGA2K37Bn",
+      "errorCode": null,
+      "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-19T11:54:05.549Z"
+  "updatedAt": "2026-10-19T14:51:21.909Z"
 }

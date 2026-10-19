@@ -3,7 +3,7 @@
   "id": "note-471e26a953f2247de271cf32",
   "ownerKey": "local-user",
   "sourceVersion": "b20a5518aac20713593bc38d46e69434b5266de408860f6ca0be24167e68b2c9",
-  "resourceVersion": "migration-v1",
+  "resourceVersion": "phase2-republish-v1",
   "targetKey": "production-v1",
   "mode": "production",
   "targets": {
@@ -11,26 +11,110 @@
       "status": "succeeded",
       "expectedVersion": "b20a5518aac20713593bc38d46e69434b5266de408860f6ca0be24167e68b2c9",
       "appliedVersion": "b20a5518aac20713593bc38d46e69434b5266de408860f6ca0be24167e68b2c9",
-      "attempts": 0,
+      "attempts": 1,
       "remoteId": "Z6q5wXocriKk8mkYjnOceURMnef",
       "docId": "UfopdqcCQoHcdFxOIs7cBDcOnKe",
-      "fingerprint": "e78e9526f700b7a2ea37a9094463027e5684f5c989937a1cbb406d71ec42040b",
-      "link": "https://www.feishu.cn/wiki/Z6q5wXocriKk8mkYjnOceURMnef"
+      "fingerprint": "07e06bf2a2bf165a9e63cc9d59d0e78497972653e7a9e64a0475e66b6a44c2b0",
+      "link": "https://www.feishu.cn/wiki/Z6q5wXocriKk8mkYjnOceURMnef",
+      "imageBlocks": [
+        {
+          "blockId": "doxcnBSTF9O6wAAGHqHcWQRhgOf",
+          "digest": "a4f52166bc3d42fba0bc4c6b98e61121b4e06504b08a849fdeb29accc4ab2e67",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/how-to-interview-engineers-in-ai-era/fig-01.png"
+        },
+        {
+          "blockId": "doxcnjVXD9tGGXNKG81878QpEfe",
+          "digest": "bb735226d026db08027f75f16da80c39f1081e7c7b4f20eae98fdf5e1ba0fc48",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/how-to-interview-engineers-in-ai-era/fig-02.jpg"
+        },
+        {
+          "blockId": "doxcn3bkXixJ3WYvexDyTgxPAxh",
+          "digest": "436ef17bf65f96928e9c48e7a73789fdc4c1912272e209bf5e13b544f6b62f45",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/how-to-interview-engineers-in-ai-era/fig-03.jpg"
+        },
+        {
+          "blockId": "doxcn8r2KqQohCreeF4AfPlBRfg",
+          "digest": "81d791ece78aa2c863f3263b3d01035c71338091c2758d29921dbc5bc60666da",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/how-to-interview-engineers-in-ai-era/fig-04.jpg"
+        },
+        {
+          "blockId": "doxcnkP4VaDHHpJ4W1bkh8jsMvb",
+          "digest": "533623b2112e8ff0a97400f328dfd98a38b0f05e95924812d38ef71059cb5d70",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/how-to-interview-engineers-in-ai-era/fig-05.jpg"
+        },
+        {
+          "blockId": "doxcn8zwQkUmnHJogB7Fb0INnxf",
+          "digest": "886cfb4fe1155ce82b6138e3b11ad046b23808f0d76af3988d8e9384cda63e43",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/how-to-interview-engineers-in-ai-era/fig-06.jpg"
+        },
+        {
+          "blockId": "doxcnrI3XeoBvax1VLKRHiuvExb",
+          "digest": "37f48daea232faa6619a56c9a0fec3793515877c81873dcc541f7dc6de88db05",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/how-to-interview-engineers-in-ai-era/fig-07.jpg"
+        }
+      ],
+      "errorCode": null,
+      "nextRetryAt": null
     },
     "images": {
-      "status": "pending",
+      "status": "succeeded",
       "expectedVersion": "b20a5518aac20713593bc38d46e69434b5266de408860f6ca0be24167e68b2c9",
-      "attempts": 0
+      "attempts": 1,
+      "receipts": [
+        {
+          "blockId": "doxcnBSTF9O6wAAGHqHcWQRhgOf",
+          "digest": "a4f52166bc3d42fba0bc4c6b98e61121b4e06504b08a849fdeb29accc4ab2e67",
+          "token": "AdXCbHujuoshldxdlGQcE2zCnOg"
+        },
+        {
+          "blockId": "doxcnjVXD9tGGXNKG81878QpEfe",
+          "digest": "bb735226d026db08027f75f16da80c39f1081e7c7b4f20eae98fdf5e1ba0fc48",
+          "token": "LqZHbTQHGo8Lj7xeLfcc1GL4nvg"
+        },
+        {
+          "blockId": "doxcn3bkXixJ3WYvexDyTgxPAxh",
+          "digest": "436ef17bf65f96928e9c48e7a73789fdc4c1912272e209bf5e13b544f6b62f45",
+          "token": "C4gYbfqkGoQXwaxHG7VcUNYWnIf"
+        },
+        {
+          "blockId": "doxcn8r2KqQohCreeF4AfPlBRfg",
+          "digest": "81d791ece78aa2c863f3263b3d01035c71338091c2758d29921dbc5bc60666da",
+          "token": "Bq44bNv1hovRXExtd6ic7Yc3npe"
+        },
+        {
+          "blockId": "doxcnkP4VaDHHpJ4W1bkh8jsMvb",
+          "digest": "533623b2112e8ff0a97400f328dfd98a38b0f05e95924812d38ef71059cb5d70",
+          "token": "UaCAbVlZNoWqrIxIu38czX2ynhb"
+        },
+        {
+          "blockId": "doxcn8zwQkUmnHJogB7Fb0INnxf",
+          "digest": "886cfb4fe1155ce82b6138e3b11ad046b23808f0d76af3988d8e9384cda63e43",
+          "token": "CNmVb4TwZolx8WxspNRcPCOGnmd"
+        },
+        {
+          "blockId": "doxcnrI3XeoBvax1VLKRHiuvExb",
+          "digest": "37f48daea232faa6619a56c9a0fec3793515877c81873dcc541f7dc6de88db05",
+          "token": "CSntbVXF5oLSkix0aZScAeR0nJ3"
+        }
+      ],
+      "verifiedVersion": "b20a5518aac20713593bc38d46e69434b5266de408860f6ca0be24167e68b2c9",
+      "fingerprint": "51cb20b3ff5ef02dabd0bb6c14c5fd7bb73b46f4ef5b067c798d8687ae2c364c",
+      "wikiFingerprint": "07e06bf2a2bf165a9e63cc9d59d0e78497972653e7a9e64a0475e66b6a44c2b0",
+      "appliedVersion": "b20a5518aac20713593bc38d46e69434b5266de408860f6ca0be24167e68b2c9",
+      "errorCode": null,
+      "nextRetryAt": null
     },
     "catalog": {
       "status": "succeeded",
       "expectedVersion": "b20a5518aac20713593bc38d46e69434b5266de408860f6ca0be24167e68b2c9",
       "appliedVersion": "b20a5518aac20713593bc38d46e69434b5266de408860f6ca0be24167e68b2c9",
-      "attempts": 0,
+      "attempts": 1,
       "remoteId": "reczz28PG9oNHG7X",
-      "fingerprint": "c9d4dd0d82ac71c51a24c275df13b46279a68defd924c465b2ad236ffdd3a498",
-      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PG9oNHG7X"
+      "fingerprint": "339af8cfee0a0a98ae620ed7cc33dd081948c8fd49a1bef0e36b3d8732612056",
+      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PG9oNHG7X",
+      "errorCode": null,
+      "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-19T11:53:52.709Z"
+  "updatedAt": "2026-10-19T14:51:04.197Z"
 }

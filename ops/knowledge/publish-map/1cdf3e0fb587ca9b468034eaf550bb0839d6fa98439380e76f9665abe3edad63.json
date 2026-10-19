@@ -1,0 +1,220 @@
+{
+  "schemaVersion": 1,
+  "id": "note-artifact-20261018-b7a5866d",
+  "ownerKey": "local-user",
+  "sourceVersion": "8675cf9224f61f03eff24e671fd987bf7fa2b30503247fad0b0c3bc2352970b1",
+  "resourceVersion": "phase2-new-v1",
+  "targetKey": "production-v1",
+  "mode": "production",
+  "targets": {
+    "wiki": {
+      "expectedVersion": "8675cf9224f61f03eff24e671fd987bf7fa2b30503247fad0b0c3bc2352970b1",
+      "status": "succeeded",
+      "attempts": 1,
+      "remoteId": "KSclwIMZAiEdo7kdlTCcyOREnBf",
+      "docId": "VJUTd7oKbospz5xs9MocAG8Nnbg",
+      "imageBlocks": [
+        {
+          "blockId": "doxcnPJkclj1zstPqsxUoV61hMg",
+          "digest": "b0464133a2996cbf70a56d406c659bfed7a4619e4306e1b2f7f5b4e91dd483af",
+          "localRef": "vault/99-System/Attachments/by-digest/b0464133a2996cbf70a56d406c659bfed7a4619e4306e1b2f7f5b4e91dd483af.webp"
+        },
+        {
+          "blockId": "doxcnXwPRn16LkROGO8XuhDMnKb",
+          "digest": "62a909fe82cde95625708bc393073c09722ff3149dd9b098ba0eff63774ec707",
+          "localRef": "vault/99-System/Attachments/by-digest/62a909fe82cde95625708bc393073c09722ff3149dd9b098ba0eff63774ec707.webp"
+        },
+        {
+          "blockId": "doxcnJ9XSoI9jegcS2qzOwu7Zuf",
+          "digest": "95dc5daa844710ee1d235637b3f69e02159d24fd9f5a323d74097d3ae84e7c26",
+          "localRef": "vault/99-System/Attachments/by-digest/95dc5daa844710ee1d235637b3f69e02159d24fd9f5a323d74097d3ae84e7c26.webp"
+        },
+        {
+          "blockId": "doxcnYzXzRh6oLNnhwwHmu85TiE",
+          "digest": "b16b9dfcbc813696b5d646485a0f1862a2a0a9abdf0dc48c912e5f2d7f0364b9",
+          "localRef": "vault/99-System/Attachments/by-digest/b16b9dfcbc813696b5d646485a0f1862a2a0a9abdf0dc48c912e5f2d7f0364b9.webp"
+        },
+        {
+          "blockId": "doxcnMagnSEYmOscU4VRn7L9QMc",
+          "digest": "95a3cf33fadee7138a8103f9b13a648e74b33bc5219c5e7e7904a9817150cb88",
+          "localRef": "vault/99-System/Attachments/by-digest/95a3cf33fadee7138a8103f9b13a648e74b33bc5219c5e7e7904a9817150cb88.webp"
+        },
+        {
+          "blockId": "doxcnROH5xqVQhN4IG4oHz4PZNd",
+          "digest": "0d35098d732fe9c7f2ee28506ade5ebd89ecc5620b902c528a9f90cb2376ff0b",
+          "localRef": "vault/99-System/Attachments/by-digest/0d35098d732fe9c7f2ee28506ade5ebd89ecc5620b902c528a9f90cb2376ff0b.webp"
+        },
+        {
+          "blockId": "doxcnxpLVQ3XvAy7Cfh5mp9xSDc",
+          "digest": "22bbd12ee08cf3721b062a6945f0125825a68958ff6c757fa41138ca6cddbb04",
+          "localRef": "vault/99-System/Attachments/by-digest/22bbd12ee08cf3721b062a6945f0125825a68958ff6c757fa41138ca6cddbb04.webp"
+        },
+        {
+          "blockId": "doxcnWRoeRsiieOoU3AixwJr8db",
+          "digest": "d4cd311ebc7e712df0ffc3d6f4397837b52d82126aa0f2b6256991ddf743c111",
+          "localRef": "vault/99-System/Attachments/by-digest/d4cd311ebc7e712df0ffc3d6f4397837b52d82126aa0f2b6256991ddf743c111.webp"
+        },
+        {
+          "blockId": "doxcnj9O7k1TfEeoalcRcHFJBzd",
+          "digest": "2e8988b8fff9d8613abfb6d061f30825cb58338a492eecdb1330b482eff4bd67",
+          "localRef": "vault/99-System/Attachments/by-digest/2e8988b8fff9d8613abfb6d061f30825cb58338a492eecdb1330b482eff4bd67.webp"
+        },
+        {
+          "blockId": "doxcnA2aBU7cUXJL3aCsxW8hn5c",
+          "digest": "c7b6f4f9df97743da4544b15f6d9e87878570ac8e973a5215abb64f12c723a01",
+          "localRef": "vault/99-System/Attachments/by-digest/c7b6f4f9df97743da4544b15f6d9e87878570ac8e973a5215abb64f12c723a01.webp"
+        },
+        {
+          "blockId": "doxcnd7Mps5L6YR0OL8D6JgF36b",
+          "digest": "b6430aedee9c9e6fda6c7715d179863582887f2944ca953ee7c47721fce1b77b",
+          "localRef": "vault/99-System/Attachments/by-digest/b6430aedee9c9e6fda6c7715d179863582887f2944ca953ee7c47721fce1b77b.webp"
+        },
+        {
+          "blockId": "doxcnkvNYCDiixGfpLCwQbU96xe",
+          "digest": "8a2597ce9d19e51e0c510402f55f6c6bb67aae0f5b9e896c4a3cfe26cc28a600",
+          "localRef": "vault/99-System/Attachments/by-digest/8a2597ce9d19e51e0c510402f55f6c6bb67aae0f5b9e896c4a3cfe26cc28a600.webp"
+        },
+        {
+          "blockId": "doxcnud74h6kqu2r1CkH6bDP20b",
+          "digest": "764ebb716919205749025aa6e6dbe1d3fff6184c5569f7336deb650a385c2a1c",
+          "localRef": "vault/99-System/Attachments/by-digest/764ebb716919205749025aa6e6dbe1d3fff6184c5569f7336deb650a385c2a1c.webp"
+        },
+        {
+          "blockId": "doxcnicViQuaizoIxp3cDQavNQf",
+          "digest": "38f86ce77d116737d94c8a42efdb1357df7643bd0b24e5a42dd884c4f4b8da11",
+          "localRef": "vault/99-System/Attachments/by-digest/38f86ce77d116737d94c8a42efdb1357df7643bd0b24e5a42dd884c4f4b8da11.webp"
+        },
+        {
+          "blockId": "doxcnueifmUejXpJu9XhyIuk8ac",
+          "digest": "49aba4b693f5b222b2c11aa2cf38edef069b81e3dfc7972a1c9c6727e1034772",
+          "localRef": "vault/99-System/Attachments/by-digest/49aba4b693f5b222b2c11aa2cf38edef069b81e3dfc7972a1c9c6727e1034772.webp"
+        },
+        {
+          "blockId": "doxcn76LONFRDj9xilX1G54vEOe",
+          "digest": "e14ef2b1648367ac07a2ab8471c65b0ab28730ed75a1761bca93bf0693e356b0",
+          "localRef": "vault/99-System/Attachments/by-digest/e14ef2b1648367ac07a2ab8471c65b0ab28730ed75a1761bca93bf0693e356b0.webp"
+        },
+        {
+          "blockId": "doxcnvrv1OqFc0kFrYxtYp2n0Sc",
+          "digest": "62d00c12967ea4708da97f58ce2386273c944c0a2c48f1d4d524a35dea956683",
+          "localRef": "vault/99-System/Attachments/by-digest/62d00c12967ea4708da97f58ce2386273c944c0a2c48f1d4d524a35dea956683.webp"
+        }
+      ],
+      "fingerprint": "b52f05b89c55d964634de5c12bef6779755f4644b4a00a5d0ed3e837bbd04d5c",
+      "link": "https://www.feishu.cn/wiki/KSclwIMZAiEdo7kdlTCcyOREnBf",
+      "appliedVersion": "8675cf9224f61f03eff24e671fd987bf7fa2b30503247fad0b0c3bc2352970b1",
+      "errorCode": null,
+      "nextRetryAt": null
+    },
+    "images": {
+      "expectedVersion": "8675cf9224f61f03eff24e671fd987bf7fa2b30503247fad0b0c3bc2352970b1",
+      "status": "succeeded",
+      "attempts": 1,
+      "receipts": [
+        {
+          "blockId": "doxcnPJkclj1zstPqsxUoV61hMg",
+          "digest": "b0464133a2996cbf70a56d406c659bfed7a4619e4306e1b2f7f5b4e91dd483af",
+          "token": "NURobRZ2MosEFMxKCW7cOIhHn0e"
+        },
+        {
+          "blockId": "doxcnXwPRn16LkROGO8XuhDMnKb",
+          "digest": "62a909fe82cde95625708bc393073c09722ff3149dd9b098ba0eff63774ec707",
+          "token": "TV6cbh77ioR7Faxae80cov82nCI"
+        },
+        {
+          "blockId": "doxcnJ9XSoI9jegcS2qzOwu7Zuf",
+          "digest": "95dc5daa844710ee1d235637b3f69e02159d24fd9f5a323d74097d3ae84e7c26",
+          "token": "BYK9bdpyKo8ACRxniNXcXc9KnRX"
+        },
+        {
+          "blockId": "doxcnYzXzRh6oLNnhwwHmu85TiE",
+          "digest": "b16b9dfcbc813696b5d646485a0f1862a2a0a9abdf0dc48c912e5f2d7f0364b9",
+          "token": "FL2CbfGNmomDqExkIqBcyjCanqf"
+        },
+        {
+          "blockId": "doxcnMagnSEYmOscU4VRn7L9QMc",
+          "digest": "95a3cf33fadee7138a8103f9b13a648e74b33bc5219c5e7e7904a9817150cb88",
+          "token": "UsHEbfWJkoZIemxDlNkcTwsAnbg"
+        },
+        {
+          "blockId": "doxcnROH5xqVQhN4IG4oHz4PZNd",
+          "digest": "0d35098d732fe9c7f2ee28506ade5ebd89ecc5620b902c528a9f90cb2376ff0b",
+          "token": "VljObH5vFopJ7Fx6tWEcHDLtnFh"
+        },
+        {
+          "blockId": "doxcnxpLVQ3XvAy7Cfh5mp9xSDc",
+          "digest": "22bbd12ee08cf3721b062a6945f0125825a68958ff6c757fa41138ca6cddbb04",
+          "token": "OLQpbvvsEoahF9xpCIgcn8tfnLh"
+        },
+        {
+          "blockId": "doxcnWRoeRsiieOoU3AixwJr8db",
+          "digest": "d4cd311ebc7e712df0ffc3d6f4397837b52d82126aa0f2b6256991ddf743c111",
+          "token": "KmLfb0qhYo82vVxtNI4cplRvnvf"
+        },
+        {
+          "blockId": "doxcnj9O7k1TfEeoalcRcHFJBzd",
+          "digest": "2e8988b8fff9d8613abfb6d061f30825cb58338a492eecdb1330b482eff4bd67",
+          "token": "NrzFbJJJ2opBfgxxkf0c10jznGc"
+        },
+        {
+          "blockId": "doxcnA2aBU7cUXJL3aCsxW8hn5c",
+          "digest": "c7b6f4f9df97743da4544b15f6d9e87878570ac8e973a5215abb64f12c723a01",
+          "token": "XTCwbTGXZoE38Vx0FJoc00Cmnuf"
+        },
+        {
+          "blockId": "doxcnd7Mps5L6YR0OL8D6JgF36b",
+          "digest": "b6430aedee9c9e6fda6c7715d179863582887f2944ca953ee7c47721fce1b77b",
+          "token": "Lv5Qbk3o1owbKCxpWu9cZsINnYf"
+        },
+        {
+          "blockId": "doxcnkvNYCDiixGfpLCwQbU96xe",
+          "digest": "8a2597ce9d19e51e0c510402f55f6c6bb67aae0f5b9e896c4a3cfe26cc28a600",
+          "token": "Ow7rbdNF8o3gCBxrCHecFDCZnsc"
+        },
+        {
+          "blockId": "doxcnud74h6kqu2r1CkH6bDP20b",
+          "digest": "764ebb716919205749025aa6e6dbe1d3fff6184c5569f7336deb650a385c2a1c",
+          "token": "RGf3bsDtgo2rzrx0R8VcZYx5ncb"
+        },
+        {
+          "blockId": "doxcnicViQuaizoIxp3cDQavNQf",
+          "digest": "38f86ce77d116737d94c8a42efdb1357df7643bd0b24e5a42dd884c4f4b8da11",
+          "token": "CWYWbKSmToA3nOxchNmcXNVPnfg"
+        },
+        {
+          "blockId": "doxcnueifmUejXpJu9XhyIuk8ac",
+          "digest": "49aba4b693f5b222b2c11aa2cf38edef069b81e3dfc7972a1c9c6727e1034772",
+          "token": "WoUGbgYGboRzMnxDi8jcwtWEnSb"
+        },
+        {
+          "blockId": "doxcn76LONFRDj9xilX1G54vEOe",
+          "digest": "e14ef2b1648367ac07a2ab8471c65b0ab28730ed75a1761bca93bf0693e356b0",
+          "token": "NZsnb1OGAoPirKxb46Icxrtbnbe"
+        },
+        {
+          "blockId": "doxcnvrv1OqFc0kFrYxtYp2n0Sc",
+          "digest": "62d00c12967ea4708da97f58ce2386273c944c0a2c48f1d4d524a35dea956683",
+          "token": "PBKHbsMh3oRviLxa69tcAiT1nbg"
+        }
+      ],
+      "verifiedVersion": "8675cf9224f61f03eff24e671fd987bf7fa2b30503247fad0b0c3bc2352970b1",
+      "fingerprint": "e831764f6fc9a94d9018d2224263fe0fac2a6d967b527ed7a2614f80e6876398",
+      "wikiFingerprint": "b52f05b89c55d964634de5c12bef6779755f4644b4a00a5d0ed3e837bbd04d5c",
+      "appliedVersion": "8675cf9224f61f03eff24e671fd987bf7fa2b30503247fad0b0c3bc2352970b1",
+      "errorCode": null,
+      "nextRetryAt": null
+    },
+    "catalog": {
+      "expectedVersion": "8675cf9224f61f03eff24e671fd987bf7fa2b30503247fad0b0c3bc2352970b1",
+      "status": "succeeded",
+      "attempts": 1,
+      "remoteId": "reczz28PJxxPrzLQ",
+      "fingerprint": "3335ee86e47ecf52cc482bc94af4355ef44c13756aecf8e4b69cd636cc9cbac3",
+      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PJxxPrzLQ",
+      "appliedVersion": "8675cf9224f61f03eff24e671fd987bf7fa2b30503247fad0b0c3bc2352970b1",
+      "errorCode": null,
+      "nextRetryAt": null
+    }
+  },
+  "updatedAt": "2026-10-19T15:37:26.201Z"
+}

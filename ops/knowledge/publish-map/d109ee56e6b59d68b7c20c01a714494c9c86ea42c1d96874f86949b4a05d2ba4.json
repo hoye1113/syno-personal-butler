@@ -3,7 +3,7 @@
   "id": "note-168261211b0b64438a31df82",
   "ownerKey": "local-user",
   "sourceVersion": "a0972a65f65ab2b2879bd70701c29aee60032dee49c3746792d329d206585fa0",
-  "resourceVersion": "migration-v1",
+  "resourceVersion": "phase2-republish-v1",
   "targetKey": "production-v1",
   "mode": "production",
   "targets": {
@@ -11,26 +11,240 @@
       "status": "succeeded",
       "expectedVersion": "a0972a65f65ab2b2879bd70701c29aee60032dee49c3746792d329d206585fa0",
       "appliedVersion": "a0972a65f65ab2b2879bd70701c29aee60032dee49c3746792d329d206585fa0",
-      "attempts": 0,
+      "attempts": 1,
       "remoteId": "DUnBwgclqi9lpjktrhacx3WwnxH",
       "docId": "GDUTdXwpYoEjIax5fEIclSOmnnx",
-      "fingerprint": "235960bbd3a5af1cfedf60ed03deb92ee08bd4d33e6b6db3a0e4528a4f7dd232",
-      "link": "https://www.feishu.cn/wiki/DUnBwgclqi9lpjktrhacx3WwnxH"
+      "fingerprint": "51a7662c34f964306937b2ce83b2ba362fefbcbef579377e0c44b1995cb1d007",
+      "link": "https://www.feishu.cn/wiki/DUnBwgclqi9lpjktrhacx3WwnxH",
+      "imageBlocks": [
+        {
+          "blockId": "doxcnv7PuxeLrW9RFoEgLrESqac",
+          "digest": "44324a6eb557e9313cd1eb77b762523f13f64d65c43e47b9168e59885ed549da",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-01.png"
+        },
+        {
+          "blockId": "doxcnDvp6lhFt1ZeLFvqy8g7A5f",
+          "digest": "6eaaa3329ab8cad7fbde744097a41e414c635a6bd99e4f7b437bab8df0af58ff",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-02.png"
+        },
+        {
+          "blockId": "doxcnJlNfwfvKSMh5HDLSnWaxab",
+          "digest": "776c73067e2abc3bffb81480866e97a3a24ffd132727b5b2e72fb6247c456f46",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-03.png"
+        },
+        {
+          "blockId": "doxcnOPXODrP28n9vJGqQL6ph4d",
+          "digest": "f73f7007e188bcb7af74f437bb91817c8da9858fe4416fd1daac0b0238a3af0f",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-04.png"
+        },
+        {
+          "blockId": "doxcnM2yU9zvfNAF0KPFttdPLDg",
+          "digest": "9e7c064e4d4be108a01cf907884af8c685279eb448b3cec915c4cfb167db22bc",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-05.jpg"
+        },
+        {
+          "blockId": "doxcnPiVWl3TAVNoa2YTEJibQPh",
+          "digest": "91e6604aade9dd766cbb49142675e459c9db141d4ea5b5091f8ec14adc048493",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-06.jpg"
+        },
+        {
+          "blockId": "doxcn94lMCi3D1twTWpm2nZc3lh",
+          "digest": "c931981c079ca71bed2c58c0856c74ba9364620a932b48daf6d4897cb6ddf794",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-07.png"
+        },
+        {
+          "blockId": "doxcnTFnXGlBOZlFdJFRuJXzdcg",
+          "digest": "eb3cccb5aaa5a28f9ac48ef5a868c4c1e64a4474f76980f06ced5a814c4b13ca",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-08.png"
+        },
+        {
+          "blockId": "doxcnMUDVTmPpQQNXnbDkKPeold",
+          "digest": "880068556afc0b331e59bef121a41563ad036e6ae93495842bd50b6c77bdb026",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-09.png"
+        },
+        {
+          "blockId": "doxcnz79fXH7mr3IugwWGzQHmug",
+          "digest": "a96b830ad121ecd6bebfb7a997817e65e3a47da3c1ccf949700a1bcac3d77147",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-10.png"
+        },
+        {
+          "blockId": "doxcnyiqGxFbPsNalvy74kAX2Kf",
+          "digest": "9f24145acf17c87c4c275bbd9ffd5e76a048fa758eaab90fcf144838b81c00e4",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-11.png"
+        },
+        {
+          "blockId": "doxcncvqL4lWxFMaITehrg5Ahvb",
+          "digest": "297de596c778e68f1089991c506b30bc55b1531994ef3ee13b2c0dd2fd0cf76d",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-12.png"
+        },
+        {
+          "blockId": "doxcn95Vgy0GDfIaPxz8VJEyMhf",
+          "digest": "fd0d41479917bc71306de4fcb805cb599f1680aec1537d224d4b73abd51d07dc",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-13.jpg"
+        },
+        {
+          "blockId": "doxcnLGI8q57BFxdEabNjJGftah",
+          "digest": "d69e1bad3c2d32015b97de9bf469d0149d0bb9e6fca177b7282cd107372c70ae",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-14.png"
+        },
+        {
+          "blockId": "doxcnWwezNsm43Uz2a99EfT75iT",
+          "digest": "3c44549786ebe6c6a73541af76c2d7d760549983d4de7e7b9a684ba65a38bf67",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-15.jpg"
+        },
+        {
+          "blockId": "doxcnXV8QfyNNhfQJhUPbJeK7bY",
+          "digest": "bbf9fce570b74bb5a053d439c5c2ea18d19327cfdc4ed16c8d2dda1262696d30",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-16.png"
+        },
+        {
+          "blockId": "doxcnIAcT5av6B28p9XFuB9Fafc",
+          "digest": "bc2104a6ebc9942a7d9d43faab2426ec417cd2c1393e0a16285d55f6b12455cb",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-17.png"
+        },
+        {
+          "blockId": "doxcno4ph9hipbfBnapo2KTsODb",
+          "digest": "0d4c111c5a47bb3a5448e30385c22bb77a6f882e4c1ec1f266cb24b5fe1e1873",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-18.png"
+        },
+        {
+          "blockId": "doxcnzrLCvrxYCkWkyhP0UQxegg",
+          "digest": "af55bd8e6b1ebd4694e4635257bf27c6140e01c32b9eb54252a164e7404e7390",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-19.png"
+        },
+        {
+          "blockId": "doxcnuPXca374rAUV22N3ckeaph",
+          "digest": "77f2e240bb57b214c0c8709bb5c5685c8a27b790005f6e4a3745e594c91907de",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/martinskxu-evals/martinskxu-20.png"
+        }
+      ],
+      "errorCode": null,
+      "nextRetryAt": null
     },
     "images": {
-      "status": "pending",
+      "status": "succeeded",
       "expectedVersion": "a0972a65f65ab2b2879bd70701c29aee60032dee49c3746792d329d206585fa0",
-      "attempts": 0
+      "attempts": 1,
+      "receipts": [
+        {
+          "blockId": "doxcnv7PuxeLrW9RFoEgLrESqac",
+          "digest": "44324a6eb557e9313cd1eb77b762523f13f64d65c43e47b9168e59885ed549da",
+          "token": "D5S7baqAQoGpGxxOig8cOYCInpe"
+        },
+        {
+          "blockId": "doxcnDvp6lhFt1ZeLFvqy8g7A5f",
+          "digest": "6eaaa3329ab8cad7fbde744097a41e414c635a6bd99e4f7b437bab8df0af58ff",
+          "token": "RxNObjgCXoUWsFxF2FncsBNDn3e"
+        },
+        {
+          "blockId": "doxcnJlNfwfvKSMh5HDLSnWaxab",
+          "digest": "776c73067e2abc3bffb81480866e97a3a24ffd132727b5b2e72fb6247c456f46",
+          "token": "It6Zb20NcoTjeuxTlyGc6SYgnhh"
+        },
+        {
+          "blockId": "doxcnOPXODrP28n9vJGqQL6ph4d",
+          "digest": "f73f7007e188bcb7af74f437bb91817c8da9858fe4416fd1daac0b0238a3af0f",
+          "token": "UCmYb34OKoD792xMTF0c9V6Qn3h"
+        },
+        {
+          "blockId": "doxcnM2yU9zvfNAF0KPFttdPLDg",
+          "digest": "9e7c064e4d4be108a01cf907884af8c685279eb448b3cec915c4cfb167db22bc",
+          "token": "MoNubAuFToSYGNxXKCwcG8iIn0g"
+        },
+        {
+          "blockId": "doxcnPiVWl3TAVNoa2YTEJibQPh",
+          "digest": "91e6604aade9dd766cbb49142675e459c9db141d4ea5b5091f8ec14adc048493",
+          "token": "QA9pbtx1FofE9Nxic19cEQnzndg"
+        },
+        {
+          "blockId": "doxcn94lMCi3D1twTWpm2nZc3lh",
+          "digest": "c931981c079ca71bed2c58c0856c74ba9364620a932b48daf6d4897cb6ddf794",
+          "token": "SGqhblqq9ohbdZxnyK3cp7GrnGg"
+        },
+        {
+          "blockId": "doxcnTFnXGlBOZlFdJFRuJXzdcg",
+          "digest": "eb3cccb5aaa5a28f9ac48ef5a868c4c1e64a4474f76980f06ced5a814c4b13ca",
+          "token": "EASBbNr4KoNwlrxKSifcwUWMnif"
+        },
+        {
+          "blockId": "doxcnMUDVTmPpQQNXnbDkKPeold",
+          "digest": "880068556afc0b331e59bef121a41563ad036e6ae93495842bd50b6c77bdb026",
+          "token": "QlCNbozs0oNA2fxF5JIcoymsnNf"
+        },
+        {
+          "blockId": "doxcnz79fXH7mr3IugwWGzQHmug",
+          "digest": "a96b830ad121ecd6bebfb7a997817e65e3a47da3c1ccf949700a1bcac3d77147",
+          "token": "U4PUbj9OnogOxsxka14c14nSn1b"
+        },
+        {
+          "blockId": "doxcnyiqGxFbPsNalvy74kAX2Kf",
+          "digest": "9f24145acf17c87c4c275bbd9ffd5e76a048fa758eaab90fcf144838b81c00e4",
+          "token": "AlRqbGHgpoph5ixZiCXc3n6JnKg"
+        },
+        {
+          "blockId": "doxcncvqL4lWxFMaITehrg5Ahvb",
+          "digest": "297de596c778e68f1089991c506b30bc55b1531994ef3ee13b2c0dd2fd0cf76d",
+          "token": "BWoFbDmo4o5HmqxwydkcRxU3nqf"
+        },
+        {
+          "blockId": "doxcn95Vgy0GDfIaPxz8VJEyMhf",
+          "digest": "fd0d41479917bc71306de4fcb805cb599f1680aec1537d224d4b73abd51d07dc",
+          "token": "YCUVbNM27oqO7yx7ZYWcxmATnRg"
+        },
+        {
+          "blockId": "doxcnLGI8q57BFxdEabNjJGftah",
+          "digest": "d69e1bad3c2d32015b97de9bf469d0149d0bb9e6fca177b7282cd107372c70ae",
+          "token": "TNtJbsPm9oPLJIxfrkPcQ9eSnfd"
+        },
+        {
+          "blockId": "doxcnWwezNsm43Uz2a99EfT75iT",
+          "digest": "3c44549786ebe6c6a73541af76c2d7d760549983d4de7e7b9a684ba65a38bf67",
+          "token": "GrFMbCk0goW0c1x9PiqcfmL0nGd"
+        },
+        {
+          "blockId": "doxcnXV8QfyNNhfQJhUPbJeK7bY",
+          "digest": "bbf9fce570b74bb5a053d439c5c2ea18d19327cfdc4ed16c8d2dda1262696d30",
+          "token": "B3iAbTTLIoxg7JxsH3ccp2Srnsd"
+        },
+        {
+          "blockId": "doxcnIAcT5av6B28p9XFuB9Fafc",
+          "digest": "bc2104a6ebc9942a7d9d43faab2426ec417cd2c1393e0a16285d55f6b12455cb",
+          "token": "I2hqb5tPBojGXNxY6zccwCZyn7e"
+        },
+        {
+          "blockId": "doxcno4ph9hipbfBnapo2KTsODb",
+          "digest": "0d4c111c5a47bb3a5448e30385c22bb77a6f882e4c1ec1f266cb24b5fe1e1873",
+          "token": "Vu5dblBTvoPjuOxH8LBcbtC6nJd"
+        },
+        {
+          "blockId": "doxcnzrLCvrxYCkWkyhP0UQxegg",
+          "digest": "af55bd8e6b1ebd4694e4635257bf27c6140e01c32b9eb54252a164e7404e7390",
+          "token": "VrBAbgYUzoJ0MNxT9xpcH5BTnOi"
+        },
+        {
+          "blockId": "doxcnuPXca374rAUV22N3ckeaph",
+          "digest": "77f2e240bb57b214c0c8709bb5c5685c8a27b790005f6e4a3745e594c91907de",
+          "token": "Dt1lbxyFdo5L5Hxrudfc6YoCndc"
+        }
+      ],
+      "verifiedVersion": "a0972a65f65ab2b2879bd70701c29aee60032dee49c3746792d329d206585fa0",
+      "fingerprint": "94d688f88f7c3eb850d263ada75ab7afc99bf992daf416c94164b6c029e75a96",
+      "wikiFingerprint": "51a7662c34f964306937b2ce83b2ba362fefbcbef579377e0c44b1995cb1d007",
+      "appliedVersion": "a0972a65f65ab2b2879bd70701c29aee60032dee49c3746792d329d206585fa0",
+      "errorCode": null,
+      "nextRetryAt": null
     },
     "catalog": {
       "status": "succeeded",
       "expectedVersion": "a0972a65f65ab2b2879bd70701c29aee60032dee49c3746792d329d206585fa0",
       "appliedVersion": "a0972a65f65ab2b2879bd70701c29aee60032dee49c3746792d329d206585fa0",
-      "attempts": 0,
+      "attempts": 1,
       "remoteId": "reczz28PG9aEgx1v",
-      "fingerprint": "3ed4a135716ff30699f72060b3b24937d7e80af375921a08acea3e60d1cd52fc",
-      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PG9aEgx1v"
+      "fingerprint": "4b3e170823a529c263b653e73ce28a4f3c1104be212c0e87dc0b160389f6c318",
+      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PG9aEgx1v",
+      "errorCode": null,
+      "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-19T11:53:39.833Z"
+  "updatedAt": "2026-10-19T14:55:27.248Z"
 }

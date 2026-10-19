@@ -3,33 +3,46 @@
   "id": "note-3e84aaf1fdfe7e0a46f699ab",
   "ownerKey": "local-user",
   "sourceVersion": "e9ff799321c215bacfa683855df356be05b1163a9870d3636caac472a5e64b12",
-  "resourceVersion": "migration-v1",
+  "resourceVersion": "phase2-new-v1",
   "targetKey": "production-v1",
   "mode": "production",
   "targets": {
     "wiki": {
-      "status": "pending",
+      "status": "succeeded",
       "expectedVersion": "e9ff799321c215bacfa683855df356be05b1163a9870d3636caac472a5e64b12",
-      "attempts": 0
+      "attempts": 1,
+      "remoteId": "RO6mwgnQhieLm8kHcqRcN2mbnFd",
+      "docId": "QwsJdIIyeo18d0x5ERkcKduTnDb",
+      "imageBlocks": [],
+      "fingerprint": "a9c7140ea14ab55ec5fa24f95ea42c10a4af9721008616ee0e1fc7de1cae4024",
+      "link": "https://www.feishu.cn/wiki/RO6mwgnQhieLm8kHcqRcN2mbnFd",
+      "appliedVersion": "e9ff799321c215bacfa683855df356be05b1163a9870d3636caac472a5e64b12",
+      "errorCode": null,
+      "nextRetryAt": null
     },
     "images": {
       "status": "succeeded",
       "expectedVersion": "e9ff799321c215bacfa683855df356be05b1163a9870d3636caac472a5e64b12",
       "appliedVersion": "e9ff799321c215bacfa683855df356be05b1163a9870d3636caac472a5e64b12",
-      "attempts": 0,
+      "attempts": 1,
       "receipts": [],
       "verifiedVersion": "e9ff799321c215bacfa683855df356be05b1163a9870d3636caac472a5e64b12",
-      "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "wikiFingerprint": "a9c7140ea14ab55ec5fa24f95ea42c10a4af9721008616ee0e1fc7de1cae4024",
+      "errorCode": null,
+      "nextRetryAt": null
     },
     "catalog": {
       "status": "succeeded",
       "expectedVersion": "e9ff799321c215bacfa683855df356be05b1163a9870d3636caac472a5e64b12",
       "appliedVersion": "e9ff799321c215bacfa683855df356be05b1163a9870d3636caac472a5e64b12",
-      "attempts": 0,
+      "attempts": 1,
       "remoteId": "reczz28PGM3p1RjQ",
-      "fingerprint": "f76befa4366c3fb0478ec9b70b1bab572706753846516630dd639110b4f87d00",
-      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PGM3p1RjQ"
+      "fingerprint": "72d58a7318a1ee4c148a7f15afeff0d42d21939c88bcc3983a893665c7e56ea8",
+      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PGM3p1RjQ",
+      "errorCode": null,
+      "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-19T12:05:28.519Z"
+  "updatedAt": "2026-10-19T15:36:29.374Z"
 }

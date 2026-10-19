@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "id": "note-189dd71cd747fd74d53b64ce",
+  "ownerKey": "local-user",
+  "sourceVersion": "7a3305b7f761073797b08226ee37c2458c27a0b4f085e4b3b0de8f027a8e4236",
+  "resourceVersion": "phase2-new-v1",
+  "targetKey": "production-v1",
+  "mode": "production",
+  "targets": {
+    "wiki": {
+      "expectedVersion": "7a3305b7f761073797b08226ee37c2458c27a0b4f085e4b3b0de8f027a8e4236",
+      "status": "succeeded",
+      "attempts": 1,
+      "remoteId": "T2d5wRgxNiLiN5kU1dacgulZnFh",
+      "docId": "QwXLdMkTNobcUixFPwxcc0JEnCb",
+      "imageBlocks": [],
+      "fingerprint": "b4b95372dd539e2d103d1ba9cba2ca96be79f52cfa558ee877836b8db3c533a9",
+      "link": "https://www.feishu.cn/wiki/T2d5wRgxNiLiN5kU1dacgulZnFh",
+      "appliedVersion": "7a3305b7f761073797b08226ee37c2458c27a0b4f085e4b3b0de8f027a8e4236",
+      "errorCode": null,
+      "nextRetryAt": null
+    },
+    "images": {
+      "expectedVersion": "7a3305b7f761073797b08226ee37c2458c27a0b4f085e4b3b0de8f027a8e4236",
+      "status": "succeeded",
+      "attempts": 1,
+      "receipts": [],
+      "verifiedVersion": "7a3305b7f761073797b08226ee37c2458c27a0b4f085e4b3b0de8f027a8e4236",
+      "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "wikiFingerprint": "b4b95372dd539e2d103d1ba9cba2ca96be79f52cfa558ee877836b8db3c533a9",
+      "appliedVersion": "7a3305b7f761073797b08226ee37c2458c27a0b4f085e4b3b0de8f027a8e4236",
+      "errorCode": null,
+      "nextRetryAt": null
+    },
+    "catalog": {
+      "expectedVersion": "7a3305b7f761073797b08226ee37c2458c27a0b4f085e4b3b0de8f027a8e4236",
+      "status": "succeeded",
+      "attempts": 1,
+      "remoteId": "reczz28PJyhvSe7A",
+      "fingerprint": "dd88bc062d996315535df83b645414ded2e46e83d05ebcac2fecc21f2e677514",
+      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PJyhvSe7A",
+      "appliedVersion": "7a3305b7f761073797b08226ee37c2458c27a0b4f085e4b3b0de8f027a8e4236",
+      "errorCode": null,
+      "nextRetryAt": null
+    }
+  },
+  "updatedAt": "2026-10-19T15:38:08.437Z"
+}

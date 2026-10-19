@@ -3,7 +3,7 @@
   "id": "note-20536f9f26d06df321efdc2b",
   "ownerKey": "local-user",
   "sourceVersion": "6ced04d78c3066c14ade4c3057b86d7288b56b870be48f74a02843f607f015d0",
-  "resourceVersion": "migration-v1",
+  "resourceVersion": "phase2-republish-v1",
   "targetKey": "production-v1",
   "mode": "production",
   "targets": {
@@ -11,26 +11,170 @@
       "status": "succeeded",
       "expectedVersion": "6ced04d78c3066c14ade4c3057b86d7288b56b870be48f74a02843f607f015d0",
       "appliedVersion": "6ced04d78c3066c14ade4c3057b86d7288b56b870be48f74a02843f607f015d0",
-      "attempts": 0,
+      "attempts": 1,
       "remoteId": "Zj4hw97bNiCLNwkaKskcwZaXnxc",
       "docId": "NHqbdvQOlosFSWxdEQlctRlpnYb",
-      "fingerprint": "5c0964a8f559f9a9829a2e79ae383462894a7da73e200c30d0fe186c9baec3ae",
-      "link": "https://www.feishu.cn/wiki/Zj4hw97bNiCLNwkaKskcwZaXnxc"
+      "fingerprint": "d347bee025c84edb452dff8e1e15c3890f5bde98ffd13dc2e91bc5a95f16bf70",
+      "link": "https://www.feishu.cn/wiki/Zj4hw97bNiCLNwkaKskcwZaXnxc",
+      "imageBlocks": [
+        {
+          "blockId": "doxcnwCX9HLdqSSedwIxoXUaS8b",
+          "digest": "7600ea86b53fec204bd7ccc0c020d271246a510257fa22f5c81726f27775302b",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/openai-harness-engineering/harness-eng-01.png"
+        },
+        {
+          "blockId": "doxcnU5Pvnevig144Pzg26WjSse",
+          "digest": "ee4003ab458dc0057ef27cec16ff9ee54eda06880f7b9b5927dadade348af0e8",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/openai-harness-engineering/harness-eng-02.jpg"
+        },
+        {
+          "blockId": "doxcnW6Qml4Y2uuEMMycRoOWIYe",
+          "digest": "0c9657c0ea0664e98bf91b1e58bbed6b87e22db2c34ef0f734b9dd545a096a8a",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/openai-harness-engineering/harness-eng-03.jpg"
+        },
+        {
+          "blockId": "doxcnhWDgwvvt5cbKmqg0tZXYeb",
+          "digest": "5e0d848bf0f2d5f8e740e10f6f3ad871e9d26cd52b58537e2383eaf25a09a602",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/openai-harness-engineering/harness-eng-04.png"
+        },
+        {
+          "blockId": "doxcnAhBcsxQKGlcfRaiyvlKEve",
+          "digest": "6807bfd856ca8656a29e83bae86c9e4ad8e6c2089e7fece854f1fedc89cb4bb5",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/openai-harness-engineering/harness-eng-05.png"
+        },
+        {
+          "blockId": "doxcnuXoyhNdmcgoAAldaauLp7e",
+          "digest": "d5e7cac608b267de191679d6d2699941bdee13c69a2cce46c6ae2e927c37c697",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/openai-harness-engineering/harness-eng-06.jpg"
+        },
+        {
+          "blockId": "doxcntWP33hvrOk1DF3XzqOcdvd",
+          "digest": "2d70224a315eabc6bff2344acbc95bf38f1141f7923acffbaa9508bbcf2691db",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/openai-harness-engineering/harness-eng-07.png"
+        },
+        {
+          "blockId": "doxcnJO4xi3PdhZv5mrUuXBPLtd",
+          "digest": "1f8bcc0ad8728a24bf4f47012a8bf3037876bed4514b84862abfd5a0ce2b54ef",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/openai-harness-engineering/harness-eng-08.png"
+        },
+        {
+          "blockId": "doxcnkDAOmD41YUcUeINtT4yFub",
+          "digest": "d1606eb6f63875af472ea4743aafd9c027e66127eb0384ab0e6800bfcbf00a19",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/openai-harness-engineering/harness-eng-09.png"
+        },
+        {
+          "blockId": "doxcnEtbc3SCa3E42ghzcmhM7Rd",
+          "digest": "12ff47b0d3c0ddc6352ec338964e1db0d494fd14fae36f72ebde0ad108606a04",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/openai-harness-engineering/harness-eng-10.png"
+        },
+        {
+          "blockId": "doxcnpNoL1oaoFT0HM91b1G5uqh",
+          "digest": "94368ae25da305e463bcd9fa4f9a0a5fa93c81b6e7b0067de398d9ffed756651",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/openai-harness-engineering/harness-eng-11.png"
+        },
+        {
+          "blockId": "doxcnrBooJKF0FbkY8lv9IhRNR8",
+          "digest": "364028a316659ac4bf0c5c9e8b88eb3f204bdb53a6ee3d3751b83f3bb67294bb",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/openai-harness-engineering/harness-eng-12.jpg"
+        },
+        {
+          "blockId": "doxcnpZjnBvIQAG5CFXBhQrvPvd",
+          "digest": "7ae954b4b6f912eff378070c7c30400a9e1d50fecb1a36db8eb1084f16e93284",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/openai-harness-engineering/harness-eng-13.png"
+        }
+      ],
+      "errorCode": null,
+      "nextRetryAt": null
     },
     "images": {
-      "status": "pending",
+      "status": "succeeded",
       "expectedVersion": "6ced04d78c3066c14ade4c3057b86d7288b56b870be48f74a02843f607f015d0",
-      "attempts": 0
+      "attempts": 1,
+      "receipts": [
+        {
+          "blockId": "doxcnwCX9HLdqSSedwIxoXUaS8b",
+          "digest": "7600ea86b53fec204bd7ccc0c020d271246a510257fa22f5c81726f27775302b",
+          "token": "UjrRbpgE3oqbEJxhZFQcIavqn2c"
+        },
+        {
+          "blockId": "doxcnU5Pvnevig144Pzg26WjSse",
+          "digest": "ee4003ab458dc0057ef27cec16ff9ee54eda06880f7b9b5927dadade348af0e8",
+          "token": "UbDMbsNvUorznexLro0clxOAn8c"
+        },
+        {
+          "blockId": "doxcnW6Qml4Y2uuEMMycRoOWIYe",
+          "digest": "0c9657c0ea0664e98bf91b1e58bbed6b87e22db2c34ef0f734b9dd545a096a8a",
+          "token": "A4m0bltEdojsguxPCgLcOfbwnpc"
+        },
+        {
+          "blockId": "doxcnhWDgwvvt5cbKmqg0tZXYeb",
+          "digest": "5e0d848bf0f2d5f8e740e10f6f3ad871e9d26cd52b58537e2383eaf25a09a602",
+          "token": "RBAjbr5pNozOVkx0VKecxX82ntg"
+        },
+        {
+          "blockId": "doxcnAhBcsxQKGlcfRaiyvlKEve",
+          "digest": "6807bfd856ca8656a29e83bae86c9e4ad8e6c2089e7fece854f1fedc89cb4bb5",
+          "token": "FyIXbxreXotemaxHi2NcgAeKn1g"
+        },
+        {
+          "blockId": "doxcnuXoyhNdmcgoAAldaauLp7e",
+          "digest": "d5e7cac608b267de191679d6d2699941bdee13c69a2cce46c6ae2e927c37c697",
+          "token": "IjKubC0k6odAXwxTA4Gc8jcqn8f"
+        },
+        {
+          "blockId": "doxcntWP33hvrOk1DF3XzqOcdvd",
+          "digest": "2d70224a315eabc6bff2344acbc95bf38f1141f7923acffbaa9508bbcf2691db",
+          "token": "B2Xgb35wAozOLDxNuWXcViwInAe"
+        },
+        {
+          "blockId": "doxcnJO4xi3PdhZv5mrUuXBPLtd",
+          "digest": "1f8bcc0ad8728a24bf4f47012a8bf3037876bed4514b84862abfd5a0ce2b54ef",
+          "token": "ZVyfbFNAUokxbqxNHAUcKgBhnic"
+        },
+        {
+          "blockId": "doxcnkDAOmD41YUcUeINtT4yFub",
+          "digest": "d1606eb6f63875af472ea4743aafd9c027e66127eb0384ab0e6800bfcbf00a19",
+          "token": "SuwSbkYrtoPOKjxTgjzcWnGtnzb"
+        },
+        {
+          "blockId": "doxcnEtbc3SCa3E42ghzcmhM7Rd",
+          "digest": "12ff47b0d3c0ddc6352ec338964e1db0d494fd14fae36f72ebde0ad108606a04",
+          "token": "H0mzbgdMJoJv4ixWkPXclDBYn0b"
+        },
+        {
+          "blockId": "doxcnpNoL1oaoFT0HM91b1G5uqh",
+          "digest": "94368ae25da305e463bcd9fa4f9a0a5fa93c81b6e7b0067de398d9ffed756651",
+          "token": "Mslib895zojq6PxBvq7ctalCnde"
+        },
+        {
+          "blockId": "doxcnrBooJKF0FbkY8lv9IhRNR8",
+          "digest": "364028a316659ac4bf0c5c9e8b88eb3f204bdb53a6ee3d3751b83f3bb67294bb",
+          "token": "XG7gb8APWogxjmxeYbkcKMc8nvh"
+        },
+        {
+          "blockId": "doxcnpZjnBvIQAG5CFXBhQrvPvd",
+          "digest": "7ae954b4b6f912eff378070c7c30400a9e1d50fecb1a36db8eb1084f16e93284",
+          "token": "RPuzb8MrpoLwpNxCiRScGg0vnVe"
+        }
+      ],
+      "verifiedVersion": "6ced04d78c3066c14ade4c3057b86d7288b56b870be48f74a02843f607f015d0",
+      "fingerprint": "fc01dc1eb70a861edf01bf320648fc634307af9f60b5fc4d01b93ab2aeae93dd",
+      "wikiFingerprint": "d347bee025c84edb452dff8e1e15c3890f5bde98ffd13dc2e91bc5a95f16bf70",
+      "appliedVersion": "6ced04d78c3066c14ade4c3057b86d7288b56b870be48f74a02843f607f015d0",
+      "errorCode": null,
+      "nextRetryAt": null
     },
     "catalog": {
       "status": "succeeded",
       "expectedVersion": "6ced04d78c3066c14ade4c3057b86d7288b56b870be48f74a02843f607f015d0",
       "appliedVersion": "6ced04d78c3066c14ade4c3057b86d7288b56b870be48f74a02843f607f015d0",
-      "attempts": 0,
+      "attempts": 1,
       "remoteId": "reczz28PG9MGSRPc",
-      "fingerprint": "d8e0685c0a4cf00f5c16ba738cd7a36b2e2b99eb4f568e0fd756e4e773fd06ca",
-      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PG9MGSRPc"
+      "fingerprint": "45078e84897d9d142bb13de0a703cbbf3d3008aeacd1eee9228d07610499b06e",
+      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PG9MGSRPc",
+      "errorCode": null,
+      "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-19T11:53:27.009Z"
+  "updatedAt": "2026-10-19T14:48:04.741Z"
 }

@@ -3,7 +3,7 @@
   "id": "note-36c869204f876149af40d364",
   "ownerKey": "local-user",
   "sourceVersion": "0fa1d0d5726fc9ac48db4a10e99107c6fc0b529dc8a5e12d83e65e0b254035d0",
-  "resourceVersion": "migration-v1",
+  "resourceVersion": "phase2-republish-v1",
   "targetKey": "production-v1",
   "mode": "production",
   "targets": {
@@ -11,26 +11,90 @@
       "status": "succeeded",
       "expectedVersion": "0fa1d0d5726fc9ac48db4a10e99107c6fc0b529dc8a5e12d83e65e0b254035d0",
       "appliedVersion": "0fa1d0d5726fc9ac48db4a10e99107c6fc0b529dc8a5e12d83e65e0b254035d0",
-      "attempts": 0,
+      "attempts": 1,
       "remoteId": "BfR1w8ngDix4RkkQR3Ec4pnEn7e",
       "docId": "UQJtdIldyomWM5xB4McceKAUnzg",
-      "fingerprint": "c29acc26825f2dae0914311f0a73a63cc276241a4225de0c62d6086077ac1d94",
-      "link": "https://www.feishu.cn/wiki/BfR1w8ngDix4RkkQR3Ec4pnEn7e"
+      "fingerprint": "0dd6258f6784dc8dd0811524770e0303c956a76aa02907ddb11777cdb8e2b7ce",
+      "link": "https://www.feishu.cn/wiki/BfR1w8ngDix4RkkQR3Ec4pnEn7e",
+      "imageBlocks": [
+        {
+          "blockId": "doxcn1ZVAgh7balepK8nRV40Gke",
+          "digest": "5b476989e68862ab25b81304af73e15a4c9ac65e4555329417d61fc7c15b0182",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/huashu-claude-jailbreak/claude-jailbreak-01.png"
+        },
+        {
+          "blockId": "doxcnBb174JxR5czWhqbmHtwFqb",
+          "digest": "489121315758ec771007a7b1c143de454d3ee6f39155f3942efe81fef667b045",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/huashu-claude-jailbreak/claude-jailbreak-02.png"
+        },
+        {
+          "blockId": "doxcnf2HPpwmthLn9CWnUS2RmDh",
+          "digest": "cb0a9091224b8f22a45a0a260c1b7dde4f71e3624df6851b72966748b6ecddfd",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/huashu-claude-jailbreak/claude-jailbreak-03.png"
+        },
+        {
+          "blockId": "doxcnjAiZ0dz2FyAP82EDnKsyo8",
+          "digest": "7cfe24f9bb1c6f9b5da63a70a5d0b4a252097c942eb187feef1f11059afb6d1e",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/huashu-claude-jailbreak/claude-jailbreak-04.png"
+        },
+        {
+          "blockId": "doxcnyHREFAXulWqrWNMjoLICdO",
+          "digest": "06a2381dccf4becf85ee81c555f12f419779b3b55a6e7efc84cf357340e673c4",
+          "localRef": "vault/99-System/Attachments/WeChat Articles/huashu-claude-jailbreak/claude-jailbreak-05.png"
+        }
+      ],
+      "errorCode": null,
+      "nextRetryAt": null
     },
     "images": {
-      "status": "pending",
+      "status": "succeeded",
       "expectedVersion": "0fa1d0d5726fc9ac48db4a10e99107c6fc0b529dc8a5e12d83e65e0b254035d0",
-      "attempts": 0
+      "attempts": 1,
+      "receipts": [
+        {
+          "blockId": "doxcn1ZVAgh7balepK8nRV40Gke",
+          "digest": "5b476989e68862ab25b81304af73e15a4c9ac65e4555329417d61fc7c15b0182",
+          "token": "WX0dbEjbvobLmBxAmggcuJkxnLf"
+        },
+        {
+          "blockId": "doxcnBb174JxR5czWhqbmHtwFqb",
+          "digest": "489121315758ec771007a7b1c143de454d3ee6f39155f3942efe81fef667b045",
+          "token": "SwEsbd1uWoUGk5x77KzcqkCnnuc"
+        },
+        {
+          "blockId": "doxcnf2HPpwmthLn9CWnUS2RmDh",
+          "digest": "cb0a9091224b8f22a45a0a260c1b7dde4f71e3624df6851b72966748b6ecddfd",
+          "token": "FJd9bqjIQog4lJxqw2cctlBnnNg"
+        },
+        {
+          "blockId": "doxcnjAiZ0dz2FyAP82EDnKsyo8",
+          "digest": "7cfe24f9bb1c6f9b5da63a70a5d0b4a252097c942eb187feef1f11059afb6d1e",
+          "token": "C0DbblFLooMwQXx7adBck9RGnVe"
+        },
+        {
+          "blockId": "doxcnyHREFAXulWqrWNMjoLICdO",
+          "digest": "06a2381dccf4becf85ee81c555f12f419779b3b55a6e7efc84cf357340e673c4",
+          "token": "Lss1be0RwotRdNxNHdxcxojzntc"
+        }
+      ],
+      "verifiedVersion": "0fa1d0d5726fc9ac48db4a10e99107c6fc0b529dc8a5e12d83e65e0b254035d0",
+      "fingerprint": "327ff49e83a75b249ed31e7d83c6f635e560c31b097bb6a8bff74663a4356374",
+      "wikiFingerprint": "0dd6258f6784dc8dd0811524770e0303c956a76aa02907ddb11777cdb8e2b7ce",
+      "appliedVersion": "0fa1d0d5726fc9ac48db4a10e99107c6fc0b529dc8a5e12d83e65e0b254035d0",
+      "errorCode": null,
+      "nextRetryAt": null
     },
     "catalog": {
       "status": "succeeded",
       "expectedVersion": "0fa1d0d5726fc9ac48db4a10e99107c6fc0b529dc8a5e12d83e65e0b254035d0",
       "appliedVersion": "0fa1d0d5726fc9ac48db4a10e99107c6fc0b529dc8a5e12d83e65e0b254035d0",
-      "attempts": 0,
+      "attempts": 1,
       "remoteId": "reczz28PGByT4TRe",
-      "fingerprint": "9c5454928b9e4e4a7b1e88c1d64c6704d9292d0e8c59288850a1edf3de46cc01",
-      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PGByT4TRe"
+      "fingerprint": "8af0357c6bc4310c2f4b44c243715ebdd1684c90b784b3bb9edd8c9a5eb97ca3",
+      "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PGByT4TRe",
+      "errorCode": null,
+      "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-19T11:55:55.556Z"
+  "updatedAt": "2026-10-19T14:53:20.049Z"
 }
