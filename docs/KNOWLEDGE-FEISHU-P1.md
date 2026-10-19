@@ -82,6 +82,15 @@ node scripts/eval-knowledge-memory.mjs --real
 - 未修改任何既有 Wiki 正文；旧树 42 个孤儿节点保持历史；无链接笔记与图片核验留待 Phase 2。
 - 运行态：`registeredNotes=240`；目标状态 662 succeeded / 58 pending；0 错误。旧笔记首次同步仍需 `notes.prepare_publish` 补齐资源清单。
 
+### 存量回填 Phase 2（2026-10-19）
+
+- 云端正文比对 205 篇：136 一致、24 云端偏短、45 云端偏长、20 图片数量不符。
+- 可安全回填 32 篇（云端偏短或仅缺图、且本地资源完整）：31 篇 synced；1 篇 blocked（两篇 vault 笔记共用同一旧节点，属旧同步历史重复链接，保留冲突未覆盖）。
+- 问题文章修复：「Harness 实践」67 张图（含 9 张扩展名不一致的本地图）与「Anthropic Agent 工程实战指南」1 张外链图（下载本地化）均已补齐并 synced。
+- 48 篇无链接 / 新可检索笔记：在「云端发布」下新建节点，全部 synced。
+- 新目录 253 条记录（清理 5 条空测试记录）；发布映射 253 条；运行态 749 succeeded / 9 pending / 1 blocked。
+- 未回填 7 篇「云端偏长且缺图」的笔记（避免删除云端既有内容）；旧树 42 个孤儿节点保持历史。
+
 ## 开源调研与取舍
 
 - [官方 DSH](https://github.com/deepseek-ai/DeepSeek-Harness)：沿用现有插件注册／工具桥接边界，复用其会话与模型调度。
