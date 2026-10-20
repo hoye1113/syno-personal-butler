@@ -120,6 +120,148 @@ Codex + superpowers 开发时，修 bug 也会走 superpowers 编排好的 **deb
 
 ---
 
+## 原文全文（重新收录）
+
+大家好，我卡颂
+
+当我们使用CC、Codex等编程时，通常会使用类似superpowers、gstack这样的AI框架。
+
+同时，我们经常听到Harness Engineering这个概念。
+
+上述两者的关系是什么？
+
+Harness Engineering
+
+首先说Harness Engineering，他指「Agent 运行的完整环境」。
+
+包括 3 层：
+
+底部：环境约束
+中间：路由
+顶部：Agent流程编排
+
+当前并没有得到广泛认可的开源Harness Engineering框架，因为Harness Engineering指的是环境，不同项目环境大相径庭，没法用一套框架概括。
+
+这 3 部分是什么意思呢？让我们从下往上看。
+
+首先是环境约束，这是你项目环境中「用于约束 Agent 生成代码质量的基建」 ，比如：
+
+lint、prettier、ts check、build check
+
+测试金字塔（单测、集成测试、e2e测试）
+
+跨边界契约（比如“后端 API DTO -> openAPI -> 前端fetch方法”）
+
+上线后的监控、告警、业务信号和回滚判断
+
+这些都是与Agent完全无关的代码基建，不管是人还是AI写代码，都是需要的。
+
+他们共同作用，保证项目代码质量。
+
+Harness Engineering的愿景是「人不写一行代码，编码完全交给 AI」。
+
+那人想约束代码怎么办呢？通过约束环境间接约束代码。
+
+举个例子，你设置一条lint：
+
+如果一段代码太复杂（超过 200 行，有 10+ 条件判断）时，需要详尽的注释
+
+AI编码时，如果写了复杂代码，lint检查就会报错。
+
+为了通过lint，他会根据报错提示补注释。
+
+Agent流程编排
+
+再说最上层 —— Agent流程编排。
+
+大家常用的superpowers、gstack属于这一层。
+
+他的作用是「约束 Agent 的执行流程」，上述两者主要区别是「视角不同」：
+
+superpowers 是「过程视角」
+
+他要求所有类型任务必须遵循 讨论（头脑风暴）-> 写 spec -> 写 plan -> TDD开发 的流程
+
+gstack是「角色视角」：
+
+他定义了很多角色（CEO、设计、测试...），对不同任务启用不同角色。
+
+假设你使用codex基于superpowers开发，codex会遵循superpowers编排的流程执行。
+
+当项目出现bug需要排查，codex会进入superpowers编排好的 debug流程。
+
+路由
+
+这里的路由是指「Agent 行为的路由」。
+
+最常见的路由形态是skill，他通过Description字段定义了「Agent 在 什么情况下会做什么」
+
+不管是superpowers还是gstack，他们的流程编排都是通过skill串联的。
+
+除了skill Description外，另一种常见的路由是AGENTS.md（对于cc是CLAUDE.md）。
+
+你可以在这个文件中定义路由规则，比如：
+
+- 需要了解或维护 Admin 项目入口时，先阅读 `packages/admin/README.md`
+- 需要了解或维护 API 项目入口时，先阅读 `packages/api/README.md`
+
+
+前文谈到Harness Engineering包括 3 层：
+
+底部：环境约束
+中间：路由
+顶部：Agent流程编排
+
+底部和顶部就是通过路由串联的。
+
+举个例子：
+
+你使用superpowers开发，superpowers要求所有代码必须遵循TDD。
+
+同时，你在AGENTS.md写好：
+
+当有代码或需求改动需要补充/生成测试用例时，先阅读`update-test-cases.md`
+
+
+那么Agent在执行TDD时，会被路由到update-test-cases.md，学习「如何基于测试金字塔的原则编写不同类型测试」。
+
+这样，写出的测试用例能进一步夯实环境约束（通过完备的测试）。
+
+原则
+
+Harness Engineering的三层结构应遵循：
+
+顶部 Agent流程编排 可厚可薄，按需来
+
+举例：
+
+你使用gstack，但里面的CEO视角对你来说没用，删掉他就是顶部变薄
+
+你使用superpowers，但觉得TDD太费token，删掉他就是顶部变薄
+
+底部 环境约束 尽可能厚
+
+底部 环境约束不会对Agent执行造成任何影响，所以应该尽可能厚以达到更好的约束。
+
+举例：你有 1000 个 lint、1000 条测试用例，与一条都没有比，对Agent执行的影响区别不大。
+
+中间 路由 尽可能薄
+
+大量堆砌skill、AGENTS.md会占用Agent上下文，进而影响执行效果。
+
+所以，这一层应该尽可能薄，并做到渐进式披露。
+
+后记
+
+即使Agent再发展，上述架构的原则都不会变化。
+
+如果你刚开始尝试AI 框架，我的建议是：
+
+本文提到的 2 款用哪个都行
+编码过程中不断加厚环境约束
+随时警惕路由变厚
+逐渐删掉流程编排中不需要的流程
+
 ## 相关阅读
 
 - [[如何为项目定制 Harness 环境 - 魔术师卡颂]] — 同一作者；在 superpowers 上「减顶、增底」的操作手册
