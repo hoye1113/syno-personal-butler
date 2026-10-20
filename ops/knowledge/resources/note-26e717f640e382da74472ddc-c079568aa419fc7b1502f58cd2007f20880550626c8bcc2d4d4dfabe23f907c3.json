@@ -1,0 +1,249 @@
+{
+  "schemaVersion": 1,
+  "items": [
+    {
+      "index": 0,
+      "position": 1000,
+      "alt": "OpenSquilla 的 GitHub 主页，开源、2.4k star，最新发布就是 3.0.0",
+      "source": "../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-01.jpg",
+      "role": "body_image",
+      "basis": "markdown_inline_image",
+      "type": "image",
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "相对资源不在本次合法附件集合中"
+      }
+    },
+    {
+      "index": 1,
+      "position": 1301,
+      "alt": "从 OpenClaw 到 Hermes，再到 OpenSquilla，同一条开源 agent 线一路走下来",
+      "source": "../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-02.jpg",
+      "role": "body_image",
+      "basis": "markdown_inline_image",
+      "type": "image",
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "相对资源不在本次合法附件集合中"
+      }
+    },
+    {
+      "index": 2,
+      "position": 1574,
+      "alt": "模型是发动机，Harness 就是外面那层壳，变速箱、油门、导航都在这层，它卷的就是这里",
+      "source": "../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-03.jpg",
+      "role": "body_image",
+      "basis": "markdown_inline_image",
+      "type": "image",
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "相对资源不在本次合法附件集合中"
+      }
+    },
+    {
+      "index": 3,
+      "position": 1787,
+      "alt": "它跑起来是个本地控制台，用了哪家 provider、烧了多少 token、网关连没连，一屏看全",
+      "source": "../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-04.jpg",
+      "role": "body_image",
+      "basis": "markdown_inline_image",
+      "type": "image",
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "相对资源不在本次合法附件集合中"
+      }
+    },
+    {
+      "index": 4,
+      "position": 2188,
+      "alt": "开机第一次列技能，我攒下的那些个人技能原样收了进来，和它自带的排在一起",
+      "source": "../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-05.jpg",
+      "role": "body_image",
+      "basis": "markdown_inline_image",
+      "type": "image",
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "相对资源不在本次合法附件集合中"
+      }
+    },
+    {
+      "index": 5,
+      "position": 2758,
+      "alt": "一句话需求扔进去，它现场跑了一串步骤，最后真造出一个带完整功能说明的字幕剪辑技能",
+      "source": "../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-06.png",
+      "role": "body_image",
+      "basis": "markdown_inline_image",
+      "type": "image",
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "相对资源不在本次合法附件集合中"
+      }
+    },
+    {
+      "index": 6,
+      "position": 4300,
+      "alt": "打个招呼，能看到它在十几个模型里飞快筛了一圈，落到最便宜的 deepseek-flash，省 97%",
+      "source": "../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-07.png",
+      "role": "body_image",
+      "basis": "markdown_inline_image",
+      "type": "image",
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "相对资源不在本次合法附件集合中"
+      }
+    },
+    {
+      "index": 7,
+      "position": 4515,
+      "alt": "25 个任务的基准对比：路由方案和单用 Opus 分数几乎一样，成本却差出一个数量级",
+      "source": "../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-08.jpg",
+      "role": "body_image",
+      "basis": "markdown_inline_image",
+      "type": "image",
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "相对资源不在本次合法附件集合中"
+      }
+    },
+    {
+      "index": 8,
+      "position": 5189,
+      "alt": "OpenSquilla GitHub 主页",
+      "source": "../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-01.jpg",
+      "role": "body_image",
+      "basis": "markdown_inline_image",
+      "type": "image",
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "相对资源不在本次合法附件集合中"
+      }
+    },
+    {
+      "index": 9,
+      "position": 5304,
+      "alt": "OpenClaw → Hermes → OpenSquilla",
+      "source": "../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-02.jpg",
+      "role": "body_image",
+      "basis": "markdown_inline_image",
+      "type": "image",
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "相对资源不在本次合法附件集合中"
+      }
+    },
+    {
+      "index": 10,
+      "position": 5429,
+      "alt": "Harness 是模型外面的壳",
+      "source": "../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-03.jpg",
+      "role": "body_image",
+      "basis": "markdown_inline_image",
+      "type": "image",
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "相对资源不在本次合法附件集合中"
+      }
+    },
+    {
+      "index": 11,
+      "position": 5538,
+      "alt": "OpenSquilla 本地控制台",
+      "source": "../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-04.jpg",
+      "role": "body_image",
+      "basis": "markdown_inline_image",
+      "type": "image",
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "相对资源不在本次合法附件集合中"
+      }
+    },
+    {
+      "index": 12,
+      "position": 5649,
+      "alt": "技能库识别结果",
+      "source": "../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-05.jpg",
+      "role": "body_image",
+      "basis": "markdown_inline_image",
+      "type": "image",
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "相对资源不在本次合法附件集合中"
+      }
+    },
+    {
+      "index": 13,
+      "position": 5750,
+      "alt": "MetaSkill Creator 生成字幕剪辑技能",
+      "source": "../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-06.png",
+      "role": "body_image",
+      "basis": "markdown_inline_image",
+      "type": "image",
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "相对资源不在本次合法附件集合中"
+      }
+    },
+    {
+      "index": 14,
+      "position": 5870,
+      "alt": "模型路由示例：便宜模型处理简单请求",
+      "source": "../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-07.png",
+      "role": "body_image",
+      "basis": "markdown_inline_image",
+      "type": "image",
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "相对资源不在本次合法附件集合中"
+      }
+    },
+    {
+      "index": 15,
+      "position": 5981,
+      "alt": "25 个任务基准对比",
+      "source": "../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-08.jpg",
+      "role": "body_image",
+      "basis": "markdown_inline_image",
+      "type": "image",
+      "downloadStatus": "failed",
+      "remoteStatus": "pending",
+      "error": {
+        "code": "SOURCE_RESOURCE_INCOMPLETE",
+        "message": "相对资源不在本次合法附件集合中"
+      }
+    }
+  ],
+  "complete": false,
+  "version": "53b38eccb4239358373f09c268285728fa514deccb03ec1dc330e323b28e4cbc",
+  "noteId": "note-26e717f640e382da74472ddc",
+  "noteVersion": "c079568aa419fc7b1502f58cd2007f20880550626c8bcc2d4d4dfabe23f907c3"
+}

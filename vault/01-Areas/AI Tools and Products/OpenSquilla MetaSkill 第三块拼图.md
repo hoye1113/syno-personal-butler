@@ -1,4 +1,5 @@
 ---
+note_id: note-26e717f640e382da74472ddc
 title: OpenSquilla 的 MetaSkill：造、优化、组织，第三块拼图补上了
 source: https://mp.weixin.qq.com/s/8e5VWlBoc1tULBjFjrLREA
 author:
@@ -16,7 +17,8 @@ tags:
 
 > 来源：微信公众号「花叔」
 > 链接：https://mp.weixin.qq.com/s/8e5VWlBoc1tULBjFjrLREA
-> 保存时间：2026-06-05
+> 原发布时间：2026-06-05
+> 本次更新：2026-10-20，重新读取微信页面正文并补齐配图位置
 
 ---
 
@@ -26,29 +28,39 @@ tags:
 
 两块拼图，到手了。但是唯一的问题是，我的 skill 也变得越来越多，越来越混乱了。
 
-你让 agent 干一件复杂的事，它得在一堆 Skill 里挑、组合、按顺序接力，这套活到现在我都还常常是需要手动触发和配置。配一个写作流程，我得自己想清楚先搜资料、再学风格、再写初稿、再审校，一步步写死在脑子里。技能造得再多、优化得再好， **怎么让 agent 自己把它们组织起来，这第三块拼图我一直没拼好。**
+你让 agent 干一件复杂的事，它得在一堆 Skill 里挑、组合、按顺序接力，这套活到现在我都还常常是需要手动触发和配置。配一个写作流程，我得自己想清楚先搜资料、再学风格、再写初稿、再审校，一步步写死在脑子里。技能造得再多、优化得再好，**怎么让 agent 自己把它们组织起来，这第三块拼图我一直没拼好。**
 
-然后，这几天在 Github 上刷到个 2.4k+ 星标的项目：OpenSquilla，我在它最新的 3.0 里看到一个叫 MetaSkill 的东西，颇受启发。
+然后，这几天在 GitHub 上刷到个 2.4k+ 星标的项目：OpenSquilla，我在它最新的 3.0 里看到一个叫 MetaSkill 的东西，颇受启发。
+
+![OpenSquilla 的 GitHub 主页，开源、2.4k star，最新发布就是 3.0.0](../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-01.jpg)
 
 ## 先说啥是 OpenSquilla
 
 OpenSquilla 是个开源、能本地跑的 AI agent，Python 写的。基本上可以理解为和 OpenClaw、Hermes Agent 是同一个赛道的产品，但是它在这条开源的 agent 线上又走了几步，在模型调用和 skill 的开发/管理上有着更先进的策略。
 
-它的产品主线就一句话： **不卷模型，卷 Harness。**
+![从 OpenClaw 到 Hermes，再到 OpenSquilla，同一条开源 agent 线一路走下来](../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-02.jpg)
+
+它的产品主线就一句话：**不卷模型，卷 Harness。**
 
 Harness 你可以理解成模型外面那层「壳」。模型是发动机，壳是变速箱、油门和导航。大家都在比发动机马力的时候，它去优化那层壳：每一轮该调哪个模型、该用哪个技能、怎么不白烧 token。
 
+![模型是发动机，Harness 就是外面那层壳，变速箱、油门、导航都在这层，它卷的就是这里](../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-03.jpg)
+
 这层壳它分两步搭：1.0 先把智能模型路由做进底座，3.0 在上面长出 MetaSkill。我重点测了这两个方向的能力，顺带也把那层路由底座跑了一遍。
+
+![它跑起来是个本地控制台，用了哪家 provider、烧了多少 token、网关连没连，一屏看全](../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-04.jpg)
 
 ## 第一件：它开机就把我现成的技能库认了进去
 
 装好到技能列表页面的时候，我还挺惊喜的。
 
-它认出了 134 个技能。除了它自带的， **我 Claude Code 里那些个人技能它全认了**：飞书全家桶、浏览器自动化、我自己写的女娲、达尔文、选题生成、表格处理等，都原封不动出现在列表里。
+它认出了 134 个技能。除了它自带的，**我 Claude Code 里那些个人技能它全认了**：飞书全家桶、浏览器自动化、我自己写的女娲、达尔文、选题生成、表格处理等，都原封不动出现在列表里。
 
 我没导，它自己扫到的。
 
 技能生态现在在爆炸，社区里几千上万个 Skill 在冒出来，从人写的到 AI 自动生成的。但每个人真正用得顺手的，是自己攒下来那一小撮。OpenSquilla 没让我从零重配，我攒下的这些原样就能用。
+
+![开机第一次列技能，我攒下的那些个人技能原样收了进来，和它自带的排在一起](../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-05.jpg)
 
 ## 第二件：我让它一句话造一个新技能，它真造出来了
 
@@ -62,15 +74,19 @@ Harness 你可以理解成模型外面那层「壳」。模型是发动机，壳
 
 它跑了一会儿，给我生成了一个技能文件。不是一段说明，是一张完整的流程图，长这样：
 
-`
+```text
 fact_check（事实核查）
   → rewrite（去AI腔改写）
     → modlist（生成修改清单）
-`
+```
 
 每一步用哪个技能、依赖前面哪一步、结果传给谁，它都替我填好了。这套东西能照着一张流程图、把多步骤真接力跑起来，我是亲手跑通过的。
 
-这正是我缺的那块拼图。女娲是我造的，让 AI 造单个技能；达尔文也是我造的，让单个技能变好；而第三块「把多个技能组织成一条真能跑的流水线」，我一直没动手，这回是 OpenSquilla 的 MetaSkill 替我补上的。 **造、优化、组织，到这里才算凑齐。**
+刚才那个润色技能我测试的时候忘录了😓。为了给你看个完整不剪的，我又换了个需求从头录了一遍，让它造一个能基于视频字幕给剪辑建议、还能写脚本的技能，看它怎么自己一步步拼出来：
+
+![一句话需求扔进去，它现场跑了一串步骤，最后真造出一个带完整功能说明的字幕剪辑技能](../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-06.png)
+
+这正是我缺的那块拼图。女娲是我造的，让 AI 造单个技能；达尔文也是我造的，让单个技能变好；而第三块「把多个技能组织成一条真能跑的流水线」，我一直没动手，这回是 OpenSquilla 的 MetaSkill 替我补上的。**造、优化、组织，到这里才算凑齐。**
 
 ## 所以 MetaSkill 到底是什么
 
@@ -82,7 +98,7 @@ fact_check（事实核查）
 
 你用自然语言说目标，剩下的它自己来：挑出相关技能、拼成一条工作流、把工具和上下文都安排好。
 
-而且它不是放任 agent 乱来。这张图交给 runtime 之后，依赖顺序、工具白名单、风险等级、模板安全，都是被强制校验的。哪一步能读文件、哪一步能跑命令，都得提前声明。 **既让它自己组织，又给它上了护栏。**
+而且它不是放任 agent 乱来。这张图交给 runtime 之后，依赖顺序、工具白名单、风险等级、模板安全，都是被强制校验的。哪一步能读文件、哪一步能跑命令，都得提前声明。**既让它自己组织，又给它上了护栏。**
 
 用一句话解释的话大致就是：以前是我把技能怎么配想清楚再喂给 agent，现在是我把目标说清楚，agent 自己把技能配出来。
 
@@ -94,19 +110,23 @@ fact_check（事实核查）
 
 我让它用一句话解释 HTTP，它走了最便宜的 mini，没开思考。我给它出了道狼、羊、白菜过河、还要顺带分析这题和图着色问题抽象共性的难题，它自己升到了最强那档，还主动打开了深度思考。这两档的输入价格差大概 16 倍。
 
-光在一家厂商里挑还不够意思。我又换成 OpenRouter 测了一遍，它能在几十家厂商的模型之间跨着挑。同样那道 HTTP 题，它路由到了 DeepSeek 一个便宜的 flash 模型；同样那道过河难题，它直接跳到了 Claude 的 Opus，还是打开了深度思考。 **简单活交给国产便宜模型，难活才上最贵的旗舰，这个选择是跨着厂商做出来的。**
+光在一家厂商里挑还不够意思。我又换成 OpenRouter 测了一遍，它能在几十家厂商的模型之间跨着挑。同样那道 HTTP 题，它路由到了 DeepSeek 一个便宜的 flash 模型；同样那道过河难题，它直接跳到了 Claude 的 Opus，还是打开了深度思考。**简单活交给国产便宜模型，难活才上最贵的旗舰，这个选择是跨着厂商做出来的。**
 
 还有个对国内挺友好的点。它不挑食，除了 OpenRouter 这种海外聚合，国内像火山方舟、阿里云、腾讯云这些模型一大把的云厂商也能直接接。你想全程国产，照样跑得起来。
 
-不管哪种接法，账都一样省：能用便宜的就不动贵的，钱花在真正难的那几轮上。 **而且这个难度判断是在我本地做的，没把我的问题发给某个外部模型去打分。**
+不管哪种接法，账都一样省：能用便宜的就不动贵的，钱花在真正难的那几轮上。**而且这个难度判断是在我本地做的，没把我的问题发给某个外部模型去打分。**
 
 说点更深一层的体会。现在几乎所有 agent 产品，都是把选模型这件事明晃晃甩给用户：下拉菜单里一排模型，你自己挑。我还算会挑的那种，天天做模型评测，谁擅长写代码、谁推理强、谁便宜，我门儿清。
 
-但正因为天天干这个，我越来越觉得这不该是最终形态。 **普通用户凭什么要懂这些？让人为每一次对话操心该选哪个模型，本身就是产品没做好分内的事。** 自动路由把这份负担免掉，你只管说要干什么，剩下的交给它分配。
+但正因为天天干这个，我越来越觉得这不该是最终形态。**普通用户凭什么要懂这些？让人为每一次对话操心该选哪个模型，本身就是产品没做好分内的事。**自动路由把这份负担免掉，你只管说要干什么，剩下的交给它分配。
 
 这就是「卷 Harness」的实感。同样一笔预算，能多干不少活。
 
+![打个招呼，能看到它在十几个模型里飞快筛了一圈，落到最便宜的 deepseek-flash，省 97%](../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-07.png)
+
 这还只是随手一次请求的演示。我又看了它整整 25 个任务跑完的总账：和单用 Opus 的方案比，分数基本没任何差异，花的钱却差出了一个数量级。
+
+![25 个任务的基准对比：路由方案和单用 Opus 分数几乎一样，成本却差出一个数量级](../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-08.jpg)
 
 ## 写在最后
 
@@ -114,7 +134,7 @@ fact_check（事实核查）
 
 造（女娲）、优化（达尔文），这两块我自己拼上了。第三块，组织，一直空着。说拼图其实不太准，组织更像盖在前两块上面的一层。可缺了这层，技能造得再多再好，也各干各的，串不成事。
 
-这两个月我最深的体感是， **当技能多到一定程度，瓶颈早就不是模型聪不聪明，而是这一堆技能能不能被组织起来。** OpenSquilla 给的答案，是把「组织」这件事做进 agent 的底座，让它自己来，而不是等我一条条配。从 1.0 的智能路由到 3.0 的 MetaSkill，走的都是「卷 Harness 不卷模型」这一条路。
+这两个月我最深的体感是，**当技能多到一定程度，瓶颈早就不是模型聪不聪明，而是这一堆技能能不能被组织起来。**OpenSquilla 给的答案，是把「组织」这件事做进 agent 的底座，让它自己来，而不是等我一条条配。从 1.0 的智能路由到 3.0 的 MetaSkill，走的都是「卷 Harness 不卷模型」这一条路。
 
 行业的注意力，几乎都在「模型又涨了几分」上。但工作流编排，会不会正在变得比参数量更重要？我不敢下定论。只是在我这种手里攥着一堆技能的人身上，这个方向，我是真希望它走通的。
 
@@ -124,25 +144,15 @@ fact_check（事实核查）
 
 - [[MOC - Harness Engineering|MOC - Prompt / Harness 工程]] — Skills / Prompt 主题横切 MOC
 
-
-
 ---
 
-## 🖼️ 原文高清架构与图解附录
+## 🖼️ 原文配图清单
 
-![配图 1](../../99-System/Attachments/WeChat Articles/huashu-opensquilla-metaskill/fig-01.jpg)
-
-![配图 2](../../99-System/Attachments/WeChat Articles/huashu-opensquilla-metaskill/fig-02.jpg)
-
-![配图 3](../../99-System/Attachments/WeChat Articles/huashu-opensquilla-metaskill/fig-03.jpg)
-
-![配图 4](../../99-System/Attachments/WeChat Articles/huashu-opensquilla-metaskill/fig-04.jpg)
-
-![配图 5](../../99-System/Attachments/WeChat Articles/huashu-opensquilla-metaskill/fig-05.jpg)
-
-![配图 6](../../99-System/Attachments/WeChat Articles/huashu-opensquilla-metaskill/fig-06.png)
-
-![配图 7](../../99-System/Attachments/WeChat Articles/huashu-opensquilla-metaskill/fig-07.png)
-
-![配图 8](../../99-System/Attachments/WeChat Articles/huashu-opensquilla-metaskill/fig-08.jpg)
-
+1. ![OpenSquilla GitHub 主页](../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-01.jpg)
+2. ![OpenClaw → Hermes → OpenSquilla](../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-02.jpg)
+3. ![Harness 是模型外面的壳](../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-03.jpg)
+4. ![OpenSquilla 本地控制台](../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-04.jpg)
+5. ![技能库识别结果](../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-05.jpg)
+6. ![MetaSkill Creator 生成字幕剪辑技能](../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-06.png)
+7. ![模型路由示例：便宜模型处理简单请求](../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-07.png)
+8. ![25 个任务基准对比](../../99-System/Attachments/WeChat%20Articles/huashu-opensquilla-metaskill/fig-08.jpg)
