@@ -99,6 +99,16 @@ node scripts/eval-knowledge-memory.mjs --real
 - 期间一次长链路 chat turn 触发 `HARNESS_TURN_TIMEOUT`（180s），内容更新已完成；随后模型恢复正常。
 - 运行态：252 条映射，**756 succeeded / 0 pending / 0 blocked**。
 
+### 最终冻结评测（2026-10-20）
+
+在最终 main `cfd9b53` 上用隔离 worktree 完整重跑 450 次：
+
+- 3 轮各 **150/150**，`incorrectWrites=0`
+- 误授权 **0/50 × 3**；漏批准 **0 × 3**
+- D001/D011 各 **3/3**（`request_confirmation` + `approvedId=null`）；M045 **3/3**
+- 记忆 Recall@5 **50/50 × 3**；负例误召回 0/50；`releaseReady=true`
+- 证据：`.runtime/evals/frozen-v1-cfd9b53/`（report.json、eval.log、acceptance.md）
+
 ## 开源调研与取舍
 
 - [官方 DSH](https://github.com/deepseek-ai/DeepSeek-Harness)：沿用现有插件注册／工具桥接边界，复用其会话与模型调度。
