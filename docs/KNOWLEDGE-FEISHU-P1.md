@@ -91,6 +91,14 @@ node scripts/eval-knowledge-memory.mjs --real
 - 新目录 253 条记录（清理 5 条空测试记录）；发布映射 253 条；运行态 749 succeeded / 9 pending / 1 blocked。
 - 未回填 7 篇「云端偏长且缺图」的笔记（避免删除云端既有内容）；旧树 42 个孤儿节点保持历史。
 
+### 云端偏长文章重新收录（2026-10-20）
+
+- OpenSquilla：bot 已补全正文与配图，补发 synced。
+- Sitor / Fable 5 / AI框架 / 自进化：经 bsk 读取微信源文章，保留现有结构并追加「原文全文（重新收录）」，补发 synced。
+- Superpowers Evals / smart-draw：无源地址，按 vault 完整版补发配图，synced。
+- 期间一次长链路 chat turn 触发 `HARNESS_TURN_TIMEOUT`（180s），内容更新已完成；随后模型恢复正常。
+- 运行态：252 条映射，**756 succeeded / 0 pending / 0 blocked**。
+
 ## 开源调研与取舍
 
 - [官方 DSH](https://github.com/deepseek-ai/DeepSeek-Harness)：沿用现有插件注册／工具桥接边界，复用其会话与模型调度。
