@@ -168,3 +168,12 @@ test("maintenance reports reproducible duplicates, broken links and missing sour
  assert.equal(r.brokenLinks[0].link,'[[missing|断链]]'); assert.equal(r.missingSources.length,2);
  assert.equal(await fs.readFile(path.join(vaultRoot,'00-Inbox/a.md'),'utf8'),before);
 });
+
+test("links to excluded system pages are not reported as broken", async (t) => {
+  const { maintenance } = await setup(t, {
+    "99-System/page.md": "# System\n",
+    "note.md": "---\ntitle: Note\n---\n[[99-System/page]]",
+  });
+  const summary = await maintenance.weeklySummary();
+  assert.ok(!summary.brokenLinks.some((item) => item.path === "vault/note.md" && item.reason === "missing_target"));
+});

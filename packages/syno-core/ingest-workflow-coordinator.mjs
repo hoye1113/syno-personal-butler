@@ -562,8 +562,10 @@ class IngestWorkflowCoordinator {
       return await operation;
     } finally {
       if (this.inFlight.get(id) === operation) this.inFlight.delete(id);
-      const latest = await this.store.get(id);
-      if (latest) this.#armRetry(latest);
+      try {
+        const latest = await this.store.get(id);
+        if (latest) this.#armRetry(latest);
+      } catch { /* 保留原始结果；恢复轮询会重新对账 */ }
     }
   }
 

@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import { judgeKnowledgeConfirmation, parseKnowledgeConfirmation } from "../apps/syno/syno/knowledge-confirmation.mjs";
 
 const decisions = [{ id: "decision-only", summary: "删除《样本笔记 A》" }];
@@ -56,5 +58,12 @@ test("natural approvals still pass through the shared parser", async () => {
   for (const message of ["可以，就按刚才的方案办", "确认 Anthropic 那条", "批准这次合并"]) {
     const runtime = runtimeReturning('{"intent":"approve","approvedId":"decision-only"}');
     assert.equal(await judgeKnowledgeConfirmation(runtime, { message, decisions }), "decision-only", message);
+  }
+});
+
+test("confirmation persona and request prompt keep the same intent rules", async () => {
+  const persona = await fs.readFile(path.resolve(import.meta.dirname, "../config/deepseek-harness/syno-confirmation-agent.md"), "utf8");
+  for (const marker of ["approve", "request_confirmation", "deny", "discuss", "ambiguous", "approvedId", "引用", "假设", "附件"]) {
+    assert.match(persona, new RegExp(marker));
   }
 });

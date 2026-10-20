@@ -300,4 +300,4 @@ Artifact / Workflow / Job ID：
 
 ## 知识与飞书 P1 开发验收
 
-发布诊断、稳定 ID 首次登记、隔离探针、配置模板及标签审核见 [P1 交付说明](KNOWLEDGE-FEISHU-P1.md)。生产发布仍为 disabled；只读可见性不替代写权限与主人访问验收。
+发布诊断、稳定 ID 首次登记、隔离探针、配置模板及标签审核见 [P1 交付说明](KNOWLEDGE-FEISHU-P1.md)。生产发布已于 2026-10-19 经隔离验收后启用（`mode: production`，目标「云端发布」+「Syno 知识目录」）；回滚方式见该交付说明，改回 `disabled` 并重启即可。只读可见性不替代写权限与主人访问验收。

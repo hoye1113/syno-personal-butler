@@ -153,6 +153,7 @@ class KnowledgePublisher {
             if (!reconciled) { state.errorCode = "SYNC_OUTCOME_UNKNOWN"; await this.save(record); await this.recordEvent("knowledge.sync.unknown", { ownerKey, id, target, version: note.version }); continue; }
             Object.assign(state, reconciled, { status: "succeeded", appliedVersion: note.version }); if (reconciled.wikiFingerprint) record.targets.wiki.fingerprint = reconciled.wikiFingerprint; await this.save(record); continue;
           }
+          if (target !== "images" && state.remoteId && !state.fingerprint && state.status === "succeeded") throw Object.assign(new Error("发布映射缺少云端指纹，拒绝覆盖"), { code: "SYNC_CONFIGURATION_INVALID", outcomeKnown: true });
           if (target !== "images" && state.remoteId && state.fingerprint) {
             const remote = await this.adapter.read(target, { state, record, config: this.config });
             if (remote.fingerprint !== state.fingerprint) throw Object.assign(new Error("受管云端内容被人工修改"), { code: "SYNC_REMOTE_CONFLICT" });

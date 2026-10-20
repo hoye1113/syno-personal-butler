@@ -120,14 +120,15 @@ class KnowledgeMaintenanceSource {
       if (reason) quarantined.push({ path: logical, ...reason, nextStep: "需明确修复决策；当前仅排除检索和发布" });
     }
     const notes = [];
-    for (const file of await walkMarkdown(this.vaultRoot)) {
+    const files = await walkMarkdown(this.vaultRoot);
+    for (const file of files) {
       const logical = `vault/${path.relative(this.vaultRoot, file).replaceAll("\\", "/")}`;
       const markdown = await fs.readFile(file, "utf8");
       if (isExcludedKnowledge(markdown) || isSensitiveKnowledgeNote(markdown) || quarantineReason(logical, markdown)) continue;
       if (/^vault\/99-System\//u.test(logical) || /(?:^|\/)(?:README|AGENTS|CLAUDE)\.md$/iu.test(logical)) continue;
       notes.push({ path: logical, markdown, title: titleOf(markdown, file), metadata: frontmatterData(markdown).values });
     }
-    const paths = new Set(notes.map(n => n.path)), brokenLinks = [], missingSources = [], duplicateGroups = new Map();
+    const paths = new Set(files.map(file => `vault/${path.relative(this.vaultRoot, file).replaceAll("\\", "/")}`)), brokenLinks = [], missingSources = [], duplicateGroups = new Map();
     for (const note of notes) {
       for (const link of noteLinks(note.markdown, note.path)) {
         const targets = resolveNoteLink(link, paths);

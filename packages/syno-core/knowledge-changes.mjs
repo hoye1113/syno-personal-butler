@@ -1,4 +1,4 @@
-import { noteLinks, resolveNoteLink, rewriteNoteLinks } from "./knowledge-links.mjs";
+import { noteLinks, resolveNoteLink, rewriteNoteLinks, removeDeadDefinitions } from "./knowledge-links.mjs";
 import { SourceResources } from "./source-resources.mjs";
 import { PATHS } from "./paths.mjs";
 import { createHash } from "node:crypto";
@@ -114,11 +114,13 @@ class KnowledgeChanges {
       const href = path.posix.relative(path.posix.dirname(referencePath), target.path).split("/").map(encodeURIComponent).join("/");
       return `[${link.label}](${href}${anchor})`;
     };
+    const retiredPaths = new Set((operation === "notes.merge" ? sources : [target]).map(n => n.path));
     const rewriteReferences = async () => {
       for (const ref of plan.backlinks || []) {
         if (operation === "notes.merge" && ref.path === target.path) continue;
         const current = await knowledge.read(ref.path);
-        const updated = rewriteNoteLinks(current.markdown, ref.links, link => replaceReference(link, ref.path));
+        const rewritten = rewriteNoteLinks(current.markdown, ref.links, link => replaceReference(link, ref.path));
+        const updated = removeDeadDefinitions(rewritten, ref.path, retiredPaths);
         const manifest = await fs.readFile(path.join(resourceDir, `${ref.id}-${ref.version}.json`), "utf8").then(JSON.parse, e => { if (e.code === "ENOENT") return { items: [] }; throw e; });
         await writeNote(ref.path, withIdentity(updated, ref.id), ref.id, ref.path, manifest.items);
         if (/^vault\/(?:00-Inbox|01-Areas|02-Resources|03-Archive)\//u.test(ref.path)) affectedIds.push(ref.id);
@@ -126,7 +128,10 @@ class KnowledgeChanges {
     };
     if (operation === "notes.merge") {
       const ref = plan.backlinks?.find(n => n.path === target.path);
-      if (ref) target.markdown = rewriteNoteLinks(target.markdown, ref.links, link => replaceReference(link, ref.path));
+      if (ref) {
+        const rewritten = rewriteNoteLinks(target.markdown, ref.links, link => replaceReference(link, ref.path));
+        target.markdown = removeDeadDefinitions(rewritten, target.path, new Set(sources.map(n => n.path)));
+      }
     }
     if (operation === "notes.prepare_publish") {
       const content = withIdentity(target.markdown, target.id);

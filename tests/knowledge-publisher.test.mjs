@@ -30,6 +30,15 @@ test("remote human edits block replacement; stale version cannot publish",async 
  const f=await fixture(t);await f.publisher.queue("owner",await f.source());await f.publisher.run("owner","n");f.setVersion("v2");await f.publisher.queue("owner",await f.source());f.setEdited(true);const result=await f.publisher.run("owner","n");assert.equal(result.targets.wiki.status,"blocked");assert.equal(result.targets.wiki.errorCode,"SYNC_REMOTE_CONFLICT");assert.equal(f.calls.length,3);
  f.setVersion("v3");assert.equal((await f.publisher.run("owner","n")).status,"stale");
 });
+test("remote mapping without fingerprint fails closed instead of overwriting", async t => {
+ const f=await fixture(t);const key=f.publisher.key("owner","n");const file=path.join(f.root,"ops/knowledge/publish-map",`${key}.json`);
+ await fs.mkdir(path.dirname(file),{recursive:true});
+ await fs.writeFile(file,JSON.stringify({schemaVersion:1,id:"n",ownerKey:"owner",sourceVersion:"v1",resourceVersion:"a1",targetKey:"isolated",mode:"sandbox",targets:{wiki:{status:"succeeded",expectedVersion:"v1",appliedVersion:"v0",remoteId:"wiki"},images:{status:"pending",expectedVersion:"v1"},catalog:{status:"pending",expectedVersion:"v1"}}}));
+ const result=await f.publisher.run("owner","n");
+ assert.equal(result.targets.wiki.status,"blocked");
+ assert.equal(result.targets.wiki.errorCode,"SYNC_CONFIGURATION_INVALID");
+ assert.deepEqual(f.calls,[]);
+});
 test("durable journal repairs only incomplete tail; never records memory content",async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),"syno-journal-"));t.after(()=>fs.rm(root,{recursive:true,force:true}));const file=path.join(root,"wal.jsonl"), j=new RecoveryJournal({file});
  await j.append("effect.intent",{id:"n",version:"v"});await fs.appendFile(file,'{"interrupted":');assert.equal((await j.read()).length,1);await j.append("effect.observed",{id:"n",remoteId:"r"});assert.equal((await j.read()).length,2);await assert.rejects(j.append("memory",{statement:"private"}));
