@@ -1,5 +1,7 @@
 # token-cloud Provider 真实验收
 
+> 历史快照：本文保留当时运行时、渠道、页面与验收结果，不代表当前产品状态。当前能力、发布状态及限制以 [文档索引](INDEX.md)、[P1 验收](KNOWLEDGE-FEISHU-P1.md) 和 [已知限制](KNOWN-LIMITATIONS.md) 为准。
+
 Provider 只允许 `https://server.flowyaipc.cn/claw/v1`、一个固定 Model ID、非流式原生工具调用。Token 只能由主人在 Syno Settings 中录入，或在主人明确授权后从本机 OpenClaw last-good 认证档案直接迁移到 Windows DPAPI；禁止通过命令行参数、日志或聊天传递。
 
 ## 自动采用门

@@ -1,35 +1,23 @@
-# Mac 主部署剩余工作（2026-10-13）
+# Mac 主部署剩余工作（2026-10-20 更新）
 
-生产已从 Windows 机器切换到本机 macOS（Apple Silicon）；飞书为唯一渠道入口，微信不绑定。本文件是当前剩余工作的执行方案与验收口径；完成后按各条归属更新对应文档。
+生产已从 Windows 切换到本机 macOS（Apple Silicon），飞书为唯一日常渠道；微信栈已物理删除。当前剩余项为 P2 登录冷启动及可选 P3 浏览器便利入口。P0 主动服务计划已取消，P1 仅保留历史分支追溯，不再将当时缺 GitHub 凭据视为当前阻塞。
 
 ## 现状（已完成，仅作事实基线）
 
-- Host（8888 控制面）与 DSH chat（3088）在本机运行，`health=ready`、`deliveryOk=true`。
-- 认知链真实验证：`pnpm spike:capabilities` 五轮全绿（Kimi 模型 → 知识检索 → 原文读取 → web_search → web_fetch）。
+- Host（8888 控制面）与 DSH chat（3088）在本机运行，`health/readiness=ready`，store／harness／channels 均 ready（2026-10-20 只读复核）。旧 deliveryOk 属于已删除的主动投递健康字段。
+- 历史认知链 smoke 覆盖 Kimi、知识检索、原文读取与联网搜索；通用 web_fetch 已于 2026-10-17 禁用，当前网页读取只用受控 knowledge.fetch_url，不再将旧五轮工具面当当前入口。
 - 飞书渠道：沿用既有应用 `cli_aa4dde442d395bdd`，Owner 已绑定；真实消息收发已验收。
 - 凭据存储：`packages/syno-core/secret-protector.mjs`（macOS 钥匙串主密钥 + AES-256-GCM；Windows 保持 DPAPI），分支 `codex/mac-deployment` 提交 `d0d54b2`。
-- Home channel 已切换到飞书（`/api/syno/channels/home`），`homeTargetAvailable=true`。
-- 回归基线：`pnpm test` 875 pass / 0 fail / 20 skipped（Windows 专属用例）；`pnpm verify` 通过。
+- Home channel 为飞书；本次状态为 running／available／ownerBound／home 均 true，不使用旧主动目标健康字段。
+- 2026-10-20 f91a40a 回归为 772 pass／1 fail／19 skipped；失败是沙箱禁止真实钥匙串写入，仓库与文档检查通过。旧 875 pass 为历史基线，不能视作本次全量通过。
 
-## P0 主动服务飞书化并开启投递（进行中，Owner 参与）
+## P0 主动服务飞书化（已取消，2026-10-17）
 
-目标：晨报（08:30）、晚间复盘（22:00）、周报（周日 20:00）、今日灵感卡与系统告警全部投递到飞书。
+主人要求删除全部主动推送；晨报、晚间复盘、周报、今日灵感、主动通知设施及其开关已删除，不再执行开启投递、confirm-test 或连续三日收卡验收。历史测试卡只证明当时版本的投递，不是当前能力。启动监督器的本机桌面崩溃告警仍保留，与产品主动消息不同。
 
-- 步骤 1（已完成）：Home channel 切到 feishu。
-- 步骤 2（已完成）：受控测试卡已投递（`runId=mac-accept-1`，`eventId=outbox-20261013151926881-ce410297`，`proactive.bundle.delivered`）。
-- 步骤 3（已完成）：Owner 在飞书确认只收到一条测试卡。
-- 步骤 4（已完成）：`/api/syno/proactive/confirm-test` 写入发布证据（`confirmedAt=2026-10-13T15:38:35Z`）。
-- 步骤 5（已完成）：`notifications.proactiveDeliveryEnabled=true`（`confirmed=true` 必需），`proactive/status` 显示 `enabled=true, homeTargetAvailable=true, 连续失败 0`。
-- 验收（进行中）：Observe 首日投递——08:30 晨报、22:00 晚间复盘、12:30 灵感卡按点到达飞书，连续 3 日 `deliveryHealth.consecutiveFailures=0`。
-- 回滚：将 `notifications.proactiveDeliveryEnabled` 置回 `false`；无需回退 home（如需可再切回）。
-- 注意：受控测试期间必须保持真实投递暂停；证据只能由确认入口写入。
+## P1 平台修复分支（历史记录）
 
-## P1 平台修复分支推送与合并（阻塞：本机缺 GitHub 凭据）
-
-- 分支 `codex/mac-deployment` 含两项提交：钥匙串凭据接缝修复（`d0d54b2`）与本方案文档。
-- 需要：提供 GitHub PAT（HTTPS）或配置 SSH；随后 `git push -u origin codex/mac-deployment`。
-- 验收：平台工作流 Windows + macOS 双绿；PR 用 squash 合并；合并后本机 `git pull` 同步。
-- 合并后动作：本机即生产，重启 Host 后用 `pnpm run verify` 与 `/api/syno/health` 复核。
+初始平台开发分支为 `codex/mac-deployment`，钥匙串接缝提交为 `d0d54b2`。当前 main 已包含平台实现；本轮没有检查远端认证或 CI，不沿用 2026-10-13 的“缺 GitHub 凭据”阻塞结论，也不自动 Push／创建 PR／合并或重启。
 
 ## P2 macOS 登录自启（开发完成，待主人登录冷启动验收）
 
@@ -54,11 +42,11 @@
 
 ## P4 其它平台验收项（低优先级）
 
-- `docs/PLATFORM-COMPATIBILITY.md` 声明的"真实 Mac 登录、渠道、浏览器验收"中，登录项见 P2、渠道项见 P0；浏览器验收并入 P3。
-- 微信渠道保持未绑定：代码保留、不再作为 home 或推送目标；历史 outbox/目标记录只读不动。
+- `docs/PLATFORM-COMPATIBILITY.md` 声明的"真实 Mac 登录、渠道、浏览器验收"中，登录项见 P2；飞书真实收发已有 2026-10-13 历史验收，本轮只复核在线与 Owner 绑定；浏览器验收并入 P3。
+- 微信通道栈及主动目标设施已物理删除，不存在重新绑定或启用开关。用户请求触发的收录／发布恢复仍保留。
 
 ## 风险与注意
 
-- 钥匙串主密钥丢失（如手动删除条目）→ 已加密载荷不可解：飞书 Secret 需重新录入、outbox 载荷不可恢复（可重建）。建议保留 login 钥匙串并纳入 Time Machine 备份；不要删除 `credentials-master-key.v1` 条目。
-- `.env`（KIMI/搜索/无飞书 key）与 `.local-data` 均不入库；密钥不写入日志；聊天里出现过的飞书 Secret 可在飞书后台轮换后再录入（重录步骤同 P0 的凭据写入）。
+- 钥匙串主密钥丢失（如手动删除条目）→ 已加密载荷不可解：飞书 Secret 需重新录入、受保护执行载荷可能不可恢复。建议保留 login 钥匙串并纳入 Time Machine 备份；不要删除 `credentials-master-key.v1` 条目。
+- `.env` 与 `.local-data` 均不入库，密钥不写入日志。凭据轮换在主人授权的独立运维流程中执行，不使用已取消的 P0 主动投递步骤。
 - 每次修改 `apps/ packages/ scripts/` 后需重启 Host 生效（无热加载）。

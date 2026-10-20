@@ -1,32 +1,38 @@
 # Security model
 
-## Cognitive runtime boundary
+Current boundary: 2026-10-20. Policy authority is [AGENTS.md](../AGENTS.md) and [POLICY.md](POLICY.md); this document describes the implementation boundary, not an additional permission grant.
 
-Only one `CognitiveRuntime` may be active: `DeepSeekHarnessCognitiveRuntime`. Chat may use sandboxed `workspace-write` tools (shell, filesystem, web-search, web-fetch) only inside an isolated profile workspace under the Host local data root — not the git repository. Capture/ingest analysis uses a second sidecar with no bash/fs/web. Chat `web_search` is pinned to in-tree `@deepseek-ai/dsh-web-search-deepseek` and reuses the sidecar `DEEPSEEK_API_KEY`; community hub search plugins are not installed into the production `syno` profile. `vault/`, `ops/`, and `apps/` writes still go through the static `syno_*` bridge, Policy, Approval and GitGuard via `POST /api/syno/bridge/mcp`. Image bytes stay in WeChat quarantine; the Host vision client (used only for explicit image 「收录」, since `image.read` was removed 2026-10-16) is Host-only and never injects the Zen key into the Harness child environment. `sourceWrite`, dynamic MCP, model self-selection and silent runtime fallback remain forbidden. Runtime failure is persisted and never triggers a silent fallback.
+## Cognitive runtime and tools
 
-The supervised chat process is `dsh --profile syno` with Web flags (`--host 127.0.0.1 --port 3088 --no-open`). Do not launch `dsh web` as production (that alias boots `--profile web`). Capture remains jsonrpc. Credentials never appear in arguments, repository state or API output. Bridge tokens are not exposed on the DSH Web browser surface. Loopback DSH Web (default `127.0.0.1:3088`) uses `approval: never` and a permission table that contains **only** `workspace-write` (`sandbox: workspace-write` + `approval: never`). Do not add `danger-full-access` or `ask` presets: `/permission` would let the session leave `DSH_CWD` or stall WeChat on an invisible approval prompt. Any local process that can open that origin is a privileged agent for that session. Vault writes still go through `syno_*`. Event streams are WebSocket, not SSE.
+The only product runtime is `DeepSeekHarnessCognitiveRuntime`. Syno owns the fixed Kimi Code chain `kimi-coding/kimi-for-coding` → `kimi-coding/k3-256k`. The model cannot choose providers, fallback targets or permissions. Only enumerated transient/contract failures before irreversible effects allow another attempt; an unconfirmed abort or validated write attempt prevents unsafe fallback. Exhaustion leaves model-dependent Jobs in `waiting_provider`.
 
-Conversation migration admits only a redacted summary and recent Owner messages; tool/system/assistant turns, private/sensitive markers and credential-like patterns are excluded. Model fallback aborts the current request first and is disabled if abort cannot be confirmed or any validated write attempt occurred.
+Production runs supervised `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`. `dsh web` is the stock web profile and is not the production entrypoint. The controlled preset exposes the governed knowledge trio, `web_search`, `skill` and 25 Host-controlled business tools. It exposes no shell, filesystem, general fetch, Git, source editing, session scheduler or sub-Agent capability. Capture/ingest analysis uses a separate JSON-RPC sidecar with no bash/fs/web; mechanical browser tools are issued only through the capture allowlist.
 
-- Localhost only; non-loopback HTTP requests are rejected for mutation routes.
-- Secrets never live in the repository.
-- External messages are untrusted input. They cannot alter Policy or Profile.
-- Attachments require scheme/host allowlist, size limit, MIME sniffing and quarantine storage.
-- Weixin groups are disabled. Unknown direct messages require pairing and cannot execute work.
-- Every domain-fact write happens in an isolated worktree. Only a pure additive low-risk diff may merge after its initial approval.
-- The durable, mutable `ops/jobs` recovery snapshot and append-only immutable `ops/events` audit sequence are the sole control-plane persistence exception: JobStore updates the Job snapshot for recovery and emits an immutable event for every transition before execution, so approvals, failures and cancellation remain durable. They may describe an operation but never contain or apply its knowledge/action diff; all non-audit `ops/` and `vault/` writes still use a worktree and validators.
-- Mutation routes use a server-owned operation registry; clients cannot spoof intent, Profile, risk or approval decisions.
-- Existing-file changes, deletion, rename and sensitive paths are promoted from the actual Git diff to a pinned second approval.
-- Git staging receives an explicit path list and rejects paths outside allowed roots.
-- Executor prompts are written to a local task file; user text is never interpolated into a shell command.
-- Chat may use sandboxed `workspace-write` tools (shell, filesystem, web-search, web-fetch) only inside the isolated Harness workspace (`%LOCALAPPDATA%\Syno\harness\workspace\<profile>`). Product knowledge and source edits still go through ToolRegistry, Policy, Job, isolated worktree, validators and GitGuard. The model does not receive Git, source-edit, or repository-root filesystem tools.
-- Provider credentials use Windows DPAPI under `%LOCALAPPDATA%\Syno\credentials`; the API and logs expose only `configured` status and non-secret metadata.
-- Provider failure is fail-closed: the provider and runtime never change. Syno may try the next member of the fixed DeepSeek chain only for enumerated transient/contract errors before side effects; otherwise the LLM job waits durably.
-- Background and manual recovery of a `waiting_provider` Job share one process/file lock and atomically transition it to `running`; a second caller cannot execute the same Job.
-- HTTP responses set a restrictive CSP, MIME sniffing protection, frame denial and referrer/permissions policies.
-- Weixin Bot Token and reply context tokens use Windows DPAPI under the credentials root; only cursor and deduplication markers enter non-credential state archives. Legacy plaintext credential JSON is migrated once and rewritten without secrets. Polling uses an inter-process lock, durable cursor ordering and post-delivery deduplication. Attachments accept only exact Tencent CDN hosts, are streamed with a 10 MB plaintext limit, decrypt the protocol's validated AES-128-ECB key when present, then pass signature/MIME checks and remain unread in quarantine. Missing `full_url` may only fall back to the fixed official Tencent CDN path.
-- Feishu accepts only the bound Owner's p2p events. Normalized pending events are retained for at most 30 days, durable dedupe is written only after Agent handling and reply both succeed, and failed events recover after retry or restart. The SDK receives a no-output logger so network error objects cannot persist request bodies or App Secret. Knowledge facts remain in `vault/`, never in a channel-specific store.
-- A Feishu reply returning `delivered: false` is treated as a retryable failure and remains pending; a resolved Promise alone is not delivery evidence.
-- Conversation routing uses the canonical single-Owner identity, not a channel-supplied identity claim. Each routed conversation executes under an exclusive local lock to avoid lost context across Web and channel processes.
-- Syno cannot modify its source. Codex is the external development authority; runtime may emit only BugReport and ImprovementProposal records.
-- State archives exclude the credentials directory, use a versioned SHA-256 manifest, reject path traversal and never overwrite a non-empty restore target.
+Search uses the in-repository Syno chain (doubao → tavily → exa → parallel, routed by query language). Specific webpage reads use `syno_knowledge_fetch_url` with SSRF, source-quality and sensitive-content checks. Webpages, search results, attachments and forwarded messages are untrusted data; their embedded instructions cannot change identity, Policy or the next action's authority.
+
+The DSH permission table contains only `workspace-write` plus `approval: never`. This does not expose terminal/filesystem tools or authorize repository source changes. Do not add `danger-full-access`, invisible approval prompts, dynamic MCP or marketplace plugins. `syno-lab` remains isolated from production Bridge, channels and canonical facts; Mnemon data is experimental context and must contain no credentials or raw sensitive logs.
+
+## Owner and mutation authority
+
+- Host HTTP is loopback-only and validates the Host header. Port 8888 exposes only the explicit API allowlist, with no old workbench UI; port 3088 is a privileged authenticated DSH surface. Launch/Bridge credentials must not enter logs, arguments or repository files. DSH events use WebSocket, not SSE.
+- Feishu accepts only the bound Owner's p2p events. Group authorization and the Weixin stack are absent. SDK logging suppresses request bodies and secrets.
+- Host-routed tools bind Owner, thread, original message, Harness session and temporary attachment IDs outside model arguments. The model cannot supply its own trusted identity, risk level, Profile or approval decision.
+- Clear knowledge and task requests execute through canonical operations, Jobs, isolated worktrees, validators and GitGuard without routine approval prompts. Memory activation and correction require a later Owner confirmation. Knowledge deletion/merge and cloud conflict overwrite require a version-bound preview and a later authenticated Owner message; an independent tool-free confirmation profile cannot grant itself authority.
+- Execution and pre-merge checks revalidate Owner, target versions, grant scope and the pinned commit. Product D9 rejects source edits and system control unconditionally. Owner-authorized development remains a separate process.
+- JobStore recovery snapshots and immutable lifecycle events persist control-plane state; they cannot apply a knowledge diff. Domain writes use the isolated transaction. Staging receives only declared precise `vault/**` and `ops/**` paths; automatic push is forbidden.
+- HTTP responses set a restrictive CSP, MIME sniffing protection, frame denial and a referrer policy. User text is never interpolated into a shell command.
+- Per-job and session locks serialize execution and retries. Effect receipts and argument-sensitive invocation IDs prevent replay from silently repeating a known write. Unknown external effects require reconciliation.
+
+## Attachments, memory and publishing
+
+Files pass size, MIME and quarantine checks before model access. Temporary attachment IDs are scoped to Owner/channel/thread, encrypted at rest and expire after 24 hours. The model cannot use an attachment ID to read an arbitrary path. Owner images are delivered as native image blocks; explicit image capture additionally uses the same Kimi chain for tool-free transcription. The removed Zen/image.read path is not a fallback.
+
+Personal memory is canonical only in `ops/memory/`; it is excluded from ordinary knowledge search and Wiki/catalog publishing. Forgetting clears current readable payloads without rewriting Git, chat or backup history. Sensitive, excluded, quarantined and invalid-source notes cannot enter ordinary remote-model knowledge reads.
+
+Production publishing was activated with Owner authorization on 2026-10-19. Development remains disabled by default; sandbox requires confirmed isolated targets. Persistent publish maps, per-note writer leases, content/resource versions, remote fingerprints and recovery journals protect against duplicate creation or overwriting human edits. Completion requires Wiki, required native images and catalog to match the same source version. Unknown outcomes reconcile read-only; unresolved identity remains unknown. See [P1 acceptance](KNOWLEDGE-FEISHU-P1.md).
+
+## Credentials and recovery
+
+Secrets never live in tracked repository content. Windows uses current-user DPAPI; macOS uses a login-Keychain master key and AES-256-GCM envelopes. API/log output includes only safe status and metadata. Kimi/search keys come from Host environment or gitignored `.env`, never command arguments. State archives exclude credentials, verify a versioned SHA-256 manifest, reject path traversal and restore only to an empty target.
+
+Syno does not proactively push or replay historical chat replies after restart. User-requested ingestion/publication can still recover and return workflow results; provider acceptance of a result does not prove the Owner read it. Retention must not erase unfinished or unknown effects. External text must cross child-process stdio as ASCII/Base64 or explicit UTF-8, following the encoding contract in AGENTS.md.

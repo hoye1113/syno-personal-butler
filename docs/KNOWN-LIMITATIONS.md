@@ -1,78 +1,49 @@
 # Syno 已知限制
 
-更新日期：2026-10-18
+更新日期：2026-10-20（Asia/Shanghai）。检查基线：`main@f91a40a`。本页描述当前限制；旧运行时、双渠道及旧工作台验收只作历史追溯，不能覆盖当前能力。
 
-## 知识与记忆 v0.2 开发验收
+## 当前验证状态
 
-当前分支实现独立记忆、受控维护、来源与图片清单、发布状态机和恢复机制。开发发布为 disabled；隔离飞书目标尚未配置，真实写权限、主人访问和全图文三端验收未完成。固定评测标签按主人要求继续保持草案，不能声称发布通过。真实模型语义回放不代替飞书端到端验收。
+- 本机 `GET /api/syno/health` 与 `/readiness` 均返回 ready，存储、Harness 和渠道组件就绪；飞书运行且已绑定 Owner。当前在线不代替登录冷启动或长时间稳定性验收。
+- 生产发布已于 2026-10-19 经隔离验收和主人授权启用。2026-10-20 本地 252 条发布映射的 Wiki／图片／目录共 756 个目标均为 succeeded，无 pending 或 blocked；本次未逐篇重新读取云端页面，也不表示全库所有文件均有发布资格。目标、访问确认与回填记录见 [P1 交付说明](KNOWLEDGE-FEISHU-P1.md)。
+- 标签已于 2026-10-19 经主人审核冻结；`cfd9b53` 上三轮真实 Kimi 语义评测各 150/150，误授权为零。该评测只证明固定样本上的检索／分类及确认判定，不覆盖普通聊天工具循环、真实业务写入、多候选排序、多预览、合并或飞书发布。
+- 本轮 Node 全量测试 792 项：772 通过、1 失败、19 跳过。唯一失败为真实 macOS 钥匙串测试被当前沙箱拒绝写入（`SECRET_KEYCHAIN_UNAVAILABLE`，`Operation not permitted`），不能称全量通过。Repository verification（2766 files）、active docs（8 files）及 `git diff --check` 通过。Windows 专属跳过项不构成当前真机验收。
 
-普通遗忘清理当前记忆记录和可读载荷，不擦除 Git、聊天、备份或云端历史。旧记忆仅生成迁移清单，未经逐条审核不迁入 active。PDF／DOCX 目前只保证已读取文字；浏览器 HTML 或资源清单不完整时保留明确缺项。未知云端创建结果不能唯一对账时保持 unknown，需处理实际对象后继续，不能盲目重建。
+## 已确认未修复问题
 
-## 2026-09-01 产品精简与拆墙（当前状态）
+- `packages/syno-core/business-tools.mjs` 的 `workflowSummary()` 对 committed／reported 收录固定返回“本地已保存；云端发布未启用”。已用隔离假服务复现 `capture.get` 同时返回该文案与 `sync.mode=production/status=synced`。`capture.list`、`work.overview` 等复用摘要的入口也受此文案影响。应以 `knowledge.sync_status` 或返回的 `sync` 字段区分云端状态；此处只记录问题，本轮文档同步没有修源码。
 
-- 学习子系统与项目子系统已整体物理移除（`f23954d`、`ec068b9`）：`learning.*`/`projects.*` 工具、`/project` 指令、Job/Workflow/Note 的 projectRef 传播与检索加权均不再存在。历史 ops 记录（含 `ops/projects/*.md` 与学习相关记录）保留只读；新记录不再写入 projectRef/project_refs，旧记录中这些字段被读取方忽略。
-- Project-aware Knowledge MVP 已关闭为 SUPERSEDED（Owner 2026-09-01 产品方向决策），Owner 主观召回观察不再回填；live 证据保留在 `ops/acceptance/project-aware-knowledge-mvp/` 仅作追溯。下文 2026-08-26 起关于 Project 边界的描述均为历史记录。
-- 用户入口边界已结构性加固（`e49a66c`、`b634efd`）：`code_change` 意图、`allowSelfModify`/`allowSystemControl` 开关与 Windows 服务安装/卸载操作已物理删除——不是开关关闭，而是代码不存在，没有任何配置能让聊天入口改代码或控制系统。模型可声明的写入路径只有 `vault/**`；`ops/` 仅系统内部固定记录器写入；自动提交只准暂存 `vault/**`、`ops/**`，永不自动 Push。
-- 知识仓库已在 2026-09-18 完成单仓迁回：`vault/` 与 `ops/` 现由本代码仓 Git 和远端统一管理，生产环境不设置 `SYNO_KNOWLEDGE_ROOT`，planner 的 `vaultRoot` 指向本仓根目录。外部 `D:\workSpace\syno-knowledge` 与 `D:\workSpace\syno-knowledge-backup-20260918` 仅作为冻结回滚副本保留，不应继续产生生产写入；旧 D13 拆库提交只作历史追溯。回滚预案见 `docs/OPERATIONS.md`「知识库单仓运行与回滚」。
-- 2026-10-08 知识库二源合一：独立仓 `obsidian_repository`（策展主线，含 99-System 工具链与 MOC 路由体系）已全量并入本仓 `vault/`；syno 捕获管道的 74 篇独有笔记原位保留，205 篇旧布局重复副本已清除（逐 basename 校验零内容丢失，vault-audit 通过）。历史外部归档及旧路径 junction 别名已清理删除，本仓 `vault/` 为唯一物理入口；obsidian 侧提交历史留存于 GitHub 远端 `hoye1113/longterm-ai-vault`（master=8a76ed0）。外部 `syno-knowledge` 冻结副本已不存在，知识库回滚仅依靠本仓 Git 历史。
-- 当前唯一执行事实源为 `docs/product-slimming-and-inspiration-plan.md`；当轮回归基线快照见 `NEXT_SESSION.md`。
+## 产品入口与范围
 
-## 发布门槛状态
+- 飞书是唯一日常渠道，只接受绑定 Owner 的私聊；不读取个人聊天历史，不支持群聊授权。微信栈已于 2026-10-16 物理删除。
+- 8888 是白名单控制 API，根路径和旧工作台业务页面返回 404；代码里保留的旧 route handler、服务或日历适配器，不等于当前对用户开放的能力。3088 是需启动令牌认证的受控 DSH Web，便利入口仍见 [Mac 部署计划](plans/mac-deployment-remaining-work.md)。
+- 学习、复习、项目管理、今日灵感及主动推送已删除；排期只记录时间，不主动提醒。没有聊天回复崩溃补发；后台收录、发布恢复及其请求结果回执仍保留。
+- 自然语言业务由模型调用受控工具，只有 `/new` 和 `/stop` 是确定性控制口令。Provider 故障时本地事实仍保留，但不能保证自然语言收录、待办和决策会绕过模型继续处理。
+- 管家运行时不能修改项目源码、执行终端或控制系统。源码开发和服务安装／重启属于主人授权的独立开发／运维流程。自动提交仅限声明的 `vault/**`、`ops/**`，永不自动 Push。
 
-- 历史 P4 发布 Goal 状态为 `blocked`：P4.0–P4.6 已完成，P4.7 的真实渠道、自动执行与澄清、跨渠道连续性、重启恢复和下次 Windows 登录冷启动仍需主人验收；不得把自动测试、探针或当前任务 Running 状态表述为封板。
-- `567f23d` 是执行语义与移动可靠交付计划的审查基线，不是所有后续 PR 的永久父提交。该时点尚未提供的 ACK 前持久化、通用 ChannelDeliveryOutbox、Effect Receipt 和 Unknown Case Store 已在后续 PR 交付；本小节整体为 2026-07 历史记录，当前能力以 `docs/ARCHITECTURE.md` 为准。
+## 来源、图片与知识维护
 
-- token-cloud 固定模型五轮真实工具调用、故障持久等待和同模型恢复已通过，不再是发布门槛。
-- （历史，2026-09 记录）微信 iLink 曾完成扫码、Owner 绑定、连续回复与故障恢复；微信通道栈已于 2026-10-16 物理删除，以下不再适用。
-- 飞书消息已完成 Owner 私聊、真实 ID 重放拒绝与重启恢复；飞书日历已完成 user 授权、主日历 CRUD、错误拒绝与恢复。
-- `0cc2669` 的 fresh clone 已通过 Node 172/172、vault 57/57 和仓库校验；`a4ec17d` 完成最终回归。真实 Windows Web 生命周期与桌面/移动浏览器增量复验通过。当前代码完整 bundle 为 `C:\tmp\syno-repository-backup-a4ec17d.bundle`，SHA-256 见最终验收矩阵。
+- URL、Bilibili、PDF 和附件受大小、MIME、SSRF、来源质量与隔离规则约束。验证页、失效链接和不完整正文不能伪报为已读原文或发布完成。
+- 聊天图片以原生 image 内容块直达 Kimi，单图原始字节上限 3MB；只有明确收录才通过无工具 capture sidecar 转写，失败时如实回报。飞书下载上限 25MB 不代表所有收录格式都支持 25MB：PDF／DOCX 上限 10MB，文本／HTML 等上限 1MB。
+- PDF／DOCX 当前只保证已提取文字；不支持的图片语法、inline SVG／canvas、扫描 PDF OCR 和浏览器缺失资源不能视作完整图文。
+- 知识搜索是本地词项检索和确定性排序；固定记忆 Recall@5 满分不证明任意问题、全库语义检索或长期多轮记忆都满分。
+- 维护工具只报告问题，不自动清理；知识删除与合并须绑定具体目标版本的预览，并等待后续真实 Owner 消息确认。
 
-历史 Provider/旧运行时验收不替代当前 DSH 发布门槛。当前生产只启用 `DeepSeekHarnessCognitiveRuntime`；真实模型、跨渠道计数、提示注入、长会话 compaction 行为、Harness 重启恢复和 Windows 登录恢复仍未完成。生产受控 `syno` agent preset、Web `agentPreset: syno` 显式绑定和 JSON-RPC 官方 compaction stack 已实现并通过构建产物级验证，但不能替代真实模型和 Owner 验收。不得把凭据已配置、自动测试或历史探针证据表述为 DSH 已封板。
+## 记忆与发布边界
 
-历史自动门禁数字和旧运行时探针只作为追溯记录；当前修复后的结果以 `NEXT_SESSION.md` 和当前执行计划（`docs/product-slimming-and-inspiration-plan.md`）最新记录为准。该结果只证明自动化门禁，不替代真实渠道和 Owner 验收。
+- 个人记忆只在 `ops/memory/` 生效；候选须后续确认，纠正生效前旧事实仍有效。普通遗忘清理当前正文及可读载荷，不擦除 Git、聊天、备份或云端历史。
+- 旧记忆仅生成迁移清单，不自动激活。Google Flow 旧 approved 记录实际是资料收录意图，保持 dormant。
+- 只有 Wiki、图片、目录都核验到当前对应版本才称同步完成。云端人工编辑会阻断覆盖；未知远端效果先只读对账，无法唯一定位时保持 unknown，不盲目重建。
+- 本地三类提交不包含发布状态的后续 Job；真实端到端耗时和逐例成本仍缺完整基线。2026-10-20 有一次长 chat turn 达到 180 秒 `HARNESS_TURN_TIMEOUT`，本地更新已经完成，不能据聊天超时推断业务未执行。
 
-Windows 计划任务安装器已通过纯 XML 契约测试加固：注册后导出、保护、重注册并再次导出验证，且健康快路径也必须先通过同一契约。当前真实任务已安装并使用绝对 `node.exe`，受控重启验证时刻曾等待 8 秒仍保持 `Running` 且 Host 健康；安装器还修复了 mise shim 与相对 server 路径接管问题。本次复核（2026-07-28 约 22:26 CST）快照：任务当前 `State=Ready`、未运行，`LastRunTime=2026-07-28 20:31:19`、`LastTaskResult=3221225786`（0xC000013A 控制中断退出），`manage-windows-task -Action Status` 报告 `running=False`，8888 上存活的是更早（20:05:47）手动启动的 Host 进程而非活动任务实例。下次 Windows 登录恢复仍未实测，不能把当前运行态当作冷启动证据；`0xC000013A` 退出根因（疑似受控重启停止旧实例或撞端口占用）需在冷启动验收中确认。
+## 平台、恢复与历史债务
 
-运行日志现在按日写入 `%LOCALAPPDATA%\Syno\logs`、保留 14 天并脱敏，但它是诊断记录而不是长期知识或会话事实源；真实 DSH 模型回答和 Windows 登录恢复仍待主人验收。
+- 支持 Windows 与 macOS Apple Silicon；其它平台未适配。Windows 使用 DPAPI，macOS 使用登录钥匙串主密钥加 AES-256-GCM 信封，不可直接跨用户／机器移植凭据。
+- 生产不设置 `SYNO_KNOWLEDGE_ROOT`；唯一物理事实源为本仓 `vault/` 与 `ops/`。外部知识仓、冻结副本和旧路径 junction 已清理，知识回滚依靠本仓 Git 历史与核验备份。
+- DSH 根必须构建后使用；默认子模块与可选外部 checkout 可能有版本差异，需按实际根检查 closure。历史 bootable 或旧版本探针不证明当前生产可运行；本轮没有重新构建或切换运行时。
+- macOS 登录冷启动、长会话 compaction、真实故障及恢复矩阵仍需按各自证据验收。当前 ready、历史 Windows 验收与冻结分类评测互不替代。
+- `ProviderClient`、`ConversationStore`、`ConversationRouter`、`ContextManager`、`ToolLoopAgent` 仍有 legacy 本地调用方；R6 真实矩阵未完成前保留，不是 Harness 故障回退路径。
+- 状态归档只包含本机 state，不含 credentials，也不替代 `vault/`、`ops/` 和代码配置的 Git／系统备份。数据契约破坏性升级须显式迁移，禁止静默改格式。
+- 项目无 TypeScript、typecheck、lint 或独立应用 build 脚本；JS 行为由 Node 测试验证，Harness 构建独立进行。
 
-本轮隔离 worktree 依赖安装先因 pnpm store 缺少 `@modelcontextprotocol/sdk` tarball 而离线失败，随后按未改变的锁文件联网补齐并完成定向测试；故“任意机器完全离线安装”不是已保证能力。
-
-## 运行时限制
-
-- 平台支持 Windows 与 macOS（Apple Silicon）；Linux 及其它平台未适配。受保护凭据按平台接缝存取（`packages/syno-core/secret-protector.mjs`）：Windows 用当前用户的 DPAPI；macOS 用登录钥匙串主密钥 + AES-256-GCM 信封。两者都不可作为跨用户/跨机器可移植凭据；文件仍按 0600 落盘，主密钥不出钥匙串。
-- 只启用 DeepSeek Harness SDK，模型链只有 `kimi-coding/kimi-for-coding` → `kimi-coding/k3-256k`（Kimi Code 订阅，经 DSH 内置 pi-ai 的 `kimi-coding` 目录路由；key 来自宿主环境 `KIMI_API_KEY` 或仓库根 `.env`）。仅在枚举的瞬态/契约失败且尚无不可逆副作用时尝试下一模型，不切换 Runtime，不回退到其它 Agent。两个模型在 pi-ai 目录中均声明了 `text`/`image` 输入能力。
-- DeepSeek Harness 运行时既可由 `SYNO_DSH_ROOT` 指向外部 checkout，亦可直接使用仓库内置 Git Submodule `vendor/deepseek-harness`（未设置环境变量时自动以此为默认）。该 checkout **必须** `pnpm run build`（`lib/` + web dist，可通过 `pnpm harness:setup` 一键初始化并构建）；只 install 不够，`harness:doctor` 的 bootable 也不是现网证据。生产 chat 的真实 argv 是 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（`dsh web` = 库存 `--profile web`，不要当生产）。事件通道是 WebSocket（HTTP GET `/api/events.*` 返回 426），不是 SSE。loopback 3088 是特权壳（`approval: never`，permission 表只准 `workspace-write`，禁止 `danger-full-access`），不是 8888 控制面。收录分析仍通过 jsonrpc sidecar；自动测试走 `tests/support/fake-dsh-jsonrpc-agent.mjs`。不要把 Harness 源码直接复制代码（vendoring）进本仓库提交历史，保持通过 Git Submodule 追踪官方版本。Chat 沙箱工作区是 `%LOCALAPPDATA%\Syno\harness\workspace\<profile>`，不是 git 仓库根。生产 `syno` profile 禁止市场 `dsh plugin add`；Host 会把 `@syno/dsh-plugin` link 进 profile `node_modules`。Windows 计划任务默认不注入 `SYNO_DSH_ROOT`。踩坑清单：`docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」。
-- 2026-08-25 的 packaged-bin 失败已由 Syno 侧 adapter 处理：Supervisor 现在检查完整 closure、配置包的实际运行入口，并在 Web/JSON-RPC 两条路径分别报告 `bootable`；缺失时返回 `HARNESS_RUNTIME_CLOSURE_UNAVAILABLE`，不会误报 `bootable`，也不会选择 OpenCode、原生 Agent 或 fake runtime。当前 doctor 的 closure 已完整；最终真实 JSON-RPC `initialize`、Capture round-trip 和 Web 官方 `web_search` 已通过显式 live 测试（历史上的 Project A/B 对照随项目子系统移除而作废，仅作追溯）。
-- 当前外部 DSH clone 在 Windows 上 graceful protocol shutdown/EOF 可能触发其自身 libuv assertion。Syno Supervisor 对自己创建的 sidecar/Web 进程使用有界 process-tree termination 清理；同时覆盖 tsx 外层先退出而 launcher 孙进程仍存活的情况。最终 live 命令已正常退出，本阶段不修改外部 clone，生产重启/崩溃行为仍需继续观察。
-- 聊天读图（2026-10-16 已打通）：主人发来的图片由通道侧读成 base64 后作为 image 内容块直达模型（模型链声明支持 image 输入），单图原始字节上限 3MB；超限或未通过隔离校验的图被拒并如实说明。「收录」路径额外做一次模型转写（同一条模型链、capture sidecar 无工具）把图转成结构化文本进 Intake。转写失败如实回报，禁止猜图。
-- Chat `web_search` 由自研 `syno-search` 链提供（豆包 → Tavily → Exa，ADR 0009）：免费额度合计 ≈2,900+ 次/月，按查询语言路由、失败自动回退、缺 key 自动跳过；中文覆盖由豆包承担，豆包英文质量弱（语言路由已规避）。该 seam 没有查询/域名白名单；每次搜索是一次额外模型轮次。`web_fetch` 已于 2026-10-17 关闭；读网页只保留 `syno_knowledge_fetch_url`（SSRF 防护 + 脱敏 + 反爬升级）。收录分析 sidecar 没有 web。
-- OpenCode、Hermes 和原生 Agent 不是产品运行时；旧认知模块的删除仍受 R6 真实验收门禁约束。
-- 模型不可用时，本地搜索、收录回执、任务、提醒与决策解析继续工作；需要模型的 Job 保留为 `waiting_provider`，不会自动换 Provider 或原生 Agent。
-- 产品运行时不能修改自身源码或控制系统：`code_change` 意图、`allowSelfModify`/`allowSystemControl` 开关与 Windows 服务注册操作已物理删除（2026-09-01，`e49a66c`），不是开关关闭而是代码不存在；SettingsRegistry 只保留白名单内的偏好变更。
-
-## DSH Hub 与 Mnemon 限制
-
-- `syno-lab` 是唯一实验 profile；`dsh-mnemon@0.2.13` 不加载到生产 `syno`，不接入 Syno Bridge、飞书或 `vault/ops` 写入。
-- Mnemon Native 需要 Windows release 至少 `0.2.3`。外部 Memory Provider 必须关闭，只允许 Runtime Memory、Documents 和本地 Native；Native 缺失时应显示降级状态而不是伪报 Recall/Remember/Forget 成功。
-- Mnemon 数据不是 Syno canonical fact；生产推广需要固定版本/构建产物、敏感数据边界验证、独立安全审查和显式政策批准。
-- 上游当前没有确定性密钥扫描器，故任何 Token、Cookie、私钥或原始敏感日志都不得进入 Mnemon；不得依赖插件自行完成脱敏。
-- 生产 DSH 的 host token meter/session 由当前 `dsh-base` bundle 提供，Web 受控 agent preset 和 JSON-RPC chat 分别挂载官方 compaction-basic、tool-result-pruner、command-compact stack；schedule 由 `@deepseek-ai/dsh-schedule` function plugin 提供。所有包都必须在 `SYNO_DSH_ROOT` 的实际构建产物中可解析，缺失时应阻塞启动，不回退到旧 ContextManager 认知链路。
-
-## 数据与渠道限制
-
-- 当前 R4.1–R4.7 工作树已完成全量 Node、vault、Repository verify、fresh clone 和 `git diff --check` 自动门禁；浏览器真实页面、Windows 登录冷启动和飞书设备行为仍由主人 P4 验收。
-- Workflow Outbox 已采用 5 分钟可恢复租约、稳定 eventId/idempotencyKey 和接收方幂等边界，仍按 durable at-least-once 语义设计。`delivered` 只证明 Provider 接受请求，不证明主人已读；若渠道已经接收而进程在送达状态落盘前崩溃，恢复后可能重复投递同一工作流回执，这不会重复写入或重复触发澄清。重复 URL 会返回已有 Workflow 状态。2026-10-17 起系统不再有主动推送与崩溃补发：重启不会重放历史消息。
-- Bilibili 专用 canonical 规则、HTML/DOCX 边界和来源更新组合场景已有 Spec/组合测试；Bilibili 未完成语义审阅时保持 incomplete，不伪报 verified。
-- 当前差异的 Standards、Spec、Security 最终复审均完成，未解决 P0/P1 为 0。
-- 当前项目没有 TypeScript 源码、`tsconfig` 或 `typecheck` 脚本；`pnpm run typecheck` 会返回 `ERR_PNPM_NO_SCRIPT`，JavaScript 语法与行为由 Node 全量测试覆盖。
-- 知识仓 `vault/` 是唯一可写知识事实源。原始 Obsidian 仓库只读，不双向同步；渠道会话和飞书文档不是知识事实源。
-- 状态归档只包含 `%LOCALAPPDATA%\Syno\state`，不包含 DPAPI credentials，也不代替对 Git 跟踪的知识仓 `vault/`、`ops/` 和代码仓配置文档做备份。
-- 自动收录先形成 `IngestProposal`；覆盖、移动、合并、新 tag 和新 MOC 在隔离工作区自动执行，整理冲突时暂停澄清，以降低错误整理的不可逆成本。
-- 飞书消息长连接使用 Syno 注册的 Feishu App；日历排期仍使用历史 `lark-cli` 授权。两者共享 Syno Policy 和 Markdown 事实源，但当前需要分别完成消息与日历授权，后续可统一凭据体验。
-- 飞书是唯一渠道（微信栈已于 2026-10-16 删除）；只支持绑定 Owner 的私聊，不读取个人聊天历史，也不支持群聊授权。
-- 外部网页、Bilibili、PDF 和附件受来源、大小、MIME、SSRF 与隔离规则限制；失效链接或无法安全提取的内容会保留失败状态，不会猜测补全。
-
-## 兼容性债务
-
-- `ProviderClient` / `ConversationStore` / `ConversationRouter` / `ContextManager` / `ToolLoopAgent` 仍有 legacy 本地调用方；只有 R6 真实矩阵完成后才删除。`ApprovalAdvisor` 已收窄为只依赖 `IngestService` 的确定性模块。
-- 当前事实记录以 Markdown/JSON 契约版本 1 为基线；未来破坏性契约变更必须新增显式迁移器，不能原地静默升级。
+历史记录见 [最终验收](FINAL-ACCEPTANCE.md)、[Provider 历史验收](PROVIDER-ACCEPTANCE.md)、[R6 证据](../ops/acceptance/pr-10-r6-seal/README.md) 及各执行计划；这些记录不代表当前版本已经全面封板。

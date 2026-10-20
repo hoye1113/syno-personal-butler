@@ -1,61 +1,61 @@
 # Syno · 赛诺个人管家
 
-Syno 是一个本机运行的知识闭环私人管家（当前生产在 macOS：launchd 登录自启 + 钥匙串凭据；Windows 仍兼容，后台服务由主人手动安装）。当前只启用飞书通道（`SYNO_CHANNELS=feishu`；微信栈已于 2026-10-16 删除）。只在你说话时回复，不发任何主动消息。它以 Markdown + YAML 为长期事实源，沿用 Afu 的收件箱、选题卡和周历工作台，统一管理收录、整理、学习、复习、创作与反馈，并保留可审计的执行与恢复边界。
+Syno 是本机运行的知识管家，当前生产平台为 macOS（launchd 登录自启、钥匙串凭据），保留 Windows 兼容支持。日常入口只有已绑定 Owner 的飞书私聊；微信通道栈已于 2026-10-16 删除。它围绕知识检索、资料收录、深度分析、知识维护、待办和独立记忆工作，不提供主动提醒、每日推送、学习或项目管理子系统。
 
 ## 快速开始
 
-```powershell
-# 1. 递归拉取主仓与 deepseek-harness 子模块
+```sh
 git clone --recurse-submodules <repo-url>
 cd syno-personal-butler
-
-# 2. 安装依赖并构建运行时（若未递归克隆，执行 pnpm harness:setup 亦会自动拉取与构建）
 pnpm install --frozen-lockfile
 pnpm harness:setup
-
-# 3. 运行测试并启动
 pnpm test
 pnpm verify
 pnpm start
 ```
 
-若未设置环境变量 `$env:SYNO_DSH_ROOT`，系统会自动缺省使用本仓内置的子模块 `./vendor/deepseek-harness`。如果本机已有独立的 Harness 克隆，亦可通过 `$env:SYNO_DSH_ROOT = "<外部路径>"` 覆盖。浏览器打开 <http://127.0.0.1:8888> 进入控制面（凭据、渠道、Policy）。日常对话在受控 DSH Web（默认 <http://127.0.0.1:3088>）。启动、事件协议和 permission 表的踩坑见 [运维](docs/OPERATIONS.md)。Syno 不依赖 Obsidian，也不依赖 OpenClaw。
+使用 Node.js 22 或以上版本，当前平台安装建议见 [平台兼容](docs/PLATFORM-COMPATIBILITY.md)。未设置 `SYNO_DSH_ROOT` 时默认使用子模块 `vendor/deepseek-harness`；外部克隆也必须先完成构建。Kimi key 优先取宿主环境 `KIMI_API_KEY`，缺省由 supervisor 从 gitignored 的仓库根 `.env` 注入；不要将密钥写入参数、日志或仓库。
 
-知识库与运行记录住在知识仓库（由 `SYNO_KNOWLEDGE_ROOT` 指向；未设置时回退到代码仓库根的单库形态，见 [运维](docs/OPERATIONS.md)「知识仓库拆分」）。token-cloud Provider 与飞书均按需配置；未配置时不影响本地知识阅读、任务、提醒与待决策项。
+`127.0.0.1:8888` 是仅本机可访问的控制 API，根路径返回 404，不提供旧工作台页面；健康入口为 `GET /api/syno/health` 与 `/api/syno/readiness`。受控 DSH Web 默认使用 `127.0.0.1:3088`，需要启动令牌认证，与飞书共享 Owner/thread 会话。日常使用飞书无需打开 Web。启动及协议说明见 [运维](docs/OPERATIONS.md)。
 
-## 核心约束
+长期知识在本仓 `vault/`，任务、记忆、发布映射和审计在 `ops/`；生产环境必须不设置 `SYNO_KNOWLEDGE_ROOT`。`.runtime/` 是可重建缓存，凭据和本机执行状态不提交。Syno 不依赖 Obsidian 或 OpenClaw。
 
-- Markdown 是唯一长期事实源；索引和数据库都是可重建缓存。
-- 产品只启用 `DeepSeekHarnessCognitiveRuntime`；模型链固定为 `kimi-coding/kimi-for-coding` → `kimi-coding/k3-256k`（Kimi Code 订阅，经 DSH 内置 pi-ai 路由；key 由仓库根 `.env` 的 `KIMI_API_KEY` 提供）。绝不自动切换 Provider、Runtime 或升级到另一个 Agent。
-- OpenCode 与 Hermes 已从产品路径删除，不是可选运行时。
-- 读取可直接执行；任何写入先形成 Job，并在隔离 worktree 中产生可审计差异。
-- 删除、覆盖、移动、新 MOC、新 tag 与代码修改在隔离工作区自动执行，并产生可审计差异。
-- 新增与修改均在隔离工作区自动执行；高风险写入经 validator 与 GitGuard 兜底，整理冲突时暂停澄清。
-- 每次提交只暂存精确的 `changed_paths`；不使用 `git add -A`，不自动 Push。
+## 当前能力（2026-10-20）
 
-## 聊天业务工具（2026-10-18）
+| 能力 | 范围与边界 |
+|---|---|
+| 检索与分析 | 知识搜索、分段续读全文、联网搜索和受控网页读取；反爬时可升级本机浏览器，登录及验证仍由主人完成 |
+| 资料收录 | URL、文本、Markdown、HTML、PDF、DOCX、图片；先查重，支持歧义选择、后台重试和状态查询；裸链接及附件不自动收录 |
+| 知识维护 | 修改、分类移动、删除、合并；只读巡检重复内容、来源、内部链接和孤岛等问题；删除与合并先预览，再由主人后续消息确认 |
+| 待办 | 创建、查询、修改、完成、归档和记录排期；排期不代表主动提醒 |
+| 独立记忆 | 提出候选、后续确认、查询、纠正及遗忘；只落 `ops/memory/`，不进入普通检索或云端发布 |
+| 飞书发布 | Wiki 正文、原生图片、目录的版本核验与恢复；生产发布已于 2026-10-19 经主人授权启用 |
+| 工作概览 | 按需读取真实待办、待决策项、后台 Job 与收录流程，不自动生成每日计划 |
 
-日常业务由聊天模型结合上下文调用工具，中文固定口令不再提前拦截消息。裸链接和附件不会自动收录；附件先隔离校验，再作为待理解的素材。收录、待办、记忆候选、工作概览和歧义处理均有受控工具入口。长期记忆仍先提出候选、等待主人后续确认；知识写入继续经过 Job / Proposal 与 Git 校验。仅显式 `/new`、`/stop` 绕过模型进行会话控制。
+聊天面提供 25 个受控业务工具、知识三件套、`web_search` 与 `skill`，清单以 `packages/syno-core/business-tools.mjs` 和 `config/deepseek-harness/syno-tool-sets.mjs` 为准。自然语言由模型结合上下文处理，仅 `/new` 与 `/stop` 绕过模型。工具返回“已接收”不代表“已入库”；本地成功也不等于云端同步完成。
 
-工作概览读取真实待办、待决策项和后台流程，不主动生成每日计划或推送消息。排期只记录时间。工具返回“已接收”不代表“已入库”。
+## 执行与权限
 
-## 已交付流程
+- 唯一产品运行时是 `DeepSeekHarnessCognitiveRuntime`，固定 Kimi Code 模型链 `kimi-coding/kimi-for-coding` → `kimi-coding/k3-256k`。只有枚举的瞬态或契约错误且没有不可逆副作用时才能推进到下一模型；全部失败进入 `waiting_provider`。
+- 模型没有终端、通用文件系统、通用抓取、Git 或系统控制工具，不能修改源码、选择 Provider、安装动态 MCP 或启动子 Agent。
+- 明确且无歧义的知识与待办请求通过 Job / Proposal、隔离 worktree、validator 和 GitGuard 执行；记忆生效、知识删除与合并遵守各自的后续确认边界。
+- 每次提交只暂存 Job 声明的精确路径；不使用 `git add -A`，不自动 Push。
+- 系统不生成主动推送，也不在重启后补发历史聊天回复；主人已发起的异步收录与发布仍有状态、恢复和结果回执。
 
-- Afu 收件箱 → 选题卡 → Content Brief → Markdown/飞书排期。
-- 知识库搜索、全文阅读和低显著度原文编辑入口，无需 Obsidian。
-- 任务、待决策项、通知、学习证据、输出机会和“问赛诺”工作抽屉。
-- 报告按需生成（无定时推送）；单一 Syno Host 独立于浏览器运行。
+## 验证状态
 
-登录自启 Syno Host：
+2026-10-20 检查基线 `main@f91a40a`：Host、存储、Harness 和渠道均为 ready；飞书运行且已绑定 Owner。本地发布映射共 252 条，Wiki／图片／目录共 756 个目标状态为 succeeded；这是持久状态记录，不代表本轮逐篇重新检查云端页面。
 
-```powershell
-pnpm windows:install
-```
+同次 Node 全量测试 772 通过、1 失败、19 跳过；失败项为沙箱禁止写入真实 macOS 钥匙串（`Operation not permitted`）。Repository verification、active docs 和差异检查通过。已保存的 `cfd9b53` 冻结语义评测三轮各 150/150，但不覆盖完整聊天工具循环及真实飞书投递。详见 [P1 验收记录](docs/KNOWLEDGE-FEISHU-P1.md) 和 [已知限制](docs/KNOWN-LIMITATIONS.md)。
 
-macOS（LaunchAgent，登录自动拉起 + 崩溃退避重启与桌面告警）：
+## 登录自启
+
+由主人手动执行安装／卸载，产品聊天不能控制生命周期：
 
 ```sh
-pnpm macos:install   # 其余命令：macos:status / macos:restart / macos:uninstall
+pnpm macos:install   # status / restart / uninstall
 ```
 
-完整设计见 [架构](docs/ARCHITECTURE.md)、[权限策略](docs/POLICY.md)、[执行语义 ADR](docs/adr/0003-execution-semantics.md)、[移动交付 ADR](docs/adr/0004-mobile-delivery-contract.md)、[运维与恢复](docs/OPERATIONS.md)、[切换清单](docs/CUTOVER-CHECKLIST.md) 和 [已知限制](docs/KNOWN-LIMITATIONS.md)。
+Windows 对应 `pnpm windows:install`，其余命令见 [运维](docs/OPERATIONS.md)。
+
+更多说明见 [文档索引](docs/INDEX.md)、[架构](docs/ARCHITECTURE.md)、[权限策略](docs/POLICY.md) 和 [安全模型](docs/SECURITY.md)。
