@@ -1,5 +1,7 @@
 # Syno Web 浏览器验收记录
 
+> 历史验收：本文保留旧运行时、微信／飞书双渠道和旧页面的清单及证据，不是当前待执行步骤。当前范围与剩余验收见 [文档索引](INDEX.md)、[P1 验收](KNOWLEDGE-FEISHU-P1.md) 和 [已知限制](KNOWN-LIMITATIONS.md)。
+
 ## 验收基线
 
 - 日期：2026-07-18（Asia/Shanghai）

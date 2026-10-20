@@ -1,4 +1,6 @@
 # Syno 产品精简与今日灵感执行计划
+
+> **2026-10-20 当前口径**：搜索／分析、收录、知识维护、待办、独立记忆与飞书发布；25 个业务工具＋知识三件套＋web_search＋skill，只有 `/new`／`/stop` 是控制口令。8888 是白名单控制 API，旧工作台不开放；生产发布已于 2026-10-19 启用，标签已冻结。下方 1–3 节是 2026-09 原始决策及阶段设计：D7／D12 灵感、D11／D13 拆库、旧主动投递和旧工具入口均已被后续决策替代。当前事实以 README、ARCHITECTURE、POLICY、KNOWN-LIMITATIONS、NEXT_SESSION 和 P1 验收记录为准，本文第 5 节继续追加执行沿革。
 > **2026-10-18 状态更新**：主动推送与崩溃补发已整体删除（见 `docs/plans/dead-surface-cleanup.md` 第十/十一轮）；本文 D7/D12 关于今日灵感、`ProactiveOrchestrator`、`ChannelDeliveryOutbox`、通知预算与 proactive Session 的设计均为历史记录，不再有效。保留的产品面：搜索、收录、知识库查找与对话。
 
 > **2026-10-17 更新**：主人确认从不看「今日灵感」卡，该功能**整体下线**——灵感采样（`inspiration-sampler`）、
@@ -6,7 +8,7 @@
 > 本文档其余部分（搜索/收录/深度探索/知识库查找）继续有效；下文 D7 与「反馈路由」段落仅作历史追溯。
 
 
-状态：IN_PROGRESS（Owner 2026-09-01 经 /goal 批准并指示一次性执行完全部任务）
+状态：原计划及执行沿革；当前范围按顶部最新日期与第 5 节追加记录解释。Owner 2026-09-01 原始授权保留追溯，不恢复已删除能力。
 创建：2026-09-01（Asia/Shanghai）
 
 ## 1. 方向与范围
@@ -123,3 +125,14 @@ Owner 2026-09-04 指令「我觉得现在就可以执行」——#17 提前开�
 - **挂账（封板后评估）**：#reconcileOutbox 灵感标记死路径（applyBundleDelivered 删条目后才取 pending 传 markInspirationDelivered，reconcile 路径灵感落账静默失效——L2 相邻但未动）；failed 态混入 pending 信号（#19 留档）；capture 侧 browser 工具×5 收敛；registry 隐形工具审计。
   - 追记（当日 12:50）：P1 live eval 首跑通过（deepseek-chat 真实 API，3/3）——有待反馈卡+「有用」→ 恰好一次落账 useful；有卡+「这篇文章有用吗」（泛谈）→ 零调用；无卡+「没用」→ 零落账且回复不编造。模型路由误判风险在部署前实证收敛。
   - 追记（当日 14:34）：**P1 已部署**——Owner 指令「可以重启更新」豁免封板闸门。标准停-杀-启（Stop-ScheduledTask → kill supervisor/host/DSH×2 → Start），14:35 健康 200，DSH 子进程重孵化（initialize.completed 06:35:05Z），部署后 tick 正常（lockWaitMs 3–15ms，零 tick.failed）。tools/list 直接探针不可行（bridge token 每 boot 随机、仅存子进程 env，不落盘不输出）；构造性论证：host 注册无条件（runtime.mjs 静态数组）+ 插件 tools/list 失败降级目录 FALLBACK_TOOLS 亦含该工具 + live eval 同 wiring 3/3。残余验证=主人下次有机口令落账（watch inspiration.feedback.recorded，12:37 日巡检兼看）。归因注意：09-03 两条反馈证据属旧确定性机制，此后反馈证据属 LLM 路由。
+
+
+### 2026-10-20 当前能力核对与本地文档同步
+
+- Owner 指令：“更新同步本地文档，让文档记录符合当前情况”。检查基线 `main@f91a40a`，在独立分支 `codex/docs-current-capabilities-20261020` 实施，仅改 Markdown；不改源码、生产配置、历史记忆或云端内容，不 Push、不合并、不重启。
+- 同步 README／AGENTS／架构／权限／安全／领域词汇／ops 目录说明、知识记忆实施记录、平台与 Mac 剩余计划、文档索引和 NEXT_SESSION；旧发布／渠道／页面验收及待办快照添加历史标记，保留原始证据。当前入口为飞书与认证 DSH Web，8888 为白名单 API，当前工具面 25 个业务工具＋知识三件套＋web_search＋skill。
+- 确认生产发布于 2026-10-19 启用、标签已冻结；本地 252 条映射共 756 个目标 succeeded。cfd9b53 固定语义评测三轮各 150/150；不将它推广成聊天工具循环、复杂确认组合或全部真实飞书验收通过。
+- 记录已复现未修问题：workflowSummary 对 committed／reported 固定误报“云端发布未启用”，即使 capture.get.sync=production／synced。本轮只记入 KNOWN-LIMITATIONS；另保留真实钥匙串测试的沙箱权限限制、登录冷启动及复杂故障恢复等未覆盖项。
+- 验证：文档同步前同轮 Node 全量 772 pass／1 fail／19 skipped，唯一失败为真实 macOS 钥匙串写入被沙箱拒绝；文档修改后 repository verification（2766 files）、active docs（8 files）、相对链接检查及 git diff --check 通过。仅文档变更，不重复调用真实模型、不重跑全量或 Harness 构建。
+
+- 后续交付授权（2026-10-20）：Owner“可以推送一波”，据此将上述 22 份文档作为单独提交推送到 `codex/docs-current-capabilities-20261020`；不合并 main、不重启服务。提交前复跑 repository verification、active docs 与差异检查通过。

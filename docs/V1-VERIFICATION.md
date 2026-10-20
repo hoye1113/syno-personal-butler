@@ -1,5 +1,7 @@
 # V1 verification
 
+> 历史快照：本文保留当时运行时、渠道、页面与验收结果，不代表当前产品状态。当前能力、发布状态及限制以 [文档索引](INDEX.md)、[P1 验收](KNOWLEDGE-FEISHU-P1.md) 和 [已知限制](KNOWN-LIMITATIONS.md) 为准。
+
 Verification date: 2026-07-17 (Asia/Shanghai)
 
 ## Automated checks
