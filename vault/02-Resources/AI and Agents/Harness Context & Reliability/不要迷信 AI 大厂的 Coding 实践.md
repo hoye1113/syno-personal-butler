@@ -20,6 +20,13 @@ source_content_sha256: 97be25b96d3e860adb9f6f8fa8bc0b26442ccc04367a4ffa636e80ea4
 
 公众号短文，核心论点是：不要把 AI Coding 提效简单外推为"继续提高 AI 使用率即可裁人/继续降本"。文章用 Grok/Lauren 2500 PR 案例引出成本、偏差累积、测试与 Code Review 工程化开销，结论为"每一量级效率提升对应指数量级成本提升"。适合作为 AI Coding 效率叙事与 Harness/Reliability 成本约束的反面参照，具体数据未核验。
 
+## 核验记录（2026-10-22 · web_search 外部核验）
+
+- **Lauren 其人其事** ✅ 基本属实：Lauren Tan（@poteto）确为 SpaceXAI（xAI）工程师，负责 GrokBot 与 Cursor，React 编译器核心团队成员，前 Netflix 工程经理。她在分享中自述运行 10-20 个 GrokBot agent 自动化约 90% 的例行工作（[X 上 tetsuo 的记录](https://x.com/tetsuoai/status/2092515475045707851)）。
+- **「一个月 2500 个 PR」** ⚠️ 数字存疑：[AI Socratic 的转述](https://aisocratic.org/news/lauren-tan-20-grokbot-agents-1000-prs-a-month-600-refactors-to-get-there)为「每月约 1000 个 PR」，且提到她在跑 agent 前推了 600+ 重构 PR 打底。文章数字（2500）与公开转述（约 1000）不一致，可能夸大或口径不同（如含 agent 自动 PR）。引用时应注明两种口径。
+- **「2500 个 PR 基本都是优化和修复」** ✅ 方向属实：公开资料支持其 PR 以重构/修 bug 为主、agent 用于自动化修复 GrokBot 自身缺陷。
+- **「1.5T token / 超 30w 刀」** ❓ 未能独立核验：参考 [2026 年 10 月 Grok 4.7 API 定价](https://usagebox.com/articles/grok-api-pricing-2026)（$2 / $0.5 缓存 / $6 每百万 token），若 1.5T token 属实，按输出占比不同费用会在数十万到数百万美元区间，文章的「30w 刀」口径不明。两个数字均按「文章自称」处理。
+
 ## 来源正文
 
 来源：微信公众号文章 https://mp.weixin.qq.com/s/D6HWL_dhpYE5VmrHFt9rEw （发布于 10月20日，IP 属地四川；经浏览器人工验证后读取正文，三次读取内容一致）
