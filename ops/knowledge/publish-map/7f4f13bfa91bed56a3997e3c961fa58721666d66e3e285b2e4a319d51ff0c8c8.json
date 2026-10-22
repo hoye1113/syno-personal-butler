@@ -2,15 +2,15 @@
   "schemaVersion": 1,
   "id": "note-artifact-20261022-14e8cbd4",
   "ownerKey": "local-user",
-  "sourceVersion": "0379f596ec8b19ea83f4024580d5031e70bdfd93a3c79051b6813f1fb31c819c",
+  "sourceVersion": "582c7276c3a2a8596e923c63e8ec049b9d4ff452330a73f219deb75fc994cc87",
   "resourceVersion": "9546ed78e49eebedb17bb3d4abe23676e0cb07fe98bb81333f7d955bd862f7b3",
   "targetKey": "production-v1",
   "mode": "production",
   "targets": {
     "wiki": {
-      "expectedVersion": "0379f596ec8b19ea83f4024580d5031e70bdfd93a3c79051b6813f1fb31c819c",
-      "status": "succeeded",
-      "attempts": 1,
+      "expectedVersion": "582c7276c3a2a8596e923c63e8ec049b9d4ff452330a73f219deb75fc994cc87",
+      "status": "pending",
+      "attempts": 0,
       "remoteId": "Q1NBwxIEkiLkizkMnhzcwCcfnuc",
       "docId": "TJazdgGSLozSnfxNIcAcuxFFnVb",
       "imageBlocks": [],
@@ -21,9 +21,9 @@
       "nextRetryAt": null
     },
     "images": {
-      "expectedVersion": "0379f596ec8b19ea83f4024580d5031e70bdfd93a3c79051b6813f1fb31c819c",
-      "status": "succeeded",
-      "attempts": 1,
+      "expectedVersion": "582c7276c3a2a8596e923c63e8ec049b9d4ff452330a73f219deb75fc994cc87",
+      "status": "pending",
+      "attempts": 0,
       "receipts": [],
       "verifiedVersion": "0379f596ec8b19ea83f4024580d5031e70bdfd93a3c79051b6813f1fb31c819c",
       "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
@@ -33,9 +33,9 @@
       "nextRetryAt": null
     },
     "catalog": {
-      "expectedVersion": "0379f596ec8b19ea83f4024580d5031e70bdfd93a3c79051b6813f1fb31c819c",
-      "status": "blocked",
-      "attempts": 1,
+      "expectedVersion": "582c7276c3a2a8596e923c63e8ec049b9d4ff452330a73f219deb75fc994cc87",
+      "status": "pending",
+      "attempts": 0,
       "remoteId": "reczz28QGuDXTDpn",
       "fingerprint": "274da572f5f08d5a900adbc38ab8df50e098ee24ebddbe2faab533472f2160ae",
       "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28QGuDXTDpn",
@@ -44,5 +44,5 @@
       "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-22T01:23:53.514Z"
+  "updatedAt": "2026-10-22T01:23:59.131Z"
 }
