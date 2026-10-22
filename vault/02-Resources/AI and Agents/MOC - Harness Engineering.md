@@ -1,4 +1,5 @@
 ---
+note_id: note-f17c365fa3c7fc2f583c5d49
 title: MOC - Harness Engineering
 description: Harness Engineering 主题横切 MOC——跨课程、公众号、B站视频的 Harness 相关笔记，42 篇核心 + 跨 MOC 链接
 created: 2026-06-11
@@ -89,7 +90,7 @@ source: vault_initiative - moc - ai_agent - harness_engineering
 - [[arize-ai团队-skill到底-应该写多长-哔哩哔哩-1fa0932a|Arize AI团队：Skill到底 应该写多长？ - 哔哩哔哩]]
 - [[deepmind团队-如何大规模-运行agent-哔哩哔哩-4cc3d8de|DeepMind团队：如何大规模 运行Agent - 哔哩哔哩]]
 - [[deepseek-harness橙皮书-花叔-v260814-a00322c4|DeepSeek-Harness橙皮书（花叔，v260814）]]
-- [[exo开发者-让agent自进化的方法-哔哩哔哩-bf4bdc38|Exo开发者：让Agent自进化的方法 - 哔哩哔哩]]
+- [[exo开发者-让agent自进化的方法-哔哩哔哩-bf4bdc38|Exo开发者：让agent自进化的方法 - 哔哩哔哩]]
 - [[galileo联创-ai时代的可观测性-哔哩哔哩-66b5ff96|Galileo联创：AI时代的可观测性 - 哔哩哔哩]]
 - [[hermes-自我改进-ai智能体-27405226|Hermes 联合创始人谈如何构建自我改进的 AI 智能体 | Karan Ma]]
 - [[linkedin-工程师-领英的ai-agent-开发和部署实践-哔哩哔哩-b84b419d|LinkedIn 工程师：领英的AI Agent 开发和部署实践 - 哔哩哔哩]]
@@ -101,6 +102,11 @@ source: vault_initiative - moc - ai_agent - harness_engineering
 - [[Restate CEO-每一步每次调用都可靠的Agent系统|Restate CEO-每一步每次调用都可靠的Agent系统]]
 - [[OpenAI研究员Noam Brown-多智能体协作能否递归自我改进|OpenAI研究员Noam Brown-多智能体协作能否递归自我改进]]
 
-- **总笔记数**：42 核心 + 3 跨 MOC 链接
-- **最后更新**：2026-07-09（新增 S-tier 8 篇视频转录：ClawdBot、OpenClaw 教程/Every/养虾/配置、Hermes、AI 编程工具、Brex CEO）
+## 新增收录（2026-10-22）
+
+- [[不要迷信 AI 大厂的 Coding 实践|不要迷信 AI 大厂的 Coding 实践（公众号，2026-10-20）]] — AI Coding 效率叙事的成本约束反面参照：偏差累积 → 测试/Review 工程化 → 每一量级提效对应指数量级成本（数据未核验）
+- [[agent-写得更快以后-时间花在了哪里-14e8cbd4|Agent 写得更快以后，时间花在了哪里？（公众号 Fly的AI研习社，2026-10-21）]] — 姊妹篇：Agent 流水线等待时间的分阶段拆解与优化方法
+
+- **总笔记数**：44 核心 + 3 跨 MOC 链接
+- **最后更新**：2026-10-22（新增 2 篇：成本约束反面参照 + 流水线等待优化姊妹篇）
 - **入选标准**：笔记主题必须直接讨论"围绕 Agent 的工程系统"（不是单纯的"Agent 本身"或"Agent 怎么用"）
