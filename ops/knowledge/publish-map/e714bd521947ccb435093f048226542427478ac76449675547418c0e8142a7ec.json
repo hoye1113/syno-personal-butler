@@ -35,8 +35,8 @@
     },
     "catalog": {
       "expectedVersion": "3e852e4af8bafe183be2d8239663ff63ce56ec4d1ec10fec0d44ae42bf4cda7f",
-      "status": "pending",
-      "attempts": 0,
+      "status": "running",
+      "attempts": 1,
       "remoteId": "reczz28QMc3ZHG3T",
       "fingerprint": "e27f08db520b3eae9200c8b15fc060c83666cfe3375134ee0b81a8dd42a95bd0",
       "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28QMc3ZHG3T",
@@ -45,5 +45,5 @@
       "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-22T10:39:48.215Z"
+  "updatedAt": "2026-10-22T10:39:55.279Z"
 }
