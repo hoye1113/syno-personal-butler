@@ -63,6 +63,27 @@ test("known partial failure retains created identity and retries only after dela
 test("catalog cannot report success while images failed", async t => {
  const f=await fixture(t);f.setFail("images");await f.publisher.queue("owner",await f.source());const r=await f.publisher.run("owner","n");assert.equal(r.status,"pending");assert.equal(r.targets.catalog.status,"pending");assert.deepEqual(f.calls,["wiki","images"]);
 });
+test("same content at a new path refreshes only the catalog (2026-10-22 note-move staleness)", async t => {
+ const f=await fixture(t);
+ const note=await f.source();
+ await f.publisher.queue("owner",{...note,path:"vault/00-Inbox/n.md"});
+ assert.equal((await f.publisher.run("owner","n")).status,"synced");
+ assert.deepEqual(f.calls,["wiki","images","catalog"]);
+ const record=await f.publisher.status("owner","n");
+ assert.equal(record.sourcePath,"vault/00-Inbox/n.md");
+ // 移动笔记：内容版本不变，路径变了 → 仅 catalog 回到 pending，wiki/images 不重发。
+ await f.publisher.queue("owner",{...note,path:"vault/02-Resources/n.md"});
+ const moved=await f.publisher.status("owner","n");
+ assert.equal(moved.targets.catalog.status,"pending");
+ assert.equal(moved.targets.wiki.status,"succeeded");
+ assert.equal(moved.targets.images.status,"succeeded");
+ assert.equal(moved.sourcePath,"vault/02-Resources/n.md");
+ assert.equal((await f.publisher.run("owner","n")).status,"synced");
+ assert.deepEqual(f.calls.slice(3),["catalog"]);
+ // 路径再不变 → 完全幂等，不再产生任何远端写。
+ await f.publisher.queue("owner",{...note,path:"vault/02-Resources/n.md"});
+ assert.deepEqual(f.calls.slice(3),["catalog"]);
+});
 
 test("explicit rate-limit responses honor server Retry-After and remain known failures",async t=>{
  const f=await fixture(t);f.adapter.apply=async(target,{effect})=>effect(`${target}.write`,async()=>{throw Object.assign(new Error("limited"),{response:{status:429,headers:{"retry-after":"180"}}})});await f.publisher.queue("owner",await f.source());const r=await f.publisher.run("owner","n");assert.equal(r.targets.wiki.status,"retryable_failed");assert.equal(r.targets.wiki.errorCode,"SYNC_RATE_LIMITED");assert.equal(r.targets.wiki.nextRetryAt,"2026-10-18T00:03:00.000Z");

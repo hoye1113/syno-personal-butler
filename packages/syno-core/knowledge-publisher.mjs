@@ -64,9 +64,20 @@ class KnowledgePublisher {
     if (note.personalMemory || note.excluded || !note.complete || !note.resources?.complete) throw Object.assign(new Error("内容或资源不完整，无发布资格"), { code: "SOURCE_RESOURCE_INCOMPLETE" });
     return this.lock(ownerKey, note.id).run(async () => {
       const previous = (await this.list(ownerKey)).find(x => x.id === note.id);
-      if (previous?.sourceVersion === note.version && previous?.resourceVersion === note.resources.version) return previous;
+      // 路径变化也要刷新目录（2026-10-22：笔记移动后内容版本不变，catalog.localPath 陈旧且
+      // 自愈无望——复用判断只看版本）。内容未变时只把 catalog 置回 pending，wiki/images 不重发；
+      // 老记录没有 sourcePath 视为路径未知，下一次 queue 懒惰补登并刷新一次目录。
+      if (previous?.sourceVersion === note.version && previous?.resourceVersion === note.resources.version) {
+        if (previous.sourcePath !== note.path && previous.targets?.catalog?.status === "succeeded") {
+          Object.assign(previous.targets.catalog, { status: "pending", attempts: 0 });
+          previous.sourcePath = note.path;
+          await this.save(previous);
+          await this.recordEvent("knowledge.sync.queued", { ownerKey, id: note.id, version: note.version, reason: "path_changed" });
+        }
+        return previous;
+      }
       if (previous && TARGETS.some(t => ["unknown", "running"].includes(previous.targets[t]?.status))) throw Object.assign(new Error("上一版本含未核对的远端效果，不能替换发布映射"), { code: "SYNC_OUTCOME_UNKNOWN" });
-      const record = { schemaVersion: 1, id: note.id, ownerKey, sourceVersion: note.version, resourceVersion: note.resources.version, targetKey: this.config.targetKey, mode: this.config.mode, targets: Object.fromEntries(TARGETS.map(t => [t, { ...previous?.targets?.[t], expectedVersion: note.version, status: previous?.targets?.[t]?.status === "unknown" ? "unknown" : "pending", attempts: 0 }])) };
+      const record = { schemaVersion: 1, id: note.id, ownerKey, sourceVersion: note.version, sourcePath: note.path, resourceVersion: note.resources.version, targetKey: this.config.targetKey, mode: this.config.mode, targets: Object.fromEntries(TARGETS.map(t => [t, { ...previous?.targets?.[t], expectedVersion: note.version, status: previous?.targets?.[t]?.status === "unknown" ? "unknown" : "pending", attempts: 0 }])) };
       await this.save(record); await this.recordEvent("knowledge.sync.queued", { ownerKey, id: note.id, version: note.version }); return record;
     });
   }
