@@ -26,6 +26,7 @@ import { ContextManager } from "./context-manager.mjs";
 import { ConversationStore } from "./conversation-store.mjs";
 import { ConversationRouter } from "./conversation-router.mjs";
 import { findDomainRecord, assertRecordVersion } from "../../../packages/syno-core/domain-records.mjs";
+import { registerApprovedTags } from "../../../packages/syno-core/canonical-tags.mjs";
 import { executeDomainOperation } from "../../../packages/syno-core/domain-operations.mjs";
 import { FeishuChannelAdapter } from "../../../packages/syno-core/feishu-channel.mjs";
 import { GitGuard } from "../../../packages/syno-core/git-guard.mjs";
@@ -596,6 +597,11 @@ function createSynoRuntime(options = {}) {
       }
       if (operation === "notes.prepare_publish" && publishingConfig.mode === "disabled") throw new Error("发布未启用，不能登记新发布请求");
       if (["notes.edit", "notes.move", "notes.delete", "notes.merge", "notes.prepare_publish"].includes(operation)) return knowledgeChanges.execute(operation, payload, { workspace: root, job });
+      if (operation === "tags.register") {
+        const relative = "ops/knowledge/approved-tags.json";
+        const outcome = await registerApprovedTags(path.join(root, "ops"), payload.tags);
+        return { changedPaths: outcome.added.length ? [relative] : [], record: { id: "approved-tags", registered: outcome.added, alreadyKnown: outcome.alreadyKnown } };
+      }
       const domain = await executeDomainOperation(operation, payload, { workspace: root, job });
       if (domain) return domain;
       if (operation === "reports.create") {

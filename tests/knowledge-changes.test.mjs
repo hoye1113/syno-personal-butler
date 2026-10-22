@@ -19,6 +19,21 @@ async function fixture(t) {
   const all = await knowledge.search("", { limit: 20 });
   return { root, changes, decisions, ctx, all, knowledge, execute: (op, payload, messageId = "confirm", ownerKey = "owner", jobId = "job-1") => changes.execute(op, payload, { workspace: root, job: { id: jobId, ownerKey, threadKey: "main", request: { sourceMessageId: messageId } } }) };
 }
+test("relatedNoteIds registers body wiki links in both [[path]] and [[vault/path]] forms", async t => {
+  const f = await fixture(t);
+  const markdown = (title, text) => `---\ntitle: ${title}\ntags: [notes]\ncreated: 2026-10-18\nsource: owner\ndescription: 测试\nstatus: orphan\n---\n\n# ${title}\n\n${text}\n`;
+  // b.md 补上显式 note_id：a.md 走路径哈希兜底、b.md 走 frontmatter 身份，两种都要能登记。
+  await fs.writeFile(path.join(f.root, "vault/00-Inbox/b.md"), markdown("B", "独有内容乙").replace("---\n", "---\nnote_id: note-explicit-b\n"));
+  await fs.writeFile(path.join(f.root, "vault/00-Inbox/c.md"), markdown("C", "引用 [[00-Inbox/a]] 与 [[vault/00-Inbox/b.md]]，外加死链 [[不存在的笔记]]。"));
+  const notes = await f.knowledge.search("", { limit: 20 });
+  const c = notes.find(n => n.path === "vault/00-Inbox/c.md");
+  const ids = await f.changes.relatedNoteIds(c.path);
+  const a = notes.find(n => n.path === "vault/00-Inbox/a.md");
+  assert.deepEqual([...ids].sort(), [a.id, "note-explicit-b"].sort());
+  assert.equal(ids.some(id => id === c.id), false, "不得自我关联");
+  assert.deepEqual(await f.changes.relatedNoteIds("vault/00-Inbox/a.md"), [], "无链接笔记返回空");
+});
+
 test("prepareTurn judges raw Owner paraphrases without requiring keywords", async (t) => {
   const f = await fixture(t), calls = [];
   const changes = new KnowledgeChanges({ root: f.root, knowledge: f.knowledge, decisions: f.decisions,

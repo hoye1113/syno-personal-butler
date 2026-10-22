@@ -28,6 +28,7 @@ const OPERATION_INTENTS = Object.freeze({
   "inbox.import": "create_content_idea",
   "inbox.import-batch": "create_content_idea",
   "settings.save": "settings_change",
+  "tags.register": "settings_change",
   "wiki.compile": "curate_note",
   "wiki.todos.generate": "curate_note",
   "wiki.todos.accept": "create_content_idea",

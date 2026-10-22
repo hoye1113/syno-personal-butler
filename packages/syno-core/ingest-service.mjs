@@ -10,7 +10,7 @@ import { PATHS } from "./paths.mjs";
 import { validateContractRecord } from "./schema-registry.mjs";
 import { hasSourceNoise } from "./source-fetcher.mjs";
 import { buildSourceDescriptor } from "./source-descriptor.mjs";
-import { classifyTags } from "./canonical-tags.mjs";
+import { classifyTags, loadExtraApprovedTags } from "./canonical-tags.mjs";
 
 function slug(value) {
   return String(value || "capture").toLocaleLowerCase("zh-CN").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 60) || "capture";
@@ -394,7 +394,11 @@ class IngestService {
       && isAllowedIngestPath(analysis.suggestedPath)
       ? analysis.suggestedPath
       : state.proposal.suggestedPath;
-    const tags = classifyTags(Array.isArray(analysis.canonicalTags) ? analysis.canonicalTags : state.proposal.canonicalTags);
+    const tags = classifyTags(
+      Array.isArray(analysis.canonicalTags) ? analysis.canonicalTags : state.proposal.canonicalTags,
+      // 主人在册标签（ops/knowledge/approved-tags.json）与内置标签并列生效；读取失败不阻断收录。
+      await loadExtraApprovedTags(this.opsRoot).catch(() => undefined),
+    );
     const mocChanges = Array.isArray(analysis.mocChanges) ? analysis.mocChanges : state.proposal.mocChanges;
     const unresolved = [
       ...(Array.isArray(analysis.unresolved) ? analysis.unresolved.map(String) : state.proposal.unresolved),

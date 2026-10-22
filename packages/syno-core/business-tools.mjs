@@ -33,6 +33,7 @@ const BUSINESS_TOOL_SPECS = Object.freeze([
   { name: "knowledge.delete", description: "仅生成删除预览；主人另条消息明确确认后才能执行。", write: true, inputSchema: schema({ id, version }, ["id", "version"]) },
   { name: "knowledge.merge", description: "仅生成合并预览；指定保留目标，主人另条消息确认后保留所有来源原文并合并。", write: true, inputSchema: schema({ targetId: id, targetVersion: version, sources: { type: "array", minItems: 1, maxItems: 19, items: schema({ id, version }, ["id", "version"]) } }, ["targetId", "targetVersion", "sources"]) },
   { name: "knowledge.maintenance", description: "只读检查知识维护问题与证据，不自动清理。", inputSchema: schema() },
+  { name: "knowledge.tags_register", description: "主人明确批准某些收录候选标签后，登记为正式标签（小写 snake_case，一次最多 20 个）；此后新收录可直接使用。仅在主人明确要求登记时使用。", write: true, inputSchema: schema({ tags: { type: "array", minItems: 1, maxItems: 20, items: string("小写 snake_case 标签", 40), description: "要登记的标签列表" } }, ["tags"]) },
   { name: "memory.search", description: "按当前问题查询主人已确认的独立记忆，返回来源、版本与命中原因。", inputSchema: schema({ query: string("当前问题", 4000), limit }, ["query"]) },
   { name: "memory.get", description: "查看一条个人记忆的状态与当前有效内容；失效记录不返回事实正文。", inputSchema: schema({ id }, ["id"]) },
   { name: "memory.correct", description: "根据明确纠正要求创建替换候选；另条消息确认前旧事实仍有效。", write: true, inputSchema: schema({ id, version, ...memoryFields }, ["id", "version", "statement"]) },
@@ -88,7 +89,11 @@ function createBusinessTools(getServices, { opsRoot = PATHS.opsRoot, clock = () 
     if (operation.startsWith("notes.") && note?.id && s.publisher) {
       const observed = await s.publisher.status(ctx.ownerKey, note.id).catch(error => ({status:"unknown",code:error.code || "SYNC_STATUS_UNAVAILABLE"}));
       const sync = observed.status === "synced" && (!note.version || observed.sourceVersion !== note.version) ? { ...observed, status: "pending", expectedVersion: note.version, reason: "本次内容版本尚未核验，已有同步结果属于此前版本" } : observed;
-      knowledge = { id: note.id, path: note.path, version: note.version, relatedNoteIds: [...new Set([...(note.retiredIds || []), ...(note.affectedIds || [])])].filter(id => id !== note.id), localStatus: job.status === "completed" ? "completed" : "pending", sync,
+      // 正文里的 [[wiki 链接]] 也是结构化关联（2026-10-22 起登记）；解析失败不拖垮操作回执。
+      const linked = note.path && typeof s.knowledgeChanges?.relatedNoteIds === "function"
+        ? await s.knowledgeChanges.relatedNoteIds(note.path).catch(() => [])
+        : [];
+      knowledge = { id: note.id, path: note.path, version: note.version, relatedNoteIds: [...new Set([...linked, ...(note.retiredIds || []), ...(note.affectedIds || [])])].filter(id => id !== note.id), localStatus: job.status === "completed" ? "completed" : "pending", sync,
         userMessage: job.status !== "completed" ? "本地操作仍在处理中，不能宣称完成。" : sync.status === "disabled" ? "本地变更已完成；云端发布未启用，Wiki 和目录未因此更新。" : sync.status === "synced" ? "本地变更已完成；请核对同步版本后说明云端结果。" : "本地变更已完成；云端尚未确认完成，请分别说明各端状态。" };
     }
     return { id: job.id, status: job.status, ...(record ? { record, version: recordVersion(record) } : {}), ...(knowledge ? { knowledge } : {}), requiresApproval: result.requiresApproval === true };
@@ -124,6 +129,7 @@ function createBusinessTools(getServices, { opsRoot = PATHS.opsRoot, clock = () 
     if (["knowledge.update", "knowledge.move"].includes(name)) return operate(s, name === "knowledge.update" ? "notes.edit" : "notes.move", input, ctx, context.originalMessageId);
     if (["knowledge.delete", "knowledge.merge"].includes(name)) return s.knowledgeChanges.preview(name === "knowledge.delete" ? "notes.delete" : "notes.merge", input, { ...ctx, messageId: context.originalMessageId });
     if (name === "knowledge.maintenance") return s.knowledgeMaintenance.weeklySummary();
+    if (name === "knowledge.tags_register") return operate(s, "tags.register", { tags: input.tags }, ctx, context.originalMessageId);
     if (name === "memory.search") return { memories: await memoryStore.search(ctx.ownerKey, input.query, { limit: input.limit }) };
     if (name === "memory.get") return { record: await memoryStore.get(ctx.ownerKey, input.id) };
     if (name === "memory.correct") return operate(s, "memory.proposals.correct", input, ctx, context.originalMessageId);

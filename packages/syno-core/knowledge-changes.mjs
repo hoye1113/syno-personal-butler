@@ -30,6 +30,23 @@ class KnowledgeChanges {
     }
     throw knowledgeError("KNOWLEDGE_NOT_FOUND", "有效笔记不存在，请先搜索准确 ID");
   }
+  // 结构化关系登记（2026-10-22，action-20261022-af48e32f）：正文 wiki/markdown 链接
+  // 解析出的有效目标即笔记的结构化关联。此前 relatedNoteIds 只来自合并/删除副作用，
+  // 正文里的 [[链接]] 从未登记。basename 歧义目标全部计入（读侧面，不抛错）。
+  async relatedNoteIds(notePath, knowledge = this.knowledge) {
+    const notes = await knowledge.list({ searchable: true });
+    const idsByPath = new Map(notes.map(n => [n.path, n.id]));
+    const paths = new Set(idsByPath.keys());
+    const current = await knowledge.read(notePath);
+    const ids = [];
+    for (const link of noteLinks(current.markdown, notePath)) {
+      for (const target of resolveNoteLink(link, paths)) {
+        const id = idsByPath.get(target);
+        if (id) ids.push(id);
+      }
+    }
+    return [...new Set(ids)];
+  }
   async backlinks(targets, knowledge = this.knowledge) {
     const notes = await knowledge.list({ searchable: true });
     const paths = new Set(notes.map(n => n.path)), retired = new Set(targets.map(n => n.path));
