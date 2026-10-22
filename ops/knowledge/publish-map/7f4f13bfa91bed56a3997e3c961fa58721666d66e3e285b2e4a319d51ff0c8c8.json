@@ -2,15 +2,15 @@
   "schemaVersion": 1,
   "id": "note-artifact-20261022-14e8cbd4",
   "ownerKey": "local-user",
-  "sourceVersion": "008460b3887a43579408afc01d307cd2ca2744979f6f3e76f33d3df4a272c5ba",
+  "sourceVersion": "0379f596ec8b19ea83f4024580d5031e70bdfd93a3c79051b6813f1fb31c819c",
   "resourceVersion": "9546ed78e49eebedb17bb3d4abe23676e0cb07fe98bb81333f7d955bd862f7b3",
   "targetKey": "production-v1",
   "mode": "production",
   "targets": {
     "wiki": {
-      "expectedVersion": "008460b3887a43579408afc01d307cd2ca2744979f6f3e76f33d3df4a272c5ba",
-      "status": "succeeded",
-      "attempts": 1,
+      "expectedVersion": "0379f596ec8b19ea83f4024580d5031e70bdfd93a3c79051b6813f1fb31c819c",
+      "status": "pending",
+      "attempts": 0,
       "remoteId": "Q1NBwxIEkiLkizkMnhzcwCcfnuc",
       "docId": "TJazdgGSLozSnfxNIcAcuxFFnVb",
       "imageBlocks": [],
@@ -21,9 +21,9 @@
       "nextRetryAt": null
     },
     "images": {
-      "expectedVersion": "008460b3887a43579408afc01d307cd2ca2744979f6f3e76f33d3df4a272c5ba",
-      "status": "succeeded",
-      "attempts": 1,
+      "expectedVersion": "0379f596ec8b19ea83f4024580d5031e70bdfd93a3c79051b6813f1fb31c819c",
+      "status": "pending",
+      "attempts": 0,
       "receipts": [],
       "verifiedVersion": "008460b3887a43579408afc01d307cd2ca2744979f6f3e76f33d3df4a272c5ba",
       "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
@@ -33,9 +33,9 @@
       "nextRetryAt": null
     },
     "catalog": {
-      "expectedVersion": "008460b3887a43579408afc01d307cd2ca2744979f6f3e76f33d3df4a272c5ba",
-      "status": "succeeded",
-      "attempts": 1,
+      "expectedVersion": "0379f596ec8b19ea83f4024580d5031e70bdfd93a3c79051b6813f1fb31c819c",
+      "status": "pending",
+      "attempts": 0,
       "remoteId": "reczz28QGuDXTDpn",
       "fingerprint": "b2e2f5a8ffba876e56879c512d949c0c9db31674a9c949024c8bbd9945b39549",
       "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28QGuDXTDpn",
@@ -44,5 +44,5 @@
       "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-22T01:16:55.551Z"
+  "updatedAt": "2026-10-22T01:23:09.893Z"
 }
