@@ -93,9 +93,14 @@ Git 已经提供一些可以评估的选项。稀疏检出控制工作目录出�
 
 收录查重时出现的候选均已确认为**相关而非重复**，以下链接用于联想与主题导航：
 
+本笔记是「AI Coding 成本与组织」三部曲的第 ① 篇（工程方法层）：
+
+- 三部曲② [[不要迷信 AI 大厂的 Coding 实践]] — 成本约束层：偏差累积 → 测试/Review 工程化 → 每一量级提效对应指数量级成本
+- 三部曲③ [[老板应该招哪类程序员-5fa0932a|老板应该招哪类程序员？]] — 组织破局层：软件开发不可能三角 + DORA 指标
 - [[02-Resources/AI and Agents/Agent Design & Patterns/Anthropic Agent 工程实战指南 - 从入门到生产落地]] — Anthropic 官方工程博客系统梳理；本文引用的 Scion 复盘同属 Anthropic 工程实践脉络
 - [[02-Resources/AI and Agents/Agent Architecture & Runtime/langchain-ceo-何时构建自己的agent框架-哔哩哔哩-1e149996]] — Harness 工程视角，谈何时该自建 Agent 框架，与本文「优化前先拆清时间花在哪」的思路互参
 - [[02-Resources/AI and Agents/Agent Architecture & Runtime/Cognition的Jared-智能体构建原则与云端异步协同]] — Devin 团队的 Agent 构建原则与异步协同，同属 agent engineering 实践
 - [[02-Resources/AI and Agents/Agent Design & Patterns/季白羽-Codex 与 Remotion 纸片分层动画流水线]] — AI coding 流水线化的具体实战案例，与本文「任务按需取数、拆阶段计时」呼应
+- 主 MOC：[[MOC - Harness Engineering]] — 专题「AI Coding 成本与组织」挂载于此
 
 主题归类建议：agent_engineering / ci_cd / devops / source_control（已获主人认可，待平台侧确认生效）。
