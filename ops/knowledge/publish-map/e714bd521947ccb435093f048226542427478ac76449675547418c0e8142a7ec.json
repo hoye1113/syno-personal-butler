@@ -2,16 +2,16 @@
   "schemaVersion": 1,
   "id": "note-artifact-20261022-edf7da05",
   "ownerKey": "local-user",
-  "sourceVersion": "e6c1a848412a350239ba28fc6f1d3b120f74a67a702a8d9b06ff03c1f138bd91",
+  "sourceVersion": "68bcb97a4d5c427dbdf360feea6eeef4896d636d5d6b01be67a3f62bd34876a8",
   "sourcePath": "vault/02-Resources/AI and Agents/Harness Context & Reliability/不要迷信 AI 大厂的 Coding 实践.md",
   "resourceVersion": "9546ed78e49eebedb17bb3d4abe23676e0cb07fe98bb81333f7d955bd862f7b3",
   "targetKey": "production-v1",
   "mode": "production",
   "targets": {
     "wiki": {
-      "expectedVersion": "e6c1a848412a350239ba28fc6f1d3b120f74a67a702a8d9b06ff03c1f138bd91",
-      "status": "succeeded",
-      "attempts": 1,
+      "expectedVersion": "68bcb97a4d5c427dbdf360feea6eeef4896d636d5d6b01be67a3f62bd34876a8",
+      "status": "pending",
+      "attempts": 0,
       "remoteId": "NMoywzII6iN4EEkqLB5c59linub",
       "docId": "NFWud0AisoUBBOxh5gRcnzHmnuJ",
       "imageBlocks": [],
@@ -22,9 +22,9 @@
       "nextRetryAt": null
     },
     "images": {
-      "expectedVersion": "e6c1a848412a350239ba28fc6f1d3b120f74a67a702a8d9b06ff03c1f138bd91",
-      "status": "succeeded",
-      "attempts": 1,
+      "expectedVersion": "68bcb97a4d5c427dbdf360feea6eeef4896d636d5d6b01be67a3f62bd34876a8",
+      "status": "pending",
+      "attempts": 0,
       "receipts": [],
       "verifiedVersion": "e6c1a848412a350239ba28fc6f1d3b120f74a67a702a8d9b06ff03c1f138bd91",
       "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
@@ -34,9 +34,9 @@
       "nextRetryAt": null
     },
     "catalog": {
-      "expectedVersion": "e6c1a848412a350239ba28fc6f1d3b120f74a67a702a8d9b06ff03c1f138bd91",
-      "status": "succeeded",
-      "attempts": 1,
+      "expectedVersion": "68bcb97a4d5c427dbdf360feea6eeef4896d636d5d6b01be67a3f62bd34876a8",
+      "status": "pending",
+      "attempts": 0,
       "remoteId": "reczz28QMc3ZHG3T",
       "fingerprint": "d6cce73b7831bd42f4711ed385a75ecd376c0c8b98ccac6a4cee0d611a26f92a",
       "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28QMc3ZHG3T",
@@ -45,5 +45,5 @@
       "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-22T14:59:24.552Z"
+  "updatedAt": "2026-10-22T14:59:38.756Z"
 }
