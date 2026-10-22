@@ -22,8 +22,8 @@
     },
     "images": {
       "expectedVersion": "0379f596ec8b19ea83f4024580d5031e70bdfd93a3c79051b6813f1fb31c819c",
-      "status": "pending",
-      "attempts": 0,
+      "status": "running",
+      "attempts": 1,
       "receipts": [],
       "verifiedVersion": "008460b3887a43579408afc01d307cd2ca2744979f6f3e76f33d3df4a272c5ba",
       "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
@@ -44,5 +44,5 @@
       "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-22T01:23:23.665Z"
+  "updatedAt": "2026-10-22T01:23:29.198Z"
 }
