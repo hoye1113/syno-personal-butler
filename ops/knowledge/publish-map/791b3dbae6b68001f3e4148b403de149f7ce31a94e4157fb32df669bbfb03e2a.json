@@ -10,8 +10,8 @@
   "targets": {
     "wiki": {
       "expectedVersion": "03f5359d6df42a1df26bac08dc9eac1546d39e066492519e88787851067ac356",
-      "status": "pending",
-      "attempts": 0,
+      "status": "running",
+      "attempts": 1,
       "remoteId": "WEZowe9I6il8yVkjaXQcrHBOnJe",
       "docId": "S7e6dLjHXovDEZxVze7cprWfnnd",
       "imageBlocks": [],
@@ -45,5 +45,5 @@
       "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-22T14:51:07.070Z"
+  "updatedAt": "2026-10-22T14:51:17.541Z"
 }
