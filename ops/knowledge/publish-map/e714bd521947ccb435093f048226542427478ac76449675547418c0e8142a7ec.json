@@ -23,8 +23,15 @@
     },
     "images": {
       "expectedVersion": "0c1648922a1a6aeec0898b4db6000d683dc145a7834ecd20270c652252818aa8",
-      "status": "running",
-      "attempts": 1
+      "status": "succeeded",
+      "attempts": 1,
+      "receipts": [],
+      "verifiedVersion": "0c1648922a1a6aeec0898b4db6000d683dc145a7834ecd20270c652252818aa8",
+      "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "wikiFingerprint": "da2c652352117e573470c27b09f0eacb8385236d741ac082c4b05d81ba598bf1",
+      "appliedVersion": "0c1648922a1a6aeec0898b4db6000d683dc145a7834ecd20270c652252818aa8",
+      "errorCode": null,
+      "nextRetryAt": null
     },
     "catalog": {
       "expectedVersion": "0c1648922a1a6aeec0898b4db6000d683dc145a7834ecd20270c652252818aa8",
@@ -32,5 +39,5 @@
       "attempts": 0
     }
   },
-  "updatedAt": "2026-10-22T06:51:25.222Z"
+  "updatedAt": "2026-10-22T06:51:31.539Z"
 }
