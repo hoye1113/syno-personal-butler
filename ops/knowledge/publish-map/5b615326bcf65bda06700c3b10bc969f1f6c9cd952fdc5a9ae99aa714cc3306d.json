@@ -22,10 +22,10 @@
       "nextRetryAt": null
     },
     "images": {
-      "status": "pending",
+      "status": "running",
       "expectedVersion": "882597d6e862befbe5e0e0b9579288ed9d2ddbd46f8bb2cc7b0a02b0597d61e3",
       "appliedVersion": "e760c01ebf0194335ffbeafb18bac84cf7485922d9b294590989574000863a04",
-      "attempts": 0,
+      "attempts": 1,
       "receipts": [],
       "verifiedVersion": "e760c01ebf0194335ffbeafb18bac84cf7485922d9b294590989574000863a04",
       "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
@@ -40,5 +40,5 @@
       "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PGIEBYPM0"
     }
   },
-  "updatedAt": "2026-10-22T10:38:31.750Z"
+  "updatedAt": "2026-10-22T10:38:40.328Z"
 }
