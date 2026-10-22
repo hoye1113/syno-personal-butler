@@ -42,7 +42,7 @@ Anthropic 在 10 月 13 日的复盘中介绍，他们为超大规模研发工�
 
 例如，一个检查文档链接的任务，可能只需要文档目录和检查工具；一个判断变更范围的任务，可能只需要提交差异。是否必须让它们和完整构建走同一套准备流程，需要结合依赖关系确认。
 
-Git 已经提供一些可以评估的选项。稀疏检出控制工作目录里出现哪些文件；部分克隆过滤传输的对象，--filter=blob:none 可以延后获取文件内容。这两件事解决的开销不同，不能仅凭工作目录变小，就认为网络传输一定减少。（引用[2] 稀疏检出手册: https://git-scm.com/docs/git-sparse-checkout；[3] 克隆手册: https://git-scm.com/docs/git-clone）
+Git 已经提供一些可以评估的选项。稀疏检出控制工作目录出现哪些文件；部分克隆过滤传输的对象，--filter=blob:none 可以延后获取文件内容。这两件事解决的开销不同，不能仅凭工作目录变小，就认为网络传输一定减少。（引用[2] 稀疏检出手册: https://git-scm.com/docs/git-sparse-checkout；[3] 克隆手册: https://git-scm.com/docs/git-clone）
 
 选之前还要看任务是否依赖其他目录、历史提交或共享配置。把输入缩小到不完整，检查即使变快，结论也可能失真。
 
@@ -89,6 +89,13 @@ Git 已经提供一些可以评估的选项。稀疏检出控制工作目录里�
 
 回到日常开发，下次遇到"代码已经改完，任务还没结束"，可以先留下一份分阶段耗时记录。知道了等待发生在哪一步，才有依据决定要不要调整拉取、缓存、并发或测试流程。
 
-## 关系状态
+## 相关笔记
 
-当前标记为 orphan，等待后续渐进关联。
+收录查重时出现的候选均已人工确认为**相关而非重复**，以下链接用于联想与主题导航：
+
+- [[vault/02-Resources/AI and Agents/Agent Design & Patterns/Anthropic Agent 工程实战指南 - 从入门到生产落地]] — Anthropic 官方工程博客系统梳理；本文引用的 Scion 复盘同属 Anthropic 工程实践脉络
+- [[vault/02-Resources/AI and Agents/Agent Architecture & Runtime/langchain-ceo-何时构建自己的agent框架-哔哩哔哩-1e149996]] — Harness 工程视角，谈何时该自建 Agent 框架，与本文「优化前先拆清时间花在哪」的思路互参
+- [[vault/02-Resources/AI and Agents/Agent Architecture & Runtime/Cognition的Jared-智能体构建原则与云端异步协同]] — Devin 团队的 Agent 构建原则与异步协同，同属 agent engineering 实践
+- [[vault/02-Resources/AI and Agents/Agent Design & Patterns/季白羽-Codex 与 Remotion 纸片分层动画流水线]] — AI coding 流水线化的具体实战案例，与本文「任务按需取数、拆阶段计时」呼应
+
+主题归类建议：agent_engineering / ci_cd / devops / source_control（已获主人认可，待平台侧确认生效）。
