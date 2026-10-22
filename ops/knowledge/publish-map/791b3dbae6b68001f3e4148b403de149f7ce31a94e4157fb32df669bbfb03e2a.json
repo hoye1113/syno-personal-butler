@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "note-artifact-20261022-bfaf6b86",
+  "ownerKey": "local-user",
+  "sourceVersion": "3fd4a14a2c2630c4ad927717ffb99f6223ec57eee0808e62c152c4df0b4922a1",
+  "sourcePath": "vault/02-Resources/AI and Agents/Industry & Opinions/老板应该招哪类程序员-5fa0932a.md",
+  "resourceVersion": "9546ed78e49eebedb17bb3d4abe23676e0cb07fe98bb81333f7d955bd862f7b3",
+  "targetKey": "production-v1",
+  "mode": "production",
+  "targets": {
+    "wiki": {
+      "expectedVersion": "3fd4a14a2c2630c4ad927717ffb99f6223ec57eee0808e62c152c4df0b4922a1",
+      "status": "pending",
+      "attempts": 0
+    },
+    "images": {
+      "expectedVersion": "3fd4a14a2c2630c4ad927717ffb99f6223ec57eee0808e62c152c4df0b4922a1",
+      "status": "pending",
+      "attempts": 0
+    },
+    "catalog": {
+      "expectedVersion": "3fd4a14a2c2630c4ad927717ffb99f6223ec57eee0808e62c152c4df0b4922a1",
+      "status": "pending",
+      "attempts": 0
+    }
+  },
+  "updatedAt": "2026-10-22T14:39:37.005Z"
+}
