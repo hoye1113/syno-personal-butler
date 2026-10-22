@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { BrowserCaptureAdapter } from "../packages/syno-core/browser-capture-adapter.mjs";
 
-function fakeRunner({ observations = [{ url: "https://example.com/article", title: "文章", observation: "中文正文" }], statusError = null, stopError = null } = {}) {
+function fakeRunner({ observations = [{ url: "https://example.com/article", title: "文章", observation: "中文正文" }], statusError = null, stopError = null, html = null } = {}) {
   const calls = [];
   let observationIndex = 0;
   const runner = async (_command, args, options) => {
@@ -19,6 +19,10 @@ function fakeRunner({ observations = [{ url: "https://example.com/article", titl
       const value = observations[Math.min(observationIndex, observations.length - 1)];
       observationIndex += 1;
       return { stdout: JSON.stringify(value) };
+    }
+    if (args[0] === "get-html") {
+      if (html == null) throw new Error(`unexpected bsk args: ${args.join(" ")}`);
+      return { stdout: JSON.stringify({ html, truncated: false }) };
     }
     if (args[0] === "tab") return { stdout: JSON.stringify({ tabs: [] }) };
     if (args[0] === "session" && args[1] === "stop") {
@@ -87,6 +91,79 @@ test("BrowserCaptureAdapter does not mistake a long article discussing login for
   const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner });
   const result = await adapter.capture({ workflowId: "workflow-article", exactUrl: "https://example.com/article" });
   assert.equal(result.status, "completed");
+});
+
+// 2026-10-21：微信验证页经 bsk 通道呈现为「空标题 + 压缩 JS 残留」，不能被当正文交出。
+const SCRIPT_RESIDUE_OBS = {
+  url: "https://mp.weixin.qq.com/s/abc",
+  title: "",
+  observation: `!function(e,t){"object"==typeof exports&&t(exports):"function"==typeof define&&define.amd?define(["exports"],t):t(e.colorLib={})}(this,function(e){"use strict";var n=function(e,t){return e<t?-1:e>t?1:0};e.rgb=function(e){return e};const r=(e,t)=>e.map(e=>t(e));let o=0;for(o=0;o<256;o++){r([o],e=>e)};if(o>0){return o}});`.repeat(3),
+};
+
+test("BrowserCaptureAdapter treats an empty title plus script residue as an auth wall", async () => {
+  const fake = fakeRunner({ observations: [SCRIPT_RESIDUE_OBS, SCRIPT_RESIDUE_OBS] });
+  const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner });
+  const result = await adapter.capture({ workflowId: "workflow-residue", exactUrl: "https://mp.weixin.qq.com/s/abc" });
+  assert.equal(result.status, "failed");
+  assert.equal(result.blocked, "unattended_auth");
+  assert.equal(result.error.code, "BROWSER_BLOCKED_UNATTENDED");
+  assert.equal(fake.calls.some((call) => call.args[0] === "get-html"), false);
+});
+
+test("BrowserCaptureAdapter still completes a long untitled prose page", async () => {
+  const fake = fakeRunner({ observations: [{
+    url: "https://example.com/article",
+    title: "",
+    observation: `这是一篇没有标题栏的普通长文。${"正文内容，继续展开。".repeat(300)}`,
+  }] });
+  const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner });
+  const result = await adapter.capture({ workflowId: "workflow-untitled", exactUrl: "https://example.com/article" });
+  assert.equal(result.status, "completed");
+});
+
+// ---------- 2026-10-22 实证修复：微信文章真实形态 ----------
+// observe 无 title 字段（标题在 VOM 的 RootWebArea 名字里）；extractReadableText 漏剥
+// 内联脚本产出 JS 垃圾 → 正文必须降级到 VOM 文本，标题从 <title> 解析。
+
+const VOM_ARTICLE_OBS = {
+  url: "https://mp.weixin.qq.com/s/abc",
+  text: [
+    "@vom 1",
+    "@view 1200x748",
+    "@layers 1 focus=L1",
+    "L1 page",
+    '  RootWebArea "Agent 写得更快以后，时间花在了哪里？ 2026年10月21日 10:53 代码改完了，流水线还没跑完……"',
+    '    heading "Agent 写得更快以后，时间花在了哪里？"',
+    '    paragraph "代码改完了，流水线还没跑完。使用 Agent 做开发时，这段等待值得单独拿出来看。"',
+    '    paragraph "如果接下来想优化整个任务的用时，我会先看：时间花在准备代码和环境上，还是花在真正的构建、测试上？"',
+  ].join("\n"),
+};
+const LEAKY_SCRIPT = "function W(t,e){return t<e?-1:1}const r=(e,t)=>e.map(e=>t(e));let o=0;for(o=0;o<256;o++){r([o],e=>e)};if(o>0){return o};var n=function(e){return e};W.prototype.go=function(t){return t};";
+const WX_HTML = '<html><head><title></title><meta property="og:title" content="Agent 写得更快以后，时间花在了哪里？"></head><body>'
+  + '<img src="https://mmbiz.qpic.cn/x/1.png" alt="">'
+  + "<script>var __=\"</scr" + "ipt>\";" + LEAKY_SCRIPT.repeat(6) + "</scr" + "ipt></body></html>";
+
+test("BrowserCaptureAdapter falls back to the VOM text when HTML extraction yields script garbage", async () => {
+  const fake = fakeRunner({ observations: [VOM_ARTICLE_OBS], html: WX_HTML });
+  const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner });
+  const result = await adapter.capture({ workflowId: "workflow-vom-fallback", exactUrl: "https://mp.weixin.qq.com/s/abc" });
+  assert.equal(result.status, "completed");
+  assert.equal(result.title, "Agent 写得更快以后，时间花在了哪里？");
+  assert.match(result.content, /代码改完了，流水线还没跑完/);
+  assert.doesNotMatch(result.content, /function W\(/);
+});
+
+test("BrowserCaptureAdapter blocks a wall page that only exists as VOM text", async () => {
+  const wallVom = {
+    url: "https://mp.weixin.qq.com/s/abc",
+    text: ["@vom 1", "L1 page", '  RootWebArea "环境异常"', '    StaticText "当前环境异常，完成验证后即可继续访问。"', '    button "去验证"'].join("\n"),
+  };
+  const fake = fakeRunner({ observations: [wallVom, wallVom] });
+  const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner });
+  const result = await adapter.capture({ workflowId: "workflow-vom-wall", exactUrl: "https://mp.weixin.qq.com/s/abc" });
+  assert.equal(result.status, "failed");
+  assert.equal(result.error.code, "BROWSER_BLOCKED_UNATTENDED");
+  assert.equal(fake.calls.some((call) => call.args[0] === "get-html"), false);
 });
 
 test("BrowserCaptureAdapter fails closed when its Agent Window cannot be stopped", async () => {

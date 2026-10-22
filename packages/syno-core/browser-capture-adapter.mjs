@@ -1,6 +1,6 @@
-import { sourceValidity } from "./source-validity.mjs";
+import { sourceValidity, scriptResidue } from "./source-validity.mjs";
 import { htmlImageReferences } from "./source-resources.mjs";
-import { extractReadableText } from "./source-fetcher.mjs";
+import { extractReadableText, hasSourceNoise } from "./source-fetcher.mjs";
 import { createHash } from "node:crypto";
 import net from "node:net";
 
@@ -51,6 +51,43 @@ function flattenSnapshotTree(value) {
   const preferred = [value.text, value.name, value.label, value.value].filter((item) => typeof item === "string");
   const children = flattenSnapshotTree(value.children || value.tree || value.nodes || value.root);
   return [...preferred, children].filter(Boolean).join("\n");
+}
+
+// bsk observe 不返回 title 字段（2026-10-22 实证），标题从 get-html 兜底解析：
+// 先 <title>，再 og:title（微信等站点 <title> 为空、由 JS 后填）。
+function decodeEntities(value) {
+  return String(value || "")
+    .replace(/&nbsp;/giu, " ").replace(/&amp;/giu, "&").replace(/&lt;/giu, "<")
+    .replace(/&gt;/giu, ">").replace(/&quot;/giu, '"').replace(/&#(?:39|x27);/giu, "'");
+}
+function htmlTitle(html) {
+  const source = String(html || "");
+  const direct = decodeEntities(/<title[^>]*>([\s\S]*?)<\/title>/iu.exec(source)?.[1] || "").trim();
+  if (direct) return direct;
+  for (const match of source.matchAll(/<meta\b[^>]*>/giu)) {
+    if (!/property\s*=\s*["']og:title["']/iu.test(match[0])) continue;
+    const content = /content\s*=\s*"([^"]*)"/iu.exec(match[0])?.[1] ?? /content\s*=\s*'([^']*)'/iu.exec(match[0])?.[1] ?? "";
+    const decoded = decodeEntities(content).trim();
+    if (decoded) return decoded;
+  }
+  return "";
+}
+
+// extractReadableText 对部分站点（微信为代表，2026-10-22 实证）会漏剥内联脚本/样式，
+// 产出压缩 JS/CSS 垃圾；垃圾不得当正文，由调用方降级到 observe 的 VOM 文本。
+function extractionGarbage(value) {
+  const body = String(value || "");
+  return !body || scriptResidue({ title: "", body }) || hasSourceNoise(body);
+}
+
+// bsk observe 的 VOM 文本里 RootWebArea 的名字承载页标题：验证墙是短名（"环境异常"），
+// 文章页是长名（标题+摘要拼接）。只取短名，喂给 wallTitle 判定，让无 title 字段的
+// 验证墙也能被识别（2026-10-22 实证：observe 无 title 字段，锚定正则够不到 VOM 里的墙文案）。
+function vomTitle(raw) {
+  const text = typeof raw === "string" ? raw : flattenSnapshotTree(raw);
+  const match = /RootWebArea\s+"([^"]*)"/u.exec(text);
+  const name = match ? match[1].trim() : "";
+  return name.length > 0 && name.length <= 60 ? name : "";
 }
 
 function digest(value) {
@@ -141,7 +178,8 @@ class BrowserCaptureAdapter {
       const observed = await this.#run(["observe", "--session", session, "--max-tokens", "25000", "--json"]);
       const raw = observed.observation ?? observed.snapshot ?? observed.content ?? observed.text;
       const finalUrl = firstString(observed, ["url", "final_url", "finalUrl"]) || task.requestedUrl;
-      if (!requiresInteraction({ finalUrl, title: observed.title, content: flattenSnapshotTree(raw) })) {
+      const observedTitle = firstString(observed, ["title", "page_title", "pageTitle"]) || vomTitle(raw);
+      if (!requiresInteraction({ finalUrl, title: observedTitle, content: flattenSnapshotTree(raw) })) {
         try { const page = await this.#run(["get-html", "--session", session, "--max-bytes", "2000000", "--json"]); return { ...observed, html: page.html, htmlTruncated: page.truncated }; } catch { /* Unsupported HTML extraction is reported as incomplete resources. */ }
       }
       return observed;
@@ -313,9 +351,12 @@ class BrowserCaptureAdapter {
     if (final.origin !== requested.origin) throw adapterError("BROWSER_REDIRECT_ORIGIN_DENIED", "浏览器页面跳转到了未签发的站点");
     const raw = result?.observation ?? result?.snapshot ?? result?.tree ?? result?.content ?? result?.text ?? result?.data;
     const images = result.html ? htmlImageReferences(result.html, final.toString()) : null;
-    const fullContent = images ? extractReadableText(images.html, "text/html") : flattenSnapshotTree(raw).replace(/\u0000/gu, " ").trim();
+    // 正文优先级：extractReadableText 产出干净则用；产出垃圾（或为空）则降级 observe 的
+    // VOM 文本（无图时的既有兜底）。两者皆垃圾时 requiresInteraction fail-closed。
+    const extracted = images ? extractReadableText(images.html, "text/html") : "";
+    const fullContent = images && !extractionGarbage(extracted) ? extracted : flattenSnapshotTree(raw).replace(/\u0000/gu, " ").trim();
     const content = fullContent.slice(0, this.maxContentChars);
-    const title = firstString(result, ["title", "page_title", "pageTitle"]);
+    const title = firstString(result, ["title", "page_title", "pageTitle"]) || htmlTitle(result.html) || vomTitle(raw);
     const base = { requestedUrl, finalUrl: final.toString(), title, content, truncated: result.htmlTruncated === true || fullContent.length > this.maxContentChars, resources: images?.refs, resourceDiscoveryComplete: Boolean(images) && result.htmlTruncated !== true, contentDigest: digest(content), usedActions: ["navigate", "observe"], browserSessionId: this.sessions.get(id)?.logicalSession };
     const observation = requiresInteraction(base)
       ? { ...base, status: "failed", blocked: "unattended_auth", error: { code: "BROWSER_BLOCKED_UNATTENDED", message: "页面要求登录或人机验证；无人值守读取已停止，且不会绕过验证" } }

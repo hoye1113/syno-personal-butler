@@ -67,6 +67,9 @@ function safeWorkflowId(value) {
 function browserFallbackReason(error) {
   const code = String(error?.code || "");
   const message = String(error?.message || "");
+  // 验证墙（微信直抓被重定向到验证码页等，2026-10-22 实证漏分类为 unclassified 直死）：
+  // 正是浏览器兜底存在的意义，必须排在 unsafe_redirect 之前——verification_redirect 不是不安全地址。
+  if (code === "SOURCE_VERIFICATION_REQUIRED") return "anti_bot_challenge";
   if (/URL 不安全|内网|本机|凭据|重定向次数过多|BROWSER_URL/iu.test(message) || /URL_UNSAFE|PRIVATE|REDIRECT/iu.test(code)) return "unsafe_redirect";
   if (/HTTP[_ ](?:401|403)|返回 HTTP (?:401|403)/iu.test(`${code} ${message}`)) {
     return /403/u.test(`${code} ${message}`) ? "http_forbidden" : "http_unauthorized";

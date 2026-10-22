@@ -372,6 +372,42 @@ test("an unattended BSK auth wall becomes terminal without waiting for owner int
   assert.equal((await coordinator.listPending("owner")).some((item) => item.browserStatus === "interaction_required"), false);
 });
 
+test("verification walls (SOURCE_VERIFICATION_REQUIRED) fall back to BSK instead of dying unclassified", async (t) => {
+  const { scheduled, store } = await fixture(t);
+  let proposes = 0;
+  const ingest = {
+    async receive(payload) { return { artifact: { id: "artifact-wall", kind: payload.kind, dedupeKey: "wall-key" }, proposalPending: true }; },
+    async readArtifact() { return { id: "artifact-wall", source: "https://mp.weixin.qq.com/s/abc" }; },
+    async applyBrowserSnapshot(id, observation) { return { id, observation }; },
+    async propose() {
+      proposes += 1;
+      // 2026-10-22 实证：微信直抓被 302 到验证码页，assertValidSource 抛出此形态。
+      if (proposes === 1) throw Object.assign(new Error("来源需要处理：verification_redirect"), { code: "SOURCE_VERIFICATION_REQUIRED", retryable: false });
+      return { candidate: { id: "candidate-wall" }, proposal: { id: "proposal-wall", sourceType: "url", sourceDigest: "a".repeat(64), proposalDigest: "b".repeat(64) } };
+    },
+  };
+  const browserCapture = {
+    authorize() { return { browserSessionId: "syno-capture-workflow-wall" }; },
+    async capture() { return { status: "completed", finalUrl: "https://mp.weixin.qq.com/s/abc", content: "browser content", contentDigest: "c".repeat(64), browserSessionId: "syno-capture-workflow-wall" }; },
+  };
+  const events = [];
+  const coordinator = new IngestWorkflowCoordinator({
+    ingest,
+    store,
+    schedule: (work) => scheduled.push(work),
+    browserCapture,
+    browserRuntime: { async run() {} },
+    onEvent: async (event) => { events.push(event.type); },
+  });
+  const receipt = await coordinator.receive({ kind: "url", value: "https://mp.weixin.qq.com/s/abc" }, { ownerKey: "owner", channel: "weixin", messageId: "wall-1" });
+  await scheduled.shift()();
+  const workflow = await coordinator.status(receipt.workflow.id);
+  assert.equal(workflow.stage, "proposed");
+  assert.equal(workflow.fetchMethod, "bsk");
+  assert.equal(workflow.fallbackReason, "anti_bot_challenge");
+  assert.ok(events.includes("capture.browser.fallback_started"));
+});
+
 test("URL safety failures never escalate to the browser fallback", async (t) => {
   const { scheduled, store } = await fixture(t);
   let browserRuns = 0;
