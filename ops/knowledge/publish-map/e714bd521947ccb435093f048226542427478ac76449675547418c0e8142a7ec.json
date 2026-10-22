@@ -10,8 +10,8 @@
   "targets": {
     "wiki": {
       "expectedVersion": "0c1648922a1a6aeec0898b4db6000d683dc145a7834ecd20270c652252818aa8",
-      "status": "pending",
-      "attempts": 0
+      "status": "running",
+      "attempts": 1
     },
     "images": {
       "expectedVersion": "0c1648922a1a6aeec0898b4db6000d683dc145a7834ecd20270c652252818aa8",
@@ -24,5 +24,5 @@
       "attempts": 0
     }
   },
-  "updatedAt": "2026-10-22T06:50:56.600Z"
+  "updatedAt": "2026-10-22T06:51:03.035Z"
 }
