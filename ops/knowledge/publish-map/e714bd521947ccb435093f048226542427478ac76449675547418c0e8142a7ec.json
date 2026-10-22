@@ -10,14 +10,14 @@
   "targets": {
     "wiki": {
       "expectedVersion": "68bcb97a4d5c427dbdf360feea6eeef4896d636d5d6b01be67a3f62bd34876a8",
-      "status": "running",
+      "status": "succeeded",
       "attempts": 1,
       "remoteId": "NMoywzII6iN4EEkqLB5c59linub",
       "docId": "NFWud0AisoUBBOxh5gRcnzHmnuJ",
       "imageBlocks": [],
-      "fingerprint": "60cb1ae9880540ddf03bd88bd9bb569f4019e23f6229f5227400a3ae4422cad2",
+      "fingerprint": "6df242308935364f0c4968ab409f515f49c8606f474ca63564c2f85afaf0f80e",
       "link": "https://www.feishu.cn/wiki/NMoywzII6iN4EEkqLB5c59linub",
-      "appliedVersion": "e6c1a848412a350239ba28fc6f1d3b120f74a67a702a8d9b06ff03c1f138bd91",
+      "appliedVersion": "68bcb97a4d5c427dbdf360feea6eeef4896d636d5d6b01be67a3f62bd34876a8",
       "errorCode": null,
       "nextRetryAt": null
     },
@@ -45,5 +45,5 @@
       "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-22T14:59:45.600Z"
+  "updatedAt": "2026-10-22T14:59:54.193Z"
 }
