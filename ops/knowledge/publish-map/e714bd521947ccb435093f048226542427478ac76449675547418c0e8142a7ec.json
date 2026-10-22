@@ -23,13 +23,13 @@
     },
     "images": {
       "expectedVersion": "68bcb97a4d5c427dbdf360feea6eeef4896d636d5d6b01be67a3f62bd34876a8",
-      "status": "running",
+      "status": "succeeded",
       "attempts": 1,
       "receipts": [],
-      "verifiedVersion": "e6c1a848412a350239ba28fc6f1d3b120f74a67a702a8d9b06ff03c1f138bd91",
+      "verifiedVersion": "68bcb97a4d5c427dbdf360feea6eeef4896d636d5d6b01be67a3f62bd34876a8",
       "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "wikiFingerprint": "60cb1ae9880540ddf03bd88bd9bb569f4019e23f6229f5227400a3ae4422cad2",
-      "appliedVersion": "e6c1a848412a350239ba28fc6f1d3b120f74a67a702a8d9b06ff03c1f138bd91",
+      "wikiFingerprint": "6df242308935364f0c4968ab409f515f49c8606f474ca63564c2f85afaf0f80e",
+      "appliedVersion": "68bcb97a4d5c427dbdf360feea6eeef4896d636d5d6b01be67a3f62bd34876a8",
       "errorCode": null,
       "nextRetryAt": null
     },
@@ -45,5 +45,5 @@
       "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-22T15:00:00.079Z"
+  "updatedAt": "2026-10-22T15:00:07.048Z"
 }
