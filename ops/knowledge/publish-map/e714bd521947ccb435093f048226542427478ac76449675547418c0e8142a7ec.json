@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "note-artifact-20261022-edf7da05",
+  "ownerKey": "local-user",
+  "sourceVersion": "0c1648922a1a6aeec0898b4db6000d683dc145a7834ecd20270c652252818aa8",
+  "sourcePath": "vault/02-Resources/AI and Agents/Harness Context & Reliability/不要迷信 AI 大厂的 Coding 实践.md",
+  "resourceVersion": "9546ed78e49eebedb17bb3d4abe23676e0cb07fe98bb81333f7d955bd862f7b3",
+  "targetKey": "production-v1",
+  "mode": "production",
+  "targets": {
+    "wiki": {
+      "expectedVersion": "0c1648922a1a6aeec0898b4db6000d683dc145a7834ecd20270c652252818aa8",
+      "status": "pending",
+      "attempts": 0
+    },
+    "images": {
+      "expectedVersion": "0c1648922a1a6aeec0898b4db6000d683dc145a7834ecd20270c652252818aa8",
+      "status": "pending",
+      "attempts": 0
+    },
+    "catalog": {
+      "expectedVersion": "0c1648922a1a6aeec0898b4db6000d683dc145a7834ecd20270c652252818aa8",
+      "status": "pending",
+      "attempts": 0
+    }
+  },
+  "updatedAt": "2026-10-22T06:50:56.600Z"
+}
