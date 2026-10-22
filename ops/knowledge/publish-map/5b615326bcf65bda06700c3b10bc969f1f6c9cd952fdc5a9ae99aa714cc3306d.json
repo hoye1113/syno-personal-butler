@@ -2,14 +2,15 @@
   "schemaVersion": 1,
   "id": "note-f17c365fa3c7fc2f583c5d49",
   "ownerKey": "local-user",
-  "sourceVersion": "e760c01ebf0194335ffbeafb18bac84cf7485922d9b294590989574000863a04",
-  "resourceVersion": "migration-v1",
+  "sourceVersion": "882597d6e862befbe5e0e0b9579288ed9d2ddbd46f8bb2cc7b0a02b0597d61e3",
+  "sourcePath": "vault/02-Resources/AI and Agents/MOC - Harness Engineering.md",
+  "resourceVersion": "9546ed78e49eebedb17bb3d4abe23676e0cb07fe98bb81333f7d955bd862f7b3",
   "targetKey": "production-v1",
   "mode": "production",
   "targets": {
     "wiki": {
-      "status": "succeeded",
-      "expectedVersion": "e760c01ebf0194335ffbeafb18bac84cf7485922d9b294590989574000863a04",
+      "status": "pending",
+      "expectedVersion": "882597d6e862befbe5e0e0b9579288ed9d2ddbd46f8bb2cc7b0a02b0597d61e3",
       "appliedVersion": "e760c01ebf0194335ffbeafb18bac84cf7485922d9b294590989574000863a04",
       "attempts": 0,
       "remoteId": "QUeewHphKiRSWUkKnXtclMeln4d",
@@ -18,8 +19,8 @@
       "link": "https://www.feishu.cn/wiki/QUeewHphKiRSWUkKnXtclMeln4d"
     },
     "images": {
-      "status": "succeeded",
-      "expectedVersion": "e760c01ebf0194335ffbeafb18bac84cf7485922d9b294590989574000863a04",
+      "status": "pending",
+      "expectedVersion": "882597d6e862befbe5e0e0b9579288ed9d2ddbd46f8bb2cc7b0a02b0597d61e3",
       "appliedVersion": "e760c01ebf0194335ffbeafb18bac84cf7485922d9b294590989574000863a04",
       "attempts": 0,
       "receipts": [],
@@ -27,8 +28,8 @@
       "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     "catalog": {
-      "status": "succeeded",
-      "expectedVersion": "e760c01ebf0194335ffbeafb18bac84cf7485922d9b294590989574000863a04",
+      "status": "pending",
+      "expectedVersion": "882597d6e862befbe5e0e0b9579288ed9d2ddbd46f8bb2cc7b0a02b0597d61e3",
       "appliedVersion": "e760c01ebf0194335ffbeafb18bac84cf7485922d9b294590989574000863a04",
       "attempts": 0,
       "remoteId": "reczz28PGIEBYPM0",
@@ -36,5 +37,5 @@
       "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PGIEBYPM0"
     }
   },
-  "updatedAt": "2026-10-19T12:01:50.909Z"
+  "updatedAt": "2026-10-22T10:38:09.494Z"
 }
