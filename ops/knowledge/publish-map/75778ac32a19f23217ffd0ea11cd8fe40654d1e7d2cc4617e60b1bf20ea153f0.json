@@ -11,7 +11,9 @@
     "wiki": {
       "expectedVersion": "a41377f6b97398a9ed8a4508e3ea26904b11d5e1279eedb5bb7895d090a62063",
       "status": "running",
-      "attempts": 1
+      "attempts": 1,
+      "remoteId": "LomDwdzMAi0f4YkaMvVc8Q4ynWc",
+      "docId": "NPOId2PDEoCkaTxSnaUcLkhrnDg"
     },
     "images": {
       "expectedVersion": "a41377f6b97398a9ed8a4508e3ea26904b11d5e1279eedb5bb7895d090a62063",
@@ -24,5 +26,5 @@
       "attempts": 0
     }
   },
-  "updatedAt": "2026-10-23T10:21:59.241Z"
+  "updatedAt": "2026-10-23T10:22:06.582Z"
 }
