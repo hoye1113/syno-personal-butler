@@ -35,9 +35,9 @@
     },
     "catalog": {
       "expectedVersion": "a41377f6b97398a9ed8a4508e3ea26904b11d5e1279eedb5bb7895d090a62063",
-      "status": "pending",
-      "attempts": 0
+      "status": "running",
+      "attempts": 1
     }
   },
-  "updatedAt": "2026-10-23T10:22:26.793Z"
+  "updatedAt": "2026-10-23T10:22:32.817Z"
 }
