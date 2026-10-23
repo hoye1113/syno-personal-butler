@@ -9,10 +9,10 @@
   "mode": "production",
   "targets": {
     "wiki": {
-      "status": "pending",
+      "status": "running",
       "expectedVersion": "0025d28c8c43ec36a6e08ff4bf48b3d1880a31c5b63d70108830425d44bc4882",
       "appliedVersion": "5224f417e45cde987d3438427d4789f5af91560cc39a078caa9d818452f7f9a1",
-      "attempts": 0,
+      "attempts": 1,
       "remoteId": "QUeewHphKiRSWUkKnXtclMeln4d",
       "docId": "NDUbdAmWAogHHIxBUKKcyqIrnRb",
       "fingerprint": "bceb27427c4526c140fdba134dfb2a0b98c3b6a9c7f584ec058b7f2b56c3a458",
@@ -45,5 +45,5 @@
       "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-23T10:25:59.684Z"
+  "updatedAt": "2026-10-23T10:26:07.992Z"
 }
