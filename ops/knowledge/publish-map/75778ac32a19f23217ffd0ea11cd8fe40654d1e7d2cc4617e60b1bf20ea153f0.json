@@ -2,16 +2,16 @@
   "schemaVersion": 1,
   "id": "note-artifact-20261023-9ea50d75",
   "ownerKey": "local-user",
-  "sourceVersion": "a41377f6b97398a9ed8a4508e3ea26904b11d5e1279eedb5bb7895d090a62063",
+  "sourceVersion": "7b1386fa46efeb394b1b8d5cbc681d3fdee746ca40f794c41ff6543aa8d285b9",
   "sourcePath": "vault/00-Inbox/ai-agent-的两极分化-自动化取代人-vs-产品帮助人-9ea50d75.md",
   "resourceVersion": "9546ed78e49eebedb17bb3d4abe23676e0cb07fe98bb81333f7d955bd862f7b3",
   "targetKey": "production-v1",
   "mode": "production",
   "targets": {
     "wiki": {
-      "expectedVersion": "a41377f6b97398a9ed8a4508e3ea26904b11d5e1279eedb5bb7895d090a62063",
-      "status": "succeeded",
-      "attempts": 1,
+      "expectedVersion": "7b1386fa46efeb394b1b8d5cbc681d3fdee746ca40f794c41ff6543aa8d285b9",
+      "status": "pending",
+      "attempts": 0,
       "remoteId": "LomDwdzMAi0f4YkaMvVc8Q4ynWc",
       "docId": "NPOId2PDEoCkaTxSnaUcLkhrnDg",
       "imageBlocks": [],
@@ -22,9 +22,9 @@
       "nextRetryAt": null
     },
     "images": {
-      "expectedVersion": "a41377f6b97398a9ed8a4508e3ea26904b11d5e1279eedb5bb7895d090a62063",
-      "status": "succeeded",
-      "attempts": 1,
+      "expectedVersion": "7b1386fa46efeb394b1b8d5cbc681d3fdee746ca40f794c41ff6543aa8d285b9",
+      "status": "pending",
+      "attempts": 0,
       "receipts": [],
       "verifiedVersion": "a41377f6b97398a9ed8a4508e3ea26904b11d5e1279eedb5bb7895d090a62063",
       "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
@@ -34,9 +34,9 @@
       "nextRetryAt": null
     },
     "catalog": {
-      "expectedVersion": "a41377f6b97398a9ed8a4508e3ea26904b11d5e1279eedb5bb7895d090a62063",
-      "status": "succeeded",
-      "attempts": 1,
+      "expectedVersion": "7b1386fa46efeb394b1b8d5cbc681d3fdee746ca40f794c41ff6543aa8d285b9",
+      "status": "pending",
+      "attempts": 0,
       "remoteId": "reczz28Qok00vuDv",
       "fingerprint": "f27eb75097052103d786b96215160bb4f1b4a989de947a0e20c7415af9488383",
       "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28Qok00vuDv",
@@ -45,5 +45,5 @@
       "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-23T10:22:50.812Z"
+  "updatedAt": "2026-10-23T10:25:47.510Z"
 }
