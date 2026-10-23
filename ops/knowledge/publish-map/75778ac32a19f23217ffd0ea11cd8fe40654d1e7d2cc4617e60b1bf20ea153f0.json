@@ -36,8 +36,9 @@
     "catalog": {
       "expectedVersion": "a41377f6b97398a9ed8a4508e3ea26904b11d5e1279eedb5bb7895d090a62063",
       "status": "running",
-      "attempts": 1
+      "attempts": 1,
+      "remoteId": "reczz28Qok00vuDv"
     }
   },
-  "updatedAt": "2026-10-23T10:22:32.817Z"
+  "updatedAt": "2026-10-23T10:22:43.352Z"
 }
