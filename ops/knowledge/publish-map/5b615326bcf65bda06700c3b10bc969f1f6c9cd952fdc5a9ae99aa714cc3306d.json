@@ -2,17 +2,17 @@
   "schemaVersion": 1,
   "id": "note-f17c365fa3c7fc2f583c5d49",
   "ownerKey": "local-user",
-  "sourceVersion": "5224f417e45cde987d3438427d4789f5af91560cc39a078caa9d818452f7f9a1",
+  "sourceVersion": "0025d28c8c43ec36a6e08ff4bf48b3d1880a31c5b63d70108830425d44bc4882",
   "sourcePath": "vault/02-Resources/AI and Agents/MOC - Harness Engineering.md",
   "resourceVersion": "9546ed78e49eebedb17bb3d4abe23676e0cb07fe98bb81333f7d955bd862f7b3",
   "targetKey": "production-v1",
   "mode": "production",
   "targets": {
     "wiki": {
-      "status": "succeeded",
-      "expectedVersion": "5224f417e45cde987d3438427d4789f5af91560cc39a078caa9d818452f7f9a1",
+      "status": "pending",
+      "expectedVersion": "0025d28c8c43ec36a6e08ff4bf48b3d1880a31c5b63d70108830425d44bc4882",
       "appliedVersion": "5224f417e45cde987d3438427d4789f5af91560cc39a078caa9d818452f7f9a1",
-      "attempts": 1,
+      "attempts": 0,
       "remoteId": "QUeewHphKiRSWUkKnXtclMeln4d",
       "docId": "NDUbdAmWAogHHIxBUKKcyqIrnRb",
       "fingerprint": "bceb27427c4526c140fdba134dfb2a0b98c3b6a9c7f584ec058b7f2b56c3a458",
@@ -22,10 +22,10 @@
       "nextRetryAt": null
     },
     "images": {
-      "status": "succeeded",
-      "expectedVersion": "5224f417e45cde987d3438427d4789f5af91560cc39a078caa9d818452f7f9a1",
+      "status": "pending",
+      "expectedVersion": "0025d28c8c43ec36a6e08ff4bf48b3d1880a31c5b63d70108830425d44bc4882",
       "appliedVersion": "5224f417e45cde987d3438427d4789f5af91560cc39a078caa9d818452f7f9a1",
-      "attempts": 1,
+      "attempts": 0,
       "receipts": [],
       "verifiedVersion": "5224f417e45cde987d3438427d4789f5af91560cc39a078caa9d818452f7f9a1",
       "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
@@ -34,10 +34,10 @@
       "nextRetryAt": null
     },
     "catalog": {
-      "status": "succeeded",
-      "expectedVersion": "5224f417e45cde987d3438427d4789f5af91560cc39a078caa9d818452f7f9a1",
+      "status": "pending",
+      "expectedVersion": "0025d28c8c43ec36a6e08ff4bf48b3d1880a31c5b63d70108830425d44bc4882",
       "appliedVersion": "5224f417e45cde987d3438427d4789f5af91560cc39a078caa9d818452f7f9a1",
-      "attempts": 1,
+      "attempts": 0,
       "remoteId": "reczz28PGIEBYPM0",
       "fingerprint": "7f4b9cce566443d98b4629933e1268a313a7588b2c26c947c0e9c719ae0a5da7",
       "link": "https://www.feishu.cn/base/IVtqbE8ocaEY93sqQ1bciWE5ncg?table=tblFswdcuKmNR8e7&record=reczz28PGIEBYPM0",
@@ -45,5 +45,5 @@
       "nextRetryAt": null
     }
   },
-  "updatedAt": "2026-10-23T08:04:30.222Z"
+  "updatedAt": "2026-10-23T10:25:59.684Z"
 }
