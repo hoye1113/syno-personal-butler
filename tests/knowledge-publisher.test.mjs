@@ -85,6 +85,60 @@ test("same content at a new path refreshes only the catalog (2026-10-22 note-mov
  assert.deepEqual(f.calls.slice(3),["catalog"]);
 });
 
+test("stale record with a dead images worker self-heals through retry (2026-10-23 deadlock)", async t => {
+ const f = await fixture(t);
+ const key = f.publisher.key("owner", "n"), file = path.join(f.root, "ops/knowledge/publish-map", `${key}.json`);
+ await fs.mkdir(path.dirname(file), { recursive: true });
+ // 事故现场还原：wiki 已成功旧版，images 死在 running，catalog 未尝试；笔记已推进到 v2。
+ await fs.writeFile(file, JSON.stringify({ schemaVersion: 1, id: "n", ownerKey: "owner", sourceVersion: "v1", sourcePath: "vault/00-Inbox/n.md", resourceVersion: "a1", targetKey: "isolated", mode: "sandbox", targets: {
+   wiki: { status: "succeeded", expectedVersion: "v1", appliedVersion: "v1", remoteId: "wiki", fingerprint: "managed" },
+   images: { status: "running", expectedVersion: "v1", appliedVersion: "v0", attempts: 1 },
+   catalog: { status: "pending", expectedVersion: "v1", appliedVersion: "v0", attempts: 0 },
+ } }));
+ f.setVersion("v2");
+ const result = await f.publisher.retry("owner", "n");
+ assert.equal(result.status, "synced");
+ assert.equal(result.sourceVersion, "v2");
+ assert.deepEqual(f.calls, ["wiki", "images", "catalog"]);
+ const stored = await f.publisher.status("owner", "n");
+ for (const target of ["wiki", "images", "catalog"]) assert.equal(stored.targets[target].appliedVersion, "v2");
+});
+
+test("stale record with a dead wiki worker still refuses to discard an unverified creation", async t => {
+ const f = await fixture(t);
+ const key = f.publisher.key("owner", "n"), file = path.join(f.root, "ops/knowledge/publish-map", `${key}.json`);
+ await fs.mkdir(path.dirname(file), { recursive: true });
+ await fs.writeFile(file, JSON.stringify({ schemaVersion: 1, id: "n", ownerKey: "owner", sourceVersion: "v1", resourceVersion: "a1", targetKey: "isolated", mode: "sandbox", targets: {
+   wiki: { status: "running", expectedVersion: "v1", attempts: 1 },
+   images: { status: "pending", expectedVersion: "v1" },
+   catalog: { status: "pending", expectedVersion: "v1" },
+ } }));
+ f.setVersion("v2");
+ await assert.rejects(f.publisher.retry("owner", "n"), { code: "SYNC_OUTCOME_UNKNOWN" });
+ const stored = await f.publisher.status("owner", "n");
+ assert.equal(stored.sourceVersion, "v1");
+ assert.deepEqual(f.calls, []);
+});
+
+test("catalog creation in flight blocks replacement; a known catalog row may be reset", async t => {
+ const f = await fixture(t);
+ const key = f.publisher.key("owner", "n"), file = path.join(f.root, "ops/knowledge/publish-map", `${key}.json`);
+ await fs.mkdir(path.dirname(file), { recursive: true });
+ const record = (catalog) => ({ schemaVersion: 1, id: "n", ownerKey: "owner", sourceVersion: "v1", resourceVersion: "a1", targetKey: "isolated", mode: "sandbox", targets: {
+   wiki: { status: "succeeded", expectedVersion: "v1", appliedVersion: "v1", remoteId: "wiki", fingerprint: "managed" },
+   images: { status: "succeeded", expectedVersion: "v1", appliedVersion: "v1" },
+   catalog,
+ } });
+ await fs.writeFile(file, JSON.stringify(record({ status: "running", expectedVersion: "v1", attempts: 1 })));
+ f.setVersion("v2");
+ await assert.rejects(f.publisher.retry("owner", "n"), { code: "SYNC_OUTCOME_UNKNOWN" });
+ await fs.writeFile(file, JSON.stringify(record({ status: "running", expectedVersion: "v1", attempts: 1, remoteId: "row-1", fingerprint: "managed" })));
+ const result = await f.publisher.retry("owner", "n");
+ assert.equal(result.status, "synced");
+ // 版本升级会把三端全部置回 pending 重发（wiki/images 的内容也属旧版），catalog 只是其中一环。
+ assert.deepEqual(f.calls, ["wiki", "images", "catalog"]);
+});
+
 test("explicit rate-limit responses honor server Retry-After and remain known failures",async t=>{
  const f=await fixture(t);f.adapter.apply=async(target,{effect})=>effect(`${target}.write`,async()=>{throw Object.assign(new Error("limited"),{response:{status:429,headers:{"retry-after":"180"}}})});await f.publisher.queue("owner",await f.source());const r=await f.publisher.run("owner","n");assert.equal(r.targets.wiki.status,"retryable_failed");assert.equal(r.targets.wiki.errorCode,"SYNC_RATE_LIMITED");assert.equal(r.targets.wiki.nextRetryAt,"2026-10-18T00:03:00.000Z");
 });

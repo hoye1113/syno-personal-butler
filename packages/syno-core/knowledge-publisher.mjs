@@ -76,7 +76,18 @@ class KnowledgePublisher {
         }
         return previous;
       }
-      if (previous && TARGETS.some(t => ["unknown", "running"].includes(previous.targets[t]?.status))) throw Object.assign(new Error("上一版本含未核对的远端效果，不能替换发布映射"), { code: "SYNC_OUTCOME_UNKNOWN" });
+      // 版本升级时放行可安全重置的悬挂效果（2026-10-23，action-20261023-3d12a18b 死锁）：
+      // images 的效果锚定 wiki 文档，wiki 随新版本整体重发后旧图片效果被取代；
+      // 已有 remoteId 的 catalog 走更新路径，无重复建行风险。
+      // wiki 的 running/unknown 与无 remoteId 的 catalog create 仍有重复创建风险，保持阻断。
+      const resettable = (target) => {
+        const state = previous?.targets?.[target];
+        if (!["unknown", "running"].includes(state?.status)) return true;
+        if (target === "images") return true;
+        if (target === "catalog" && state.remoteId) return true;
+        return false;
+      };
+      if (previous && !TARGETS.every(resettable)) throw Object.assign(new Error("上一版本含未核对的远端效果，不能替换发布映射"), { code: "SYNC_OUTCOME_UNKNOWN" });
       const record = { schemaVersion: 1, id: note.id, ownerKey, sourceVersion: note.version, sourcePath: note.path, resourceVersion: note.resources.version, targetKey: this.config.targetKey, mode: this.config.mode, targets: Object.fromEntries(TARGETS.map(t => [t, { ...previous?.targets?.[t], expectedVersion: note.version, status: previous?.targets?.[t]?.status === "unknown" ? "unknown" : "pending", attempts: 0 }])) };
       await this.save(record); await this.recordEvent("knowledge.sync.queued", { ownerKey, id: note.id, version: note.version }); return record;
     });
@@ -138,7 +149,14 @@ class KnowledgePublisher {
       for (const state of Object.values(record.targets)) if (state.status === "blocked" && state.errorCode !== "SYNC_REMOTE_CONFLICT" || state.status === "retryable_failed" && state.attempts >= 8) { Object.assign(state, { status: "pending", attempts: 0 }); changed = true; }
       if (changed) await this.save(record);
     });
-    return this.run(ownerKey, id);
+    // 笔记在登记后变化会让 run() 直接返回 stale（版本不符短路）；此时按当前版本重新登记再跑，
+    // 可安全重置的悬挂效果由 queue() 放行，真正危险的未核对效果仍会抛 SYNC_OUTCOME_UNKNOWN。
+    const outcome = await this.run(ownerKey, id);
+    if (outcome?.status === "stale") {
+      await this.queue(ownerKey, await this.source(ownerKey, id));
+      return this.run(ownerKey, id);
+    }
+    return outcome;
   }
   async run(ownerKey, id) {
     if (this.config.mode === "disabled") return this.status(ownerKey, id);
