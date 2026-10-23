@@ -26,7 +26,7 @@ source: vault_initiative - moc - ai_agent - harness_engineering
 | # | 笔记 | 来源 | 视角 | 一句话 |
 |---|------|------|------|--------|
 | 1 | [[2026 年 Agent 最重要的工程概念 Harness Engineering]] | 公众号（特工宇宙翻译 OpenAI 官方）| **OpenAI 5 个月实验** | harness = docs/ 当 source of truth + linter 强制不变量 + 黄金原则 |
-| 2 | [[祝贺Claude Code成功越狱，获得永生]] | 公众号（花叔）| **Anthropic 源码逆向** | harness 内部 6 大模块：system prompt / 四层权限 / 记忆 / 9 段式压缩 / swarm / grep |
+| 2 | [[祝贺Claude Code成功越狱]] | 公众号（花叔）| **Anthropic 源码逆向** | harness 内部 6 大模块：system prompt / 四层权限 / 记忆 / 9 段式压缩 / swarm / grep |
 | 3 | [[Anthropic Agent 工程实战指南 - 从入门到生产落地]] | 公众号（Anthropic 官方汇编）| **Anthropic 完整方法论** | 15 篇博客按"入门-进阶-核心-高级-生产"5 模块系统化 |
 | 5 | [[别再搭 Harness 了，先把你的痛点解决，用最笨的方式]] | 公众号（三元同学）| **反规范视角** | 马斯克五步法：先痛点后系统，不先搭系统 |
 | 6 | [[Loop Engineering 橙皮书 - 花叔]] | GitHub 橙皮书系列（花叔）| **Loop = Harness 上一层** | 别再自己一句句指挥 agent；五动作循环 + 六零件 + 四笔代价 |
@@ -57,9 +57,9 @@ source: vault_initiative - moc - ai_agent - harness_engineering
 
 | 序 | 笔记 | 角色 | 一句话 |
 |---|------|------|--------|
-| ① | [[agent-写得更快以后-时间花在了哪里-14e8cbd4\|Agent 写得更快以后，时间花在了哪里？]] | 工程方法层 | Agent 流水线等待时间的分阶段拆解与优化（基于 Anthropic Scion 复盘） |
-| ② | [[不要迷信 AI 大厂的 Coding 实践\|不要迷信 AI 大厂的 Coding 实践]] | 成本约束层 | 偏差累积 → 测试/Review 工程化 → 每一量级提效对应指数量级成本（Lauren 2500 PR 数字与公开转述约 1000 不一致，引用注意） |
-| ③ | [[老板应该招哪类程序员-5fa0932a\|老板应该招哪类程序员？]] | 组织破局层 | 软件开发不可能三角 + DORA 五指标预警；答案是招 AI 架构师守住架构健康（DORA 五维已核实；「38 刀时薪」实为每卡每小时收入） |
+| ① | [[agent-写得更快以后-时间花在了哪里-14e8cbd4]] | 工程方法层 | Agent 流水线等待时间的分阶段拆解与优化（基于 Anthropic Scion 复盘） |
+| ② | [[不要迷信 AI 大厂的 Coding 实践]] | 成本约束层 | 偏差累积 → 测试/Review 工程化 → 每一量级提效对应指数量级成本（Lauren 2500 PR 数字与公开转述约 1000 不一致，引用注意） |
+| ③ | [[老板应该招哪类程序员-5fa0932a]] | 组织破局层 | 软件开发不可能三角 + DORA 五指标预警；答案是招 AI 架构师守住架构健康（DORA 五维已核实；「38 刀时薪」实为每卡每小时收入） |
 
 ---
 
@@ -115,5 +115,5 @@ source: vault_initiative - moc - ai_agent - harness_engineering
 - [[OpenAI研究员Noam Brown-多智能体协作能否递归自我改进|OpenAI研究员Noam Brown-多智能体协作能否递归自我改进]]
 
 - **总笔记数**：45 核心 + 3 跨 MOC 链接
-- **最后更新**：2026-10-22（新增专题「AI Coding 成本与组织」：三部曲 3 篇，关键数字已外部核验）
+- **最后更新**：2026-10-23（修复专题表格死链：链接解析器不支持表格内 `\|` 转义别名，改用纯文件名链接）
 - **入选标准**：笔记主题必须直接讨论"围绕 Agent 的工程系统"（不是单纯的"Agent 本身"或"Agent 怎么用"）
