@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,13 +10,39 @@ const errors = [];
 // 工作区文件以 git 语义枚举：tracked + untracked-non-ignored（= `git status` 可见面）。
 // 取代手写 walk 的白名单忽略集：不再随测试产物（*.log、临时夹具等）漂移计数，
 // 忽略规则一次维护在 .gitignore；quarantine（历史 ops 内敏感隔离区，仅回滚形态存在）仍显式排除。
-function gitFileList() {
-  const tracked = execFileSync("git", ["-c", "core.quotepath=false", "ls-files"], { cwd: ROOT, encoding: "utf8", windowsHide: true });
-  const others = execFileSync("git", ["-c", "core.quotepath=false", "ls-files", "--others", "--exclude-standard"], { cwd: ROOT, encoding: "utf8", windowsHide: true });
-  return [...new Set([...tracked.split(/\r?\n/), ...others.split(/\r?\n/)].filter(Boolean))].sort();
+function gitPaths(args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("git", ["-c", "core.quotepath=false", "ls-files", "-z", ...args], { cwd: ROOT, windowsHide: true });
+    const files = [];
+    let pending = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      const parts = (pending + chunk).split("\0");
+      pending = parts.pop();
+      files.push(...parts);
+    });
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code !== 0) {
+        reject(new Error(`git ls-files 失败：${stderr.trim() || `exit ${code}`}`));
+        return;
+      }
+      if (pending) files.push(pending);
+      resolve(files);
+    });
+  });
 }
 
-const files = gitFileList()
+async function gitFileList() {
+  const tracked = await gitPaths([]);
+  const others = await gitPaths(["--others", "--exclude-standard"]);
+  return [...new Set([...tracked, ...others])].sort();
+}
+
+const files = (await gitFileList())
   .filter((relative) => !relative.startsWith("ops/artifacts/quarantine/"))
   .map((relative) => path.join(ROOT, relative));
 for (const file of files) {

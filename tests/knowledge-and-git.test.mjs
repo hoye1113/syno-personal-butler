@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 import { promisify } from "node:util";
 
 import { GitGuard, parsePorcelainZ } from "../packages/syno-core/git-guard.mjs";
@@ -94,6 +95,30 @@ async function writeFixture(file, text) {
   await fs.writeFile(file, text, "utf8");
 }
 
+test("GitGuard changeSnapshot preserves order, missing files and special paths", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-git-snapshot-paths-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await exec("git", ["init", "--quiet"], { cwd: root });
+  await exec("git", ["config", "user.name", "Syno Test"], { cwd: root });
+  await exec("git", ["config", "user.email", "syno-test@localhost"], { cwd: root });
+  await fs.mkdir(path.join(root, "ops"));
+  await fs.writeFile(path.join(root, "ops", "missing.md"), "gone\n");
+  await exec("git", ["add", "--", "ops/missing.md"], { cwd: root });
+  await exec("git", ["commit", "--quiet", "-m", "fixture"], { cwd: root });
+  await fs.rm(path.join(root, "ops", "missing.md"));
+  for (const [name, text] of [["第一.md", "alpha\n"], ["space and -dash.md", "beta\n"], ["line\nbreak.md", "gamma\n"]]) {
+    await fs.writeFile(path.join(root, "ops", name), text);
+  }
+
+  const snapshot = await new GitGuard({ repoRoot: root, worktreeRoot: path.join(root, ".worktrees") }).changeSnapshot();
+  assert.deepEqual(snapshot.map(({ path: file, fingerprint }) => ({ path: file, fingerprint })), [
+    { path: "ops/missing.md", fingerprint: "36180f07af06af63022ccb4d8dce113534f8c30196d70fe8e624ba2dee580ebc" },
+    { path: "ops/line\nbreak.md", fingerprint: "94a21404836b4a34959a41e56caf328b49083a7701f86fd19e5aa71ff58b82e8" },
+    { path: "ops/space and -dash.md", fingerprint: "6088d33b1ff65030bcb55bbaa08340c351499fe4258262652b0e2eee9b448fca" },
+    { path: "ops/第一.md", fingerprint: "e1e3ac69525ee82f1b787f2193694df0c827f9b9e79e02f84d8555bcdbb7c02c" },
+  ]);
+});
+
 test("GitGuard changeSnapshot survives large change sets without unbounded git spawn", { timeout: 60_000 }, async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-git-snapshot-many-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
@@ -109,6 +134,23 @@ test("GitGuard changeSnapshot survives large change sets without unbounded git s
   const snapshot = await guard.changeSnapshot();
   assert.equal(snapshot.length, count);
   assert.equal(new Set(snapshot.map((change) => change.path)).size, count);
+});
+
+test("GitGuard changeSnapshot hashes a large workspace within the batching budget", { timeout: 60_000 }, async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-git-snapshot-fast-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await exec("git", ["init", "--quiet"], { cwd: root });
+  const count = 8_000;
+  await fs.mkdir(path.join(root, "ops"));
+  await Promise.all(Array.from({ length: count }, (_, index) =>
+    fs.writeFile(path.join(root, "ops", `record-${String(index).padStart(4, "0")}.md`), `record ${index}\n`),
+  ));
+  const guard = new GitGuard({ repoRoot: root, worktreeRoot: path.join(root, ".worktrees") });
+  const startedAt = performance.now();
+  const snapshot = await guard.changeSnapshot();
+  const elapsedMs = performance.now() - startedAt;
+  assert.equal(snapshot.length, count);
+  assert.ok(elapsedMs < 5_000, `8000-file snapshot took ${elapsedMs.toFixed(0)} ms; batching budget is 5000 ms`);
 });
 
 test("GitGuard commits only declared paths", async (t) => {

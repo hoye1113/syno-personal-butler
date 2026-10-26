@@ -277,15 +277,29 @@ class GitGuard {
   async changeSnapshot(cwd = this.repoRoot) {
     const changes = await this.changes(cwd);
     const snapshots = [];
-    // 5 万+ 审计文件时无界 Promise.all 会同时孵化大量 git，耗尽进程/fd 并以 EBADF/EAGAIN
-    // 击穿 publish 状态提交。分批保持最多 16 个子进程，同时保留逐文件 missing 语义与结果顺序。
-    for (let start = 0; start < changes.length; start += 16) {
-      const batch = await Promise.all(changes.slice(start, start + 16).map(async (change) => {
-        const result = await git(["hash-object", "--no-filters", "--", change.path], { cwd, allowExitCodes: [128] });
-        const blob = result.code === 0 ? result.stdout.trim() : "missing";
-        return { ...change, fingerprint: diffHash(`${change.status}\0${change.path}\0${change.sourcePath || ""}\0${blob}`) };
-      }));
-      snapshots.push(...batch);
+    // 批量参数避免为每个文件孵化 git；64 个路径同时限制命令行长度与子进程数。
+    // 若批次中有文件在快照前消失，则退回最多 16 并发的逐文件哈希，保留 missing 语义。
+    for (let start = 0; start < changes.length; start += 64) {
+      const batch = changes.slice(start, start + 64);
+      const result = await git(["hash-object", "--no-filters", "--", ...batch.map((change) => change.path)], { cwd, allowExitCodes: [128] });
+      let blobs;
+      if (result.code === 0) {
+        blobs = result.stdout.trim().split(/\r?\n/);
+        if (blobs.length !== batch.length) throw new Error(`git hash-object 返回 ${blobs.length} 个结果，预期 ${batch.length} 个`);
+      } else {
+        blobs = [];
+        for (let offset = 0; offset < batch.length; offset += 16) {
+          const fallback = await Promise.all(batch.slice(offset, offset + 16).map(async (change) => {
+            const item = await git(["hash-object", "--no-filters", "--", change.path], { cwd, allowExitCodes: [128] });
+            return item.code === 0 ? item.stdout.trim() : "missing";
+          }));
+          blobs.push(...fallback);
+        }
+      }
+      snapshots.push(...batch.map((change, index) => ({
+        ...change,
+        fingerprint: diffHash(`${change.status}\0${change.path}\0${change.sourcePath || ""}\0${blobs[index]}`),
+      })));
     }
     return snapshots;
   }
