@@ -276,11 +276,18 @@ class GitGuard {
 
   async changeSnapshot(cwd = this.repoRoot) {
     const changes = await this.changes(cwd);
-    return Promise.all(changes.map(async (change) => {
-      const result = await git(["hash-object", "--no-filters", "--", change.path], { cwd, allowExitCodes: [128] });
-      const blob = result.code === 0 ? result.stdout.trim() : "missing";
-      return { ...change, fingerprint: diffHash(`${change.status}\0${change.path}\0${change.sourcePath || ""}\0${blob}`) };
-    }));
+    const snapshots = [];
+    // 5 万+ 审计文件时无界 Promise.all 会同时孵化大量 git，耗尽进程/fd 并以 EBADF/EAGAIN
+    // 击穿 publish 状态提交。分批保持最多 16 个子进程，同时保留逐文件 missing 语义与结果顺序。
+    for (let start = 0; start < changes.length; start += 16) {
+      const batch = await Promise.all(changes.slice(start, start + 16).map(async (change) => {
+        const result = await git(["hash-object", "--no-filters", "--", change.path], { cwd, allowExitCodes: [128] });
+        const blob = result.code === 0 ? result.stdout.trim() : "missing";
+        return { ...change, fingerprint: diffHash(`${change.status}\0${change.path}\0${change.sourcePath || ""}\0${blob}`) };
+      }));
+      snapshots.push(...batch);
+    }
+    return snapshots;
   }
 }
 

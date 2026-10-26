@@ -94,6 +94,23 @@ async function writeFixture(file, text) {
   await fs.writeFile(file, text, "utf8");
 }
 
+test("GitGuard changeSnapshot survives large change sets without unbounded git spawn", { timeout: 60_000 }, async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-git-snapshot-many-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await exec("git", ["init", "--quiet"], { cwd: root });
+  const count = 4_000;
+  // 2026-10-26：主工作区 5 万+ 审计文件让无界 Promise.all 同时孵化大量 git，
+  // 在 launchd maxfiles=8192 下仍以 spawn EBADF/EAGAIN 击穿 publish 状态提交。
+  await fs.mkdir(path.join(root, "ops"));
+  await Promise.all(Array.from({ length: count }, (_, index) =>
+    fs.writeFile(path.join(root, "ops", `record-${String(index).padStart(4, "0")}.md`), `record ${index}\n`),
+  ));
+  const guard = new GitGuard({ repoRoot: root, worktreeRoot: path.join(root, ".worktrees") });
+  const snapshot = await guard.changeSnapshot();
+  assert.equal(snapshot.length, count);
+  assert.equal(new Set(snapshot.map((change) => change.path)).size, count);
+});
+
 test("GitGuard commits only declared paths", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-git-guard-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
