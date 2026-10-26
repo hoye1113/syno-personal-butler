@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { FeishuChannelAdapter, FeishuStateStore } from "../packages/syno-core/feishu-channel.mjs";
+import { FeishuChannelAdapter, FeishuStateStore, optimizeFeishuCardMarkdown } from "../packages/syno-core/feishu-channel.mjs";
 
 async function fixture(t, { onMessage, typingIndicator = true, fail = {} } = {}) {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-feishu-typing-"));
@@ -146,4 +146,31 @@ test("Feishu still replies normally when the placeholder card cannot be sent", a
   assert.equal(fallback.body.markdown, "照常答复");
   assert.equal(calls.some((call) => call.kind === "updateCard"), false);
   await adapter.stop();
+});
+
+test("card markdown is normalized for visual density: heading demotion, table spacing, code protection", () => {
+  const input = [
+    "# 大标题",
+    "",
+    "",
+    "",
+    "正文第一段。",
+    "| 列A | 列B |",
+    "| --- | --- |",
+    "| 1 | 2 |",
+    "```md",
+    "# 代码里的标题不动",
+    "```",
+    "#### 已是小标题",
+    "##### 连续小标题",
+  ].join("\n");
+  const out = optimizeFeishuCardMarkdown(input);
+  assert.match(out, /^#### 大标题/m, "H1 降级为 H4");
+  assert.ok(!out.includes("\n\n\n"), "三连空行被压缩");
+  assert.match(out, /正文第一段。\n\n\| 列A/, "表格前补空行");
+  assert.match(out, /```md\n# 代码里的标题不动\n```/, "代码块内标题不受影响");
+  assert.match(out, /<br>\n```md/, "代码块前补呼吸位");
+  assert.match(out, /#### 已是小标题\n<br>\n##### 连续小标题/, "连续标题间补间隔");
+  assert.equal(optimizeFeishuCardMarkdown(null), "");
+  assert.equal(optimizeFeishuCardMarkdown("纯文本，没有 markdown"), "纯文本，没有 markdown");
 });

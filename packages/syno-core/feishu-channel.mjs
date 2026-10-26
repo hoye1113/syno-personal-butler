@@ -148,6 +148,32 @@ class FeishuCredentialStore {
 
 async function officialSdk() { return import("@larksuiteoapi/node-sdk"); }
 
+// 管家回复最终落在 Card 2.0 的 markdown 组件（#statusCard），不走 SDK 的 post 优化管线，
+// 需要自己做视觉归一（思路同 SDK optimizeMarkdownStyle 的 cardVersion=2 分支）：
+// 一级/二级标题在卡片里字号过大 → 降级为 H4/H5；表格和代码块四周补呼吸行；压缩多余空行。
+// 模型产出不可控，这层是确定性的兜底排版，提示词规约管不到的地方由它保证。
+function optimizeFeishuCardMarkdown(text) {
+  try {
+    const MARK = "___CB_";
+    const codeBlocks = [];
+    let r = String(text || "").replace(/(^|\n)(`{3,})([^\n]*)\n[\s\S]*?\n\2(?=\n|$)/g, (m, prefix = "") => {
+      const block = m.slice(String(prefix).length);
+      return `${prefix}${MARK}${codeBlocks.push(block) - 1}___`;
+    });
+    if (/^#{1,3} /m.test(r)) {
+      r = r.replace(/^#{2,6} (.+)$/gm, "##### $1");
+      r = r.replace(/^# (.+)$/gm, "#### $1");
+    }
+    r = r.replace(/^(#{4,5} .+)\n{1,2}(#{4,5} )/gm, "$1\n<br>\n$2");
+    r = r.replace(/^([^|\n].*)\n(\|.+\|)/gm, "$1\n\n$2");
+    codeBlocks.forEach((block, i) => { r = r.replace(`${MARK}${i}___`, `\n<br>\n${block}\n<br>\n`); });
+    return r.replace(/\n{3,}/g, "\n\n");
+  } catch {
+    return String(text || "");
+  }
+}
+
+
 const DEFAULT_FEISHU_QUARANTINE_ROOT = () => path.join(PATHS.runtimeRoot, "quarantine", "feishu");
 
 class FeishuChannelAdapter {
@@ -246,7 +272,7 @@ class FeishuChannelAdapter {
     return {
       schema: "2.0",
       config: { update_multi: true, ...(summary ? { summary: { content: String(summary).slice(0, 80) } } : {}) },
-      body: { elements: [{ tag: "markdown", content: String(markdown || "") }] },
+      body: { elements: [{ tag: "markdown", content: optimizeFeishuCardMarkdown(markdown) }] },
     };
   }
 
@@ -443,4 +469,4 @@ class FeishuChannelAdapter {
   }
 }
 
-export { FAILED_PAYLOAD_RETENTION_MS, FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, officialSdk, renderRegistrationQr, SILENT_SDK_LOGGER, validateRegistrationUrl };
+export { FAILED_PAYLOAD_RETENTION_MS, FeishuChannelAdapter, FeishuCredentialStore, FeishuStateStore, officialSdk, optimizeFeishuCardMarkdown, renderRegistrationQr, SILENT_SDK_LOGGER, validateRegistrationUrl };
