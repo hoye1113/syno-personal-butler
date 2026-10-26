@@ -43,6 +43,13 @@ function buildLaunchAgentPlist({ label = LABEL, nodePath, launcherPath, repoRoot
   <integer>10</integer>
   <key>ProcessType</key>
   <string>Background</string>
+  <!-- 2026-10-26 事故：launchd 默认 maxfiles 软上限只有 256，管家在同步风暴中 fd 耗尽后
+       spawn git 报 EBADF 假死。放宽到 8192（远低于 kern.maxfilesperproc）。 -->
+  <key>SoftResourceLimits</key>
+  <dict>
+    <key>NumberOfFiles</key>
+    <integer>8192</integer>
+  </dict>
   <key>StandardOutPath</key>
   <string>${xmlEscape(path.join(logRoot, "launchd-agent.out.log"))}</string>
   <key>StandardErrorPath</key>

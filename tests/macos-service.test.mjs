@@ -61,6 +61,8 @@ test("plist 内容固定：绝对路径、登录自启、失败重拉、日志�
   assert.match(plist, /<string>[^<]*launchd-agent\.out\.log<\/string>/);
   assert.match(plist, /<string>[^<]*launchd-agent\.err\.log<\/string>/);
   assert.match(plist, /<key>PATH<\/key>\n    <string>\/usr\/bin:\/bin:\/usr\/sbin:\/sbin:\/usr\/local\/bin:\/opt\/homebrew\/bin<\/string>/);
+  // 2026-10-26：launchd 默认 maxfiles=256 曾导致同步风暴中 spawn EBADF 假死
+  assert.match(plist, /<key>SoftResourceLimits<\/key>\n  <dict>\n    <key>NumberOfFiles<\/key>\n    <integer>8192<\/integer>/);
   const escaped = buildLaunchAgentPlist({ label: "x", nodePath: "/n&x", launcherPath: "/l<m", repoRoot: "/r>", logRoot: "/g" });
   assert.match(escaped, /\/n&amp;x/);
   assert.match(escaped, /\/l&lt;m/);
