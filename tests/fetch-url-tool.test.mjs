@@ -143,6 +143,37 @@ test("fetchUrlForChat escalates an anti-bot wall to the browser in a live chat c
   assert.equal(adapter.calls[0][2], "https://mp.weixin.qq.com/s/abc");
 });
 
+test("fetchUrlForChat escalates direct network failures only in live chat", async () => {
+  const failures = [
+    Object.assign(new Error("read ETIMEDOUT"), { code: "ETIMEDOUT" }),
+    new Error("来源抓取超时"),
+    Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" }),
+  ];
+  for (const failure of failures) {
+    const adapter = fakeBrowserAdapter({
+      capture: { status: "completed", finalUrl: "https://x.com/Mileson07/status/2114746056005329363", title: "超级峰", content: "浏览器取得的推文正文" },
+    });
+    const result = await fetchUrlForChat({
+      url: "https://x.com/Mileson07/status/2114746056005329363",
+      fetcher: async () => { throw failure; },
+      browserCapture: adapter,
+      context: chatContext,
+    });
+    assert.equal(result.via, "browser");
+    assert.match(result.content, /浏览器取得的推文正文/);
+    assert.equal(adapter.calls.length, 1);
+  }
+
+  const scheduled = fakeBrowserAdapter({ capture: { status: "completed", title: "不应读取", content: "不应读取" } });
+  await assert.rejects(fetchUrlForChat({
+    url: "https://x.com/Mileson07/status/2114746056005329363",
+    fetcher: async () => { throw failures[0]; },
+    browserCapture: scheduled,
+    context: { channel: "scheduler", ownerId: "local-user", threadKey: "proactive" },
+  }), /ETIMEDOUT/);
+  assert.equal(scheduled.calls.length, 0);
+});
+
 test("fetchUrlForChat keeps the Agent Window open and asks the owner to finish verification", async () => {
   // 2026-10-16「一步到位」：拦截不再当场关窗。窗口留着、话术允许提示「继续」，
   // 因为人只能在还开着的窗口里过验证；仍然禁止代替主人验证或绕过验证。

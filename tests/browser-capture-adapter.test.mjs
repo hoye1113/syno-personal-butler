@@ -62,6 +62,8 @@ test("BrowserCaptureAdapter uses a background Agent Window and closes it after U
   const args = fake.calls.map((call) => call.args);
   assert.ok(args.some((item) => item[0] === "session" && item[1] === "start" && item.includes("--no-focus")));
   assert.ok(args.some((item) => item[0] === "navigate" && item.includes("bsk-session-1")));
+  const navigate = args.find((item) => item[0] === "navigate");
+  assert.equal(navigate[navigate.indexOf("--wait-until") + 1], "load", "动态页面至少等 load，不能在 domcontentloaded 读取 JS 壳页");
   assert.ok(args.some((item) => item[0] === "observe" && item.includes("bsk-session-1")));
   assert.ok(args.some((item) => item[0] === "session" && item[1] === "stop" && item[2] === "bsk-session-1"));
   assert.equal(args.flat().includes("borrow"), false);
@@ -151,6 +153,32 @@ test("BrowserCaptureAdapter falls back to the VOM text when HTML extraction yiel
   assert.equal(result.title, "Agent 写得更快以后，时间花在了哪里？");
   assert.match(result.content, /代码改完了，流水线还没跑完/);
   assert.doesNotMatch(result.content, /function W\(/);
+});
+
+test("BrowserCaptureAdapter prefers rendered VOM content over an X JavaScript shell from HTML", async () => {
+  const rendered = {
+    url: "https://x.com/Mileson07/status/2114746056005329363",
+    text: ["@vom 1", "L1 page", '  RootWebArea "超级峰 on X"', '    StaticText "小红书全自动化运营，新手保姆级完整教程"', '    StaticText "我把一个小红书账号的日常内容运营交给了 Dot。"'].join("\n"),
+  };
+  const html = '<html><head><title>(1) X</title></head><body><img src="https://pbs.twimg.com/media/example.jpg"><p>JavaScript is not available.</p><p>We’ve detected that JavaScript is disabled in this browser. Please enable JavaScript.</p></body></html>';
+  const fake = fakeRunner({ observations: [rendered], html });
+  const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner });
+  const result = await adapter.capture({ workflowId: "workflow-x-shell-fallback", exactUrl: "https://x.com/Mileson07/status/2114746056005329363" });
+  assert.equal(result.status, "completed");
+  assert.match(result.content, /小红书全自动化运营/);
+  assert.doesNotMatch(result.content, /JavaScript is not available/);
+});
+
+test("BrowserCaptureAdapter fails instead of completing with only a JavaScript shell", async () => {
+  const shell = {
+    url: "https://x.com/Mileson07/status/2114746056005329363",
+    text: ["@vom 1", "L1 page", '  RootWebArea "(1) X"', '    StaticText "JavaScript is not available."', '    StaticText "We’ve detected that JavaScript is disabled in this browser. Please enable JavaScript."'].join("\n"),
+  };
+  const fake = fakeRunner({ observations: [shell] });
+  const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner });
+  const result = await adapter.capture({ workflowId: "workflow-x-shell-only", exactUrl: "https://x.com/Mileson07/status/2114746056005329363" });
+  assert.equal(result.status, "failed");
+  assert.equal(result.error.code, "BROWSER_JAVASCRIPT_REQUIRED");
 });
 
 test("BrowserCaptureAdapter blocks a wall page that only exists as VOM text", async () => {

@@ -73,11 +73,18 @@ function htmlTitle(html) {
   return "";
 }
 
+function javascriptShell(value) {
+  const body = String(value || "");
+  return body.length < 2_000
+    && /JavaScript is not available/iu.test(body)
+    && /JavaScript is disabled|enable JavaScript/iu.test(body);
+}
+
 // extractReadableText 对部分站点（微信为代表，2026-10-22 实证）会漏剥内联脚本/样式，
 // 产出压缩 JS/CSS 垃圾；垃圾不得当正文，由调用方降级到 observe 的 VOM 文本。
 function extractionGarbage(value) {
   const body = String(value || "");
-  return !body || scriptResidue({ title: "", body }) || hasSourceNoise(body);
+  return !body || javascriptShell(body) || scriptResidue({ title: "", body }) || hasSourceNoise(body);
 }
 
 // bsk observe 的 VOM 文本里 RootWebArea 的名字承载页标题：验证墙是短名（"环境异常"），
@@ -171,7 +178,7 @@ class BrowserCaptureAdapter {
       const target = assertSafeUrl(args.url);
       if (target.toString() !== task.requestedUrl) throw adapterError("BROWSER_URL_NOT_SIGNED", "浏览器只能打开当前 Workflow 已签发的精确地址");
       const session = await this.#ensureSession(id, task);
-      return this.#run(["navigate", target.toString(), "--session", session, "--wait-until", "domcontentloaded", "--timeout", `${this.timeoutMs}ms`, "--json"]);
+      return this.#run(["navigate", target.toString(), "--session", session, "--wait-until", "load", "--timeout", `${this.timeoutMs}ms`, "--json"]);
     }
     if (action === "snapshot") {
       const session = await this.#ensureSession(id, task);
@@ -360,9 +367,11 @@ class BrowserCaptureAdapter {
     const base = { requestedUrl, finalUrl: final.toString(), title, content, truncated: result.htmlTruncated === true || fullContent.length > this.maxContentChars, resources: images?.refs, resourceDiscoveryComplete: Boolean(images) && result.htmlTruncated !== true, contentDigest: digest(content), usedActions: ["navigate", "observe"], browserSessionId: this.sessions.get(id)?.logicalSession };
     const observation = requiresInteraction(base)
       ? { ...base, status: "failed", blocked: "unattended_auth", error: { code: "BROWSER_BLOCKED_UNATTENDED", message: "页面要求登录或人机验证；无人值守读取已停止，且不会绕过验证" } }
-      : !content
-        ? { ...base, status: "failed", error: { code: "BROWSER_EMPTY_CONTENT", message: "浏览器页面没有可读取正文" } }
-        : { ...base, status: "completed" };
+      : javascriptShell(content)
+        ? { ...base, status: "failed", error: { code: "BROWSER_JAVASCRIPT_REQUIRED", message: "浏览器页面仍是 JavaScript 壳页，正文尚未加载" } }
+        : !content
+          ? { ...base, status: "failed", error: { code: "BROWSER_EMPTY_CONTENT", message: "浏览器页面没有可读取正文" } }
+          : { ...base, status: "completed" };
     this.observations.set(id, observation);
     return observation;
   }

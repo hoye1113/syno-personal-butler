@@ -199,6 +199,10 @@ test("Syno agent instructions match the shared core chat tool set", async () => 
   assert.match(instructions, /blocked.*未取得正文/);
   // 2026-10-16：浏览器升级接回插件路径，提示词口径改为「活聊天命中反爬墙自动改用本机浏览器」
   assert.match(instructions, /命中反爬验证墙.*自动改用本机浏览器/);
+  assert.match(instructions, /网络超时.*自动改用本机浏览器/);
+  assert.match(instructions, /via=browser.*才能声称已调用 BSK/);
+  assert.match(instructions, /复用已连接浏览器的既有登录态/);
+  assert.doesNotMatch(instructions, /独立 profile/);
   assert.doesNotMatch(instructions, /默认插件仅支持直抓/);
   assert.doesNotMatch(instructions, /告知主人完成后回复|先.*web_search.*再.*web_fetch/);
   assert.match(instructions, /不要求固定口令/);

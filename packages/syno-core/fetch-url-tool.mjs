@@ -4,6 +4,7 @@
 // 2026-09-03 #20：直抓命中反爬验证码墙（或 HTTP 401/403/429 封锁）时，活聊天上下文自动升级
 // BrowserCaptureAdapter（BSK 后台 Agent Window，复用已有浏览器登录态）；scheduler 等主动任务绝不升级，
 // 主人发送链接的聊天与显式收录任务才允许创建不抢焦点的临时 Agent Window。
+// 2026-10-27：X 等来源在活聊天中直抓网络超时/连接重置也走同一兜底，不再把原始网络错误误当浏览器终态。
 
 import { sourceValidity } from "./source-validity.mjs";
 import { createHash } from "node:crypto";
@@ -32,6 +33,12 @@ function detectAntiBotWall({ sourceUrl, text, title, html } = {}) {
 function httpBlockStatus(error) {
   const match = /HTTP (401|403|429)\b/u.exec(String(error?.message || ""));
   return match ? Number(match[1]) : null;
+}
+
+function directNetworkFailureReason(error) {
+  if (error?.code === "ETIMEDOUT" || /来源抓取超时|ETIMEDOUT/iu.test(String(error?.message || ""))) return "network_timeout";
+  if (error?.code === "ECONNRESET" || /ECONNRESET/iu.test(String(error?.message || ""))) return "network_reset";
+  return null;
 }
 
 // 公开网页常带凭据示例（API key、Authorization 头），原文直接发远程模型会被工具桥安全检查拦死
@@ -166,7 +173,7 @@ async function escalateViaBrowser({ url, browserCapture, context, wall, maxText,
     sourceUrl: url,
     contentType: "none",
     content: [
-      `直抓被反爬拦截（${wall}），浏览器通道也未走通：${observation?.error?.message || observation?.error?.code || "未知原因"}。`,
+      `直抓未取得正文（${wall}），浏览器通道也未走通：${observation?.error?.message || observation?.error?.code || "未知原因"}。`,
       "如实告诉主人：直抓与 BSK 浏览器两种读取方式都没成功；不要请求临时借用标签页或人工接管。",
     ].join("\n\n"),
     truncated: false,
@@ -190,22 +197,28 @@ async function fetchUrlForChat({ url, maxChars = DEFAULT_MAX_CHARS, fetcher = fe
   const maxText = Math.min(MAX_SOURCE_TEXT, Math.max(1_000, Number(maxChars) || DEFAULT_MAX_CHARS));
   let snapshot = null;
   let httpBlocked = null;
+  let networkFailure = null;
+  let networkWall = null;
   try {
     snapshot = await fetcher(target, { maxText });
   } catch (error) {
     if (httpBlockStatus(error) || error.code === "SOURCE_VERIFICATION_REQUIRED") httpBlocked = error;
-    else throw error;
+    else {
+      networkWall = directNetworkFailureReason(error);
+      if (networkWall) networkFailure = error;
+      else throw error;
+    }
   }
   const wall = httpBlocked
     ? `http_${httpBlockStatus(httpBlocked)}`
-    : detectAntiBotWall({ sourceUrl: snapshot.url, text: snapshot.text });
+    : networkWall || detectAntiBotWall({ sourceUrl: snapshot.url, text: snapshot.text });
   if (wall && browserCapture && LIVE_CHAT_CHANNELS.has(String(context?.channel || ""))) {
     try {
       return await escalateViaBrowser({ url: target, browserCapture, context, wall, maxText, recordEvent });
     } catch (error) {
-      // 升级故障不能把验证页当正文；HTTP 封锁继续抛原错误，其余只返回带 blocked 的说明。
+      // 升级故障不能把验证页当正文；HTTP 封锁与网络故障继续抛原错误，其余只返回带 blocked 的说明。
       reportEscalation(recordEvent, { url: target, wall, outcome: "escalation_error" });
-      if (httpBlocked) throw httpBlocked;
+      if (httpBlocked || networkFailure) throw httpBlocked || networkFailure;
       return wrapUntrusted({
         sourceUrl: snapshot?.url || target,
         contentType: snapshot?.contentType || "text/html",
@@ -217,9 +230,9 @@ async function fetchUrlForChat({ url, maxChars = DEFAULT_MAX_CHARS, fetcher = fe
     }
   }
   // 无墙：正常返回。有墙但不可升级（后台上下文/无浏览器通道）：只返回阻塞说明，避免验证页被当作正文，
-  // HTTP 层封锁维持原样上抛（既有契约）。
+  // HTTP 层封锁与网络故障维持原样上抛（既有契约）。
   if (wall) reportEscalation(recordEvent, { url: target, wall, outcome: "not_escalated" });
-  if (httpBlocked) throw httpBlocked;
+  if (httpBlocked || networkFailure) throw httpBlocked || networkFailure;
   return wrapUntrusted({
     sourceUrl: snapshot.url,
     contentType: snapshot.contentType,
