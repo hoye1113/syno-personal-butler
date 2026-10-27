@@ -8,6 +8,7 @@ import { locateCommand, runProcess } from "./process-runner.mjs";
 import { isPrivateAddress } from "./source-fetcher.mjs";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_RENDER_SETTLE_MS = 1_500;
 const DEFAULT_SESSION_TTL_MS = 2 * 60 * 60 * 1_000;
 const MAX_CONTENT_CHARS = 100_000;
 const ALLOWED_ACTIONS = Object.freeze(new Set(["navigate", "snapshot", "list_tabs", "close_session"]));
@@ -80,6 +81,13 @@ function javascriptShell(value) {
     && /JavaScript is disabled|enable JavaScript/iu.test(body);
 }
 
+function stripJavascriptNotice(value) {
+  return String(value || "")
+    .replace(/^[ \t]*JavaScript is not available\.?[ \t]*(?:\r?\n|$)/gimu, "")
+    .replace(/^[ \t]*We(?:'|’)ve detected that JavaScript is disabled in this browser\.[^\r\n]*(?:\r?\n|$)/gimu, "")
+    .replace(/\n{3,}/gu, "\n\n");
+}
+
 // extractReadableText 对部分站点（微信为代表，2026-10-22 实证）会漏剥内联脚本/样式，
 // 产出压缩 JS/CSS 垃圾；垃圾不得当正文，由调用方降级到 observe 的 VOM 文本。
 function extractionGarbage(value) {
@@ -139,11 +147,13 @@ function requiresInteraction({ finalUrl, title, content }) {
 }
 
 class BrowserCaptureAdapter {
-  constructor({ command = locateCommand("bsk", "SYNO_BSK_COMMAND"), runner = runProcess, clock = () => new Date(), timeoutMs = DEFAULT_TIMEOUT_MS, maxContentChars = MAX_CONTENT_CHARS, sessionTtlMs = DEFAULT_SESSION_TTL_MS, browser = process.env.SYNO_BSK_BROWSER || "" } = {}) {
+  constructor({ command = locateCommand("bsk", "SYNO_BSK_COMMAND"), runner = runProcess, clock = () => new Date(), timeoutMs = DEFAULT_TIMEOUT_MS, renderSettleMs = DEFAULT_RENDER_SETTLE_MS, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), maxContentChars = MAX_CONTENT_CHARS, sessionTtlMs = DEFAULT_SESSION_TTL_MS, browser = process.env.SYNO_BSK_BROWSER || "" } = {}) {
     this.commandPath = command;
     this.runner = runner;
     this.clock = clock;
     this.timeoutMs = timeoutMs;
+    this.renderSettleMs = Math.max(0, Number(renderSettleMs) || 0);
+    this.sleep = sleep;
     this.maxContentChars = Math.min(MAX_CONTENT_CHARS, Math.max(1_000, Number(maxContentChars) || MAX_CONTENT_CHARS));
     this.sessionTtlMs = Math.min(24 * 60 * 60 * 1_000, Math.max(5 * 60 * 1_000, Number(sessionTtlMs) || DEFAULT_SESSION_TTL_MS));
     this.browser = String(browser || "");
@@ -271,6 +281,13 @@ class BrowserCaptureAdapter {
         await this.#withTimeout(this.navigate({ workflowId: id }), timeoutMs);
         observation = await this.#snapshot(id, requested, timeoutMs);
       }
+      // load 只代表资源加载完成，不代表动态正文已注水。轻内容短暂停留后原窗重读一次；
+      // 后读仍失败时保留首读正文，但若变成验证墙则必须 fail-closed。
+      if (observation.status === "completed" && observation.content.length < 2_000 && this.renderSettleMs > 0) {
+        await this.sleep(this.renderSettleMs);
+        const settled = await this.#snapshot(id, requested, timeoutMs);
+        if (settled.status === "completed" || settled.error?.code === "BROWSER_BLOCKED_UNATTENDED") observation = settled;
+      }
       blocked = observation.error?.code === "BROWSER_BLOCKED_UNATTENDED";
       return observation;
     } catch (error) {
@@ -360,8 +377,11 @@ class BrowserCaptureAdapter {
     const images = result.html ? htmlImageReferences(result.html, final.toString()) : null;
     // 正文优先级：extractReadableText 产出干净则用；产出垃圾（或为空）则降级 observe 的
     // VOM 文本（无图时的既有兜底）。两者皆垃圾时 requiresInteraction fail-closed。
-    const extracted = images ? extractReadableText(images.html, "text/html") : "";
-    const fullContent = images && !extractionGarbage(extracted) ? extracted : flattenSnapshotTree(raw).replace(/\u0000/gu, " ").trim();
+    const extractedRaw = images ? extractReadableText(images.html, "text/html") : "";
+    const extracted = javascriptShell(extractedRaw) ? "" : stripJavascriptNotice(extractedRaw);
+    const observedRaw = flattenSnapshotTree(raw).replace(/\u0000/gu, " ").trim();
+    const observed = javascriptShell(observedRaw) ? observedRaw : stripJavascriptNotice(observedRaw);
+    const fullContent = images && !extractionGarbage(extracted) ? extracted : observed;
     const content = fullContent.slice(0, this.maxContentChars);
     const title = firstString(result, ["title", "page_title", "pageTitle"]) || htmlTitle(result.html) || vomTitle(raw);
     const base = { requestedUrl, finalUrl: final.toString(), title, content, truncated: result.htmlTruncated === true || fullContent.length > this.maxContentChars, resources: images?.refs, resourceDiscoveryComplete: Boolean(images) && result.htmlTruncated !== true, contentDigest: digest(content), usedActions: ["navigate", "observe"], browserSessionId: this.sessions.get(id)?.logicalSession };

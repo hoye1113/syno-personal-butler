@@ -181,6 +181,31 @@ test("BrowserCaptureAdapter fails instead of completing with only a JavaScript s
   assert.equal(result.error.code, "BROWSER_JAVASCRIPT_REQUIRED");
 });
 
+test("BrowserCaptureAdapter strips an X noscript notice from a fully rendered article", async () => {
+  const html = '<html><head><title>超级峰 on X</title></head><body><p>JavaScript is not available.</p><p>We’ve detected that JavaScript is disabled in this browser. Please enable JavaScript or switch to a supported browser to continue using x.com.</p><img src="https://pbs.twimg.com/media/example.jpg"><article><p>小红书全自动化运营，新手保姆级完整教程</p><p>'
+    + "真实正文内容。".repeat(400)
+    + "</p></article></body></html>";
+  const fake = fakeRunner({ observations: [{ url: "https://x.com/Mileson07/status/2114746056005329363", text: "小红书全自动化运营" }], html });
+  const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner, sleep: async () => {} });
+  const result = await adapter.capture({ workflowId: "workflow-x-shell-residue", exactUrl: "https://x.com/Mileson07/status/2114746056005329363" });
+  assert.equal(result.status, "completed");
+  assert.match(result.content, /小红书全自动化运营/);
+  assert.match(result.content, /真实正文内容/);
+  assert.doesNotMatch(result.content, /JavaScript is not available|JavaScript is disabled/);
+});
+
+test("BrowserCaptureAdapter reobserves a thin dynamic page after load before completing", async () => {
+  const url = "https://x.com/Mileson07/status/2114746056005329363";
+  const partial = { url, title: "(1) X", observation: "X 正在加载" };
+  const rendered = { url, title: "超级峰 on X", observation: "小红书全自动化运营，新手保姆级完整教程。浏览器稍后取得的完整正文。" };
+  const fake = fakeRunner({ observations: [partial, rendered] });
+  const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner, sleep: async () => {} });
+  const result = await adapter.capture({ workflowId: "workflow-x-dynamic-settle", exactUrl: url });
+  assert.equal(result.status, "completed");
+  assert.match(result.content, /小红书全自动化运营/);
+  assert.equal(fake.calls.filter((call) => call.args[0] === "observe").length, 2);
+});
+
 test("BrowserCaptureAdapter blocks a wall page that only exists as VOM text", async () => {
   const wallVom = {
     url: "https://mp.weixin.qq.com/s/abc",
