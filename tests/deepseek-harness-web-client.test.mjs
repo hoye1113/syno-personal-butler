@@ -389,6 +389,53 @@ test("DeepSeekHarnessWebClient keeps event streams after initializeTimeoutMs", a
   assert.equal(result.finalResponse, "web-hello");
 });
 
+test("DeepSeekHarnessWebClient resets the inactivity timeout on current-session activity", async (t) => {
+  let activity;
+  const fake = await startFakeWeb({
+    onPrompt({ sendEvent }) {
+      sendEvent({ type: "turn/start", data: { turn: 1 } });
+      let step = 0;
+      activity = setInterval(() => {
+        step += 1;
+        sendEvent({ type: "tool/result", data: { step } });
+        if (step === 3) {
+          clearInterval(activity);
+          sendEvent({ type: "assistant/message", data: { message: { content: [{ type: "text", text: "late-ok" }] } } });
+          sendEvent({ type: "turn/end", data: { turn: 1, reason: { kind: "completed" } } });
+        }
+      }, 60);
+    },
+  });
+  t.after(() => fake.close());
+  t.after(() => clearInterval(activity));
+  const client = makeClient(fake, { turnTimeoutMs: 90, maxTurnTimeoutMs: 1_000 });
+  t.after(() => client.close());
+  await client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" });
+  const result = await client.runTurn("syno-active-turn", [{ type: "text", text: "执行工具" }]);
+  assert.equal(result.finalResponse, "late-ok");
+});
+
+test("DeepSeekHarnessWebClient enforces an absolute timeout despite continuous activity", async (t) => {
+  let activity;
+  const fake = await startFakeWeb({
+    onPrompt({ sendEvent }) {
+      sendEvent({ type: "turn/start", data: { turn: 1 } });
+      activity = setInterval(() => sendEvent({ type: "tool/result", data: {} }), 30);
+    },
+  });
+  t.after(() => fake.close());
+  t.after(() => clearInterval(activity));
+  const client = makeClient(fake, { turnTimeoutMs: 70, maxTurnTimeoutMs: 140 });
+  t.after(() => client.close());
+  await client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" });
+  const started = Date.now();
+  await assert.rejects(
+    () => client.runTurn("syno-never-ending", [{ type: "text", text: "持续执行" }]),
+    (error) => error.code === "HARNESS_TURN_TIMEOUT" && /绝对上限/u.test(error.message),
+  );
+  assert.ok(Date.now() - started >= 100, "不能沿用活动超时而提前放弃绝对上限用例");
+});
+
 test("DeepSeekHarnessWebClient fails the turn when selectModel is unavailable", async (t) => {
   const notices = [];
   const fake = await startFakeWeb({

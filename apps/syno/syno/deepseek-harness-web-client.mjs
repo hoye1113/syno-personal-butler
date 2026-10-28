@@ -53,6 +53,7 @@ class DeepSeekHarnessWebClient {
     requestTimeoutMs = 180_000,
     initializeTimeoutMs = 30_000,
     turnTimeoutMs,
+    maxTurnTimeoutMs = 600_000,
     turnSettleQuietMs = 400,
     onNotice = null,
   } = {}) {
@@ -68,6 +69,7 @@ class DeepSeekHarnessWebClient {
     this.requestTimeoutMs = requestTimeoutMs;
     this.initializeTimeoutMs = initializeTimeoutMs;
     this.turnTimeoutMs = turnTimeoutMs ?? requestTimeoutMs;
+    this.maxTurnTimeoutMs = maxTurnTimeoutMs;
     this.turnSettleQuietMs = turnSettleQuietMs;
     this.onNotice = typeof onNotice === "function" ? onNotice : null;
     this.initialized = false;
@@ -145,11 +147,13 @@ class DeepSeekHarnessWebClient {
     return new Promise((resolve, reject) => {
       let settled = false;
       let timer;
+      let maxTimer;
       let drainTimer;
       const finish = (error, value) => {
         if (settled) return;
         settled = true;
         if (timer) clearTimeout(timer);
+        if (maxTimer) clearTimeout(maxTimer);
         if (drainTimer) clearTimeout(drainTimer);
         unsubscribe();
         signal?.removeEventListener("abort", onAbort);
@@ -158,6 +162,15 @@ class DeepSeekHarnessWebClient {
       };
       const onAbort = () => {
         finish(signal?.reason || runtimeError("HARNESS_CANCELED", "DeepSeek Harness turn 已取消"));
+      };
+      // 180 秒是无活动上限，不是整轮硬截止：工具结果和模型输出会续期；
+      // maxTimer 独立限制绝对时长，避免持续事件把真正卡死的回合无限续命。
+      const armInactivityTimeout = () => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          finish(runtimeError("HARNESS_TURN_TIMEOUT", "DeepSeek Harness Web turn 等待 turn/end 或 idle 静默超时", { retryable: true }));
+        }, this.turnTimeoutMs);
+        timer.unref?.();
       };
       // 兜底结算（兼容面）：未发 turn/start 的对端（旧版/假面）没有权威终态
       // 事件，沿用 idle + 静默期结算，期间每个新帧重置计时，让晚到的事件帧
@@ -186,6 +199,9 @@ class DeepSeekHarnessWebClient {
       const unsubscribe = this.subscribe((notification) => {
         notifications.push(notification);
         onNotification?.(notification);
+        const currentSessionActivity = ["session.status", "session.event"].includes(notification.method)
+          && notification.params.sessionId === sessionId;
+        if (currentSessionActivity) armInactivityTimeout();
         if (notification.method === "session.status" && notification.params.sessionId === sessionId) {
           if (notification.params.status === "running") sawRunning = true;
           if (notification.params.status === "idle" && sawRunning) idleAfterRunning = true;
@@ -209,10 +225,11 @@ class DeepSeekHarnessWebClient {
         }
         maybeSettle();
       });
-      timer = setTimeout(() => {
-        finish(runtimeError("HARNESS_TURN_TIMEOUT", "DeepSeek Harness Web turn 等待 turn/end 或 idle 静默超时", { retryable: true }));
-      }, this.turnTimeoutMs);
-      timer.unref?.();
+      maxTimer = setTimeout(() => {
+        finish(runtimeError("HARNESS_TURN_TIMEOUT", "DeepSeek Harness Web turn 超过绝对上限，停止等待", { retryable: true }));
+      }, this.maxTurnTimeoutMs);
+      maxTimer.unref?.();
+      armInactivityTimeout();
       if (signal?.aborted) {
         onAbort();
         return;
