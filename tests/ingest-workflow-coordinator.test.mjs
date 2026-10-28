@@ -307,6 +307,49 @@ test("URL preparation automatically uses BSK after direct HTTP is forbidden", as
   assert.ok(events.includes("capture.browser.completed"));
 });
 
+test("URL preparation uses BSK for the same direct network failures as chat", async (t) => {
+  const failures = [
+    Object.assign(new Error("read ETIMEDOUT"), { code: "ETIMEDOUT" }),
+    new Error("来源抓取超时"),
+    Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" }),
+  ];
+  for (const [index, failure] of failures.entries()) {
+    const { scheduled, store } = await fixture(t);
+    let proposes = 0;
+    const captures = [];
+    const artifactId = `artifact-network-${index}`;
+    const ingest = {
+      async receive(payload) { return { artifact: { id: artifactId, kind: payload.kind, dedupeKey: `network-key-${index}` }, proposalPending: true }; },
+      async readArtifact() { return { id: artifactId, source: "https://example.com/network" }; },
+      async applyBrowserSnapshot() {},
+      async propose() {
+        proposes += 1;
+        if (proposes === 1) throw failure;
+        return { candidate: { id: `candidate-network-${index}` }, proposal: { id: `proposal-network-${index}`, sourceType: "url", sourceDigest: "a".repeat(64), proposalDigest: "b".repeat(64) } };
+      },
+    };
+    const coordinator = new IngestWorkflowCoordinator({
+      ingest,
+      store,
+      schedule: (work) => scheduled.push(work),
+      browserCapture: {
+        authorize() { return { browserSessionId: `syno-capture-network-${index}` }; },
+        async capture() {
+          captures.push(index);
+          return { status: "completed", finalUrl: "https://example.com/network", content: "browser content", contentDigest: "c".repeat(64), browserSessionId: `syno-capture-network-${index}` };
+        },
+      },
+    });
+    const receipt = await coordinator.receive({ kind: "url", value: "https://example.com/network" }, { ownerKey: "owner", channel: "feishu", messageId: `network-${index}` });
+    await scheduled.shift()();
+    const workflow = await coordinator.status(receipt.workflow.id);
+    assert.equal(workflow.stage, "proposed", failure.message);
+    assert.equal(workflow.fetchMethod, "bsk", failure.message);
+    assert.equal(workflow.fallbackReason, "network_failure", failure.message);
+    assert.equal(captures.length, 1, failure.message);
+  }
+});
+
 test("URL sources whose正文 is CSS noise fall back to BSK with empty_or_low_quality", async (t) => {
   const { scheduled, store } = await fixture(t);
   let proposes = 0;

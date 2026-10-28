@@ -11,6 +11,7 @@ import { createHash } from "node:crypto";
 
 import { fetchSourceText, MAX_SOURCE_TEXT } from "./source-fetcher.mjs";
 import { inspectRemoteContent, redactRemoteContent } from "./sensitive-content.mjs";
+import { classifyDirectNetworkFailure } from "./source-network-failure.mjs";
 
 const DEFAULT_MAX_CHARS = 20_000;
 
@@ -33,12 +34,6 @@ function detectAntiBotWall({ sourceUrl, text, title, html } = {}) {
 function httpBlockStatus(error) {
   const match = /HTTP (401|403|429)\b/u.exec(String(error?.message || ""));
   return match ? Number(match[1]) : null;
-}
-
-function directNetworkFailureReason(error) {
-  if (error?.code === "ETIMEDOUT" || /来源抓取超时|ETIMEDOUT/iu.test(String(error?.message || ""))) return "network_timeout";
-  if (error?.code === "ECONNRESET" || /ECONNRESET/iu.test(String(error?.message || ""))) return "network_reset";
-  return null;
 }
 
 // 公开网页常带凭据示例（API key、Authorization 头），原文直接发远程模型会被工具桥安全检查拦死
@@ -204,7 +199,7 @@ async function fetchUrlForChat({ url, maxChars = DEFAULT_MAX_CHARS, fetcher = fe
   } catch (error) {
     if (httpBlockStatus(error) || error.code === "SOURCE_VERIFICATION_REQUIRED") httpBlocked = error;
     else {
-      networkWall = directNetworkFailureReason(error);
+      networkWall = classifyDirectNetworkFailure(error);
       if (networkWall) networkFailure = error;
       else throw error;
     }

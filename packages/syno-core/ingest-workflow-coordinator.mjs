@@ -6,6 +6,7 @@ import { PATHS } from "./paths.mjs";
 import { validateContractRecord } from "./schema-registry.mjs";
 import { inspectRemoteContent } from "./sensitive-content.mjs";
 import { buildSourceDescriptor } from "./source-descriptor.mjs";
+import { classifyDirectNetworkFailure } from "./source-network-failure.mjs";
 
 const TERMINAL_STAGES = new Set(["reported", "failed_terminal", "rejected", "superseded"]);
 // A3：模型耗尽/不可用的错误码。这些错误发生在 analyze 阶段，此时 propose 已产出基础方案——
@@ -78,7 +79,7 @@ function browserFallbackReason(error) {
   if (/javascript|脚本/iu.test(message)) return "javascript_shell";
   if (/没有可读取正文|正文为空|低质量/iu.test(message)) return "empty_or_low_quality";
   if (/微信|weixin|wechat/iu.test(message)) return "wechat_restriction";
-  if (/超时|timeout|ECONN|ENOTFOUND|fetch failed|network/iu.test(`${code} ${message}`)) return "network_failure";
+  if (classifyDirectNetworkFailure(error)) return "network_failure";
   return null;
 }
 
