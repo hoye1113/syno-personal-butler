@@ -36,13 +36,37 @@ test("complete capture report retains the publishing status", () => {
     source: { reliability: "trusted", verificationStatus: "verified" },
   }, { publishingMode: "feishu" });
 
-  assert.match(text, /^✅ 收录已保存\n/);
-  assert.match(text, /· 内容核验：verified/);
+  assert.match(text, /^✅ 已收录\n/);
+  assert.match(text, /保存至 00-Inbox\ncomplete\.md/);
   assert.match(text, /没有未披露的验证事项。/);
-  assert.match(text, /Wiki／目录／图片状态待核验$/);
+  assert.match(text, /Wiki／目录／图片状态待核验/);
+  assert.match(text, /已收录，不代表已掌握$/);
 });
 
-test("capture report groups verification details and translates internal labels", () => {
+test("minimal receipt preserves nonzero signals and unrecognized verification details", () => {
+  const text = formatCaptureReport({
+    path: "vault/02-Resources/A/n.md",
+    completionStatus: "incomplete",
+    candidates: { claims: [{}, {}], evidence: [{}, {}] },
+    duplicateOrRelations: { matches: [{}], relations: [{}, {}, {}] },
+    unverifiedIssues: [
+      "无法归类的自定义核验事项",
+      "新标签候选：one",
+      "新标签候选：two",
+      "新标签候选：three",
+      "新标签候选：four",
+      "新标签候选：five",
+    ],
+  });
+
+  assert.doesNotMatch(text, /主张/);
+  assert.match(text, /保存至 02-Resources\/A\nn\.md/);
+  assert.match(text, /· 2 条证据候选\n· 1 个重复候选\n· 3 条已说明关系/);
+  assert.match(text, /待核验 1 项\n· 无法归类的自定义核验事项/);
+  assert.match(text, /one · two · three · 等 5 项/);
+});
+
+test("capture report keeps only actionable information in the receipt", () => {
   const text = formatCaptureReport({
     path: "vault/00-Inbox/2114746056005329363-a4957f5b.md",
     completionStatus: "incomplete",
@@ -62,29 +86,19 @@ test("capture report groups verification details and translates internal labels"
   });
 
   assert.equal(text, [
-    "📥 收录已保存 · 待验证",
+    "📥 已收录，待核验",
     "",
-    "📂 保存位置",
-    "vault/00-Inbox/2114746056005329363-a4957f5b.md",
+    "保存至 00-Inbox",
+    "2114746056005329363-a4957f5b.md",
     "",
-    "🔎 核验状态",
-    "· 来源可信度：未验证",
-    "· 内容核验：未验证",
-    "· 知识状态：已收录（captured），不代表已掌握",
+    "待核验 3 项",
+    "· 来源正文及外部链接尚未核验",
+    "· Dot、Grok Bot、Muse 的能力描述可能过时",
+    "· 浏览量、时间线等账号数据无法独立核验",
     "",
-    "🧩 内容提取",
-    "· 主张候选：4 条",
-    "· 证据候选：0 条",
-    "· 重复候选：0 条",
-    "· 已说明关系：0 条",
+    "新标签",
+    "content-operations · xiaohongshu · workflow · agents",
     "",
-    "⚠️ 尚未验证",
-    "· 来源或内容尚未通过事实核验",
-    "· 文中飞书模板链接为占位入口，未实际核验",
-    "· 作者使用的 Dot 及 Grok Bot、Muse 当前能力描述未经核实，可能已过时",
-    "· 账号实践数据（浏览量、时间线）无法核验",
-    "",
-    "🏷 新标签候选",
-    "#content-operations #xiaohongshu #workflow #agents",
+    "已收录，不代表已掌握",
   ].join("\n"));
 });

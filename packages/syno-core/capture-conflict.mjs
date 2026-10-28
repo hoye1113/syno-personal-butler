@@ -16,38 +16,66 @@ function captureTargetExists(notes = [], suggestedPath = "") {
   return Boolean(suggestedPath) && notes.some((note) => note.path === suggestedPath);
 }
 
-// 收录终态只改变呈现，不改变核验语义：captured/unverified 仍如实保留，不用排版掩盖未验证状态。
+// 回执只压缩展示，不删除核验事实：可安全合并的同类项归纳，无法识别的原文继续保留。
+function compactVerificationIssues(issues) {
+  const sourceIssue = "来源或内容尚未通过事实核验";
+  const hasSourceIssue = issues.includes(sourceIssue);
+  const hasLinkIssue = issues.some((item) => /链接.*未实际核验|占位入口/u.test(item));
+  const compacted = [];
+  if (hasSourceIssue) compacted.push(hasLinkIssue ? "来源正文及外部链接尚未核验" : "来源正文尚未通过事实核验");
+  for (const issue of issues) {
+    if (issue === sourceIssue) continue;
+    if (/链接.*未实际核验|占位入口/u.test(issue)) {
+      if (!hasSourceIssue) compacted.push("外部链接尚未核验");
+      continue;
+    }
+    const capability = /^作者使用的 (.+?) 当前能力描述未经核实，可能已过时$/u.exec(issue);
+    if (capability) {
+      compacted.push(`${capability[1].replace(/ 及 /gu, "、")} 的能力描述可能过时`);
+      continue;
+    }
+    const accountData = /^账号实践数据（(.+?)）无法核验$/u.exec(issue);
+    if (accountData) {
+      compacted.push(`${accountData[1]}等账号数据无法独立核验`);
+      continue;
+    }
+    compacted.push(issue);
+  }
+  return compacted;
+}
+
+// 主人回执只保留结果、位置和需要行动的信息；主张数等内部指标仍留在 Workflow，不占据首屏。
 function formatCaptureReport(result = {}, { publishingMode = "disabled" } = {}) {
   const complete = result.completionStatus === "complete";
   const issues = (Array.isArray(result.unverifiedIssues) ? result.unverifiedIssues : [])
     .map((item) => String(item).trim())
     .filter(Boolean);
-  const tagIssues = issues.filter((item) => item.startsWith("新标签候选："));
-  const verificationIssues = issues.filter((item) => !item.startsWith("新标签候选："));
-  const verificationLabel = (value) => value === "unverified" || !value ? "未验证" : String(value);
+  const tags = issues.filter((item) => item.startsWith("新标签候选："))
+    .map((item) => item.slice("新标签候选：".length).trim())
+    .filter(Boolean);
+  const verificationIssues = compactVerificationIssues(issues.filter((item) => !item.startsWith("新标签候选：")));
+  const pathParts = String(result.path || "").replace(/\\/gu, "/").split("/").filter(Boolean);
+  const fileName = pathParts.pop();
+  const directory = pathParts.join("/").replace(/^vault\//u, "");
+  const locationLines = fileName ? [`保存至 ${directory || "vault"}`, fileName] : ["知识记录已写入"];
+  const actionableStats = [
+    result.candidates?.evidence?.length ? `${result.candidates.evidence.length} 条证据候选` : "",
+    result.duplicateOrRelations?.matches?.length ? `${result.duplicateOrRelations.matches.length} 个重复候选` : "",
+    result.duplicateOrRelations?.relations?.length ? `${result.duplicateOrRelations.relations.length} 条已说明关系` : "",
+  ].filter(Boolean);
+  const visibleTags = tags.length > 4 ? [...tags.slice(0, 3), `等 ${tags.length} 项`] : tags;
+  const publishingFooter = complete ? (publishingMode === "disabled" ? "云端发布未启用" : "Wiki／目录／图片状态待核验") : "";
   return formatNotice({
-    title: complete ? "✅ 收录已保存" : "📥 收录已保存 · 待验证",
+    title: complete ? "✅ 已收录" : "📥 已收录，待核验",
     sections: [
-      { icon: "📂", heading: "保存位置", lines: [result.path || "知识记录已写入"] },
-      { icon: "🔎", heading: "核验状态", lines: [
-        `· 来源可信度：${verificationLabel(result.source?.reliability)}`,
-        `· 内容核验：${verificationLabel(result.source?.verificationStatus)}`,
-        "· 知识状态：已收录（captured），不代表已掌握",
-      ] },
-      { icon: "🧩", heading: "内容提取", lines: [
-        `· 主张候选：${result.candidates?.claims?.length || 0} 条`,
-        `· 证据候选：${result.candidates?.evidence?.length || 0} 条`,
-        `· 重复候选：${result.duplicateOrRelations?.matches?.length || 0} 条`,
-        `· 已说明关系：${result.duplicateOrRelations?.relations?.length || 0} 条`,
-      ] },
+      { lines: locationLines },
+      actionableStats.length ? { lines: actionableStats.map((item) => `· ${item}`) } : null,
       verificationIssues.length
-        ? { icon: "⚠️", heading: "尚未验证", lines: verificationIssues.map((item) => `· ${item}`) }
-        : { icon: "✅", heading: "验证事项", lines: ["没有未披露的验证事项。"] },
-      tagIssues.length ? { icon: "🏷", heading: "新标签候选", lines: [
-        tagIssues.map((item) => `#${item.slice("新标签候选：".length).trim()}`).join(" "),
-      ] } : null,
+        ? { heading: `待核验 ${verificationIssues.length} 项`, lines: verificationIssues.map((item) => `· ${item}`) }
+        : { lines: ["没有未披露的验证事项。"] },
+      visibleTags.length ? { heading: "新标签", lines: [visibleTags.join(" · ")] } : null,
     ],
-    footer: complete ? (publishingMode === "disabled" ? "云端发布未启用" : "Wiki／目录／图片状态待核验") : undefined,
+    footer: [publishingFooter, "已收录，不代表已掌握"].filter(Boolean).join("\n"),
   });
 }
 
