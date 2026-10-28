@@ -10,7 +10,7 @@ import { RecoveryJournal } from "../../../packages/syno-core/recovery-journal.mj
 import { KnowledgePublisher } from "../../../packages/syno-core/knowledge-publisher.mjs";
 import { KnowledgeChanges } from "../../../packages/syno-core/knowledge-changes.mjs";
 import { MemoryStore } from "../../../packages/syno-core/memory-store.mjs";
-import { captureHasBlockingConflict, captureTargetExists, shouldNotifyWorkflowEvent } from "../../../packages/syno-core/capture-conflict.mjs";
+import { captureHasBlockingConflict, captureTargetExists, formatCaptureReport, shouldNotifyWorkflowEvent } from "../../../packages/syno-core/capture-conflict.mjs";
 import { createBusinessTools } from "../../../packages/syno-core/business-tools.mjs";
 import { AgentHost } from "../../../packages/syno-core/agent-host.mjs";
 import { ApprovalAdvisor, minimalAdvice } from "./approval-advisor.mjs";
@@ -958,16 +958,7 @@ function createSynoRuntime(options = {}) {
           : "";
         const text = type === "workflow.failed"
           ? `收录 ${workflow.id} 未完成：${error?.message || workflow.lastError?.message || "未知错误"}${attemptSummary}`
-          : [
-            result?.completionStatus === "complete"
-              ? `本地已保存：${result?.path || "知识记录已写入"}；${publishingConfig.mode === "disabled" ? "云端发布未启用" : "Wiki／目录／图片状态待核验"}。`
-              : `知识记录已保存，但仍待验证：${result?.path || "知识记录已写入"}。`,
-            `来源：${result?.source?.reliability || "unverified"}/${result?.source?.verificationStatus || "unverified"}。`,
-            `重复与关联：${result?.duplicateOrRelations?.matches?.length || 0} 个重复候选，${result?.duplicateOrRelations?.relations?.length || 0} 个已说明关系。`,
-            `候选：Claim ${result?.candidates?.claims?.length || 0}，Evidence ${result?.candidates?.evidence?.length || 0}。`,
-            result?.unverifiedIssues?.length ? `尚未验证：${result.unverifiedIssues.join("；")}。` : "没有未披露的验证事项。",
-            "知识状态为 captured，不代表已经掌握。",
-          ].join("\n");
+          : formatCaptureReport(result, { publishingMode: publishingConfig.mode });
         for (const targetChannel of [workflow.originChannel, "main-session"]) {
           await workflowOutbox.enqueue({
             workflowId: workflow.id,
