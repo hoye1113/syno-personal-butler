@@ -347,7 +347,9 @@ test("a timeout after a tool call disables fallback while its outcome is unknown
     (error) => error.code === "HARNESS_ATTEMPTS_EXHAUSTED"
       && error.retryable === false
       && error.sessionStateKnown === "unknown"
-      && error.cause?.toolOutcomeUnknown === true,
+      && error.cause?.toolOutcomeUnknown === true
+      && /回合等待超时.*原回合结果未知/u.test(error.message)
+      && !/模型尝试全部失败/u.test(error.message),
   );
   assert.equal(attempts, 1);
   assert.equal(stops, 0);

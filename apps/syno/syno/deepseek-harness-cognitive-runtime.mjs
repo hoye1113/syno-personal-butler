@@ -637,7 +637,12 @@ class DeepSeekHarnessCognitiveRuntime {
             }
           }
           const unknown = run.status === "cancel_unknown";
-          const exhausted = Object.assign(new Error(unknown ? "Harness Session 状态未知" : "DeepSeek Harness 模型尝试全部失败"), {
+          const failureMessage = unknown
+            ? "Harness Session 状态未知"
+            : lastError?.code === "HARNESS_TURN_TIMEOUT"
+              ? "DeepSeek Harness 回合等待超时，原回合结果未知，请勿重复提交"
+              : "DeepSeek Harness 模型尝试全部失败";
+          const exhausted = Object.assign(new Error(failureMessage), {
             code: unknown ? "HARNESS_ABORT_UNKNOWN" : "HARNESS_ATTEMPTS_EXHAUSTED",
             retryable: unknown || lastError?.irreversibleEffect || lastError?.toolOutcomeUnknown ? false : retryableFailure(lastError),
             irreversibleEffect: lastError?.irreversibleEffect === true,

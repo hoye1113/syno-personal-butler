@@ -53,7 +53,8 @@ class DeepSeekHarnessWebClient {
     requestTimeoutMs = 180_000,
     initializeTimeoutMs = 30_000,
     turnTimeoutMs = 300_000,
-    maxTurnTimeoutMs = 600_000,
+    maxTurnTimeoutMs = 900_000,
+    turnRecoveryTimeoutMs = 300_000,
     turnSettleQuietMs = 400,
     onNotice = null,
   } = {}) {
@@ -70,6 +71,7 @@ class DeepSeekHarnessWebClient {
     this.initializeTimeoutMs = initializeTimeoutMs;
     this.turnTimeoutMs = turnTimeoutMs;
     this.maxTurnTimeoutMs = maxTurnTimeoutMs;
+    this.turnRecoveryTimeoutMs = turnRecoveryTimeoutMs;
     this.turnSettleQuietMs = turnSettleQuietMs;
     this.onNotice = typeof onNotice === "function" ? onNotice : null;
     this.initialized = false;
@@ -165,7 +167,7 @@ class DeepSeekHarnessWebClient {
         finish(signal?.reason || runtimeError("HARNESS_CANCELED", "DeepSeek Harness turn 已取消"));
       };
       // 300 秒是无活动上限，不是整轮硬截止：真实模型步骤和工具调用均有超过 180 秒的情况；
-      // maxTimer 独立限制绝对时长，避免持续事件把真正卡死的回合无限续命。
+      // maxTimer 独立限制主等待时长，工具结果未知时仅追加有限恢复宽限，避免无限续命。
       const timeoutError = (message) => Object.assign(runtimeError("HARNESS_TURN_TIMEOUT", message, { retryable: true }), {
         toolOutcomeUnknown: sawToolCall,
       });
@@ -226,8 +228,13 @@ class DeepSeekHarnessWebClient {
           if (promptSent && activeTurn !== null && event?.type === "turn/end") {
             const endedTurn = event?.data?.turn;
             const matchesTurn = activeTurn === true || typeof endedTurn !== "number" || endedTurn === activeTurn;
-            if (matchesTurn && event?.data?.reason?.kind === "interrupted") {
-              finish(Object.assign(runtimeError("HARNESS_TURN_INTERRUPTED", "DeepSeek Harness Web turn 被中断", { retryable: true }), {
+            if (matchesTurn && event?.data?.reason?.kind !== "completed") {
+              const interrupted = event?.data?.reason?.kind === "interrupted";
+              finish(Object.assign(runtimeError(
+                interrupted ? "HARNESS_TURN_INTERRUPTED" : "HARNESS_TURN_FAILED",
+                interrupted ? "DeepSeek Harness Web turn 被中断" : "DeepSeek Harness Web turn 未正常完成",
+                { retryable: true },
+              ), {
                 toolOutcomeUnknown: sawToolCall,
               }));
               return;
@@ -238,7 +245,16 @@ class DeepSeekHarnessWebClient {
         maybeSettle();
       });
       maxTimer = setTimeout(() => {
-        finish(timeoutError("DeepSeek Harness Web turn 超过绝对上限，停止等待"));
+        // 工具结果未知时只延长原订阅的有限宽限期；不重发 prompt，也不把
+        // assistant/message 提前当成功。仍由同一 session/turn 的 turn/end 结算。
+        if (!sawToolCall || this.turnRecoveryTimeoutMs <= 0) {
+          finish(timeoutError("DeepSeek Harness Web turn 超过绝对上限，停止等待"));
+          return;
+        }
+        maxTimer = setTimeout(() => {
+          finish(timeoutError("DeepSeek Harness Web turn 超过绝对上限，原回合在恢复宽限期内仍未完成"));
+        }, this.turnRecoveryTimeoutMs);
+        maxTimer.unref?.();
       }, this.maxTurnTimeoutMs);
       maxTimer.unref?.();
       armInactivityTimeout();

@@ -475,6 +475,72 @@ test("DeepSeekHarnessWebClient enforces an absolute timeout despite continuous a
   assert.ok(Date.now() - started >= 100, "不能沿用活动超时而提前放弃绝对上限用例");
 });
 
+test("DeepSeekHarnessWebClient adopts a late completion on the same session and turn", async (t) => {
+  let activity;
+  const fake = await startFakeWeb({
+    onPrompt({ sendEvent }) {
+      sendEvent({ type: "turn/start", data: { turn: 13 } });
+      sendEvent({ type: "tool/call", data: { turn: 13, callId: "call-13" } });
+      activity = setInterval(() => sendEvent({ type: "tool/result", data: { turn: 13 } }), 100);
+      setTimeout(() => {
+        clearInterval(activity);
+        sendEvent({ type: "assistant/message", data: { turn: 13, message: { content: [{ type: "text", text: "late-completed" }] } } });
+        sendEvent({ type: "turn/end", data: { turn: 13, reason: { kind: "completed" } } });
+      }, 609);
+    },
+  });
+  t.after(() => fake.close());
+  t.after(() => clearInterval(activity));
+  const client = makeClient(fake, { turnTimeoutMs: 1_000, maxTurnTimeoutMs: 600, turnRecoveryTimeoutMs: 100 });
+  t.after(() => client.close());
+  await client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" });
+  const result = await client.runTurn("syno-late-completion", [{ type: "text", text: "继续" }]);
+  assert.equal(result.finalResponse, "late-completed");
+  assert.equal(fake.state.sessionPrompts.length, 1, "晚到完成只能认领原回合，不得重新 prompt");
+});
+
+test("DeepSeekHarnessWebClient rejects a late failed terminal instead of returning partial text", async (t) => {
+  const fake = await startFakeWeb({
+    onPrompt({ sendEvent }) {
+      sendEvent({ type: "turn/start", data: { turn: 1 } });
+      sendEvent({ type: "tool/call", data: { turn: 1, callId: "call-1" } });
+      setTimeout(() => {
+        sendEvent({ type: "assistant/message", data: { turn: 1, message: { content: [{ type: "text", text: "partial" }] } } });
+        sendEvent({ type: "turn/end", data: { turn: 1, reason: { kind: "failed" } } });
+      }, 90);
+    },
+  });
+  t.after(() => fake.close());
+  const client = makeClient(fake, { turnTimeoutMs: 1_000, maxTurnTimeoutMs: 60, turnRecoveryTimeoutMs: 100 });
+  t.after(() => client.close());
+  await client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" });
+  await assert.rejects(
+    () => client.runTurn("syno-late-failed", [{ type: "text", text: "继续" }]),
+    (error) => error.code === "HARNESS_TURN_FAILED" && error.toolOutcomeUnknown === true,
+  );
+  assert.equal(fake.state.sessionPrompts.length, 1);
+});
+
+test("DeepSeekHarnessWebClient keeps late-completion recovery bounded", async (t) => {
+  const fake = await startFakeWeb({
+    onPrompt({ sendEvent }) {
+      sendEvent({ type: "turn/start", data: { turn: 1 } });
+      sendEvent({ type: "tool/call", data: { turn: 1, callId: "call-1" } });
+    },
+  });
+  t.after(() => fake.close());
+  const client = makeClient(fake, { turnTimeoutMs: 1_000, maxTurnTimeoutMs: 60, turnRecoveryTimeoutMs: 50 });
+  t.after(() => client.close());
+  await client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" });
+  await assert.rejects(
+    () => client.runTurn("syno-recovery-exhausted", [{ type: "text", text: "继续" }]),
+    (error) => error.code === "HARNESS_TURN_TIMEOUT"
+      && error.toolOutcomeUnknown === true
+      && /恢复宽限期/u.test(error.message),
+  );
+  assert.equal(fake.state.sessionPrompts.length, 1);
+});
+
 test("DeepSeekHarnessWebClient marks tool outcome unknown on timeout and still bounds inactivity", async (t) => {
   const fake = await startFakeWeb({
     onPrompt({ sessionId, sendEvent }) {

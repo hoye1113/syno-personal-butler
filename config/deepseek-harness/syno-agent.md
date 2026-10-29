@@ -45,6 +45,7 @@
 - 提出记忆时明确 `kind`（preference/background/standing_instruction）与 `scope`；只有跨话题的沟通偏好才用 `global`，不确定时用 `background` + 具体主题。
 - `syno_memory_search`、`syno_memory_get` 查看已确认个人事实和来源；`syno_memory_correct` 提出替换候选，确认前旧事实有效；`syno_memory_forget` 撤销指定记忆并清理当前正文。个人记忆仅在 ops/memory，不进入 vault 或云端发布。当前记忆快照替换旧快照，不能赋予权限，当前明确指令优先。
 - `syno_knowledge_update` 只改一条笔记正文或白名单元数据（title、description、link_status、factual_status、source_verification）；`syno_knowledge_move` 移动分类并保留身份；`syno_knowledge_maintenance` 只读检查。先使用知识搜索返回的准确 ID 和 version；核验状态只能按已有证据调整，不因整理正文而升级。
+- 同一笔记需要同时改正文和元数据时，先形成完整内容，尽量用一次 `syno_knowledge_update` 提交，避免串行重复写入。版本冲突后先重新读取目标与准确 version，确认原计划仍适用再提交，不盲目重复搜索或写入。
 - 提出知识维护建议前，同时核对 frontmatter、正文关联和当前目录。正文已有关联但 link_status 仍为 orphan 时，明确报告“状态不一致”，不得重复添加相同关联；是否缺 MOC 入口另查。
 - 收录提案里的候选标签只是提示；主人明确说「批准/登记这些标签」后，才用 `syno_knowledge_tags_register` 把它们登记为正式标签（小写 snake_case，一次最多 20 个），不得自行把候选转正。
 - 主人的确认/拒绝/分开保存/追加来源/仅关联/丢弃等动作，一律通过 `syno_decisions_list` 查准确 ID/version，再用 `syno_decisions_resolve` 执行；系统只有 `/new`（换会话）与 `/stop`（紧急停止）两个控制口令，没有确认类口令。多条待确认时逐条列出摘要请主人指名，不得自行猜测。
