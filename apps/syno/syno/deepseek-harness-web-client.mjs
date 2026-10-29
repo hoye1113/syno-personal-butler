@@ -52,7 +52,7 @@ class DeepSeekHarnessWebClient {
     webSocketImpl = globalThis.WebSocket,
     requestTimeoutMs = 180_000,
     initializeTimeoutMs = 30_000,
-    turnTimeoutMs,
+    turnTimeoutMs = 300_000,
     maxTurnTimeoutMs = 600_000,
     turnSettleQuietMs = 400,
     onNotice = null,
@@ -68,7 +68,7 @@ class DeepSeekHarnessWebClient {
     this.webSocketImpl = webSocketImpl;
     this.requestTimeoutMs = requestTimeoutMs;
     this.initializeTimeoutMs = initializeTimeoutMs;
-    this.turnTimeoutMs = turnTimeoutMs ?? requestTimeoutMs;
+    this.turnTimeoutMs = turnTimeoutMs;
     this.maxTurnTimeoutMs = maxTurnTimeoutMs;
     this.turnSettleQuietMs = turnSettleQuietMs;
     this.onNotice = typeof onNotice === "function" ? onNotice : null;
@@ -143,6 +143,7 @@ class DeepSeekHarnessWebClient {
     // turn/end 会落进本轮事件列表，只有配对能挡住这种自我污染。
     let activeTurn = null;
     let turnEnded = false;
+    let sawToolCall = false;
     const result = () => ({ sessionId, finalResponse: assistantText(events), events, notifications });
     return new Promise((resolve, reject) => {
       let settled = false;
@@ -163,12 +164,15 @@ class DeepSeekHarnessWebClient {
       const onAbort = () => {
         finish(signal?.reason || runtimeError("HARNESS_CANCELED", "DeepSeek Harness turn 已取消"));
       };
-      // 180 秒是无活动上限，不是整轮硬截止：工具结果和模型输出会续期；
+      // 300 秒是无活动上限，不是整轮硬截止：真实模型步骤和工具调用均有超过 180 秒的情况；
       // maxTimer 独立限制绝对时长，避免持续事件把真正卡死的回合无限续命。
+      const timeoutError = (message) => Object.assign(runtimeError("HARNESS_TURN_TIMEOUT", message, { retryable: true }), {
+        toolOutcomeUnknown: sawToolCall,
+      });
       const armInactivityTimeout = () => {
         if (timer) clearTimeout(timer);
         timer = setTimeout(() => {
-          finish(runtimeError("HARNESS_TURN_TIMEOUT", "DeepSeek Harness Web turn 等待 turn/end 或 idle 静默超时", { retryable: true }));
+          finish(timeoutError("DeepSeek Harness Web turn 等待 turn/end 或 idle 静默超时"));
         }, this.turnTimeoutMs);
         timer.unref?.();
       };
@@ -218,15 +222,23 @@ class DeepSeekHarnessWebClient {
               drainTimer = null;
             }
           }
+          if (promptSent && activeTurn !== null && event?.type === "tool/call") sawToolCall = true;
           if (promptSent && activeTurn !== null && event?.type === "turn/end") {
             const endedTurn = event?.data?.turn;
-            if (activeTurn === true || typeof endedTurn !== "number" || endedTurn === activeTurn) turnEnded = true;
+            const matchesTurn = activeTurn === true || typeof endedTurn !== "number" || endedTurn === activeTurn;
+            if (matchesTurn && event?.data?.reason?.kind === "interrupted") {
+              finish(Object.assign(runtimeError("HARNESS_TURN_INTERRUPTED", "DeepSeek Harness Web turn 被中断", { retryable: true }), {
+                toolOutcomeUnknown: sawToolCall,
+              }));
+              return;
+            }
+            if (matchesTurn) turnEnded = true;
           }
         }
         maybeSettle();
       });
       maxTimer = setTimeout(() => {
-        finish(runtimeError("HARNESS_TURN_TIMEOUT", "DeepSeek Harness Web turn 超过绝对上限，停止等待", { retryable: true }));
+        finish(timeoutError("DeepSeek Harness Web turn 超过绝对上限，停止等待"));
       }, this.maxTurnTimeoutMs);
       maxTimer.unref?.();
       armInactivityTimeout();

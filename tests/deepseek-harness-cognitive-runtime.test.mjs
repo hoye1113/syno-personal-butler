@@ -318,3 +318,37 @@ test("a write followed by an empty response disables model fallback and whole-me
   assert.equal(bound.privateConversation, true);
   assert.match(bound.harnessSessionId, /^syno-main-/);
 });
+
+test("a timeout after a tool call disables fallback while its outcome is unknown", async (t) => {
+  const file = await temporaryFile(t);
+  let attempts = 0;
+  let stops = 0;
+  const runtime = new DeepSeekHarnessCognitiveRuntime({
+    tools: bridgeTools(),
+    bindings: new DeepSeekHarnessSessionBindingStore({ file }),
+    supervisor: {
+      async ensure() {
+        attempts += 1;
+        return {
+          async runTurn() {
+            throw Object.assign(new Error("tool still running"), {
+              code: "HARNESS_TURN_TIMEOUT",
+              retryable: true,
+              toolOutcomeUnknown: true,
+            });
+          },
+        };
+      },
+      async stop() { stops += 1; return { state: "stopped" }; },
+    },
+  });
+  await assert.rejects(
+    runtime.run({ text: "整理笔记" }, { ownerKey: "owner", messageId: "real-message" }),
+    (error) => error.code === "HARNESS_ATTEMPTS_EXHAUSTED"
+      && error.retryable === false
+      && error.sessionStateKnown === "unknown"
+      && error.cause?.toolOutcomeUnknown === true,
+  );
+  assert.equal(attempts, 1);
+  assert.equal(stops, 0);
+});

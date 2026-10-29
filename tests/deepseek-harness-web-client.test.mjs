@@ -311,6 +311,24 @@ test("DeepSeekHarnessWebClient settles on turn/end even without assistant text",
   assert.ok(Date.now() - started < 700);
 });
 
+test("DeepSeekHarnessWebClient rejects an interrupted turn instead of returning partial text", async (t) => {
+  const fake = await startFakeWeb({
+    onPrompt({ sendEvent }) {
+      sendEvent({ type: "turn/start", data: { turn: 1 } });
+      sendEvent({ type: "assistant/message", data: { turn: 1, message: { content: [{ type: "text", text: "partial" }] } } });
+      sendEvent({ type: "turn/end", data: { turn: 1, reason: { kind: "interrupted" } } });
+    },
+  });
+  t.after(() => fake.close());
+  const client = makeClient(fake);
+  t.after(() => client.close());
+  await client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" });
+  await assert.rejects(
+    () => client.runTurn("syno-interrupted", [{ type: "text", text: "继续" }]),
+    (error) => error.code === "HARNESS_TURN_INTERRUPTED" && error.toolOutcomeUnknown === false,
+  );
+});
+
 test("DeepSeekHarnessWebClient waits for the paired turn/end when a stale one races ahead", async (t) => {
   // 2026-09-03 生产事故复现的 0.1.7 版：上一轮迟到的 turn/end 必须被配对
   // 逻辑挡住；step-2 最终答案到达前不得结算。
@@ -389,6 +407,27 @@ test("DeepSeekHarnessWebClient keeps event streams after initializeTimeoutMs", a
   assert.equal(result.finalResponse, "web-hello");
 });
 
+test("DeepSeekHarnessWebClient waits beyond the RPC timeout for model and tool phases", async (t) => {
+  const fake = await startFakeWeb({
+    onPrompt({ sessionId, sendEvent }) {
+      sendEvent({ type: "turn/start", data: { turn: 1 } });
+      const toolPhase = sessionId === "syno-slow-tool";
+      if (toolPhase) sendEvent({ type: "tool/call", data: { turn: 1, callId: "call-1" } });
+      setTimeout(() => {
+        if (toolPhase) sendEvent({ type: "tool/result", data: { turn: 1, callId: "call-1" } });
+        sendEvent({ type: "assistant/message", data: { turn: 1, message: { content: [{ type: "text", text: toolPhase ? "tool-ok" : "model-ok" }] } } });
+        sendEvent({ type: "turn/end", data: { turn: 1, reason: { kind: "completed" } } });
+      }, 90);
+    },
+  });
+  t.after(() => fake.close());
+  const client = makeClient(fake, { requestTimeoutMs: 30, turnTimeoutMs: undefined, maxTurnTimeoutMs: 1_000 });
+  t.after(() => client.close());
+  await client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" });
+  assert.equal((await client.runTurn("syno-slow-model", [{ type: "text", text: "思考" }])).finalResponse, "model-ok");
+  assert.equal((await client.runTurn("syno-slow-tool", [{ type: "text", text: "执行" }])).finalResponse, "tool-ok");
+});
+
 test("DeepSeekHarnessWebClient resets the inactivity timeout on current-session activity", async (t) => {
   let activity;
   const fake = await startFakeWeb({
@@ -434,6 +473,29 @@ test("DeepSeekHarnessWebClient enforces an absolute timeout despite continuous a
     (error) => error.code === "HARNESS_TURN_TIMEOUT" && /绝对上限/u.test(error.message),
   );
   assert.ok(Date.now() - started >= 100, "不能沿用活动超时而提前放弃绝对上限用例");
+});
+
+test("DeepSeekHarnessWebClient marks tool outcome unknown on timeout and still bounds inactivity", async (t) => {
+  const fake = await startFakeWeb({
+    onPrompt({ sessionId, sendEvent }) {
+      sendEvent({ type: "turn/start", data: { turn: 1 } });
+      if (sessionId === "syno-timeout-tool") {
+        sendEvent({ type: "tool/call", data: { turn: 1, callId: "call-1" } });
+      }
+    },
+  });
+  t.after(() => fake.close());
+  const client = makeClient(fake, { turnTimeoutMs: 60, maxTurnTimeoutMs: 1_000 });
+  t.after(() => client.close());
+  await client.initialize({ cwd: "/tmp/workspace", provider: "kimi-coding", model: "kimi-for-coding" });
+  await assert.rejects(
+    () => client.runTurn("syno-timeout-tool", [{ type: "text", text: "执行" }]),
+    (error) => error.code === "HARNESS_TURN_TIMEOUT" && error.toolOutcomeUnknown === true,
+  );
+  await assert.rejects(
+    () => client.runTurn("syno-timeout-model", [{ type: "text", text: "思考" }]),
+    (error) => error.code === "HARNESS_TURN_TIMEOUT" && error.toolOutcomeUnknown === false,
+  );
 });
 
 test("DeepSeekHarnessWebClient fails the turn when selectModel is unavailable", async (t) => {

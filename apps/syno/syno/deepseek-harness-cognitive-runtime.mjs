@@ -587,11 +587,14 @@ class DeepSeekHarnessCognitiveRuntime {
               lastError = error;
               const effectAfter = this.tools?.effectVersion?.() ?? effectVersion;
               if (effectAfter > effectVersion) error.irreversibleEffect = true;
-              run.sessionStateKnown = sessionStateAfterFailure({
-                effectBefore: effectVersion,
-                effectAfter,
-                irreversibleEffect: error.irreversibleEffect === true,
-              });
+              if (error.toolOutcomeUnknown === true) error.retryable = false;
+              run.sessionStateKnown = error.toolOutcomeUnknown === true
+                ? SESSION_STATE_KNOWN.UNKNOWN
+                : sessionStateAfterFailure({
+                  effectBefore: effectVersion,
+                  effectAfter,
+                  irreversibleEffect: error.irreversibleEffect === true,
+                });
               const attemptDetail = String(error.message || "").slice(0, ATTEMPT_DETAIL_LIMIT);
               attempts.push({
                 modelId: qualifiedModel,
@@ -611,7 +614,7 @@ class DeepSeekHarnessCognitiveRuntime {
                 context.onEvent?.({ runId, type: "run.canceled", at: this.clock().toISOString(), data: { abortConfirmed: run.abortConfirmed } });
                 throw new SchedulerCancellationError();
               }
-              if (error?.irreversibleEffect === true || !retryableFailure(error)) break;
+              if (error?.irreversibleEffect === true || error?.toolOutcomeUnknown === true || !retryableFailure(error)) break;
               try {
                 await this.supervisor.stop(profile);
                 run.abortConfirmed = true;
@@ -636,7 +639,7 @@ class DeepSeekHarnessCognitiveRuntime {
           const unknown = run.status === "cancel_unknown";
           const exhausted = Object.assign(new Error(unknown ? "Harness Session 状态未知" : "DeepSeek Harness 模型尝试全部失败"), {
             code: unknown ? "HARNESS_ABORT_UNKNOWN" : "HARNESS_ATTEMPTS_EXHAUSTED",
-            retryable: unknown || lastError?.irreversibleEffect ? false : retryableFailure(lastError),
+            retryable: unknown || lastError?.irreversibleEffect || lastError?.toolOutcomeUnknown ? false : retryableFailure(lastError),
             irreversibleEffect: lastError?.irreversibleEffect === true,
             attempts,
             cause: lastError,
