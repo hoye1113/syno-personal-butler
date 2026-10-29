@@ -13,6 +13,8 @@ import { SynoToolBridge } from "../apps/syno/syno/syno-tool-bridge.mjs";
 import { EffectReceiptStore } from "../apps/syno/syno/effect-receipt-store.mjs";
 import { validateRepositoryChange } from "../packages/syno-core/validator.mjs";
 import { evaluate } from "../packages/syno-core/policy.mjs";
+import { KnowledgeStore } from "../packages/syno-core/knowledge-store.mjs";
+import { KnowledgeChanges, noteVersion } from "../packages/syno-core/knowledge-changes.mjs";
 const base = path.resolve(".");
 
 async function fixture(t) {
@@ -257,4 +259,52 @@ test('a previous synced revision cannot be reported as completion of the new loc
  f.services.core.execute=async()=>({job:{id:'local-job',status:'completed',result:{operationResult:{id:'note-test',version:'new',path:'vault/00-Inbox/test.md'}}}});
  const r=await f.call('knowledge.update',{id:'note-test',version:'a'.repeat(64),body:'新正文'});
  assert.equal(r.knowledge.version,'new');assert.equal(r.knowledge.sync.status,'pending');assert.equal(r.knowledge.sync.expectedVersion,'new');
+});
+
+test('knowledge.update applies whitelisted metadata through the existing audited notes.edit job', async t => {
+ const f = await fixture(t);
+ const relative = 'vault/00-Inbox/note.md';
+ await fs.mkdir(path.dirname(path.join(f.root, relative)), { recursive: true });
+ const before = '---\nnote_id: note-metadata\ntitle: 旧标题\ntags: [notes]\ncreated: 2026-10-29\nsource: owner\ndescription: 旧描述\nlink_status: orphan\nfactual_status: unverified\nsource_verification: unverified\n---\n\n# 正文标题\n\n保留正文。\n';
+ await fs.writeFile(path.join(f.root, relative), before);
+ const knowledge = new KnowledgeStore({ vaultRoot: path.join(f.root, 'vault'), indexFile: path.join(f.root, '.runtime/index.json') });
+ const changes = new KnowledgeChanges({ root: f.root, knowledge, decisions: f.services.pendingDecisions });
+ f.services.knowledgeChanges = changes;
+ f.services.publisher = { async status() { return { status: 'disabled' }; } };
+ f.services.core.execute = async (request, context) => {
+  f.requests.push({ request, context });
+  const result = await changes.execute(request.operation, request.payload, { workspace: f.root, job: { id: 'job-metadata', ownerKey: context.ownerKey, threadKey: context.threadKey, request } });
+  return { job: { id: 'job-metadata', status: 'completed', result: { operationResult: result } } };
+ };
+ const [note] = await knowledge.search('', { limit: 20 });
+ const input = { id: note.id, version: note.version, metadata: { title: '新标题', description: '清理后的描述', link_status: 'connected', factual_status: 'partial', source_verification: 'partial' } };
+ const effectBefore = f.effectVersion();
+ const result = await f.call('knowledge.update', input);
+ const after = await fs.readFile(path.join(f.root, relative), 'utf8');
+ assert.match(after, /^title: "新标题"$/m);
+ assert.match(after, /^description: "清理后的描述"$/m);
+ assert.match(after, /^link_status: connected$/m);
+ assert.match(after, /^factual_status: partial$/m);
+ assert.match(after, /^source_verification: partial$/m);
+ assert.match(after, /^source: owner$/m);
+ assert.match(after, /# 正文标题\n\n保留正文。/);
+ assert.equal(result.knowledge.version, noteVersion(after));
+ assert.equal(f.requests[0].request.operation, 'notes.edit');
+ assert.deepEqual(f.requests[0].request.payload.metadata, input.metadata);
+ assert.ok(f.effectVersion() > effectBefore);
+ assert.equal((await f.raw('knowledge.update', { id: note.id, version: note.version, metadata: { source: 'forged' } })).error.code, -32602);
+ assert.equal((await f.raw('knowledge.update', { id: note.id, version: note.version, metadata: { note_id: 'forged' } })).error.code, -32602);
+ assert.equal(f.requests.length, 1);
+ f.bind('body-only');
+ const bodyResult = await f.call('knowledge.update', { id: note.id, version: result.knowledge.version, body: '# 新正文\n\n只改正文。' });
+ const bodyOnly = await fs.readFile(path.join(f.root, relative), 'utf8');
+ assert.match(bodyOnly, /^title: "新标题"$/m);
+ assert.match(bodyOnly, /^link_status: connected$/m);
+ assert.match(bodyOnly, /# 新正文\n\n只改正文。/);
+ f.bind('stale-version');
+ assert.equal((await f.raw('knowledge.update', { id: note.id, version: note.version, metadata: { title: '过期写入' } })).result.isError, true);
+ assert.equal(await fs.readFile(path.join(f.root, relative), 'utf8'), bodyOnly);
+ f.restart();
+ assert.deepEqual(await f.call('knowledge.update', input), result);
+ assert.equal(f.requests.length, 3);
 });

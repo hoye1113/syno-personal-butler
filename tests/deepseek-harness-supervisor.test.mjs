@@ -208,6 +208,10 @@ test("Syno agent instructions match the shared core chat tool set", async () => 
   assert.match(instructions, /不要求固定口令/);
   assert.match(instructions, /不得编造快照/);
   assert.match(instructions, /同一回合不得自行批准/);
+  assert.match(instructions, /frontmatter.*正文关联.*目录/);
+  assert.match(instructions, /正文已有关联.*link_status.*orphan.*状态不一致/);
+  assert.match(instructions, /不得.*重复添加.*关联/);
+  assert.match(instructions, /白名单元数据/);
 });
 
 test("cordis configs live in the Syno repo and never inline API keys", async () => {

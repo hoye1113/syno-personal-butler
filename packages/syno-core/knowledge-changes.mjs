@@ -10,6 +10,7 @@ import { frontmatterData } from "./validator.mjs";
 import { decisionVersion } from "./pending-decision.mjs";
 const digest = (s) => createHash("sha256").update(s).digest("hex");
 const NOTE_DIRS = { inbox: "00-Inbox", areas: "01-Areas", resources: "02-Resources", archive: "03-Archive" };
+const EDITABLE_NOTE_METADATA = new Set(["title", "description", "link_status", "factual_status", "source_verification"]);
 function noteIdentity(markdown, logicalPath) { return frontmatterData(markdown).values.note_id || `note-${digest(logicalPath).slice(0, 24)}`; }
 function noteVersion(markdown) { return digest(markdown); }
 function withIdentity(markdown, id) { return /^note_id:/mu.test(markdown.split("---")[1] || "") ? markdown : markdown.replace(/^---\r?\n/u, `---\nnote_id: ${id}\n`); }
@@ -155,10 +156,19 @@ class KnowledgeChanges {
       if (frontmatterData(content).values.note_id !== target.id) throw new Error("目标缺少有效 frontmatter");
       await writeNote(target.path, content);
     } else if (operation === "notes.edit") {
-      if (!String(payload.body || "").trim()) throw new Error("update 不能用空正文代替删除");
-      const header = /^---\r?\n[\s\S]*?\r?\n---\r?\n/u.exec(target.markdown)?.[0];
+      if (payload.body === undefined && !Object.keys(payload.metadata || {}).length) throw new Error("update 需要新正文或元数据");
+      if (payload.body !== undefined && !String(payload.body || "").trim()) throw new Error("update 不能用空正文代替删除");
+      let header = /^---\r?\n[\s\S]*?\r?\n---\r?\n/u.exec(target.markdown)?.[0];
       if (!header) throw new Error("目标缺少有效 frontmatter");
-      await writeNote(target.path, withIdentity(`${header}\n${payload.body.trim()}\n`, target.id));
+      const currentBody = target.markdown.slice(header.length);
+      for (const [key, value] of Object.entries(payload.metadata || {})) {
+        if (!EDITABLE_NOTE_METADATA.has(key)) throw knowledgeError("KNOWLEDGE_METADATA_DENIED", `不允许修改元数据字段：${key}`);
+        const line = `${key}: ${["title", "description"].includes(key) ? JSON.stringify(value) : value}`;
+        const field = new RegExp(`^${key}:.*$`, "mu");
+        header = field.test(header) ? header.replace(field, line) : header.replace(/---\r?\n$/u, `${line}\n---\n`);
+      }
+      const body = payload.body === undefined ? currentBody : `\n${payload.body.trim()}\n`;
+      await writeNote(target.path, withIdentity(`${header}${body}`, target.id));
     } else if (operation === "notes.move") {
       const directory = NOTE_DIRS[payload.destination];
       if (!directory) throw new Error("未知知识分类");
