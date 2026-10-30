@@ -251,6 +251,18 @@ class SynoToolBridge {
           };
           return replay;
         }
+        if (!begun.created && durableReceipt.status === "failed") {
+          const code = durableReceipt.businessOutcome?.code || "TOOL_FAILED";
+          return {
+            ...response,
+            result: {
+              content: [{ type: "text", text: `${code}: 该调用已确定失败且未产生写入；请重新读取状态后再操作` }],
+              directEffect: durableReceipt.directEffect,
+              businessOutcome: durableReceipt.businessOutcome,
+              isError: true,
+            },
+          };
+        }
         if (!begun.created) {
           await this.reconciliationCases?.open({ toolInvocationKey: toolInvocation, toolName: name, ownerKey: active.ownerKey, sourceType: "tool", sourceId: active.messageId, lastErrorCode: "TOOL_INVOCATION_PENDING" });
           return { ...response, result: { content: [{ type: "text", text: "TOOL_INVOCATION_PENDING: 该调用已有未完成事实，请等待对账" }], isError: true } };
@@ -323,7 +335,20 @@ class SynoToolBridge {
         await this.effectReceipts.commit({ toolInvocationKey: toolInvocation, toolName: name, ownerKey: active.ownerKey, argumentsDigest, result, directEffect, businessOutcome });
         return { ...response, result: { ...serializeForMcp(result, { redact: false, charLimit: this.charLimit }), directEffect, businessOutcome, isError: true } };
       }
-      if (this.reconciliationCases && toolInvocation && definition.risk !== "read" && !["TOOL_INPUT_INVALID", "TOOL_NOT_ALLOWED"].includes(error.code)) {
+      const deterministicFailure = error.effectUnknown === false && error.code === "OBJECT_VERSION_CHANGED";
+      if (this.effectReceipts && toolInvocation && definition.risk !== "read" && deterministicFailure) {
+        const toolArguments = request.params?.arguments || {};
+        const argumentsDigest = createHash("sha256").update(JSON.stringify(business ? stable(toolArguments) : toolArguments)).digest("hex");
+        await this.effectReceipts.fail({
+          toolInvocationKey: toolInvocation,
+          toolName: name,
+          ownerKey: active.ownerKey,
+          argumentsDigest,
+          directEffect: { status: "no_effect", type: definition.name, sourceType: null, sourceId: null, toolInvocationKey: toolInvocation, occurredAt: null },
+          businessOutcome: { status: "failed", code: error.code },
+        });
+      }
+      if (!deterministicFailure && this.reconciliationCases && toolInvocation && definition.risk !== "read" && !["TOOL_INPUT_INVALID", "TOOL_NOT_ALLOWED"].includes(error.code)) {
         await this.reconciliationCases.open({ toolInvocationKey: toolInvocation, toolName: name, ownerKey: active.ownerKey, sourceType: "tool", sourceId: active.messageId, lastErrorCode: error.code || "EFFECT_UNKNOWN" }).catch(() => {});
       }
       const invalid = ["TOOL_INPUT_INVALID", "TOOL_NOT_ALLOWED"].includes(error.code);

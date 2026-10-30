@@ -119,6 +119,21 @@ test("GitGuard changeSnapshot preserves order, missing files and special paths",
   ]);
 });
 
+test("GitGuard changeSnapshot excludes system paths without changing business fingerprints", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-git-snapshot-filter-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await exec("git", ["init", "--quiet"], { cwd: root });
+  await writeFixture(path.join(root, "ops", "jobs", "job.md"), "job audit\n");
+  await writeFixture(path.join(root, "ops", "events", "2026", "10", "event-one.md"), "event audit\n");
+  await writeFixture(path.join(root, "vault", "note.md"), "business change\n");
+  const guard = new GitGuard({ repoRoot: root, worktreeRoot: path.join(root, ".worktrees") });
+  const complete = await guard.changeSnapshot();
+  const snapshot = await guard.changeSnapshot(root, {
+    excludePath: (file) => file.startsWith("ops/jobs/") || file.startsWith("ops/events/"),
+  });
+  assert.deepEqual(snapshot, complete.filter((change) => change.path === "vault/note.md"));
+});
+
 test("GitGuard changeSnapshot survives large change sets without unbounded git spawn", { timeout: 60_000 }, async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-git-snapshot-many-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));

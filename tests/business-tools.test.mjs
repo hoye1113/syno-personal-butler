@@ -67,7 +67,7 @@ async function fixture(t) {
         assert.equal(r.result.isError, false, JSON.stringify(r));
         return r.result.structuredContent;
     }
-    return { root, opsRoot, requests, services, raw, call, bind, tools, effectVersion: () => bridge.effectVersion(), restart() {
+    return { root, opsRoot, requests, services, raw, call, bind, tools, effects, effectVersion: () => bridge.effectVersion(), restart() {
             release();
             release = null;
             bridge = make();
@@ -90,6 +90,27 @@ test('distinct actions, persistent replay, completion and overview', async (t) =
     assert.equal((await f.call('actions.list')).actions.length, 1);
     assert.equal((await f.raw('actions.update', { id: a.record.id, version: a.version, status: 'archived' })).result.isError, true);
 });
+test('a failed Job version conflict preserves its code and becomes a no-effect failed receipt', async (t) => {
+    const f = await fixture(t);
+    let executions = 0;
+    f.services.core.execute = async () => {
+        executions += 1;
+        return { job: { id: 'job-version-conflict', status: 'failed', error: { code: 'OBJECT_VERSION_CHANGED', message: '笔记版本已变化，请重新查询' } } };
+    };
+    const input = { id: 'note-versioned', version: 'old-version', body: '# 不写入' };
+    const first = await f.raw('knowledge.update', input);
+    const second = await f.raw('knowledge.update', input);
+    assert.equal(first.result.isError, true);
+    assert.equal(second.result.isError, true);
+    assert.match(second.result.content[0].text, /OBJECT_VERSION_CHANGED/);
+    assert.doesNotMatch(second.result.content[0].text, /TOOL_INVOCATION_PENDING/);
+    const receipts = await f.effects.list({ status: 'failed' });
+    assert.equal(receipts.length, 1);
+    assert.equal(receipts[0].directEffect.status, 'no_effect');
+    assert.equal(receipts[0].businessOutcome.code, 'OBJECT_VERSION_CHANGED');
+    assert.equal(executions, 1);
+});
+
 test('memory proposes then waits for later confirmation and validates note', async (t) => {
     const f = await fixture(t);
     const proposed = await f.call('memory.propose', { statement: '以后回答优先给中文实例' });

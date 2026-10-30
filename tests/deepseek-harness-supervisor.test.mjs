@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import test from "node:test";
 
 import {
@@ -17,6 +18,7 @@ import { publicSynoToolName, selectToolDefinitions, toBridgeName } from "../conf
 import { CORE_CHAT_TOOL_NAMES } from "../config/deepseek-harness/syno-tool-sets.mjs";
 import { doctor } from "../scripts/deepseek-harness-runtime.mjs";
 
+const exec = promisify(execFile);
 const fakeAgent = path.resolve("tests/support/fake-dsh-jsonrpc-agent.mjs");
 const testKillTree = async (pid) => {
   if (!pid) return;
@@ -383,6 +385,32 @@ test("DeepSeekHarnessSupervisor injects Kimi and search keys into a replaced chi
     path.resolve("config/deepseek-harness/syno-chat.cordis.yml"),
   ]);
   assert.equal(supervisor.status("chat").ready, true);
+});
+
+test("DSH workspace does not inherit the enclosing product repository snapshot", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "syno-harness-workspace-boundary-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await exec("git", ["init", "--quiet"], { cwd: root });
+  let spawnedEnv;
+  const supervisor = new DeepSeekHarnessSupervisor({
+    fakeAgent,
+    killTree: testKillTree,
+    localRoot: root,
+    spawnImpl: (command, args, options) => {
+      spawnedEnv = options.env;
+      return spawn(command, args, options);
+    },
+  });
+  t.after(() => supervisor.stop());
+  await supervisor.start("chat", { model: "kimi-for-coding" });
+  const cwd = spawnedEnv.DSH_CWD;
+  assert.equal(spawnedEnv.GIT_CEILING_DIRECTORIES, path.dirname(cwd));
+  const discovery = await exec("git", ["rev-parse", "--show-toplevel"], { cwd, env: spawnedEnv }).then(
+    () => null,
+    (error) => error,
+  );
+  assert.equal(discovery?.code, 128);
+  assert.match(discovery?.stderr || "", /not a git repository/);
 });
 
 test("capture launches DSH sdk-minimal with its restricted Syno overlay", async (t) => {

@@ -167,6 +167,65 @@ test("A pending receipt blocks a retry until reconciliation resolves it", async 
   assert.equal(executions, 0);
 });
 
+test("A deterministic business failure stores a failed receipt without reconciliation or repeated writes", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-effect-deterministic-failure-"));
+  t.after(() => cleanup(root));
+  const store = makeStore(root);
+  let executions = 0;
+  let reconciliationOpens = 0;
+  const tools = new ToolRegistry([{
+    name: "knowledge.search", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1", agentAdjustableBoundary: true,
+    inputSchema: { type: "object", additionalProperties: false }, outputSchema: { type: "object" },
+    execute: async () => {
+      executions += 1;
+      throw Object.assign(new Error("目标笔记已变化"), { code: "OBJECT_VERSION_CHANGED", effectUnknown: false });
+    },
+  }]);
+  const bridge = new SynoToolBridge({
+    tools, token: "secret", effectReceipts: store,
+    reconciliationCases: { async open() { reconciliationOpens += 1; } },
+  });
+  const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-version-conflict", allowedTools: ["knowledge_search"] });
+  const call = (id) => ({ authorization: "Bearer secret", body: { jsonrpc: "2.0", id, method: "tools/call", params: { name: "knowledge_search", arguments: {} } } });
+  const first = await bridge.handle(call(1));
+  const second = await bridge.handle(call(2));
+  release();
+  const invocation = toolInvocationKey({ ownerKey: "owner", threadKey: "main", messageId: "message-version-conflict", toolName: "knowledge_search" });
+  const receipt = await store.get(invocation);
+  assert.equal(first.result.isError, true);
+  assert.equal(second.result.isError, true);
+  assert.match(second.result.content[0].text, /OBJECT_VERSION_CHANGED/);
+  assert.doesNotMatch(second.result.content[0].text, /TOOL_INVOCATION_PENDING/);
+  assert.equal(receipt.status, "failed");
+  assert.equal(receipt.directEffect.status, "no_effect");
+  assert.equal(receipt.businessOutcome.code, "OBJECT_VERSION_CHANGED");
+  assert.equal(reconciliationOpens, 0);
+  assert.equal(executions, 1);
+});
+
+test("An unknown tool failure remains pending and opens reconciliation", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-effect-unknown-failure-"));
+  t.after(() => cleanup(root));
+  const store = makeStore(root);
+  let reconciliationOpens = 0;
+  const tools = new ToolRegistry([{
+    name: "knowledge.search", description: "Adjust", risk: "low", permission: "syno-settings", retry: "idempotent", version: "1", agentAdjustableBoundary: true,
+    inputSchema: { type: "object", additionalProperties: false }, outputSchema: { type: "object" },
+    execute: async () => { throw Object.assign(new Error("连接在工具执行期间中断"), { code: "ECONNRESET", effectUnknown: true }); },
+  }]);
+  const bridge = new SynoToolBridge({
+    tools, token: "secret", effectReceipts: store,
+    reconciliationCases: { async open() { reconciliationOpens += 1; } },
+  });
+  const release = bridge.bindContext({ ownerKey: "owner", threadKey: "main", messageId: "message-unknown-effect", allowedTools: ["knowledge_search"] });
+  const response = await bridge.handle({ authorization: "Bearer secret", body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "knowledge_search", arguments: {} } } });
+  release();
+  const invocation = toolInvocationKey({ ownerKey: "owner", threadKey: "main", messageId: "message-unknown-effect", toolName: "knowledge_search" });
+  assert.equal(response.result.isError, true);
+  assert.equal((await store.get(invocation)).status, "pending");
+  assert.equal(reconciliationOpens, 1);
+});
+
 test("Tool output validation failure stores a committed direct-effect receipt", async (t) => {
   const root = await fs.mkdtemp(path.join(tmpdir(), "syno-effect-invalid-"));
   t.after(() => cleanup(root));

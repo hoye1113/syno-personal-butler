@@ -274,8 +274,11 @@ class GitGuard {
     return value === managed || value.startsWith(`${managed}/`);
   }
 
-  async changeSnapshot(cwd = this.repoRoot) {
-    const changes = await this.changes(cwd);
+  async changeSnapshot(cwd = this.repoRoot, { excludePath = () => false } = {}) {
+    // 系统审计文件在调用方随后会被丢弃；进入 hash-object 前排除，避免为它们支付内容哈希成本。
+    // 重命名只要任一端属于业务路径就保留，防止漏掉跨系统/业务边界的真实变更。
+    const changes = (await this.changes(cwd)).filter((change) =>
+      [change.path, change.sourcePath].filter(Boolean).some((file) => !excludePath(file)));
     const snapshots = [];
     // 批量参数避免为每个文件孵化 git；64 个路径同时限制命令行长度与子进程数。
     // 若批次中有文件在快照前消失，则退回最多 16 并发的逐文件哈希，保留 missing 语义。

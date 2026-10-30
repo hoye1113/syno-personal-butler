@@ -754,6 +754,9 @@ class DeepSeekHarnessSupervisor {
     const env = {
       ...harnessChildEnvironment(process.env),
       DSH_CWD: workspaceRoot,
+      // chat 工作区只是隔离工具目录，不应让 workspace-changes 每轮快照整个产品仓的审计历史。
+      // Git 在父目录停止向上发现后，插件仍按非 Git 工作区捕获文件工具编辑。
+      GIT_CEILING_DIRECTORIES: path.dirname(workspaceRoot),
       DSH_HOME: homeRoot,
       DSH_SESSION_ROOT: sessionRoot,
       DSH_SYSTEM_PROMPT: persona,

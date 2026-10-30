@@ -82,7 +82,13 @@ function createBusinessTools(getServices, { opsRoot = PATHS.opsRoot, clock = () 
   async function operate(s, operation, payload, ctx, originalMessageId) {
     const result = await s.core.execute(buildOperationRequest(operation, payload, { sourceMessageId: originalMessageId }), ctx);
     const job = result.job;
-    if (!job || ["failed", "rejected", "canceled"].includes(job.status)) throw new Error(job?.error?.message || "业务操作未完成");
+    if (!job || ["failed", "rejected", "canceled"].includes(job.status)) {
+      const error = new Error(job?.error?.message || "业务操作未完成");
+      if (job?.error?.code) error.code = job.error.code;
+      // 失败 Job 的隔离 worktree 不会合并；版本冲突因此是已确认的零业务效果，而非未知写入。
+      if (job?.status === "failed" && error.code === "OBJECT_VERSION_CHANGED") error.effectUnknown = false;
+      throw error;
+    }
     const record = job.result?.operationResult?.record;
     const note = job.result?.operationResult;
     let knowledge;

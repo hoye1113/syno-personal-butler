@@ -170,7 +170,7 @@ class AgentHost {
     try {
       if (!alreadyRunning) await this.store.transition(job, "running");
       const baselineChanges = typeof this.gitGuard.changeSnapshot === "function"
-        ? await this.gitGuard.changeSnapshot(PATHS.knowledgeRoot)
+        ? await this.gitGuard.changeSnapshot(PATHS.knowledgeRoot, { excludePath: isSystemPath })
         : (await this.gitGuard.changedPaths(PATHS.knowledgeRoot)).map((item) => ({ path: item }));
       const dirtyBefore = [...new Set(baselineChanges.flatMap((item) => [item.path, item.sourcePath].filter(Boolean)))];
       const unrelated = dirtyBefore.filter((item) => !isSystemPath(item));
@@ -260,7 +260,7 @@ class AgentHost {
       }
 
       const changes = typeof this.gitGuard.changeSnapshot === "function"
-        ? await this.gitGuard.changeSnapshot(workspace)
+        ? await this.gitGuard.changeSnapshot(workspace, { excludePath: isSystemPath })
         : typeof this.gitGuard.changes === "function"
           ? await this.gitGuard.changes(workspace)
         : (await this.gitGuard.changedPaths(workspace)).map((item) => ({ status: "M", path: item, kind: "existing" }));

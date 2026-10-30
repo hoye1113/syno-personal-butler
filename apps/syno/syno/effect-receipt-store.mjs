@@ -134,6 +134,27 @@ class EffectReceiptStore {
     });
   }
 
+  async fail({ toolInvocationKey, toolName, ownerKey, argumentsDigest, directEffect, businessOutcome } = {}) {
+    const key = fileKey(toolInvocationKey);
+    return this.processLock.run(async () => {
+      const current = await this.#readByKeyUnlocked(key);
+      if (!current) throw Object.assign(new Error("Effect Receipt 尚未 begin"), { code: "EFFECT_RECEIPT_MISSING" });
+      if (current.argumentsDigest !== String(argumentsDigest)) throw Object.assign(new Error("Tool Invocation 参数与既有事实不一致"), { code: "TOOL_INVOCATION_IDENTITY_CONFLICT" });
+      if (["committed", "failed"].includes(current.status)) return { created: false, receipt: current };
+      const next = {
+        ...current,
+        ownerKey: String(ownerKey || current.ownerKey),
+        toolName: String(toolName || current.toolName),
+        status: "failed",
+        directEffect,
+        businessOutcome,
+        updatedAt: this.clock().toISOString(),
+      };
+      await atomicWrite(metadataFile(this.root, key), `${JSON.stringify(next, null, 2)}\n`);
+      return { created: true, receipt: next };
+    });
+  }
+
   async get(toolInvocationKey, { includePayload = false } = {}) {
     const key = fileKey(toolInvocationKey);
     const record = await this.#readByKeyUnlocked(key);
