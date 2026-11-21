@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { SourceResources, htmlImageReferences } from "../packages/syno-core/source-resources.mjs";
+import { SourceResources, htmlImageReferences, fetchImage } from "../packages/syno-core/source-resources.mjs";
 const png = Buffer.from([137,80,78,71,13,10,26,10,1,2,3]);
 test("HTML images keep content order; only semantic navigation is decorative", () => {
  const result = htmlImageReferences('<nav><img src="avatar.png"></nav><main><p>图前</p><img data-src="/tiny.png" alt="原理示意"><p>图后</p></main>', 'https://example.com/article');
@@ -21,6 +22,28 @@ test("resources dedupe by bytes, retain manifest, fail missing relative attachme
 test("download failure and unsupported image prevent complete status", async t => {
  const resources = new SourceResources({ cacheRoot: os.tmpdir(), fetcher: async () => ({ bytes: Buffer.from("not png"), mime: "image/png" }) });
  const m = await resources.prepare("![x](https://example.com/x.png)"); assert.equal(m.complete,false);
+});
+
+test("fetchImage scopes the fixed WeChat Referer through proxies and drops it on cross-host redirects", async t => {
+ const requests=[];
+ const proxy=http.createServer((request,response)=>{
+  requests.push({url:request.url,referer:request.headers.referer||null});
+  if(request.url==="http://mmbiz.qpic.cn/redirect.png"){
+   response.writeHead(302,{location:"http://example.com/final.png"});response.end();return;
+  }
+  response.writeHead(200,{"content-type":"image/png"});response.end(png);
+ });
+ await new Promise(resolve=>proxy.listen(0,"127.0.0.1",resolve));t.after(()=>proxy.close());
+ const proxyEnv={HTTP_PROXY:`http://127.0.0.1:${proxy.address().port}`};
+ await fetchImage("http://mmbiz.qpic.cn/body.png",{proxyEnv});
+ await fetchImage("http://example.com/other.png",{proxyEnv});
+ await fetchImage("http://mmbiz.qpic.cn/redirect.png",{proxyEnv});
+ assert.deepEqual(requests,[
+  {url:"http://mmbiz.qpic.cn/body.png",referer:"https://mp.weixin.qq.com/"},
+  {url:"http://example.com/other.png",referer:null},
+  {url:"http://mmbiz.qpic.cn/redirect.png",referer:"https://mp.weixin.qq.com/"},
+  {url:"http://example.com/final.png",referer:null},
+ ]);
 });
 
 test("shared asset is removed only after all valid references disappear",async t=>{

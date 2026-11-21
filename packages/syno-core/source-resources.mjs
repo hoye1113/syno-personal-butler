@@ -47,7 +47,9 @@ async function fetchImage(value, { maxBytes = 10 * 1024 * 1024, lookup, proxyEnv
   for (let redirects = 0; redirects <= 3; redirects++) {
     validatePublicUrl(url.toString());
     const route = net.isIP(url.hostname) ? { proxied: false } : proxyRouteForUrl(url, proxyEnv);
-    const response = route.proxied ? await requestViaProxy(url, route.proxyUrl, { maxBytes }) : await requestOnce(url, await resolvePublicAddress(url, lookup), { maxBytes });
+    const referer = url.hostname.toLowerCase() === "mmbiz.qpic.cn" ? "https://mp.weixin.qq.com/" : "";
+    const options = { maxBytes, ...(referer ? { referer } : {}) };
+    const response = route.proxied ? await requestViaProxy(url, route.proxyUrl, options) : await requestOnce(url, await resolvePublicAddress(url, lookup), options);
     if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) { url = new URL(response.headers.location, url); continue; }
     if (response.statusCode < 200 || response.statusCode >= 300) throw new Error(`图片返回 HTTP ${response.statusCode}`);
     const mime = String(response.headers["content-type"] || "").split(";")[0].toLowerCase();

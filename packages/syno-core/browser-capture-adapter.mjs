@@ -11,6 +11,8 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_RENDER_SETTLE_MS = 1_500;
 const DEFAULT_SESSION_TTL_MS = 2 * 60 * 60 * 1_000;
 const MAX_CONTENT_CHARS = 100_000;
+// 2026-11-09 实测微信正文页 HTML 4.73 MB；2 MB 会在正文可用时仍被完整性门拒收。
+const MAX_HTML_BYTES = 8_000_000;
 const ALLOWED_ACTIONS = Object.freeze(new Set(["navigate", "snapshot", "list_tabs", "close_session"]));
 
 function adapterError(code, message, details = {}) {
@@ -70,6 +72,32 @@ function htmlTitle(html) {
     const content = /content\s*=\s*"([^"]*)"/iu.exec(match[0])?.[1] ?? /content\s*=\s*'([^']*)'/iu.exec(match[0])?.[1] ?? "";
     const decoded = decodeEntities(content).trim();
     if (decoded) return decoded;
+  }
+  return "";
+}
+
+// 微信正文之外还有头像、二维码和大量脚本。只取 js_content 的完整元素，
+// 让正文与图片来自同一容器；截断导致闭合标签缺失时保守返回空。
+function htmlElementById(html, id) {
+  const source = String(html || "");
+  const escaped = id.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  // 等长掩码保留原始索引，避免把注释或 raw-text 元素里的模板当成真实容器。
+  const searchable = source.replace(/<!--[\s\S]*?-->|<(script|style|textarea|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>/giu, token => " ".repeat(token.length));
+  const start = new RegExp(`<([a-zA-Z][\\w-]*)\\b(?=[^>]*\\b[iI][dD]\\s*=\\s*(?:"${escaped}"|'${escaped}'|${escaped}(?:\\s|>)))[^>]*>`, "u").exec(searchable);
+  if (!start) return "";
+  const tag = start[1].toLowerCase();
+  const tokens = new RegExp(`<!--[\\s\\S]*?-->|<(?:script|style|textarea|noscript)\\b[^>]*>[\\s\\S]*?<\\/(?:script|style|textarea|noscript)\\s*>|<${tag}\\b[^>]*>|<\\/${tag}\\s*>`, "giu");
+  tokens.lastIndex = start.index + start[0].length;
+  let depth = 1;
+  for (let match = tokens.exec(source); match; match = tokens.exec(source)) {
+    const token = match[0];
+    if (token.startsWith("<!--") || /^<(?:script|style|textarea|noscript)\b/iu.test(token)) continue;
+    if (new RegExp(`^<\\/${tag}\\s*>$`, "iu").test(token)) {
+      depth -= 1;
+      if (depth === 0) return source.slice(start.index, tokens.lastIndex);
+    } else if (!/\/\s*>$/u.test(token)) {
+      depth += 1;
+    }
   }
   return "";
 }
@@ -197,7 +225,7 @@ class BrowserCaptureAdapter {
       const finalUrl = firstString(observed, ["url", "final_url", "finalUrl"]) || task.requestedUrl;
       const observedTitle = firstString(observed, ["title", "page_title", "pageTitle"]) || vomTitle(raw);
       if (!requiresInteraction({ finalUrl, title: observedTitle, content: flattenSnapshotTree(raw) })) {
-        try { const page = await this.#run(["get-html", "--session", session, "--max-bytes", "2000000", "--json"]); return { ...observed, html: page.html, htmlTruncated: page.truncated }; } catch { /* Unsupported HTML extraction is reported as incomplete resources. */ }
+        try { const page = await this.#run(["get-html", "--session", session, "--max-bytes", String(MAX_HTML_BYTES), "--json"]); return { ...observed, html: page.html, htmlTruncated: page.truncated }; } catch { /* Unsupported HTML extraction is reported as incomplete resources. */ }
       }
       return observed;
     }
@@ -374,17 +402,21 @@ class BrowserCaptureAdapter {
     const requested = assertSafeUrl(requestedUrl);
     if (final.origin !== requested.origin) throw adapterError("BROWSER_REDIRECT_ORIGIN_DENIED", "浏览器页面跳转到了未签发的站点");
     const raw = result?.observation ?? result?.snapshot ?? result?.tree ?? result?.content ?? result?.text ?? result?.data;
-    const images = result.html ? htmlImageReferences(result.html, final.toString()) : null;
+    const isWeChat = final.hostname.toLowerCase() === "mp.weixin.qq.com";
+    const bodyHtml = isWeChat ? htmlElementById(result.html, "js_content") : result.html;
+    const images = result.html ? htmlImageReferences(bodyHtml || result.html, final.toString()) : null;
     // 正文优先级：extractReadableText 产出干净则用；产出垃圾（或为空）则降级 observe 的
     // VOM 文本（无图时的既有兜底）。两者皆垃圾时 requiresInteraction fail-closed。
     const extractedRaw = images ? extractReadableText(images.html, "text/html") : "";
     const extracted = javascriptShell(extractedRaw) ? "" : stripJavascriptNotice(extractedRaw);
     const observedRaw = flattenSnapshotTree(raw).replace(/\u0000/gu, " ").trim();
     const observed = javascriptShell(observedRaw) ? observedRaw : stripJavascriptNotice(observedRaw);
-    const fullContent = images && !extractionGarbage(extracted) ? extracted : observed;
+    const extractedClean = !extractionGarbage(extracted);
+    const fullContent = images && extractedClean ? extracted : observed;
     const content = fullContent.slice(0, this.maxContentChars);
     const title = firstString(result, ["title", "page_title", "pageTitle"]) || htmlTitle(result.html) || vomTitle(raw);
-    const base = { requestedUrl, finalUrl: final.toString(), title, content, truncated: result.htmlTruncated === true || fullContent.length > this.maxContentChars, resources: images?.refs, resourceDiscoveryComplete: Boolean(images) && result.htmlTruncated !== true, contentDigest: digest(content), usedActions: ["navigate", "observe"], browserSessionId: this.sessions.get(id)?.logicalSession };
+    const bodyResourcesComplete = !isWeChat || Boolean(bodyHtml) && extractedClean;
+    const base = { requestedUrl, finalUrl: final.toString(), title, content, truncated: result.htmlTruncated === true || fullContent.length > this.maxContentChars, resources: images?.refs, resourceDiscoveryComplete: Boolean(images) && result.htmlTruncated !== true && bodyResourcesComplete, contentDigest: digest(content), usedActions: ["navigate", "observe"], browserSessionId: this.sessions.get(id)?.logicalSession };
     const observation = requiresInteraction(base)
       ? { ...base, status: "failed", blocked: "unattended_auth", error: { code: "BROWSER_BLOCKED_UNATTENDED", message: "页面要求登录或人机验证；无人值守读取已停止，且不会绕过验证" } }
       : javascriptShell(content)

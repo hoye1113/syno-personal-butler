@@ -111,12 +111,12 @@ function wireResponse(request, resolve, reject, { timeoutMs, maxBytes }) {
   request.on("error", reject);
 }
 
-function requestOnce(url, address, { timeoutMs = 15_000, maxBytes = MAX_SOURCE_BYTES } = {}) {
+function requestOnce(url, address, { timeoutMs = 15_000, maxBytes = MAX_SOURCE_BYTES, referer = "" } = {}) {
   return new Promise((resolve, reject) => {
     const transport = url.protocol === "https:" ? https : http;
     const request = transport.request(url, {
       method: "GET",
-      headers: { ...FETCH_HEADERS },
+      headers: { ...FETCH_HEADERS, ...(referer ? { referer } : {}) },
       lookup(_hostname, _options, callback) {
         // Node 24 may request an `all` lookup when auto-selecting IPv4/IPv6.
         // Return the pinned record in the shape that the caller requested;
@@ -136,7 +136,7 @@ function requestOnce(url, address, { timeoutMs = 15_000, maxBytes = MAX_SOURCE_B
 // 校验责任在调用方：字面非公网 IP 在进入本函数前已被 resolvePublicAddress 拦下。
 // https: 目标走 CONNECT 隧道后在隧道上握手 TLS；http: 目标用 absolute-form。
 // 实证于 2026-09-22（探针打 https://x.com 与 http://example.com 均 HTTP 200）。
-function requestViaProxy(url, proxyUrl, { timeoutMs = 15_000, maxBytes = MAX_SOURCE_BYTES } = {}) {
+function requestViaProxy(url, proxyUrl, { timeoutMs = 15_000, maxBytes = MAX_SOURCE_BYTES, referer = "" } = {}) {
   return new Promise((resolve, reject) => {
     const proxyHeaders = {};
     if (proxyUrl.username || proxyUrl.password) {
@@ -149,7 +149,7 @@ function requestViaProxy(url, proxyUrl, { timeoutMs = 15_000, maxBytes = MAX_SOU
         port: proxyUrl.port || 8080,
         method: "GET",
         path: url.toString(),
-        headers: { ...FETCH_HEADERS, ...proxyHeaders, host: url.host },
+        headers: { ...FETCH_HEADERS, ...(referer ? { referer } : {}), ...proxyHeaders, host: url.host },
       });
       wireResponse(request, resolve, reject, { timeoutMs, maxBytes });
       request.end();
@@ -173,7 +173,7 @@ function requestViaProxy(url, proxyUrl, { timeoutMs = 15_000, maxBytes = MAX_SOU
       const tlsSocket = tls.connect({ socket, servername: url.hostname });
       const request = https.request(url, {
         method: "GET",
-        headers: { ...FETCH_HEADERS },
+        headers: { ...FETCH_HEADERS, ...(referer ? { referer } : {}) },
         createConnection: () => tlsSocket,
         agent: false,
       });

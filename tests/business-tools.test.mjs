@@ -268,6 +268,20 @@ test('publishing diagnostics and first publish use only Host configuration and e
  f.bind('publish-next');assert.equal((await f.call('knowledge.sync_start',{id:'note-test',version:'a'.repeat(64)})).status,'completed');
 });
 
+test('sync status keeps image receipt metadata but does not send material tokens to the model',async t=>{
+ const f=await fixture(t);const materialToken='image-material-123456';
+ const record={mode:'production',status:'synced',id:'note-image',sourceVersion:'a'.repeat(64),targets:{wiki:{status:'succeeded'},images:{status:'succeeded',receipts:[{blockId:'block-image',digest:'b'.repeat(64),token:materialToken}]},catalog:{status:'succeeded'}}};
+ f.services.publisher={async status(owner,id){assert.equal(owner,'owner');assert.equal(id,'note-image');return record;}};
+ const response=await f.raw('knowledge.sync_status',{id:'note-image'});
+ assert.equal(response.result.isError,false,JSON.stringify(response.result));
+ const result=response.result.structuredContent;
+ assert.equal(result.status,'synced');
+ assert.deepEqual(Object.fromEntries(Object.entries(result.targets).map(([target,state])=>[target,state.status])),{wiki:'succeeded',images:'succeeded',catalog:'succeeded'});
+ assert.deepEqual(result.targets.images.receipts,[{blockId:'block-image',digest:'b'.repeat(64)}]);
+ assert.equal(record.targets.images.receipts[0].token,materialToken,'本地原始回执不得被修改');
+ assert.doesNotMatch(JSON.stringify(response),new RegExp(materialToken));
+});
+
 test('completed local knowledge writes explicitly report disabled publishing',async t=>{
  const f=await fixture(t);f.services.publisher={async status(){return{mode:'disabled',status:'disabled'}}};
  f.services.core.execute=async()=>({job:{id:'local-job',status:'completed',result:{operationResult:{id:'note-test',path:'vault/00-Inbox/test.md'}}}});

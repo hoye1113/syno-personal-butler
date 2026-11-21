@@ -31,6 +31,7 @@ test("recovery after content merge before terminal projection never repeats the 
  delete env.SYNO_CRASH_AFTER_MERGE;env.SYNO_RECOVERY_ONLY="1";
  const result=JSON.parse((await exec(process.execPath,[worker],{env,encoding:"utf8",timeout:60000})).stdout);
  assert.equal(result.jobs.length,1);assert.equal(result.jobs[0].status,"completed");assert.equal(result.dirty,"");
- const files=await fs.readdir(path.join(root,"ops/actions/2026/10"));assert.equal(files.length,1);
+ const actionId=result.jobs[0].record.id,date=/^action-(\d{4})(\d{2})\d{2}-/u.exec(actionId);assert.ok(date,`动作 ID 缺少存储年月: ${actionId}`);
+ const files=await fs.readdir(path.join(root,"ops/actions",date[1],date[2]));assert.deepEqual(files,[`${actionId}.md`]);
  const again=JSON.parse((await exec(process.execPath,[worker],{env,encoding:"utf8",timeout:60000})).stdout);assert.equal(again.jobs.length,1);assert.equal(again.dirty,"");
 });

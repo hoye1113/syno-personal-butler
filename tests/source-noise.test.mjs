@@ -63,3 +63,22 @@ test("applyBrowserSnapshot: 浏览器快照的 CSS 噪声二次门被拒并给�
   );
   await assert.doesNotReject(() => ingest.applyBrowserSnapshot("artifact-noise", { content: "正常浏览器渲染正文\n".repeat(40), finalUrl: "https://example.com/css-leak" }));
 });
+
+test("applyBrowserSnapshot: 保留浏览器资源发现不完整状态", async (t) => {
+  const root = await fs.mkdtemp(path.join(tmpdir(), "syno-resource-discovery-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.writeFile(path.join(root, "artifact-truncated.json"), JSON.stringify({
+    payload: { kind: "url", value: "https://example.com/article" },
+    status: "received", created: "2026-11-09T00:00:00.000Z",
+  }), "utf8");
+  const ingest = new IngestService({ knowledge: { async search() { return []; } }, stateRoot: root });
+
+  const snapshot = await ingest.applyBrowserSnapshot("artifact-truncated", {
+    content: "正常浏览器渲染正文\n".repeat(40),
+    finalUrl: "https://example.com/article",
+    resources: [],
+    resourceDiscoveryComplete: false,
+  });
+
+  assert.equal(snapshot.resourceDiscoveryComplete, false);
+});
