@@ -8,14 +8,38 @@ import { DEFAULT_WEB_PORT, PATHS } from "../../packages/syno-core/paths.mjs";
 import { ProcessFileLock } from "../../packages/syno-core/process-lock.mjs";
 import { repoFingerprintFor } from "../../packages/syno-core/repo-fingerprint.mjs";
 import { readinessHttpStatus } from "./syno/server-readiness.mjs";
+import {
+  assertLegacyHandoverPaths,
+  createLegacyHandoverShutdown,
+  installLegacyHandoverSignals,
+  openLegacyProductionHandover,
+  resolveLegacyHandoverStartup,
+} from "../../experiments/superagent-p0/legacy-production-handover.mjs";
 
 const PORT = Number(process.env.PORT || DEFAULT_WEB_PORT);
+// P4.3-B 配置门禁：任何半配置的生产消费者在获取租约／监听前失败关闭。
+const legacyHandoverConfig = resolveLegacyHandoverStartup(process.env);
+// 旧 adapter 的凭据／state／锁来自静态 PATHS，必须与新 Runtime 的 P0 配置同根；runtimeRoot 不比对。
+assertLegacyHandoverPaths({ config: legacyHandoverConfig, paths: PATHS });
 const fingerprint = repoFingerprintFor(PATHS.repoRoot);
 const hostLease = await new ProcessFileLock({
   file: path.join(PATHS.stateRoot, "locks", "syno-host.lock"), failFast: true,
   metadata: { instanceId: randomUUID(), repoFingerprint: fingerprint, entrypoint: "apps/syno/server.mjs" },
 }).acquire();
-const runtime = createSynoRuntime();
+let legacyHandover = null;
+try {
+  legacyHandover = legacyHandoverConfig ? openLegacyProductionHandover({
+    databasePath: legacyHandoverConfig.databasePath,
+    statusFile: legacyHandoverConfig.hostStatusFile,
+    appId: legacyHandoverConfig.appId,
+    pid: process.pid,
+  }) : null;
+} catch (error) {
+  await hostLease.release();
+  throw error;
+}
+const runtime = createSynoRuntime(legacyHandover ? { legacyHandover } : {});
+if (legacyHandover) installLegacyHandoverSignals({ target: process, bridge: legacyHandover });
 
 function isLoopback(req) { return ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(String(req.socket.remoteAddress || "")); }
 // DNS 重绑定防御：浏览器可能被诱导入以 attacker.com 的 Host 访问 127.0.0.1，此时
@@ -45,11 +69,19 @@ const server = createServer(async (req, res) => {
     return send(res, routed === "/api/syno/readiness" ? readinessHttpStatus(runtime.lifecycle().state) : 200, JSON.stringify(value));
   } catch (error) { return send(res, error.statusCode || (error.code === "SYNO_BRIDGE_UNAUTHORIZED" ? 401 : 500), JSON.stringify({ error: error.code || "host_error", message: error.message })); }
 });
-await new Promise((resolve, reject) => { server.once("error", reject); server.listen(PORT, "127.0.0.1", resolve); }).catch(async (error) => { await runtime.close().catch(() => {}); await hostLease.release(); throw error; });
+await new Promise((resolve, reject) => { server.once("error", reject); server.listen(PORT, "127.0.0.1", resolve); }).catch(async (error) => {
+  await runtime.close().catch(() => {});
+  try { legacyHandover?.close(); } catch {} finally { await hostLease.release(); }
+  throw error;
+});
 console.log(`Syno headless Host listening on 127.0.0.1:${PORT}`);
+const shutdown = createLegacyHandoverShutdown({
+  runtime,
+  bridge: legacyHandover,
+  stopHttp: () => new Promise((resolve) => server.close(resolve)),
+  hostLease,
+});
 const ready = runtime.initialize({ worker: true });
 ready.catch(async (error) => { console.error("[syno] Runtime 初始化失败:", String(error?.message || error)); try { await shutdown(); process.exitCode = 1; } catch (shutdownError) { console.error("[syno] shutdown failed:", shutdownError.code || "HOST_SHUTDOWN_FAILED"); } });
-let closing = null;
-async function shutdown() { if (closing) return closing; closing = (async () => { await runtime.close(); await new Promise((resolve) => server.close(resolve)); await hostLease.release(); })().catch((error) => { closing = null; throw error; }); return closing; }
 const shutdownOnSignal = () => { void shutdown().catch((error) => { console.error("[syno] shutdown failed:", error.code || "HOST_SHUTDOWN_FAILED"); }); };
 process.on("SIGINT", shutdownOnSignal); process.on("SIGTERM", shutdownOnSignal);

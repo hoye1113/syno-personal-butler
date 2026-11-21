@@ -58,6 +58,12 @@ function workflowSummary(item) {
           : "正在后台处理。";
   return { id: item.id, stage, retrying: stage === "failed_retryable", userMessage, artifactId: item.artifactId, updatedAt: item.updatedAt, browserStatus: item.browserStatus, error: item.lastError?.message, jobId: item.jobId };
 }
+function syncStatusForModel(record) {
+  const receipts = record?.targets?.images?.receipts;
+  if (!Array.isArray(receipts)) return record;
+  // 图片素材 token 仅供本地对账；模型只需要回执位置与摘要，不能因此触发凭据门。
+  return { ...record, targets: { ...record.targets, images: { ...record.targets.images, receipts: receipts.map(({ token, ...receipt }) => receipt) } } };
+}
 function trustedContext(context) {
   if (!context.ownerId || !context.originalMessageId || !context.harnessSessionId) throw Object.assign(new Error("业务工具必须绑定主人的真实聊天回合"), { code: "BUSINESS_CONTEXT_REQUIRED" });
   return { ownerKey: context.ownerId, threadKey: context.threadKey, channel: context.channel, senderId: context.senderId || context.ownerId, messageId: context.messageId, conversationId: context.conversationId };
@@ -124,7 +130,7 @@ function createBusinessTools(getServices, { opsRoot = PATHS.opsRoot, clock = () 
       if (s.publisher.config.mode === "disabled") throw new Error("发布未启用，请先完成隔离配置与验收");
       return operate(s, "notes.prepare_publish", input, ctx, context.originalMessageId);
     }
-    if (name === "knowledge.sync_status") return s.publisher.status(ctx.ownerKey, input.id);
+    if (name === "knowledge.sync_status") return syncStatusForModel(await s.publisher.status(ctx.ownerKey, input.id));
     if (name === "knowledge.sync_retry") {
       const status = await s.publisher.status(ctx.ownerKey, input.id);
       if (["disabled", "not_registered"].includes(status.status)) throw new Error("没有可恢复的已登记发布请求");

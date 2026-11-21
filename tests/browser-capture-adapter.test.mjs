@@ -153,6 +153,66 @@ test("BrowserCaptureAdapter falls back to the VOM text when HTML extraction yiel
   assert.equal(result.title, "Agent 写得更快以后，时间花在了哪里？");
   assert.match(result.content, /代码改完了，流水线还没跑完/);
   assert.doesNotMatch(result.content, /function W\(/);
+  assert.equal(result.resourceDiscoveryComplete, false, "没有可靠正文容器时不能把全页资源当作完整正文资源");
+});
+
+test("BrowserCaptureAdapter extracts WeChat body images without mixing page chrome or script residue", async () => {
+  const html = '<html><head><meta property="og:title" content="微信正文图片"></head><body>'
+    + '<img src="https://mmbiz.qpic.cn/avatar.png" alt="作者头像">'
+    + "<script>var __=\"</scr" + "ipt>\";" + LEAKY_SCRIPT.repeat(6) + "</scr" + "ipt>"
+    + '<div id="js_content"><p>图前正文</p><div><p>嵌套段落</p><img data-src="https://mmbiz.qpic.cn/body-1.png" alt="架构图"></div>'
+    + '<p>图后正文</p><img data-src="https://mmbiz.qpic.cn/body-2.png" alt="流程图"></div>'
+    + '<img src="https://mmbiz.qpic.cn/qrcode.png" alt="二维码"></body></html>';
+  const observation = {
+    url: "https://mp.weixin.qq.com/s/abc",
+    text: ['RootWebArea "微信正文图片"', 'paragraph "图前正文"', 'image "架构图"', 'paragraph "嵌套段落"', 'paragraph "图后正文"', 'image "流程图"', 'image "作者头像"', 'image "二维码"'].join("\n"),
+  };
+  const fake = fakeRunner({ observations: [observation], html });
+  const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner });
+  const result = await adapter.capture({ workflowId: "workflow-wechat-body-images", exactUrl: "https://mp.weixin.qq.com/s/abc" });
+
+  assert.equal(result.status, "completed");
+  assert.match(result.content, /图前正文[\s\S]*!\[架构图\]\(https:\/\/mmbiz\.qpic\.cn\/body-1\.png\)[\s\S]*图后正文[\s\S]*!\[流程图\]\(https:\/\/mmbiz\.qpic\.cn\/body-2\.png\)/u);
+  assert.doesNotMatch(result.content, /作者头像|二维码|function W\(/u);
+  assert.deepEqual(result.resources.map((item) => item.source), ["https://mmbiz.qpic.cn/body-1.png", "https://mmbiz.qpic.cn/body-2.png"]);
+  assert.equal(result.resourceDiscoveryComplete, true);
+});
+
+test("BrowserCaptureAdapter ignores WeChat container templates in non-content elements", async () => {
+  const template = (label, image) => `<div id="js_content"><p>${label}</p><img src="https://mmbiz.qpic.cn/${image}"></div>`;
+  const html = '<html><head><meta property="og:title" content="微信正文图片"></head><body>'
+    + `<!-- ${template("注释模板", "comment.png")} -->`
+    + `<script>const template = ${JSON.stringify(template("脚本模板", "script.png"))};</script>`
+    + `<style>${template("样式模板", "style.png")}</style>`
+    + `<textarea>${template("输入框模板", "textarea.png")}</textarea>`
+    + `<noscript>${template("noscript 模板", "noscript.png")}</noscript>`
+    + '<div id="js_content"><p>真实正文</p><img data-src="https://mmbiz.qpic.cn/right.png" alt="正文图"></div>'
+    + '</body></html>';
+  const fake = fakeRunner({ observations: [{ url: "https://mp.weixin.qq.com/s/abc", text: "真实正文" }], html });
+  const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner });
+  const result = await adapter.capture({ workflowId: "workflow-wechat-template", exactUrl: "https://mp.weixin.qq.com/s/abc" });
+
+  assert.equal(result.status, "completed");
+  assert.match(result.content, /真实正文/u);
+  assert.doesNotMatch(result.content, /注释模板|脚本模板|样式模板|输入框模板|noscript 模板/u);
+  assert.deepEqual(result.resources.map((item) => item.source), ["https://mmbiz.qpic.cn/right.png"]);
+  assert.equal(result.resourceDiscoveryComplete, true);
+});
+
+test("BrowserCaptureAdapter matches the WeChat body container id case-sensitively", async () => {
+  const html = '<html><head><meta property="og:title" content="微信正文图片"></head><body>'
+    + '<div id="JS_CONTENT"><p>错误的大写容器</p><img src="https://mmbiz.qpic.cn/wrong.png"></div>'
+    + '<DIV ID="js_content"><p>真实正文</p><img data-src="https://mmbiz.qpic.cn/right.png" alt="正文图"></DIV>'
+    + '</body></html>';
+  const fake = fakeRunner({ observations: [{ url: "https://mp.weixin.qq.com/s/abc", text: "真实正文" }], html });
+  const adapter = new BrowserCaptureAdapter({ command: "bsk", runner: fake.runner });
+  const result = await adapter.capture({ workflowId: "workflow-wechat-id-case", exactUrl: "https://mp.weixin.qq.com/s/abc" });
+
+  assert.equal(result.status, "completed");
+  assert.match(result.content, /真实正文/u);
+  assert.doesNotMatch(result.content, /错误的大写容器/u);
+  assert.deepEqual(result.resources.map((item) => item.source), ["https://mmbiz.qpic.cn/right.png"]);
+  assert.equal(result.resourceDiscoveryComplete, true);
 });
 
 test("BrowserCaptureAdapter prefers rendered VOM content over an X JavaScript shell from HTML", async () => {

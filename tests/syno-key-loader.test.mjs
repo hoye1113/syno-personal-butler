@@ -60,6 +60,13 @@ test("process environment wins per key over the env file", async () => {
   });
 });
 
+test("SYNO_SECRET_ENV_FILE selects the existing owner env without copying credentials", async () => {
+  await withTempEnv("KIMI_API_KEY=owner-kimi\n", async (file) => {
+    const secrets = await defaultSynoSecretLoader({ env: { SYNO_SECRET_ENV_FILE: file } });
+    assert.deepEqual(secrets, { KIMI_API_KEY: "owner-kimi" });
+  });
+});
+
 test("defaultSynoSecretLoader returns an empty record when the file is missing", async () => {
   const missing = path.join(os.tmpdir(), "syno-secret-env-missing", ".env");
   assert.deepEqual(await defaultSynoSecretLoader({ envFile: missing, env: {} }), {});

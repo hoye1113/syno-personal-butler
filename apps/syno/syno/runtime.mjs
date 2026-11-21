@@ -1004,10 +1004,19 @@ function createSynoRuntime(options = {}) {
       };
     },
   });
+  const legacyHandover = options.legacyHandover || null;
+  const legacyOnMessage = (message) => channelConversationHandler.handle({ ...message, ownerKey: "local-user", threadKey: "main", channel: "feishu" });
   const feishu = options.feishu || new FeishuChannelAdapter({
     // 「正在回复中」占位卡默认开；SYNO_FEISHU_TYPING=0|false 可关（关闭后退回单条最终回复）。
     typingIndicator: envToggle(process.env.SYNO_FEISHU_TYPING, { defaultOn: true }),
-    onMessage: (message) => channelConversationHandler.handle({ ...message, ownerKey: "local-user", threadKey: "main", channel: "feishu" }),
+    // P4.3-B：仅当显式传入 legacyHandover 时才经过冻结桥；默认路径与旧行为逐字节一致。
+    onMessage: legacyHandover
+      ? (message) => legacyHandover.handleMessage(
+        message,
+        legacyOnMessage,
+        ({ text }) => feishu.send({ chatId: message.chatId, replyTo: message.id, text }),
+      )
+      : legacyOnMessage,
     // 入站附件落到飞书专属隔离区（图片直传 / 文件收录共用同一条 artifact 契约）
     quarantineRoot: path.join(PATHS.runtimeRoot, "quarantine", "feishu"),
   });

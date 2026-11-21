@@ -4,7 +4,9 @@ import http from "node:http";
 import { fetchSourceText, proxyRouteForUrl, requestOnce, resolvePublicAddress } from "../packages/syno-core/source-fetcher.mjs";
 
 test("requestOnce supports Node all-address lookup callbacks", async (t) => {
-  const server = http.createServer((_request, response) => {
+  let receivedReferer;
+  const server = http.createServer((request, response) => {
+    receivedReferer = request.headers.referer;
     response.writeHead(200, { "content-type": "text/plain" });
     response.end("source body");
   });
@@ -15,10 +17,12 @@ test("requestOnce supports Node all-address lookup callbacks", async (t) => {
   const result = await requestOnce(
     new URL(`http://example.com:${port}/article`),
     { address: "127.0.0.1", family: 4 },
+    { referer: "https://mp.weixin.qq.com/" },
   );
 
   assert.equal(result.statusCode, 200);
   assert.equal(result.body.toString("utf8"), "source body");
+  assert.equal(receivedReferer, "https://mp.weixin.qq.com/");
 });
 
 // 生产形态（2026-09）：本机代理把 x.com 等公开域名 DNS 重写进 198.18.0.0/15 Fake-IP 段。

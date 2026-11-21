@@ -32,7 +32,7 @@ function parseDotenvValue(text, name) {
 }
 
 async function defaultSynoSecretLoader({ envFile, env = process.env } = {}) {
-  const file = envFile || path.join(PATHS.repoRoot, ".env");
+  const file = envFile || env.SYNO_SECRET_ENV_FILE || path.join(PATHS.repoRoot, ".env");
   let fileText = "";
   try {
     fileText = await fs.readFile(file, "utf8");

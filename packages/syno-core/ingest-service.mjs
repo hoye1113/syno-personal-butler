@@ -267,7 +267,7 @@ class IngestService {
       text: text.slice(0, 100_000),
       truncated: snapshot.truncated === true || text.length > 100_000,
       resources: snapshot.resources,
-      resourceDiscoveryComplete: Array.isArray(snapshot.resources),
+      resourceDiscoveryComplete: snapshot.resourceDiscoveryComplete !== false && Array.isArray(snapshot.resources),
       method: "bsk",
       contentDigest: String(snapshot.contentDigest || ""),
     };
