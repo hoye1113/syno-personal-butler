@@ -1,4 +1,5 @@
 // Root Router chooses a domain and object only; Specialists own execution and Result Lane.
+import { parseRadarCommand } from "./p5-radar/command.mjs";
 import { resolveDecisionCommand } from "./decision-object.mjs";
 import { ideaContextId, resolveIdeaRequest } from "./idea-object.mjs";
 import { resolveKnowledgeRequest } from "./knowledge-query.mjs";
@@ -57,6 +58,8 @@ export function routeRoot({
 }) {
   const normalized = text.trim();
   if (normalized === sourceUrl) return { status: "routed", domain: "capture" };
+  const radar = parseRadarCommand(normalized);
+  if (radar) return { status: "routed", domain: "radar", ...radar };
   const decision = resolveDecisionCommand(normalized);
   if (decision.status === "resolved") return { ...decision, status: "routed", domain: "decision" };
   if (decision.status === "ambiguous") return { ...decision, status: "ambiguous", domain: "decision" };
