@@ -5,12 +5,123 @@ import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
+import { createFeishuDocFromAst } from "../../packages/syno-core/feishu-doc-ast.mjs";
+import { runActivePlugin } from "../../packages/syno-core/plugin-runner.mjs";
+import { RADAR_HELP } from "./p5-radar/command.mjs";
+import { createP5HostRunner, createP5Scheduler } from "./p5-radar/host.mjs";
 import { resolveRealFeishuConfig } from "./real-feishu-config.mjs";
 
 // Explicit runtime configuration: isolated-test by default, production only when fully specified.
 // Resolution happens before any business module import, directory creation or Feishu connection.
 const config = resolveRealFeishuConfig(process.env);
 const execFileAsync = promisify(execFile);
+const p5Home = path.join(config.localDataRoot, "p5-radar");
+const p5Runner = createP5HostRunner({
+  cliPath: path.join(import.meta.dirname, "p5-radar.mjs"),
+  home: p5Home,
+  env: process.env,
+});
+const p5PluginRegistry = path.join(config.runtimeRoot, "plugins", "p5-radar", "active.json");
+const p5DocStateFile = path.join(p5Home, "feishu-doc.json");
+const p5SettingsFile = path.join(p5Home, "settings.json");
+const readP5Settings = async () => {
+  try {
+    const parsed = JSON.parse(await fs.readFile(p5SettingsFile, "utf8"));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+const p5PluginAction = async (action, payload = {}) => {
+  const result = await runActivePlugin({
+    registryFile: p5PluginRegistry,
+    env: { ...process.env, P5_RADAR_HOME: p5Home },
+    timeoutMs: 600_000,
+    request: {
+      contract: "syno.p5-radar/1",
+      requestId: `p5-${action}-${Date.now()}`,
+      action,
+      payload,
+    },
+  });
+  if (!result.ok) throw Object.assign(new Error(result.message || `P5 插件 ${action} 失败`), { code: result.code || "P5_PLUGIN_FAILED" });
+  return result.data;
+};
+const p5PluginDailyDoc = async () => {
+  const settings = await readP5Settings();
+  const configured = Number(settings.maxItems);
+  const maxItems = Number.isSafeInteger(configured) && configured >= 10 && configured <= 200 ? configured : 50;
+  const ast = await p5PluginAction("renderDailyDoc", { windowDays: 7, maxItems });
+  const doc = await createFeishuDocFromAst({
+    ast,
+    configPath: path.resolve(import.meta.dirname, "../../config/knowledge-publishing.json"),
+    stateFile: p5DocStateFile,
+    log: (event, detail = {}) => console.log(JSON.stringify({ event, ...detail })),
+  });
+  try {
+    const items = (ast.items || []).map((item) => ({
+      index: item.index,
+      itemId: item.itemId,
+      title: item.title,
+      titleZh: item.titleZh,
+      publishedAt: item.publishedAt,
+      kind: item.kind,
+    }));
+    const manifest = {
+      date: ast.date,
+      link: doc.link,
+      nodeToken: doc.nodeToken,
+      docId: doc.docId,
+      itemCount: items.length,
+      unfiltered: true,
+      groups: true,
+      items,
+      createdAt: new Date().toISOString(),
+    };
+    await fs.writeFile(path.join(p5Home, `daily-doc-${ast.date}.json`), JSON.stringify(manifest, null, 2), { encoding: "utf8", mode: 0o600 });
+    await fs.writeFile(path.join(p5Home, `digest-${ast.date}.json`), JSON.stringify({ date: ast.date, items }, null, 2), { encoding: "utf8", mode: 0o600 });
+  } catch (error) {
+    console.log(JSON.stringify({ event: "p5-doc-map-write-failed", error: String(error?.message || error).slice(0, 300) }));
+  }
+  return `今日 P5 信息雷达已整理：${doc.link}\n${ast.shortMessage}`;
+};
+const p5DailyDoc = async () => {
+  try {
+    return await p5PluginDailyDoc();
+  } catch (error) {
+    console.log(JSON.stringify({ event: "p5-plugin-daily-doc-fallback", error: String(error?.message || error).slice(0, 300) }));
+    return p5Runner.dailyDoc();
+  }
+};
+const p5DailyCollect = async () => {
+  try {
+    return await p5PluginAction("collect", {});
+  } catch (error) {
+    console.log(JSON.stringify({ event: "p5-plugin-collect-fallback", error: String(error?.message || error).slice(0, 300) }));
+    return p5Runner.collect();
+  }
+};
+const p5Status = async () => {
+  try {
+    return await p5PluginAction("status", {});
+  } catch {
+    return p5Runner.status();
+  }
+};
+const p5Feedback = async (action, numbers) => {
+  try {
+    return await p5PluginAction("feedback", { action, numbers });
+  } catch {
+    return p5Runner.mark(action, numbers);
+  }
+};
+const p5Preference = async (text) => {
+  try {
+    return await p5PluginAction("preference", { text });
+  } catch (error) {
+    return `当前 P5 插件不支持偏好命令，需要 v5 或更高版本：${String(error?.message || error).slice(0, 200)}`;
+  }
+};
 const replayIndex = process.argv.indexOf("--replay-message-id");
 const replayMessageId = replayIndex >= 0 ? process.argv[replayIndex + 1] : null;
 if (replayMessageId !== null) assert.match(replayMessageId, /^[A-Za-z0-9_-]{1,48}$/, "恢复消息 ID 不符合隔离实验约束");
@@ -106,6 +217,29 @@ const readJson = async (file) => {
   catch (error) { if (error.code === "ENOENT") return null; throw error; }
 };
 const readChat = () => readJson(chatFile);
+
+const radarFromFeishu = async (command) => {
+  if (command.action === "help") return { text: RADAR_HELP };
+  if (!command.numbers?.length && ["follow", "ignore"].includes(command.action)) {
+    return { text: "请提供候选编号，例如：跟进 1、4；忽略 8、9。" };
+  }
+  try {
+    if (command.action === "digest") return { text: await p5DailyDoc() };
+    if (command.action === "status") return { text: await p5Status() };
+    if (command.action === "setLimit") {
+      if (!Number.isSafeInteger(command.maxItems) || command.maxItems < 10 || command.maxItems > 200) {
+        return { text: "每日展示条数需要在 10–200 之间。" };
+      }
+      await fs.writeFile(p5SettingsFile, JSON.stringify({ maxItems: command.maxItems, updatedAt: new Date().toISOString() }, null, 2), { encoding: "utf8", mode: 0o600 });
+      return { text: `每日雷达展示条数已设为 ${command.maxItems}。` };
+    }
+    if (command.action === "preference") return { text: await p5Preference(command.text) };
+    const outputs = await p5Feedback(command.action, command.numbers);
+    return { text: Array.isArray(outputs) ? outputs.join("\n") : String(outputs) };
+  } catch (error) {
+    return { text: `雷达操作失败：${String(error?.message || error).slice(0, 500)}` };
+  }
+};
 
 const successText = async (trace, evidence = null) => {
   assert.equal(trace.taskState, "completed", "业务 Task 未完成");
@@ -1554,6 +1688,7 @@ const handleMessage = async (message) => {
   const ideaFactsBefore = idea.factCount();
   const projectFactsBefore = project.factCount();
   const routed = butler.route(message.text, candidates.map((candidate) => candidate.documentId));
+  if (routed.domain === "radar") return radarFromFeishu(routed);
   if (routed.domain === "capture") {
     startCapture(message);
     return { deferredDelivery: true };
@@ -1672,6 +1807,14 @@ const adapter = new FeishuChannelAdapter({
   },
 });
 
+const p5Scheduler = createP5Scheduler({
+  runner: { ...p5Runner, collect: p5DailyCollect, dailyDoc: p5DailyDoc },
+  send: (payload) => adapter.send(payload),
+  readChat,
+  stateFile: path.join(config.runtimeRoot, "p5-scheduler.json"),
+  logger: (event, detail) => console.log(JSON.stringify({ event, ...detail })),
+});
+
 // Read-only unified Host status: butler.status() plus non-body metadata. It never advances Specialist/Decision/
 // delivery state and never writes spool/reply text, memory values or Worker prompts.
 const writeHostStatus = async (extra = {}) => {
@@ -1716,6 +1859,7 @@ const stop = async () => {
   settleReadyGate("aborted");
   for (const timer of deliveryTimers) clearTimeout(timer);
   deliveryTimers.clear();
+  p5Scheduler.stop();
   if (hostOwnsConsumer) await writeHostStatus({ running: true, phase: "host-stop-frozen" }).catch(() => {});
   try {
     await Promise.all([...backgroundCaptures]);
@@ -1812,6 +1956,7 @@ try {
   butler.handover.unfreeze({ reason: "host-start-complete" });
   await writeHostStatus({ running: true, phase: "startup-takeover" });
   settleReadyGate("ready");
+  if (config.mode === "production") void p5Scheduler.start();
   await requestCaptureDrain();
   await requestIdeaDrain();
   await requestProjectDrain();

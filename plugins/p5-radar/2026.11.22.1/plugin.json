@@ -1,0 +1,13 @@
+{
+  "name": "p5-radar",
+  "contract": "syno.p5-radar/1",
+  "version": "2026.11.22.1",
+  "entry": "bin/plugin.mjs",
+  "capabilities": ["health", "renderDailyDoc"],
+  "limits": {
+    "healthTimeoutMs": 10000,
+    "renderTimeoutMs": 600000
+  },
+  "network": true,
+  "filesystem": ["P5_RADAR_HOME"]
+}
