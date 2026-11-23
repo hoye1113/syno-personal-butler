@@ -2,6 +2,7 @@
   "name": "syno-personal-butler",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@12.11.2",
   "type": "module",
   "scripts": {
     "test": "node scripts/run-tests.mjs",
@@ -16,7 +17,7 @@
     "gate": "node scripts/run-tests.mjs && node scripts/verify-repository.mjs && node scripts/check-active-docs.mjs && git diff --check"
   },
   "engines": {
-    "node": ">=22"
+    "node": "24.21.0"
   },
   "dependencies": {
     "@deepseek-ai/node-addon-system": "0.1.2",
