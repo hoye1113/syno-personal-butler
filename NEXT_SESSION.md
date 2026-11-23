@@ -4,7 +4,7 @@
 
 ## 1. 当前一句话状态
 
-生产仍运行 P3 native Host + 飞书 + Pi／OpenCode Go + P5；P0、P1-4、P2 四项和本轮 3 个审查 P1 均已完成代码与隔离验证，但**未部署、未重启生产**。P1-5 多日观察仍在等待跨日证据。
+生产仍运行 P3 native Host + 飞书 + Pi／OpenCode Go + P5；P0、P1-4、P2 四项及后续审查发现的 5 个 P1 均已完成代码与隔离验证，但**未部署、未重启生产**。P1-5 多日观察仍在等待跨日证据。
 
 ## 2. 生产事实（2026-11-23 交接基线）
 
@@ -64,16 +64,24 @@
    - 明确的多关注／少推／别推句式进入原 P5 偏好链，普通聊天与对象命令不被劫持。
 
 7. `7fc5148ec feat: 接入插件对话批准与回滚`
-   - `插件状态`、`插件批准 <version> <canary-commit>`、`插件回滚 <当前version>`；版本或 canary commit 不符拒绝，merge 后按 pinned commit 对账恢复。
+   - `插件状态`、`插件批准 <version> <canary-commit>`、`插件回滚 <当前version> <active-sha256>`；版本或内容身份不符拒绝，merge 后按 pinned commit 对账恢复。
 
 8. `df21ec0fa fix: 让干净 CI 与不可变 release 自包含`
    - Host 使用的 autoloop 最小导入闭包固定在 `packages/syno-autoloop`，来源为 `agent-autoloop@aa946b85392efb84e8565742ddff43b1a0f06169`，保留 MIT 许可证；
-   - CI 使用项目支持的 macOS runner；release prepare／activate 实际加载 Host 模块图，不再只做语法检查。
+   - CI 使用项目支持的 macOS runner；release prepare／activate 实际加载真实入口模块图，不再只做语法检查。
 
 9. `8d34b0b8c fix: 将插件批准绑定到 canary 内容`
    - 同版本 canary 丢弃重建后，旧批准命令以 `P5_CANARY_COMMIT_MISMATCH` 拒绝；直接 API 同样要求完整 commit。
 
-P2 最终 gate：744 tests／738 pass／6 skipped／0 fail。本轮修复后在本工作树及 HEAD 的独立干净 worktree 各跑一次完整 gate：均为 747 tests／741 pass／6 skipped／0 fail；Repository verification 3577 files、Active documentation 7 files、`git diff --check` 均通过。干净提交另完成真实 release prepare、生产依赖冻结安装和 Host 加载，未 activate 或部署。
+10. `37a5839c4 fix: 保持插件版本不可变并绑定回滚内容`
+    - canary 与直接 release 均拒绝覆盖已存在版本目录；active 历史中的同版本不同内容直接拒绝；
+    - 回滚绑定版本与完整 active SHA-256；CLI approve／rollback 同步内容身份参数。
+
+11. `c8398cd63 fix: 在发布验收中加载真实入口`
+    - `real-feishu-client.mjs --verify-import` 加载入口全部顶层静态／动态依赖后，在存储、凭据和网络操作前退出；
+    - prepare／activate 均执行真实入口，回归覆盖入口独有的缺失依赖。
+
+P2 最终 gate：744 tests／738 pass／6 skipped／0 fail。首轮修复双次 gate 均为 747 tests／741 pass／6 skipped／0 fail。本次边界修复后，本工作树及 `c8398cd63` 的独立干净 worktree 各跑一次完整 gate：均为 748 tests／742 pass／6 skipped／0 fail；Repository verification 3577 files、Active documentation 7 files、`git diff --check` 均通过。干净提交另完成真实 release prepare、生产依赖冻结安装和真实入口加载，未 activate 或部署。
 
 ### 3.2 私有历史工作树
 
