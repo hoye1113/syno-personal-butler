@@ -4,7 +4,7 @@
 
 ## 1. 当前一句话状态
 
-生产仍运行 P3 native Host + 飞书 + Pi／OpenCode Go + P5；P0 的 Pi 依赖固定、工具链／CI／不可变部署和私有 worktree 归档已经完成代码与隔离验证，但**尚未合并公开 main、未部署、未重启生产**。当前按 P0 → P1 → P2 顺序推进到 P1 文档与多日观察。
+生产仍运行 P3 native Host + 飞书 + Pi／OpenCode Go + P5；P0 的 Pi 依赖固定、工具链／CI／不可变部署、私有 worktree 归档和 P2 四项开发均已完成代码与隔离验证，但**尚未合并公开 main、未部署、未重启生产**。P1-5 多日观察仍在等待跨日证据。
 
 ## 2. 生产事实（2026-11-23 交接基线）
 
@@ -50,7 +50,23 @@
    - gate：717 tests／711 pass／6 skipped／0 fail；
    - 已在 `/private/tmp` 从干净提交完成真实隔离 prepare／activate，未触生产。
 
-P1-4 文档重写随本工作树下一次文档提交交付；准确 SHA 以 `git log` 为准。
+3. `87a99ea84 docs: 重写 P3 Host 当前架构与运维交接`
+   - 当前架构、运维与本交接正文已去除 DSH／8888 现行语义。
+
+4. `558b024d8 feat: 将项目写任务接入隔离工作区`
+   - 真实 project Specialist／Host 接缝使用 TaskWorkspaceManager；候选在独立 worktree，Result Lane 后按 pinned commit 合回；
+   - 覆盖建树、commit、merge、业务结算之间的崩溃恢复与旧产物只读修订。
+
+5. `49be5a5ac feat: 增加 X 时间线只读采集`
+   - 复用 P5 链，显式账号 CLI，Bearer Token 仅经进程环境和 curl stdin；只完成离线 mock 验收，未连接真实 X。
+
+6. `143c5fe79 feat: 支持自由聊天中的显式偏好`
+   - 明确的多关注／少推／别推句式进入原 P5 偏好链，普通聊天与对象命令不被劫持。
+
+7. `7fc5148ec feat: 接入插件对话批准与回滚`
+   - `插件状态`、`插件批准 <version>`、`插件回滚 <当前version>`；版本不符拒绝，merge 后按 pinned commit 对账恢复。
+
+P2 最终 gate：744 tests／738 pass／6 skipped／0 fail；Repository verification 3562 files、Active documentation 7 files、`git diff --check` 均通过。以上只在本分支提交，未 Push 或部署。
 
 ### 3.2 私有历史工作树
 
@@ -99,9 +115,9 @@ corepack pnpm run gate
 
 最终验证：717 tests／711 pass／6 skipped／0 fail；Repository verification 通过（3556 files）；Active documentation 通过（7 files）；`git diff --check` 通过。文档变更未触生产代码、运行数据或服务。
 
-## 6. 下一步：严格按顺序
+## 6. 下一步：等待 P1-5 跨日观察
 
-### P1-5：P5 多日观察（下一项）
+### P1-5：P5 多日观察（仍在进行）
 
 连续观察 2–3 天后再决定每日 40／50／60 条及偏好权重。每天至少记录：
 
@@ -114,14 +130,14 @@ corepack pnpm run gate
 
 短时检查不能冒充多日观察。观察期结束前不提前选择 40／50／60，也不自动改生产权重。
 
-### P2：观察完成后逐项实施
+### P2：四项已完成代码与隔离验收
 
-1. P5.1 X 直连；
-2. TaskWorkspace 接真实写任务；
-3. 自由聊天偏好解析；
-4. 管家窗口内插件 canary 批准／回滚。
+1. TaskWorkspace 接真实写任务：`558b024d8`；
+2. P5.1 X 只读直连：`49be5a5ac`；
+3. 自由聊天偏好解析：`143c5fe79`；
+4. 管家窗口内插件 canary 批准／回滚：`7fc5148ec`。
 
-每项开始前先从当前架构确定最小验收和隔离测试边界；真实外部接入、生产写入、插件批准和发布仍需对应授权。不得因为 P2 已列出就同时展开四项或直接触生产。
+X 仅有离线 fixture／假 curl／临时 SQLite 证据，不能声称真实 API 已验收；插件命令仅完成临时真实 Git 仓验收，未操作生产 active。后续若要把本分支用于生产，必须另开授权窗口，重新审查、合并、制备 release、激活并验收。
 
 ## 7. 授权与停止条件
 
