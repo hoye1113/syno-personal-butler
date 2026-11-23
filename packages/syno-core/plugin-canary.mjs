@@ -142,6 +142,7 @@ export async function canaryP5Plugin({
 export async function approveP5Plugin({
   canaryFile,
   registryFile,
+  expectedVersion = null,
   repoRoot = process.cwd(),
   worktreeRoot = path.join(repoRoot, ".worktrees"),
   activate = true,
@@ -152,12 +153,21 @@ export async function approveP5Plugin({
   if (!canaryFile) throw new Error("approveP5Plugin 缺少 canaryFile");
   const canary = await readJson(canaryFile);
   if (!canary) throw canaryError("P5_CANARY_NOT_FOUND", "没有可批准的 canary");
+  if (expectedVersion && canary.version !== expectedVersion) {
+    throw canaryError("P5_CANARY_VERSION_MISMATCH", `待批准插件版本不是 ${expectedVersion}，拒绝操作`);
+  }
   if (Date.parse(canary.expiresAt) < now().getTime()) throw canaryError("P5_CANARY_EXPIRED", "canary 已过期，请重新运行");
   const guard = gitGuard || new GitGuard({ repoRoot, worktreeRoot });
   const workspaceManager = manager || new TaskWorkspaceManager({ gitGuard: guard, sharedRoot: repoRoot, worktreeRoot });
   const workspace = { ...canary.workspace, task: { taskId: `p5-plugin-canary-${canary.version}` }, isolated: true };
-  const merged = await workspaceManager.finalize(workspace, { merge: true, commit: canary.commit });
-  await workspaceManager.discard(workspace);
+  // A crash may leave the marker after the pinned commit merged. Reconcile first; never merge that commit twice.
+  const alreadyMerged = await workspaceManager.isMerged(workspace, canary.commit);
+  const merged = alreadyMerged
+    ? { merged: true, commit: await workspaceManager.mergeCommitFor(canary.commit), recovered: true }
+    : await workspaceManager.finalize(workspace, { merge: true, commit: canary.commit });
+  await workspaceManager.discard(workspace).catch((error) => {
+    if (!alreadyMerged) throw error;
+  });
   const installed = path.join(repoRoot, canary.source);
   const manifest = JSON.parse(await fs.readFile(path.join(installed, "plugin.json"), "utf8"));
   const active = activate ? await activatePluginVersion({ pluginDir: installed, manifest, registryFile, now }) : null;
@@ -182,8 +192,8 @@ export async function discardP5Canary({
   return { removed: true, version: canary.version };
 }
 
-export async function rollbackP5Plugin({ registryFile, now = () => new Date() } = {}) {
-  return rollbackPluginVersion({ registryFile, now });
+export async function rollbackP5Plugin({ registryFile, expectedVersion = null, now = () => new Date() } = {}) {
+  return rollbackPluginVersion({ registryFile, expectedVersion, now });
 }
 
 export { DEFAULT_TEST_COMMAND };

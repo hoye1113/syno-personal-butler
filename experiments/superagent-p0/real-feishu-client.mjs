@@ -9,6 +9,7 @@ import { createFeishuDocFromAst } from "../../packages/syno-core/feishu-doc-ast.
 import { runActivePlugin } from "../../packages/syno-core/plugin-runner.mjs";
 import { RADAR_HELP } from "./p5-radar/command.mjs";
 import { createP5HostRunner, createP5Scheduler } from "./p5-radar/host.mjs";
+import { executePluginCommand } from "./plugin-control.mjs";
 import { resolveRealFeishuConfig } from "./real-feishu-config.mjs";
 
 // Explicit runtime configuration: isolated-test by default, production only when fully specified.
@@ -252,6 +253,20 @@ const radarFromFeishu = async (command) => {
     return { text: Array.isArray(outputs) ? outputs.join("\n") : String(outputs) };
   } catch (error) {
     return { text: `雷达操作失败：${String(error?.message || error).slice(0, 500)}` };
+  }
+};
+
+const pluginFromFeishu = async (command) => {
+  try {
+    const repoRoot = path.resolve(import.meta.dirname, "../..");
+    return executePluginCommand(command, {
+      registryFile: p5PluginRegistry,
+      canaryFile: path.join(path.dirname(p5PluginRegistry), "canary.json"),
+      repoRoot,
+      worktreeRoot: path.join(repoRoot, ".worktrees"),
+    });
+  } catch (error) {
+    return { text: `插件操作失败：${String(error?.message || error).slice(0, 500)}` };
   }
 };
 
@@ -1710,6 +1725,7 @@ const handleMessage = async (message) => {
   const projectFactsBefore = project.factCount();
   const routed = butler.route(message.text, candidates.map((candidate) => candidate.documentId));
   if (routed.domain === "radar") return radarFromFeishu(routed);
+  if (routed.domain === "plugin") return pluginFromFeishu(routed);
   if (routed.domain === "capture") {
     startCapture(message);
     return { deferredDelivery: true };

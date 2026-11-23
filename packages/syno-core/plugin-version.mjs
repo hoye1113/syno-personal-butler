@@ -108,9 +108,13 @@ export async function readActivePlugin({ registryFile = DEFAULT_P5_PLUGIN_REGIST
 
 export async function rollbackPluginVersion({
   registryFile = DEFAULT_P5_PLUGIN_REGISTRY,
+  expectedVersion = null,
   now = () => new Date(),
 } = {}) {
   const active = await readJson(registryFile);
+  if (expectedVersion && active?.version !== expectedVersion) {
+    throw pluginError("P5_PLUGIN_VERSION_MISMATCH", `当前插件版本不是 ${expectedVersion}，拒绝回滚`);
+  }
   if (!active?.previous) throw pluginError("P5_PLUGIN_NO_PREVIOUS", "没有可回滚的插件版本");
   const previous = active.previous;
   const next = {

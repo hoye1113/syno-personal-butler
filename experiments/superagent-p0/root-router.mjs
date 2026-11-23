@@ -4,6 +4,7 @@ import { resolveDecisionCommand } from "./decision-object.mjs";
 import { ideaContextId, resolveIdeaRequest } from "./idea-object.mjs";
 import { resolveKnowledgeRequest } from "./knowledge-query.mjs";
 import { resolveMemoryCommand } from "./memory-object.mjs";
+import { parsePluginCommand } from "./plugin-control.mjs";
 import { projectContextId, resolveProjectRequest } from "./project-object.mjs";
 
 const ideaPrompt = (text) => {
@@ -60,6 +61,8 @@ export function routeRoot({
   if (normalized === sourceUrl) return { status: "routed", domain: "capture" };
   const radar = parseRadarCommand(normalized);
   if (radar) return { status: "routed", domain: "radar", ...radar };
+  const plugin = parsePluginCommand(normalized);
+  if (plugin) return { status: "routed", domain: "plugin", ...plugin };
   const decision = resolveDecisionCommand(normalized);
   if (decision.status === "resolved") return { ...decision, status: "routed", domain: "decision" };
   if (decision.status === "ambiguous") return { ...decision, status: "ambiguous", domain: "decision" };
