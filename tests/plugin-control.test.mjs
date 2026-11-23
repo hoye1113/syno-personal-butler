@@ -7,7 +7,7 @@ import test from "node:test";
 
 import { executePluginCommand, parsePluginCommand } from "../experiments/superagent-p0/plugin-control.mjs";
 import { routeRoot } from "../experiments/superagent-p0/root-router.mjs";
-import { canaryP5Plugin } from "../packages/syno-core/plugin-canary.mjs";
+import { canaryP5Plugin, discardP5Canary } from "../packages/syno-core/plugin-canary.mjs";
 import { activatePluginVersion, readActivePlugin } from "../packages/syno-core/plugin-version.mjs";
 
 function git(repo, ...args) {
@@ -54,16 +54,18 @@ async function fixture(t) {
   return { root, repoRoot, worktreeRoot, registryFile, canaryFile, candidate };
 }
 
-test("plugin control commands are explicit, versioned and do not capture ordinary approval chat", () => {
+test("plugin control commands bind approval to the exact canary commit", () => {
+  const commit = "0123456789abcdef0123456789abcdef01234567";
   assert.deepEqual(parsePluginCommand("插件状态"), { action: "status" });
-  assert.deepEqual(parsePluginCommand("P5 插件 批准 版本 2.0.0"), { action: "approve", version: "2.0.0" });
+  assert.deepEqual(parsePluginCommand(`P5 插件 批准 版本 2.0.0 ${commit}`), { action: "approve", version: "2.0.0", commit });
   assert.deepEqual(parsePluginCommand("插件回滚 当前版本 2.0.0"), { action: "rollback", version: "2.0.0" });
-  assert.deepEqual(routeRoot({ text: "插件批准 2.0.0" }), {
-    status: "routed", domain: "plugin", action: "approve", version: "2.0.0",
+  assert.deepEqual(routeRoot({ text: `插件批准 2.0.0 ${commit}` }), {
+    status: "routed", domain: "plugin", action: "approve", version: "2.0.0", commit,
   });
   assert.equal(parsePluginCommand("批准这个决定"), null);
   assert.equal(parsePluginCommand("回滚插件"), null);
   assert.equal(parsePluginCommand("插件批准"), null);
+  assert.equal(parsePluginCommand("插件批准 2.0.0"), null, "仅版本号不能批准内容未绑定的 canary");
 });
 
 test("Host plugin control approves only the shown canary, recovers a merged marker and rolls back only the shown active", async (t) => {
@@ -84,26 +86,28 @@ test("Host plugin control approves only the shown canary, recovers a merged mark
     testCommand: ["node", "-e", "process.exit(0)"],
   });
   const canarySnapshot = await fs.readFile(f.canaryFile, "utf8");
+  const canary = JSON.parse(canarySnapshot);
+  const approval = { action: "approve", version: canary.version, commit: canary.commit };
   const status = await executePluginCommand({ action: "status" }, options);
   assert.match(status.text, /当前插件：1\.0\.0/u);
   assert.match(status.text, /待批准 canary：2\.0\.0/u);
-  assert.match(status.text, /插件批准 2\.0\.0/u);
+  assert.match(status.text, new RegExp(`插件批准 2\\.0\\.0 ${canary.commit}`, "u"));
 
   await assert.rejects(
-    executePluginCommand({ action: "approve", version: "9.9.9" }, options),
+    executePluginCommand({ ...approval, version: "9.9.9" }, options),
     { code: "P5_CANARY_VERSION_MISMATCH" },
   );
   assert.equal((await readActivePlugin({ registryFile: f.registryFile })).version, "1.0.0");
   assert.ok(await fs.readFile(f.canaryFile, "utf8"));
 
-  const approved = await executePluginCommand({ action: "approve", version: "2.0.0" }, options);
+  const approved = await executePluginCommand(approval, options);
   assert.match(approved.text, /2\.0\.0.*批准并激活/u);
   assert.equal((await readActivePlugin({ registryFile: f.registryFile })).version, "2.0.0");
   const mergedHead = git(f.repoRoot, "rev-parse", "HEAD");
 
   // Simulate a crash leaving the canary marker after merge/activation: recovery must not add another merge.
   await fs.writeFile(f.canaryFile, canarySnapshot);
-  const recovered = await executePluginCommand({ action: "approve", version: "2.0.0" }, options);
+  const recovered = await executePluginCommand(approval, options);
   assert.equal(recovered.result.merged.recovered, true);
   assert.equal(git(f.repoRoot, "rev-parse", "HEAD"), mergedHead);
   assert.equal((await readActivePlugin({ registryFile: f.registryFile })).version, "2.0.0");
@@ -120,4 +124,41 @@ test("Host plugin control approves only the shown canary, recovers a merged mark
     executePluginCommand({ action: "rollback", version: "1.0.0" }, options),
     { code: "P5_PLUGIN_NO_PREVIOUS" },
   );
+});
+
+test("a stale approval cannot activate a same-version replacement canary", async (t) => {
+  const f = await fixture(t);
+  const options = {
+    registryFile: f.registryFile,
+    canaryFile: f.canaryFile,
+    repoRoot: f.repoRoot,
+    worktreeRoot: f.worktreeRoot,
+  };
+  const canaryOptions = {
+    sourceDir: f.candidate.directory,
+    repoRoot: f.repoRoot,
+    worktreeRoot: f.worktreeRoot,
+    canaryFile: f.canaryFile,
+    registryFile: f.registryFile,
+    p5Home: path.join(f.root, "p5-home"),
+    testCommand: ["node", "-e", "process.exit(0)"],
+  };
+  const first = await canaryP5Plugin(canaryOptions);
+  const staleApproval = { action: "approve", version: first.version, commit: first.commit };
+  await discardP5Canary({
+    canaryFile: f.canaryFile,
+    repoRoot: f.repoRoot,
+    worktreeRoot: f.worktreeRoot,
+  });
+  await fs.appendFile(path.join(f.candidate.directory, f.candidate.manifest.entry), "// replacement content\n");
+  const replacement = await canaryP5Plugin(canaryOptions);
+  assert.notEqual(replacement.commit, first.commit);
+
+  await assert.rejects(executePluginCommand(staleApproval, options), { code: "P5_CANARY_COMMIT_MISMATCH" });
+  assert.equal((await readActivePlugin({ registryFile: f.registryFile })).version, "1.0.0");
+  assert.equal(JSON.parse(await fs.readFile(f.canaryFile, "utf8")).commit, replacement.commit);
+  await assert.rejects(fs.access(path.join(f.repoRoot, "plugins/p5-radar/2.0.0/plugin.json")), { code: "ENOENT" });
+
+  await executePluginCommand({ action: "approve", version: replacement.version, commit: replacement.commit }, options);
+  assert.equal((await readActivePlugin({ registryFile: f.registryFile })).version, "2.0.0");
 });

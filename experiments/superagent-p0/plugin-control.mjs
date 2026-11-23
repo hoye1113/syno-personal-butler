@@ -5,14 +5,15 @@ import { approveP5Plugin, rollbackP5Plugin } from "../../packages/syno-core/plug
 import { readActivePlugin } from "../../packages/syno-core/plugin-version.mjs";
 
 const VERSION = "[0-9A-Za-z][0-9A-Za-z._-]{0,80}";
+const COMMIT = "[0-9a-f]{40}";
 const PREFIX = "(?:p5\\s*)?插件";
 
 /** Explicit versioned control commands only; generic approval chat never reaches plugin mutation. */
 export function parsePluginCommand(text) {
   const value = String(text ?? "").trim();
   if (new RegExp(`^${PREFIX}\\s*状态$`, "iu").test(value)) return { action: "status" };
-  const approve = new RegExp(`^${PREFIX}\\s*批准\\s*(?:版本\\s*)?(${VERSION})$`, "iu").exec(value);
-  if (approve) return { action: "approve", version: approve[1] };
+  const approve = new RegExp(`^${PREFIX}\\s*批准\\s*(?:版本\\s*)?(${VERSION})\\s+(${COMMIT})$`, "iu").exec(value);
+  if (approve) return { action: "approve", version: approve[1], commit: approve[2] };
   const rollback = new RegExp(`^${PREFIX}\\s*回滚\\s*(?:当前版本\\s*)?(${VERSION})$`, "iu").exec(value);
   if (rollback) return { action: "rollback", version: rollback[1] };
   return null;
@@ -44,7 +45,7 @@ export async function executePluginCommand(command, {
         canary
           ? `待批准 canary：${canary.version}；条目 ${canary.report?.items ?? "?"}；过期时间 ${canary.expiresAt}`
           : "待批准 canary：无",
-        canary ? `批准命令：插件批准 ${canary.version}` : null,
+        canary ? `批准命令：插件批准 ${canary.version} ${canary.commit}` : null,
         active?.previous ? `回滚命令：插件回滚 ${active.version}` : null,
       ].filter(Boolean).join("\n"),
     };
@@ -52,7 +53,7 @@ export async function executePluginCommand(command, {
   if (command.action === "approve") {
     if (!repoRoot || !worktreeRoot) throw new Error("批准插件缺少 repoRoot 或 worktreeRoot");
     const result = await approveP5Plugin({
-      canaryFile, registryFile, repoRoot, worktreeRoot, expectedVersion: command.version, now,
+      canaryFile, registryFile, repoRoot, worktreeRoot, expectedVersion: command.version, expectedCommit: command.commit, now,
     });
     return { text: `插件 ${result.active.version} 已按已验收 canary 批准并激活。`, result };
   }

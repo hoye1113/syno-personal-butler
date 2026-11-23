@@ -143,6 +143,7 @@ export async function approveP5Plugin({
   canaryFile,
   registryFile,
   expectedVersion = null,
+  expectedCommit = null,
   repoRoot = process.cwd(),
   worktreeRoot = path.join(repoRoot, ".worktrees"),
   activate = true,
@@ -155,6 +156,12 @@ export async function approveP5Plugin({
   if (!canary) throw canaryError("P5_CANARY_NOT_FOUND", "没有可批准的 canary");
   if (expectedVersion && canary.version !== expectedVersion) {
     throw canaryError("P5_CANARY_VERSION_MISMATCH", `待批准插件版本不是 ${expectedVersion}，拒绝操作`);
+  }
+  if (!/^[0-9a-f]{40}$/i.test(String(expectedCommit || ""))) {
+    throw canaryError("P5_CANARY_COMMIT_REQUIRED", "批准必须绑定完整 canary commit");
+  }
+  if (canary.commit !== String(expectedCommit).toLowerCase()) {
+    throw canaryError("P5_CANARY_COMMIT_MISMATCH", "待批准 canary 内容已变化，请重新查看状态并批准新 commit");
   }
   if (Date.parse(canary.expiresAt) < now().getTime()) throw canaryError("P5_CANARY_EXPIRED", "canary 已过期，请重新运行");
   const guard = gitGuard || new GitGuard({ repoRoot, worktreeRoot });

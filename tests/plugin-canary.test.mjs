@@ -65,6 +65,7 @@ test("canary renders AST without activating; approve merges and activates", asyn
     registryFile: f.registryFile,
     repoRoot: f.repo,
     worktreeRoot: path.join(f.repo, ".worktrees"),
+    expectedCommit: canary.commit,
   });
   assert.equal(approved.active.version, "9.9.8");
   assert.equal((await readActivePlugin({ registryFile: f.registryFile })).version, "9.9.8");
