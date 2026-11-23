@@ -146,6 +146,8 @@ const { MODEL_LABEL: MEMORY_MODEL_LABEL } = await import("./memory-worker-contra
 const { canonicalMemorySnapshot, memorySnapshot, parseMemorySnapshot } = await import("./memory-object.mjs");
 const { KnowledgeStore } = await import("../../packages/syno-core/knowledge-store.mjs");
 const { ProcessFileLock } = await import("../../packages/syno-core/process-lock.mjs");
+// Release verification loads the real entry's complete static/dynamic import graph, then exits before storage or credentials.
+if (process.argv.includes("--verify-import")) process.exit(0);
 const inboxRoot = config.inboxRoot;
 const runtimeRoot = config.runtimeRoot;
 const chatFile = config.chatFile;

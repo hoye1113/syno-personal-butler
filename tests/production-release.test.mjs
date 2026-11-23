@@ -71,17 +71,17 @@ test("activate 原子切换 current，保留旧 release 并拒绝覆盖真实目
   assert.throws(() => activateRelease({ release }), /拒绝覆盖/);
 });
 
-test("prepare 真实加载 Host 模块图，拒绝归档后缺失的依赖", (t) => {
+test("prepare 真实加载入口模块图，拒绝入口独有的缺失依赖", (t) => {
   const { root, source } = fixture(t);
   writeFileSync(
-    path.join(source, "experiments/superagent-p0/native-butler-runtime.mjs"),
-    "import \"./missing-kernel.mjs\";\n",
+    path.join(source, "experiments/superagent-p0/real-feishu-client.mjs"),
+    "import \"./native-butler-runtime.mjs\";\nimport \"./missing-entry-dependency.mjs\";\n",
   );
-  git(source, "add", "--", "experiments/superagent-p0/native-butler-runtime.mjs");
-  git(source, "commit", "-q", "-m", "missing dependency");
+  git(source, "add", "--", "experiments/superagent-p0/real-feishu-client.mjs");
+  git(source, "commit", "-q", "-m", "missing entry dependency");
   assert.throws(
     () => prepareRelease({ sourceRoot: source, releasesRoot: path.join(root, "releases"), gate: false, install: false }),
-    /Command failed:[\s\S]*native-butler-runtime\.mjs/u,
+    /Command failed:[\s\S]*real-feishu-client\.mjs/u,
   );
 });
 

@@ -13,11 +13,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 const EXPECTED_NODE = "v24.21.0";
 const ENTRY = "experiments/superagent-p0/real-feishu-client.mjs";
-const HOST_ENTRY = "experiments/superagent-p0/native-butler-runtime.mjs";
 const SCHEMA = "syno-production-release-v1";
 
 function run(command, args, cwd) {
@@ -34,8 +33,7 @@ function assertSupportedNode() {
 
 function verifyRelease(release) {
   run(process.execPath, ["--check", path.join(release, ENTRY)], release);
-  const hostUrl = pathToFileURL(path.join(release, HOST_ENTRY)).href;
-  run(process.execPath, ["--input-type=module", "--eval", `await import(${JSON.stringify(hostUrl)})`], release);
+  run(process.execPath, [path.join(release, ENTRY), "--verify-import"], release);
 }
 
 export function prepareRelease({

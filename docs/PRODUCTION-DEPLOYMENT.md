@@ -20,6 +20,6 @@ node scripts/deploy-production.mjs prepare --releases-root <绝对 releases 目�
 node scripts/deploy-production.mjs activate --release <上一步生成的绝对 release 目录>
 ```
 
-`prepare` 要求源工作树干净，先跑完整 gate，再从 `HEAD` 归档代码、冻结安装生产依赖并写 `release.json`。Host 使用的 autoloop 内核快照随仓库归档；prepare 与 activate 都会检查真实入口语法并实际加载 Host 模块图，缺失依赖会直接失败。同一 release 已存在时失败，不覆盖。`activate` 只接受依赖已安装的 release，并通过临时软链加原子 rename 切换同级的 `current`；若 `current` 是真实目录则拒绝。
+`prepare` 要求源工作树干净，先跑完整 gate，再从 `HEAD` 归档代码、冻结安装生产依赖并写 `release.json`。Host 使用的 autoloop 内核快照随仓库归档；prepare 与 activate 都会检查真实入口语法，并以 `--verify-import` 加载真实入口的完整静态／动态模块图，在存储、凭据和网络操作前退出；缺失依赖会直接失败。同一 release 已存在时失败，不覆盖。`activate` 只接受依赖已安装的 release，并通过临时软链加原子 rename 切换同级的 `current`；若 `current` 是真实目录则拒绝。
 
 回滚时将 `activate --release` 指向上一份完整 release。代码指针切换与 Host 重启是两个动作；重启仍须按生产 Runbook 单独授权和验收，不能由部署脚本隐式执行。
