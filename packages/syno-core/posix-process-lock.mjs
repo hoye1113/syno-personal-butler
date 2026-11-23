@@ -1,14 +1,7 @@
 import { promises as fs } from "node:fs";
-import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
 
-let nativePromise;
-function nativeLock() {
-  const root = process.env.SYNO_DSH_ROOT || path.resolve(import.meta.dirname, "../../vendor/deepseek-harness");
-  nativePromise ||= import(pathToFileURL(path.join(root, "native/system/packages/entry/lib/flock.js")).href);
-  return nativePromise;
-}
+import { tryLockExclusive } from "@deepseek-ai/node-addon-system/flock";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const lockError = (code) => Object.assign(new Error(code), { code });
 async function readOwner(file) {
@@ -22,7 +15,6 @@ async function guard(file, { timeoutMs = 0, pollMs = 50, failFast = true } = {})
   const handle = await fs.open(file + ".flock", "a+", 0o600);
   const deadline = Date.now() + timeoutMs;
   try {
-    const { tryLockExclusive } = await nativeLock();
     while (true) {
       try { await tryLockExclusive(handle.fd); return { release: () => handle.close() }; }
       catch (error) {
