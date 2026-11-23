@@ -2,11 +2,13 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { Agent } from "/Users/hoye/Documents/workspace/butler-superagent/v4/pi-runtime-lab/node_modules/@earendil-works/pi-agent-core/dist/index.js";
-import { createAssistantMessageEventStream } from "/Users/hoye/Documents/workspace/butler-superagent/v4/pi-runtime-lab/node_modules/@earendil-works/pi-ai/dist/index.js";
+import { createRequire } from "node:module";
+import { Agent } from "@earendil-works/pi-agent-core";
+import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
 
 const PI_VERSION = "1.5.2";
-const installed = JSON.parse(readFileSync("/Users/hoye/Documents/workspace/butler-superagent/v4/pi-runtime-lab/node_modules/@earendil-works/pi-agent-core/package.json", "utf8"));
+const require = createRequire(import.meta.url);
+const installed = JSON.parse(readFileSync(require.resolve("@earendil-works/pi-agent-core/package.json"), "utf8"));
 assert.equal(installed.version, PI_VERSION, "Pi 版本必须锁定");
 const args = process.argv.slice(2);
 const option = (name) => args[args.indexOf(name) + 1];

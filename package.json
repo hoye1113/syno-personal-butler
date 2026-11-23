@@ -20,6 +20,8 @@
   },
   "dependencies": {
     "@deepseek-ai/node-addon-system": "0.1.2",
+    "@earendil-works/pi-agent-core": "1.5.2",
+    "@earendil-works/pi-ai": "1.5.2",
     "@larksuiteoapi/node-sdk": "1.64.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "mammoth": "1.9.1",
