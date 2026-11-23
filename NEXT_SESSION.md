@@ -4,7 +4,7 @@
 
 ## 1. 当前一句话状态
 
-生产仍运行 P3 native Host + 飞书 + Pi／OpenCode Go + P5；P0 的 Pi 依赖固定、工具链／CI／不可变部署、私有 worktree 归档和 P2 四项开发均已完成代码与隔离验证，但**尚未合并公开 main、未部署、未重启生产**。P1-5 多日观察仍在等待跨日证据。
+生产仍运行 P3 native Host + 飞书 + Pi／OpenCode Go + P5；P0、P1-4、P2 四项和本轮 3 个审查 P1 均已完成代码与隔离验证，但**未部署、未重启生产**。P1-5 多日观察仍在等待跨日证据。
 
 ## 2. 生产事实（2026-11-23 交接基线）
 
@@ -64,9 +64,16 @@
    - 明确的多关注／少推／别推句式进入原 P5 偏好链，普通聊天与对象命令不被劫持。
 
 7. `7fc5148ec feat: 接入插件对话批准与回滚`
-   - `插件状态`、`插件批准 <version>`、`插件回滚 <当前version>`；版本不符拒绝，merge 后按 pinned commit 对账恢复。
+   - `插件状态`、`插件批准 <version> <canary-commit>`、`插件回滚 <当前version>`；版本或 canary commit 不符拒绝，merge 后按 pinned commit 对账恢复。
 
-P2 最终 gate：744 tests／738 pass／6 skipped／0 fail；Repository verification 3562 files、Active documentation 7 files、`git diff --check` 均通过。以上只在本分支提交，未 Push 或部署。
+8. `df21ec0fa fix: 让干净 CI 与不可变 release 自包含`
+   - Host 使用的 autoloop 最小导入闭包固定在 `packages/syno-autoloop`，来源为 `agent-autoloop@aa946b85392efb84e8565742ddff43b1a0f06169`，保留 MIT 许可证；
+   - CI 使用项目支持的 macOS runner；release prepare／activate 实际加载 Host 模块图，不再只做语法检查。
+
+9. `8d34b0b8c fix: 将插件批准绑定到 canary 内容`
+   - 同版本 canary 丢弃重建后，旧批准命令以 `P5_CANARY_COMMIT_MISMATCH` 拒绝；直接 API 同样要求完整 commit。
+
+P2 最终 gate：744 tests／738 pass／6 skipped／0 fail。本轮修复后在本工作树及 HEAD 的独立干净 worktree 各跑一次完整 gate：均为 747 tests／741 pass／6 skipped／0 fail；Repository verification 3577 files、Active documentation 7 files、`git diff --check` 均通过。干净提交另完成真实 release prepare、生产依赖冻结安装和 Host 加载，未 activate 或部署。
 
 ### 3.2 私有历史工作树
 
@@ -137,13 +144,13 @@ corepack pnpm run gate
 3. 自由聊天偏好解析：`143c5fe79`；
 4. 管家窗口内插件 canary 批准／回滚：`7fc5148ec`。
 
-X 仅有离线 fixture／假 curl／临时 SQLite 证据，不能声称真实 API 已验收；插件命令仅完成临时真实 Git 仓验收，未操作生产 active。后续若要把本分支用于生产，必须另开授权窗口，重新审查、合并、制备 release、激活并验收。
+X 仅有离线 fixture／假 curl／临时 SQLite 证据，不能声称真实 API 已验收；插件命令仅完成临时真实 Git 仓验收，未操作生产 active。后续若要把公开 main 用于生产，必须另开授权窗口，重新审查、制备 release、激活并验收。
 
 ## 7. 授权与停止条件
 
-当前授权只覆盖独立工作树中的实现、隔离测试、文档与精确提交，以及 P5 的只读多日观察。以下事项**没有**新的授权：
+当前授权覆盖独立工作树中的实现、隔离测试、文档与精确提交、清理完成后 fast-forward 更新公开 main，以及 P5 的只读多日观察。以下事项**没有**新的授权：
 
-- Push、合并公开 main 或创建生产发布；
+- 创建或激活生产发布；
 - 修改 `/Users/hoye/Documents/workspace/syno-personal-butler-prod`；
 - 切换生产 current、安装或修改 launchd；
 - 停止、启动或重启生产 Host；
