@@ -16,9 +16,9 @@ import {
   recordVerification,
   reportWorkerDone,
   requestCancel,
-} from "../../../syno-autoloop-p0/examples/syno-p0/commands.ts";
-import { rows } from "../../../syno-autoloop-p0/kernel/evolve.ts";
-import { parseRules } from "../../../syno-autoloop-p0/protocol/rules.ts";
+} from "../../packages/syno-autoloop/examples/syno-p0/commands.ts";
+import { rows } from "../../packages/syno-autoloop/kernel/evolve.ts";
+import { parseRules } from "../../packages/syno-autoloop/protocol/rules.ts";
 import { readKnowledgeDocument, verifyKnowledgeAnswer } from "./knowledge-query.mjs";
 
 const SOURCE_MATERIAL = "knowledge-read-only-v1";

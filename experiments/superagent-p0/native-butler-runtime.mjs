@@ -2,8 +2,8 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { executeNative, openBusinessView } from "../../../syno-autoloop-p0/examples/syno-p0/commands.ts";
-import { parseRules } from "../../../syno-autoloop-p0/protocol/rules.ts";
+import { executeNative, openBusinessView } from "../../packages/syno-autoloop/examples/syno-p0/commands.ts";
+import { parseRules } from "../../packages/syno-autoloop/protocol/rules.ts";
 import { GitGuard } from "../../packages/syno-core/git-guard.mjs";
 import { TaskWorkspaceManager } from "../../packages/syno-core/task-workspace.mjs";
 import { openHostHandover } from "./host-handover.mjs";

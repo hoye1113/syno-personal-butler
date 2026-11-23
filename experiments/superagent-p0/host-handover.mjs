@@ -1,8 +1,8 @@
 // P3.4 deterministic handover: persistent freeze spool and a one-way reply state machine in the shared fact log.
 import { randomUUID } from "node:crypto";
-import { FORMAT, applyRoute, executeNative, openBusinessView } from "../../../syno-autoloop-p0/examples/syno-p0/commands.ts";
-import { rows } from "../../../syno-autoloop-p0/kernel/evolve.ts";
-import { commitLatest } from "../../../syno-autoloop-p0/kernel/store.ts";
+import { FORMAT, applyRoute, executeNative, openBusinessView } from "../../packages/syno-autoloop/examples/syno-p0/commands.ts";
+import { rows } from "../../packages/syno-autoloop/kernel/evolve.ts";
+import { commitLatest } from "../../packages/syno-autoloop/kernel/store.ts";
 import { ProcessFileLock } from "../../packages/syno-core/process-lock.mjs";
 
 export const HANDOVER_SCHEMA = "syno-handover-status-v1";

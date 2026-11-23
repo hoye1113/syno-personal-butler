@@ -30,11 +30,11 @@ import {
   openBusinessView,
   recordVerification,
   reportWorkerDone,
-} from "../../syno-autoloop-p0/examples/syno-p0/commands.ts";
-import { rows } from "../../syno-autoloop-p0/kernel/evolve.ts";
-import { commitLatest } from "../../syno-autoloop-p0/kernel/store.ts";
-import { FORMAT } from "../../syno-autoloop-p0/examples/syno-p0/commands.ts";
-import { parseRules } from "../../syno-autoloop-p0/protocol/rules.ts";
+} from "../packages/syno-autoloop/examples/syno-p0/commands.ts";
+import { rows } from "../packages/syno-autoloop/kernel/evolve.ts";
+import { commitLatest } from "../packages/syno-autoloop/kernel/store.ts";
+import { FORMAT } from "../packages/syno-autoloop/examples/syno-p0/commands.ts";
+import { parseRules } from "../packages/syno-autoloop/protocol/rules.ts";
 import { openHostHandover } from "../experiments/superagent-p0/host-handover.mjs";
 import { FeishuChannelAdapter, FeishuStateStore } from "../packages/syno-core/feishu-channel.mjs";
 import { buildHostStatus, buildMigrationSnapshot } from "../experiments/superagent-p0/host-operations.mjs";

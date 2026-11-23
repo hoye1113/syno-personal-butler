@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { applyRoute, openBusinessView, reportWorkerDone } from "../../syno-autoloop-p0/examples/syno-p0/commands.ts";
+import { applyRoute, openBusinessView, reportWorkerDone } from "../packages/syno-autoloop/examples/syno-p0/commands.ts";
 import { candidateMarkdown, parseCandidateMarkdown } from "../experiments/superagent-p0/idea-object.mjs";
 import { drainQueue } from "../experiments/superagent-p0/idea-worker-drain.mjs";
 import {

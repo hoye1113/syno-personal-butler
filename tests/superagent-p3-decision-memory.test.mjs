@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { finalizeTask, openBusinessView, recordVerification, reportWorkerDone } from "../../syno-autoloop-p0/examples/syno-p0/commands.ts";
+import { finalizeTask, openBusinessView, recordVerification, reportWorkerDone } from "../packages/syno-autoloop/examples/syno-p0/commands.ts";
 import { candidateMarkdown, sha256 } from "../experiments/superagent-p0/idea-object.mjs";
 import { openNativeButlerRuntime } from "../experiments/superagent-p0/native-butler-runtime.mjs";
 import { canonicalMemorySnapshot, memorySnapshot } from "../experiments/superagent-p0/memory-object.mjs";

@@ -1,7 +1,7 @@
 // P3.4 deterministic host operations: read-only unified status, bounded delivery retry and migration data.
-import { FORMAT, claimDelivery, openBusinessView } from "../../../syno-autoloop-p0/examples/syno-p0/commands.ts";
-import { rows } from "../../../syno-autoloop-p0/kernel/evolve.ts";
-import { commitLatest } from "../../../syno-autoloop-p0/kernel/store.ts";
+import { FORMAT, claimDelivery, openBusinessView } from "../../packages/syno-autoloop/examples/syno-p0/commands.ts";
+import { rows } from "../../packages/syno-autoloop/kernel/evolve.ts";
+import { commitLatest } from "../../packages/syno-autoloop/kernel/store.ts";
 
 export const STATUS_SCHEMA = "syno-host-status-v1";
 export const MAX_DELIVERY_RETRY_DELAY_MS = 5 * 60 * 1000;

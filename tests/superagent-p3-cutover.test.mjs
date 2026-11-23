@@ -10,8 +10,8 @@ import {
   FORMAT,
   claimDelivery,
   openBusinessView,
-} from "../../syno-autoloop-p0/examples/syno-p0/commands.ts";
-import { commitLatest } from "../../syno-autoloop-p0/kernel/store.ts";
+} from "../packages/syno-autoloop/examples/syno-p0/commands.ts";
+import { commitLatest } from "../packages/syno-autoloop/kernel/store.ts";
 import { acquireHandoverLock, openHostHandover } from "../experiments/superagent-p0/host-handover.mjs";
 import {
   MAX_DELIVERY_RETRY_COUNT,

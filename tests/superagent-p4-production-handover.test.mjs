@@ -7,8 +7,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
-import { FORMAT } from "../../syno-autoloop-p0/examples/syno-p0/commands.ts";
-import { commitLatest } from "../../syno-autoloop-p0/kernel/store.ts";
+import { FORMAT } from "../packages/syno-autoloop/examples/syno-p0/commands.ts";
+import { commitLatest } from "../packages/syno-autoloop/kernel/store.ts";
 import { planMigration } from "../experiments/superagent-p0/migration-rehearsal.mjs";
 import {
   ALLOWED_MIGRATION_ACTIONS,

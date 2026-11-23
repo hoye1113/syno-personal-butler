@@ -24,11 +24,12 @@ function fixture(t) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const source = path.join(root, "source");
   mkdirSync(path.join(source, "experiments/superagent-p0"), { recursive: true });
-  writeFileSync(path.join(source, "experiments/superagent-p0/real-feishu-client.mjs"), "// fixture\n");
+  writeFileSync(path.join(source, "experiments/superagent-p0/native-butler-runtime.mjs"), "export const host = true;\n");
+  writeFileSync(path.join(source, "experiments/superagent-p0/real-feishu-client.mjs"), "import \"./native-butler-runtime.mjs\";\n");
   git(source, "init", "-q");
   git(source, "config", "user.name", "Release Test");
   git(source, "config", "user.email", "release-test@example.invalid");
-  git(source, "add", "--", "experiments/superagent-p0/real-feishu-client.mjs");
+  git(source, "add", "--", "experiments/superagent-p0/real-feishu-client.mjs", "experiments/superagent-p0/native-butler-runtime.mjs");
   git(source, "commit", "-q", "-m", "fixture");
   return { root, source };
 }
@@ -40,7 +41,7 @@ test("prepare 从干净提交生成不可变 release，不自动激活", (t) => 
   const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: source, encoding: "utf8" }).trim();
   assert.equal(result.commit, commit);
   assert.equal(result.activated, false);
-  assert.equal(readFileSync(path.join(result.release, "experiments/superagent-p0/real-feishu-client.mjs"), "utf8"), "// fixture\n");
+  assert.equal(readFileSync(path.join(result.release, "experiments/superagent-p0/real-feishu-client.mjs"), "utf8"), "import \"./native-butler-runtime.mjs\";\n");
   assert.equal(existsSync(path.join(releasesRoot, "current")), false);
   assert.throws(() => prepareRelease({ sourceRoot: source, releasesRoot, gate: false, install: false, now: () => new Date("2026-11-23T04:00:00.000Z") }));
 });
@@ -68,4 +69,29 @@ test("activate 原子切换 current，保留旧 release 并拒绝覆盖真实目
   unlinkSync(current);
   mkdirSync(current);
   assert.throws(() => activateRelease({ release }), /拒绝覆盖/);
+});
+
+test("prepare 真实加载 Host 模块图，拒绝归档后缺失的依赖", (t) => {
+  const { root, source } = fixture(t);
+  writeFileSync(
+    path.join(source, "experiments/superagent-p0/native-butler-runtime.mjs"),
+    "import \"./missing-kernel.mjs\";\n",
+  );
+  git(source, "add", "--", "experiments/superagent-p0/native-butler-runtime.mjs");
+  git(source, "commit", "-q", "-m", "missing dependency");
+  assert.throws(
+    () => prepareRelease({ sourceRoot: source, releasesRoot: path.join(root, "releases"), gate: false, install: false }),
+    /Command failed:[\s\S]*native-butler-runtime\.mjs/u,
+  );
+});
+
+test("Host 与测试不依赖仓外内核路径", () => {
+  const source = path.resolve(import.meta.dirname, "..");
+  const files = execFileSync("git", ["ls-files"], {
+    cwd: source,
+    encoding: "utf8",
+  }).trim().split("\n").filter((file) => /^(?:experiments|packages|tests)\/.+\.mjs$/u.test(file));
+  const externalKernel = ["syno", "autoloop", "p0"].join("-");
+  const offenders = files.filter((file) => readFileSync(path.join(source, file), "utf8").includes(externalKernel));
+  assert.deepEqual(offenders, [], "干净 checkout 不能依赖相邻私有仓库");
 });

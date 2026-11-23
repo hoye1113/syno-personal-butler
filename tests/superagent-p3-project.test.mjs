@@ -14,7 +14,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { openBusinessView, reportWorkerDone } from "../../syno-autoloop-p0/examples/syno-p0/commands.ts";
+import { openBusinessView, reportWorkerDone } from "../packages/syno-autoloop/examples/syno-p0/commands.ts";
 import { candidateMarkdown } from "../experiments/superagent-p0/idea-object.mjs";
 import { openNativeButlerRuntime } from "../experiments/superagent-p0/native-butler-runtime.mjs";
 import { openNativeProjectRuntime } from "../experiments/superagent-p0/native-project-runtime.mjs";

@@ -16,9 +16,9 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import { FORMAT, openBusinessView } from "../../../syno-autoloop-p0/examples/syno-p0/commands.ts";
-import { rows } from "../../../syno-autoloop-p0/kernel/evolve.ts";
-import { commitLatest } from "../../../syno-autoloop-p0/kernel/store.ts";
+import { FORMAT, openBusinessView } from "../../packages/syno-autoloop/examples/syno-p0/commands.ts";
+import { rows } from "../../packages/syno-autoloop/kernel/evolve.ts";
+import { commitLatest } from "../../packages/syno-autoloop/kernel/store.ts";
 import { inventoryTree } from "./migration-rehearsal.mjs";
 import { buildHostStatus, buildMigrationSnapshot } from "./host-operations.mjs";
 import { openHostHandover } from "./host-handover.mjs";

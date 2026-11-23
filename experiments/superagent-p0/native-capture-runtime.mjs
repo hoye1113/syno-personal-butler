@@ -15,9 +15,9 @@ import {
   openBusinessView,
   recordVerification,
   reportWorkerDone,
-} from "../../../syno-autoloop-p0/examples/syno-p0/commands.ts";
-import { rows } from "../../../syno-autoloop-p0/kernel/evolve.ts";
-import { parseRules } from "../../../syno-autoloop-p0/protocol/rules.ts";
+} from "../../packages/syno-autoloop/examples/syno-p0/commands.ts";
+import { rows } from "../../packages/syno-autoloop/kernel/evolve.ts";
+import { parseRules } from "../../packages/syno-autoloop/protocol/rules.ts";
 import { assertWorkerBoundaryProbes } from "./preflight.mjs";
 
 const MODEL = "opencode-go/deepseek-v4.1-flash";

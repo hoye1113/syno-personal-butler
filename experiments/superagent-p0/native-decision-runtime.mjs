@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { FORMAT, openBusinessView } from "../../../syno-autoloop-p0/examples/syno-p0/commands.ts";
-import { rows } from "../../../syno-autoloop-p0/kernel/evolve.ts";
-import { commitLatest } from "../../../syno-autoloop-p0/kernel/store.ts";
+import { FORMAT, openBusinessView } from "../../packages/syno-autoloop/examples/syno-p0/commands.ts";
+import { rows } from "../../packages/syno-autoloop/kernel/evolve.ts";
+import { commitLatest } from "../../packages/syno-autoloop/kernel/store.ts";
 import {
   DECISION_ID,
   assertDecisionId,

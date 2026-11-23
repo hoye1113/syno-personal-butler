@@ -13,10 +13,11 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const EXPECTED_NODE = "v24.21.0";
 const ENTRY = "experiments/superagent-p0/real-feishu-client.mjs";
+const HOST_ENTRY = "experiments/superagent-p0/native-butler-runtime.mjs";
 const SCHEMA = "syno-production-release-v1";
 
 function run(command, args, cwd) {
@@ -29,6 +30,12 @@ function output(command, args, cwd) {
 
 function assertSupportedNode() {
   assert.equal(process.version, EXPECTED_NODE, `生产部署必须使用 Node ${EXPECTED_NODE}`);
+}
+
+function verifyRelease(release) {
+  run(process.execPath, ["--check", path.join(release, ENTRY)], release);
+  const hostUrl = pathToFileURL(path.join(release, HOST_ENTRY)).href;
+  run(process.execPath, ["--input-type=module", "--eval", `await import(${JSON.stringify(hostUrl)})`], release);
 }
 
 export function prepareRelease({
@@ -53,7 +60,7 @@ export function prepareRelease({
     run("git", ["archive", "--format=tar", `--output=${archive}`, "HEAD"], sourceRoot);
     run("tar", ["-xf", archive, "-C", release], sourceRoot);
     if (install) run("corepack", ["pnpm", "install", "--frozen-lockfile", "--prod"], release);
-    run(process.execPath, ["--check", path.join(release, ENTRY)], release);
+    verifyRelease(release);
     writeFileSync(path.join(release, "release.json"), `${JSON.stringify({
       schema: SCHEMA,
       commit,
@@ -76,7 +83,7 @@ export function activateRelease({ release } = {}) {
   assert.match(manifest.commit, /^[0-9a-f]{40}$/);
   assert.equal(manifest.dependenciesInstalled, true, "依赖未安装的 release 不得激活");
   assert.ok(existsSync(path.join(release, "node_modules")), "release 缺少独立 node_modules");
-  run(process.execPath, ["--check", path.join(release, ENTRY)], release);
+  verifyRelease(release);
 
   const parent = path.dirname(release);
   const current = path.join(parent, "current");
