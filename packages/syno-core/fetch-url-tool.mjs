@@ -102,7 +102,7 @@ function reportEscalation(recordEvent, { url, wall, outcome }) {
 }
 
 // 命中验证后在同一窗口里等人过验证的有界等待（2026-10-16「一步到位」）。
-// 上限受 DSH 单回合 180s 请求超时约束（apps/syno/syno/deepseek-harness-web-client.mjs:53）。
+// 上限受单回合 180s 请求超时约束。
 const CLEARANCE_WAIT_MS = Math.min(150_000, Math.max(10_000, Number(process.env.SYNO_FETCH_CLEARANCE_WAIT_MS) || 90_000));
 // 等不到就保留窗口，但要有个上限：主人在这个窗口里过完验证再说「继续」都来得及，逾期自动收窗。
 const ABANDONED_WINDOW_CLOSE_MS = 10 * 60 * 1_000;

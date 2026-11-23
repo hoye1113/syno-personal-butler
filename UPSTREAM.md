@@ -1,5 +1,8 @@
 # Upstream provenance
 
+> 2026-11-23：DSH 运行时已退役。当前生产为 P3 native Host + Pi/OpenCode Go；本文件中的 DSH 章节为历史记录，不再是启动或部署依据。
+
+
 Syno 使用全新 Git 历史，不合并任何上游提交历史，也不自动跟踪上游。
 
 ## Afu

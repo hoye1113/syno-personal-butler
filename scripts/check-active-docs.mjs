@@ -10,7 +10,6 @@ const activeFiles = [
   "docs/KNOWN-LIMITATIONS.md",
   "docs/TODO-EXECUTION-PLAN.md",
   "docs/INDEX.md",
-  "config/deepseek-harness/syno-agent.md",
 ];
 const forbidden = [
   "产品只启用原生 `ToolLoopAgent`",

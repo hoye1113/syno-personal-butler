@@ -79,7 +79,7 @@ function relativeToRoot(root, candidate) {
   return path.relative(resolvedRoot, absolute).replace(/\\/g, "/") || ".";
 }
 
-// Canonical local web port. Host listens here (apps/syno/server.mjs); every probe/script mirrors it.
+// Legacy local control port retained for historical probes; the current P3 Host uses launchd and Feishu.
 // PORT env overrides. This is the single JS source of truth — PowerShell scripts mirror with `$env:PORT || 8888`.
 const DEFAULT_WEB_PORT = 8888;
 

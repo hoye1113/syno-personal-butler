@@ -15,15 +15,15 @@
 5. 长期记忆只能先写为候选，经主人后续消息确认后在 `ops/memory/` 生效；不进入 `vault/`、普通知识索引、Wiki 或目录表。遗忘清理当前正文，不重写 Git、聊天和备份历史。独立开发验收环境的知识发布默认关闭；生产已于 2026-10-19 经隔离验收及主人授权启用，发布目标与验收记录见 `docs/KNOWLEDGE-FEISHU-P1.md`。不得自行切换发布模式或目标。
 6. 自动提交只能暂存 Job 声明的精确路径；禁止 `git add -A`，禁止自动 Push。
 7. 不读取、输出或提交 Token、Cookie、密钥和 `%LOCALAPPDATA%\Syno` 下的凭据。
-8. 当前飞书与受控 DSH Web 使用同一 Owner 权限：已绑定 Owner 即可直接指挥，澄清确认不要求六位审批码。微信 iLink 通道栈已删除，不再是产品入口。
+8. 当前飞书与本机受控接口使用同一 Owner 权限：已绑定 Owner 即可直接指挥，澄清确认不要求六位审批码。微信 iLink 通道栈已删除，不再是产品入口。
 
 ## 执行器
 
-- 产品只启用 `DeepSeekHarnessCognitiveRuntime`。不得选择或回退到 OpenCode、Claude Code 或原生 Agent。
-- 模型链固定为 Kimi Code 两档：`kimi-coding/kimi-for-coding` → `kimi-coding/k3-256k`（经 DSH 内置 pi-ai 适配器的 `kimi-coding` 目录路由，Base URL `https://api.kimi.com/coding`）。Adapter 为 `deepseek-harness-sdk`（CognitiveRuntime v3）。key 来源 = host 环境变量 `KIMI_API_KEY` 优先，缺省时 supervisor 读仓库根 `.env`（gitignored）的 `KIMI_API_KEY` 注入子进程。DSH 根路径缺省使用本仓 Git Submodule `vendor/deepseek-harness`（推荐，无需环境变量）；也可用 `SYNO_DSH_ROOT` 指向外部克隆（说明见 `docs/OPERATIONS.md`）；不要把 Harness 源码 vendoring 进本仓库。
-- 仅在不可用、限流、连接失败、超时、5xx、空响应或契约校验失败，且本次尝试尚未产生不可逆副作用时，才由 Syno 按上述顺序确定性回退。
-- Agent 不得选择模型、Provider 或回退目标；全部失败时进入 `waiting_provider`。禁止动态 MCP。
-- Harness 聊天会话**没有**终端、文件系统或通用抓取工具：模型只能使用受控业务工具（保留 capture.*，记忆和知识维护由 Host 受控执行）、受控知识三件套（`syno_knowledge_search`/`syno_knowledge_read_snippet`/`syno_knowledge_fetch_url`）、`web_search` 与 `skill`（2026-10-17 工具面重设计）。`web_search` 由自研 `syno-search` 链提供（豆包 → Tavily → Exa → Parallel 匿名备用，按查询语言路由，免费额度；key 走 `.env` 注入，见 ADR 0009），不安装社区 hub 插件或动态 MCP。主人发来的图片直接作为 image 内容块投给模型（模型链 `kimi-for-coding`/`k3-256k` 自身声明支持 image 输入，2026-10-16 起；Host `image.read` 工具已摘除）；只有明确「收录」的图片才额外做一次结构化转写（同一模型链、capture sidecar 且无任何工具）作为 Intake 正文；转写失败如实回报，禁止猜图。生产 chat 是受控 `dsh --profile syno --host 127.0.0.1 --port 3088 --no-open`（与渠道会话同一 session；`dsh web` 是 `--profile web` 别名，不是生产）。通道只有飞书（微信栈已于 2026-10-16 物理删除）；入站图片直投模型、文件落隔离区后走收录。收录分析 / 浏览器兜底仍用 `syno-capture.cordis.yml` jsonrpc（无 bash/fs/web）。8888 是控制面。知识写入与覆盖 canonical 笔记仍走 Job / Proposal；改 `apps/` 源码不属于管家能力（D9），只有开发 Agent 的人工开发流程能改。生产 profile 禁止 `dsh plugin add`，禁止把 `danger-full-access` 写进 `@syno/dsh-plugin` 的 permission 表。DSH 根必须 `pnpm run build`；事件通道是 WebSocket 不是 SSE。踩坑清单见 `docs/OPERATIONS.md`「DeepSeek Harness 生产 chat」。
+- 当前生产入口是 `experiments/superagent-p0/real-feishu-client.mjs`（P3 native Host）；飞书是唯一日常渠道。
+- Specialist/Worker 模型固定为 `opencode-go/deepseek-v4.1-flash`；Pi Agent 是当前内核，P5 信息雷达使用同一 OpenCode Go 客户端。
+- DSH 聊天运行时、DSH 插件、旧 8888 服务和 `vendor/deepseek-harness` 已退役；禁止重新引入 `SYNO_DSH_ROOT` 或 DSH submodule。
+- Worker 不选择 Provider/模型，只执行 Host 下发的受控任务；业务写入仍经 Job/Proposal、隔离 worktree 和 GitGuard。
+- 生产只保留飞书入口；不新增主动推送、通用终端、动态 MCP 或系统控制。
 
 ## 源码修改原则
 
@@ -55,7 +55,7 @@
 - PowerShell 脚本内只用 `[Convert]::FromBase64String`/`ToBase64String`，绝不调 `UTF8.GetString/GetBytes` 或依赖默认编码。
 - Python sidecar 用 `io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", line_buffering=True, write_through=True)` 包裹协议 stdio（须在 `sys.stdout=sys.stderr` 重定向之前取 `buffer`），reader 侧同包 stdin；并让 bridge 经 `processBootstrapEnv` 注入 `PYTHONUTF8=1` / `PYTHONIOENCODING=utf-8` 作双保险。
 
-参考实现：`runDpapi`（`apps/syno/syno/provider-credential-store.mjs`，Base64 传输）、DeepSeek Harness JSON-RPC sidecar（`apps/syno/syno/deepseek-harness-jsonrpc-client.mjs`，UTF-8 字节层）。运维侧说明见 `docs/OPERATIONS.md`「zh-CN 主机的 PowerShell/子进程编码陷阱」。新增跨进程文本往返必须有对应测试覆盖中文路径（参考 `tests/deepseek-harness-jsonrpc-client.test.mjs`）。
+参考实现：`runDpapi`（`apps/syno/syno/provider-credential-store.mjs`，Base64 传输）。新增跨进程文本往返必须有对应测试覆盖中文路径。
 
 ## 知识任务
 
