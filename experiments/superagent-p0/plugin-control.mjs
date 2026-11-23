@@ -6,6 +6,7 @@ import { readActivePlugin } from "../../packages/syno-core/plugin-version.mjs";
 
 const VERSION = "[0-9A-Za-z][0-9A-Za-z._-]{0,80}";
 const COMMIT = "[0-9a-f]{40}";
+const SHA256 = "[0-9a-f]{64}";
 const PREFIX = "(?:p5\\s*)?插件";
 
 /** Explicit versioned control commands only; generic approval chat never reaches plugin mutation. */
@@ -14,8 +15,8 @@ export function parsePluginCommand(text) {
   if (new RegExp(`^${PREFIX}\\s*状态$`, "iu").test(value)) return { action: "status" };
   const approve = new RegExp(`^${PREFIX}\\s*批准\\s*(?:版本\\s*)?(${VERSION})\\s+(${COMMIT})$`, "iu").exec(value);
   if (approve) return { action: "approve", version: approve[1], commit: approve[2] };
-  const rollback = new RegExp(`^${PREFIX}\\s*回滚\\s*(?:当前版本\\s*)?(${VERSION})$`, "iu").exec(value);
-  if (rollback) return { action: "rollback", version: rollback[1] };
+  const rollback = new RegExp(`^${PREFIX}\\s*回滚\\s*(?:当前版本\\s*)?(${VERSION})\\s+(${SHA256})$`, "iu").exec(value);
+  if (rollback) return { action: "rollback", version: rollback[1], sha256: rollback[2] };
   return null;
 }
 
@@ -46,7 +47,7 @@ export async function executePluginCommand(command, {
           ? `待批准 canary：${canary.version}；条目 ${canary.report?.items ?? "?"}；过期时间 ${canary.expiresAt}`
           : "待批准 canary：无",
         canary ? `批准命令：插件批准 ${canary.version} ${canary.commit}` : null,
-        active?.previous ? `回滚命令：插件回滚 ${active.version}` : null,
+        active?.previous ? `回滚命令：插件回滚 ${active.version} ${active.sha256}` : null,
       ].filter(Boolean).join("\n"),
     };
   }
@@ -58,7 +59,7 @@ export async function executePluginCommand(command, {
     return { text: `插件 ${result.active.version} 已按已验收 canary 批准并激活。`, result };
   }
   if (command.action === "rollback") {
-    const result = await rollbackP5Plugin({ registryFile, expectedVersion: command.version, now });
+    const result = await rollbackP5Plugin({ registryFile, expectedVersion: command.version, expectedSha256: command.sha256, now });
     return { text: `插件已从 ${command.version} 回滚到 ${result.version}。`, result };
   }
   throw new Error("未知插件控制动作");

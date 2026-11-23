@@ -43,6 +43,16 @@ export function validatePluginManifest(manifest, { pluginDir } = {}) {
   };
 }
 
+export async function assertPluginVersionTargetAbsent(pluginDir) {
+  try {
+    await fs.lstat(pluginDir);
+  } catch (error) {
+    if (error.code === "ENOENT") return;
+    throw error;
+  }
+  throw pluginError("P5_PLUGIN_VERSION_EXISTS", `插件版本目录已存在，禁止覆盖：${path.basename(pluginDir)}`);
+}
+
 async function readJson(file) {
   try {
     return JSON.parse(await fs.readFile(file, "utf8"));
@@ -73,6 +83,9 @@ export async function activatePluginVersion({
     .update(entryBytes)
     .digest("hex");
   const prior = await readJson(registryFile);
+  if ([prior, prior?.previous].some((item) => item?.version === manifest.version && item.sha256 !== sha256)) {
+    throw pluginError("P5_PLUGIN_VERSION_CONTENT_MISMATCH", `插件版本 ${manifest.version} 已有不同内容，禁止覆盖历史`);
+  }
   const active = {
     contract: P5_PLUGIN_CONTRACT,
     name: "p5-radar",
@@ -109,11 +122,18 @@ export async function readActivePlugin({ registryFile = DEFAULT_P5_PLUGIN_REGIST
 export async function rollbackPluginVersion({
   registryFile = DEFAULT_P5_PLUGIN_REGISTRY,
   expectedVersion = null,
+  expectedSha256 = null,
   now = () => new Date(),
 } = {}) {
   const active = await readJson(registryFile);
   if (expectedVersion && active?.version !== expectedVersion) {
     throw pluginError("P5_PLUGIN_VERSION_MISMATCH", `当前插件版本不是 ${expectedVersion}，拒绝回滚`);
+  }
+  if (!/^[0-9a-f]{64}$/i.test(String(expectedSha256 || ""))) {
+    throw pluginError("P5_PLUGIN_HASH_REQUIRED", "回滚必须绑定完整 active 内容摘要");
+  }
+  if (active?.sha256 !== String(expectedSha256).toLowerCase()) {
+    throw pluginError("P5_PLUGIN_HASH_MISMATCH", "当前插件内容已变化，请重新查看状态并复制新回滚命令");
   }
   if (!active?.previous) throw pluginError("P5_PLUGIN_NO_PREVIOUS", "没有可回滚的插件版本");
   const previous = active.previous;

@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { GitGuard } from "./git-guard.mjs";
 import { runPluginEntry } from "./plugin-runner.mjs";
-import { activatePluginVersion, rollbackPluginVersion, validatePluginManifest } from "./plugin-version.mjs";
+import { activatePluginVersion, assertPluginVersionTargetAbsent, rollbackPluginVersion, validatePluginManifest } from "./plugin-version.mjs";
 import { TaskWorkspaceManager } from "./task-workspace.mjs";
 
 const CONTRACT = "syno.p5-radar/1";
@@ -96,7 +96,7 @@ export async function canaryP5Plugin({
   });
   try {
     const target = path.join(workspace.directory, targetRelative);
-    await fs.rm(target, { recursive: true, force: true });
+    await assertPluginVersionTargetAbsent(target);
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.cp(source, target, { recursive: true });
     await run(testCommand, {
@@ -199,8 +199,8 @@ export async function discardP5Canary({
   return { removed: true, version: canary.version };
 }
 
-export async function rollbackP5Plugin({ registryFile, expectedVersion = null, now = () => new Date() } = {}) {
-  return rollbackPluginVersion({ registryFile, expectedVersion, now });
+export async function rollbackP5Plugin({ registryFile, expectedVersion = null, expectedSha256 = null, now = () => new Date() } = {}) {
+  return rollbackPluginVersion({ registryFile, expectedVersion, expectedSha256, now });
 }
 
 export { DEFAULT_TEST_COMMAND };

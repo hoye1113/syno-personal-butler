@@ -4,7 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { GitGuard } from "./git-guard.mjs";
-import { activatePluginVersion, validatePluginManifest } from "./plugin-version.mjs";
+import { activatePluginVersion, assertPluginVersionTargetAbsent, validatePluginManifest } from "./plugin-version.mjs";
 import { TaskWorkspaceManager } from "./task-workspace.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -59,7 +59,7 @@ export async function releaseP5Plugin({
   let merged = null;
   try {
     const target = path.join(workspace.directory, targetRelative);
-    await fs.rm(target, { recursive: true, force: true });
+    await assertPluginVersionTargetAbsent(target);
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.cp(source, target, { recursive: true });
     await run(testCommand, {

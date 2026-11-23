@@ -46,6 +46,15 @@ test("releaseP5Plugin creates a worktree, tests, merges and activates", async (t
   assert.match(installed, /9\.9\.9/);
   const active = await readActivePlugin({ registryFile: f.registryFile });
   assert.equal(active.version, "9.9.9");
+  await fs.writeFile(path.join(f.source, "bin/plugin.mjs"), "process.exit(1);\n");
+  await assert.rejects(releaseP5Plugin({
+    sourceDir: f.source,
+    repoRoot: f.repo,
+    worktreeRoot: path.join(f.repo, ".worktrees"),
+    registryFile: f.registryFile,
+    testCommand: ["node", "-e", "process.exit(0)"],
+  }), { code: "P5_PLUGIN_VERSION_EXISTS" });
+  assert.equal((await readActivePlugin({ registryFile: f.registryFile })).sha256, active.sha256);
   const worktrees = await fs.readdir(path.join(f.repo, ".worktrees")).catch(() => []);
   assert.deepEqual(worktrees, []);
 });

@@ -54,11 +54,12 @@ async function fixture(t) {
   return { root, repoRoot, worktreeRoot, registryFile, canaryFile, candidate };
 }
 
-test("plugin control commands bind approval to the exact canary commit", () => {
+test("plugin control commands bind approval and rollback to exact content", () => {
   const commit = "0123456789abcdef0123456789abcdef01234567";
+  const sha256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
   assert.deepEqual(parsePluginCommand("插件状态"), { action: "status" });
   assert.deepEqual(parsePluginCommand(`P5 插件 批准 版本 2.0.0 ${commit}`), { action: "approve", version: "2.0.0", commit });
-  assert.deepEqual(parsePluginCommand("插件回滚 当前版本 2.0.0"), { action: "rollback", version: "2.0.0" });
+  assert.deepEqual(parsePluginCommand(`插件回滚 当前版本 2.0.0 ${sha256}`), { action: "rollback", version: "2.0.0", sha256 });
   assert.deepEqual(routeRoot({ text: `插件批准 2.0.0 ${commit}` }), {
     status: "routed", domain: "plugin", action: "approve", version: "2.0.0", commit,
   });
@@ -66,6 +67,7 @@ test("plugin control commands bind approval to the exact canary commit", () => {
   assert.equal(parsePluginCommand("回滚插件"), null);
   assert.equal(parsePluginCommand("插件批准"), null);
   assert.equal(parsePluginCommand("插件批准 2.0.0"), null, "仅版本号不能批准内容未绑定的 canary");
+  assert.equal(parsePluginCommand("插件回滚 当前版本 2.0.0"), null, "仅版本号不能回滚内容未绑定的 active");
 });
 
 test("Host plugin control approves only the shown canary, recovers a merged marker and rolls back only the shown active", async (t) => {
@@ -112,16 +114,25 @@ test("Host plugin control approves only the shown canary, recovers a merged mark
   assert.equal(git(f.repoRoot, "rev-parse", "HEAD"), mergedHead);
   assert.equal((await readActivePlugin({ registryFile: f.registryFile })).version, "2.0.0");
 
+  const active = await readActivePlugin({ registryFile: f.registryFile });
+  const activeStatus = await executePluginCommand({ action: "status" }, options);
+  assert.match(activeStatus.text, new RegExp(`插件回滚 2\\.0\\.0 ${active.sha256}`, "u"));
+  const rollback = { action: "rollback", version: active.version, sha256: active.sha256 };
   await assert.rejects(
-    executePluginCommand({ action: "rollback", version: "1.0.0" }, options),
+    executePluginCommand({ ...rollback, version: "1.0.0" }, options),
     { code: "P5_PLUGIN_VERSION_MISMATCH" },
   );
-  assert.equal((await readActivePlugin({ registryFile: f.registryFile })).version, "2.0.0");
-  const rolledBack = await executePluginCommand({ action: "rollback", version: "2.0.0" }, options);
-  assert.match(rolledBack.text, /从 2\.0\.0 回滚到 1\.0\.0/u);
-  assert.equal((await readActivePlugin({ registryFile: f.registryFile })).version, "1.0.0");
   await assert.rejects(
-    executePluginCommand({ action: "rollback", version: "1.0.0" }, options),
+    executePluginCommand({ ...rollback, sha256: "0".repeat(64) }, options),
+    { code: "P5_PLUGIN_HASH_MISMATCH" },
+  );
+  assert.equal((await readActivePlugin({ registryFile: f.registryFile })).version, "2.0.0");
+  const rolledBack = await executePluginCommand(rollback, options);
+  assert.match(rolledBack.text, /从 2\.0\.0 回滚到 1\.0\.0/u);
+  const restored = await readActivePlugin({ registryFile: f.registryFile });
+  assert.equal(restored.version, "1.0.0");
+  await assert.rejects(
+    executePluginCommand({ action: "rollback", version: restored.version, sha256: restored.sha256 }, options),
     { code: "P5_PLUGIN_NO_PREVIOUS" },
   );
 });
@@ -160,5 +171,10 @@ test("a stale approval cannot activate a same-version replacement canary", async
   await assert.rejects(fs.access(path.join(f.repoRoot, "plugins/p5-radar/2.0.0/plugin.json")), { code: "ENOENT" });
 
   await executePluginCommand({ action: "approve", version: replacement.version, commit: replacement.commit }, options);
-  assert.equal((await readActivePlugin({ registryFile: f.registryFile })).version, "2.0.0");
+  const installed = await readActivePlugin({ registryFile: f.registryFile });
+  assert.equal(installed.version, "2.0.0");
+
+  await fs.appendFile(path.join(f.candidate.directory, f.candidate.manifest.entry), "// forbidden activated replacement\n");
+  await assert.rejects(canaryP5Plugin(canaryOptions), { code: "P5_PLUGIN_VERSION_EXISTS" });
+  assert.equal((await readActivePlugin({ registryFile: f.registryFile })).sha256, installed.sha256);
 });

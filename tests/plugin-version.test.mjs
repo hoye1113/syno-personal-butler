@@ -58,10 +58,26 @@ test("rolls back to the previous active version", async (t) => {
   const v2 = { ...v1.manifest, version: "1.1.0" };
   await fs.writeFile(path.join(v2Dir, "plugin.json"), JSON.stringify(v2));
   await activatePluginVersion({ pluginDir: v2Dir, manifest: v2, registryFile: v1.registryFile });
-  assert.equal((await readActivePlugin({ registryFile: v1.registryFile })).version, "1.1.0");
-  const rolled = await rollbackPluginVersion({ registryFile: v1.registryFile });
+  const active = await readActivePlugin({ registryFile: v1.registryFile });
+  assert.equal(active.version, "1.1.0");
+  const rolled = await rollbackPluginVersion({ registryFile: v1.registryFile, expectedSha256: active.sha256 });
   assert.equal(rolled.version, "1.0.0");
   assert.equal((await readActivePlugin({ registryFile: v1.registryFile })).version, "1.0.0");
+});
+
+test("activation rejects different content for a version already present in active history", async (t) => {
+  const f = await fixture("2.0.0");
+  t.after(() => fs.rm(f.root, { recursive: true, force: true }));
+  const active = await activatePluginVersion({ pluginDir: f.pluginDir, manifest: f.manifest, registryFile: f.registryFile });
+  const replacementDir = path.join(f.root, "replacement");
+  await fs.mkdir(replacementDir);
+  await fs.writeFile(path.join(replacementDir, "entry.mjs"), "export const ok = false;\n");
+  await fs.writeFile(path.join(replacementDir, "plugin.json"), JSON.stringify(f.manifest));
+  await assert.rejects(
+    activatePluginVersion({ pluginDir: replacementDir, manifest: f.manifest, registryFile: f.registryFile }),
+    { code: "P5_PLUGIN_VERSION_CONTENT_MISMATCH" },
+  );
+  assert.equal((await readActivePlugin({ registryFile: f.registryFile })).sha256, active.sha256);
 });
 
 test("rejects wrong contract, capability and an entry outside the plugin directory", async (t) => {

@@ -32,7 +32,11 @@ const repoRoot = path.resolve(import.meta.dirname, "..");
 const worktreeRoot = path.join(repoRoot, ".worktrees");
 
 if (args.rollback) {
-  console.log(JSON.stringify(await rollbackP5Plugin({ registryFile }), null, 2));
+  console.log(JSON.stringify(await rollbackP5Plugin({
+    registryFile,
+    expectedVersion: args.version || null,
+    expectedSha256: args.sha256 || null,
+  }), null, 2));
 } else if (args.discard) {
   console.log(JSON.stringify(await discardP5Canary({ canaryFile, repoRoot, worktreeRoot }), null, 2));
 } else if (args.approve) {
@@ -42,6 +46,8 @@ if (args.rollback) {
     repoRoot,
     worktreeRoot,
     activate: args["no-activate"] !== true,
+    expectedVersion: args.version || null,
+    expectedCommit: args.commit || null,
   }), null, 2));
 } else if (args.canary) {
   const sourceDir = args.source || args._[0];
@@ -62,7 +68,7 @@ if (args.rollback) {
 } else {
   const sourceDir = args.source || args._[0];
   if (!sourceDir) {
-    console.error("用法：node scripts/release-p5-plugin.mjs --source <dir> [--auto|--no-activate]，或 --canary / --approve / --rollback");
+    console.error("用法：--source <dir> [--auto|--no-activate]；--canary；--approve --version <version> --commit <sha>；--rollback --version <version> --sha256 <hash>");
     process.exit(2);
   }
   console.log(JSON.stringify(await releaseP5Plugin({
