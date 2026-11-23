@@ -1,5 +1,8 @@
 # Syno 执行语义与移动可靠交付：权威执行计划
 
+> 2026-11-23：DSH 运行时已退役。当前生产为 P3 native Host + Pi/OpenCode Go；本文件中的 DSH 章节为历史记录，不再是启动或部署依据。
+
+
 > **SUPERSEDED FOR CURRENT PROJECT MVP（2026-08-24）**：本文保留旧 OpenCode/移动可靠交付计划和历史验收记录。当前 Project-aware Knowledge MVP 的唯一执行入口是 [`docs/project-aware-knowledge-execution-plan.md`](project-aware-knowledge-execution-plan.md)；文档分类和权威性见 [`docs/INDEX.md`](INDEX.md)，当前交接见 [`NEXT_SESSION.md`](../NEXT_SESSION.md)。
 
 更新日期：2026-08-25（Asia/Shanghai）

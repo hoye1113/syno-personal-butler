@@ -47,7 +47,7 @@ function hostMatchesNoProxy(hostname, noProxy) {
   return false;
 }
 
-// 代理路由判定（对齐 deepseek-harness dsh-http-proxy 的策略语义）：
+// 代理路由判定（对齐本机 HTTP 代理策略语义）：
 // 域名 URL 在对应 scheme 配了代理且未被 NO_PROXY 绕行时走代理，由代理远端解析 DNS——
 // 本地不再解析，TUN/Fake-IP 环境（x.com → 198.18.x.x）才不会被 SSRF 校验误杀。
 // 字面 IP 由调用方先行拦截，永不进入本函数；代理 URL 只支持 http:（CONNECT 与 absolute-form

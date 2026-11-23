@@ -1,24 +1,22 @@
 # Syno · 赛诺个人管家
 
+> 2026-11-23：DSH 聊天运行时、旧 8888 服务、DSH 插件和 `vendor/deepseek-harness` 已退役。当前生产入口为 P3 native Host（`experiments/superagent-p0/real-feishu-client.mjs`），内核为 Pi/OpenCode Go；下文带历史日期的 DSH 说明只供追溯。
+
 Syno 是本机运行的知识管家，当前生产平台为 macOS（launchd 登录自启、钥匙串凭据），保留 Windows 兼容支持。日常入口只有已绑定 Owner 的飞书私聊；微信通道栈已于 2026-10-16 删除。它围绕知识检索、资料收录、深度分析、知识维护、待办和独立记忆工作，不提供主动提醒、每日推送、学习或项目管理子系统。
 
 ## 快速开始
 
 ```sh
-git clone --recurse-submodules <repo-url>
+git clone <repo-url>
 cd syno-personal-butler
-pnpm install --frozen-lockfile
-pnpm harness:setup
-pnpm test
-pnpm verify
-pnpm start
+corepack pnpm install --frozen-lockfile
+npm test
+npm run verify
 ```
 
-使用 Node.js 22 或以上版本，当前平台安装建议见 [平台兼容](docs/PLATFORM-COMPATIBILITY.md)。未设置 `SYNO_DSH_ROOT` 时默认使用子模块 `vendor/deepseek-harness`；外部克隆也必须先完成构建。Kimi key 优先取宿主环境 `KIMI_API_KEY`，缺省由 supervisor 从 gitignored 的仓库根 `.env` 注入；不要将密钥写入参数、日志或仓库。
+使用 Node.js 22 或以上版本，当前平台安装建议见 [平台兼容](docs/PLATFORM-COMPATIBILITY.md)。DSH 依赖已移除，不需要 submodule 或 `harness:setup`。生产由 macOS launchd 运行 P3 Host；日常使用飞书。
 
-`127.0.0.1:8888` 是仅本机可访问的控制 API，根路径返回 404，不提供旧工作台页面；健康入口为 `GET /api/syno/health` 与 `/api/syno/readiness`。受控 DSH Web 默认使用 `127.0.0.1:3088`，需要启动令牌认证，与飞书共享 Owner/thread 会话。日常使用飞书无需打开 Web。启动及协议说明见 [运维](docs/OPERATIONS.md)。
-
-长期知识在本仓 `vault/`，任务、记忆、发布映射和审计在 `ops/`；生产环境必须不设置 `SYNO_KNOWLEDGE_ROOT`。`.runtime/` 是可重建缓存，凭据和本机执行状态不提交。Syno 不依赖 Obsidian 或 OpenClaw。
+运行数据、凭据和本机状态放在仓库外或 `.runtime/`；`.runtime/` 可重建，禁止提交。Syno 不依赖 Obsidian 或 OpenClaw。
 
 ## 当前能力（2026-10-20）
 
@@ -32,11 +30,11 @@ pnpm start
 | 飞书发布 | Wiki 正文、原生图片、目录的版本核验与恢复；生产发布已于 2026-10-19 经主人授权启用 |
 | 工作概览 | 按需读取真实待办、待决策项、后台 Job 与收录流程，不自动生成每日计划 |
 
-聊天面提供 25 个受控业务工具、知识三件套、`web_search` 与 `skill`，清单以 `packages/syno-core/business-tools.mjs` 和 `config/deepseek-harness/syno-tool-sets.mjs` 为准。自然语言由模型结合上下文处理，仅 `/new` 与 `/stop` 绕过模型。工具返回“已接收”不代表“已入库”；本地成功也不等于云端同步完成。
+聊天面提供 25 个受控业务工具、知识三件套、`web_search` 与 `skill`，清单以 `packages/syno-core/business-tools.mjs` 为准。自然语言由模型结合上下文处理，仅 `/new` 与 `/stop` 绕过模型。工具返回“已接收”不代表“已入库”；本地成功也不等于云端同步完成。
 
 ## 执行与权限
 
-- 唯一产品运行时是 `DeepSeekHarnessCognitiveRuntime`，固定 Kimi Code 模型链 `kimi-coding/kimi-for-coding` → `kimi-coding/k3-256k`。只有枚举的瞬态或契约错误且没有不可逆副作用时才能推进到下一模型；全部失败进入 `waiting_provider`。
+- 当前生产运行时是 P3 native Host；Specialist/Worker 固定使用 `opencode-go/deepseek-v4.1-flash`，由 Host 控制重试与结果落库。
 - 模型没有终端、通用文件系统、通用抓取、Git 或系统控制工具，不能修改源码、选择 Provider、安装动态 MCP 或启动子 Agent。
 - 明确且无歧义的知识与待办请求通过 Job / Proposal、隔离 worktree、validator 和 GitGuard 执行；记忆生效、知识删除与合并遵守各自的后续确认边界。
 - 每次提交只暂存 Job 声明的精确路径；不使用 `git add -A`，不自动 Push。
@@ -50,12 +48,6 @@ pnpm start
 
 ## 登录自启
 
-由主人手动执行安装／卸载，产品聊天不能控制生命周期：
-
-```sh
-pnpm macos:install   # status / restart / uninstall
-```
-
-Windows 对应 `pnpm windows:install`，其余命令见 [运维](docs/OPERATIONS.md)。
+生产由 `com.syno.butler.host` launchd 服务启动；安装、重启和回滚由主人手动执行。旧 `pnpm macos:install` / `windows:install` 入口已随 DSH 旧应用退役。
 
 更多说明见 [文档索引](docs/INDEX.md)、[架构](docs/ARCHITECTURE.md)、[权限策略](docs/POLICY.md) 和 [安全模型](docs/SECURITY.md)。

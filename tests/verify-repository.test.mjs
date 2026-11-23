@@ -16,7 +16,7 @@ test("repository verification accepts Git file lists larger than 1 MB", { timeou
   await fs.mkdir(scriptsDir, { recursive: true });
   const script = path.join(scriptsDir, "verify-repository.mjs");
   await fs.copyFile(path.resolve(import.meta.dirname, "../scripts/verify-repository.mjs"), script);
-  for (const relative of ["apps/syno/server.mjs", "packages/syno-core/syno-core.mjs", "contracts/job.schema.json", "docs/ARCHITECTURE.md"]) {
+  for (const relative of ["packages/syno-core/syno-core.mjs", "contracts/job.schema.json", "docs/ARCHITECTURE.md"]) {
     const file = path.join(root, relative);
     await fs.mkdir(path.dirname(file), { recursive: true });
     await fs.writeFile(file, relative.endsWith(".json") ? "{}\n" : "// fixture\n");
@@ -29,5 +29,5 @@ test("repository verification accepts Git file lists larger than 1 MB", { timeou
   ));
 
   const { stdout } = await execFileAsync(process.execPath, [script], { cwd: root, encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
-  assert.equal(stdout, `Repository verification passed (${count + 5} files).\n`);
+  assert.equal(stdout, `Repository verification passed (${count + 4} files).\n`);
 });
