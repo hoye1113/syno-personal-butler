@@ -76,6 +76,13 @@ test("feedback and explicit preference update weights without filtering", () => 
   assert.ok(result.matched.includes("Harness / Agent 工程"));
   assert.ok(preferences.topics["Harness / Agent 工程"] >= 2);
   assert.equal(applyExplicitPreference({ preferences, text: "随便聊聊" }).matched.length, 0);
+  const naturalNegative = applyExplicitPreference({ preferences, text: "别给我推模型新闻了" });
+  assert.deepEqual(naturalNegative.matched, ["模型 / 前沿"]);
+  assert.equal(naturalNegative.negative, true);
+  assert.equal(preferences.topics["模型 / 前沿"], -2);
+  const lessRecommended = applyExplicitPreference({ preferences, text: "以后少推 coding 内容" });
+  assert.equal(lessRecommended.negative, true);
+  assert.equal(preferences.topics["AI Coding / 工程"], 1);
 });
 
 test("ranking keeps every entry, raises preferred, and reserves exploration", () => {

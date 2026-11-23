@@ -111,7 +111,7 @@ export function recordFeedback({ preferences, item, score, action, now = () => n
 export function applyExplicitPreference({ preferences, text, now = () => new Date() }) {
   if (!preferences) throw new Error("applyExplicitPreference 缺少 preferences");
   const value = String(text || "").trim();
-  const negative = /(少看|不看|降低|减少|别推)/u.test(value);
+  const negative = /(少看|少推|不看|降低|减少|不再(?:关注|看|推|推荐)|别(?:再)?(?:给我)?(?:推|推荐)|不要(?:再)?(?:给我)?(?:推|推荐))/u.test(value);
   const matched = [];
   for (const rule of TOPIC_HINTS) {
     if (rule.patterns.some((pattern) => pattern.test(value))) {

@@ -23,6 +23,21 @@ test("P5 radar commands route digest, status and numbered follow/ignore", () => 
   assert.deepEqual(parseRadarCommand("兴趣: 多看 coding"), { action: "preference", text: "多看 coding" });
   assert.equal(parseRadarCommand("跟进项目 A"), null);
   assert.equal(parseRadarCommand("普通聊天"), null);
+  assert.deepEqual(parseRadarCommand("以后多关注 Agent 和 MCP"), {
+    action: "preference", text: "以后多关注 Agent 和 MCP",
+  });
+  assert.deepEqual(parseRadarCommand("我想更关注 context engineering"), {
+    action: "preference", text: "我想更关注 context engineering",
+  });
+  assert.deepEqual(parseRadarCommand("别给我推模型新闻了"), {
+    action: "preference", text: "别给我推模型新闻了",
+  });
+  assert.deepEqual(routeRoot({ text: "以后多关注 Agent 和 MCP" }), {
+    status: "routed", domain: "radar", action: "preference", text: "以后多关注 Agent 和 MCP",
+  });
+  assert.equal(parseRadarCommand("我想看项目 A"), null);
+  assert.equal(parseRadarCommand("新建项目：多关注 Agent"), null);
+  assert.equal(parseRadarCommand("继续想法：别给我推模型"), null);
   assert.deepEqual(parseCandidateNumbers("第 1 条、#2，3"), ["1", "2", "3"]);
   assert.deepEqual(routeRoot({ text: "跟进 1、4" }), {
     status: "routed", domain: "radar", action: "follow", numbers: ["1", "4"],
