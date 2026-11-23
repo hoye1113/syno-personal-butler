@@ -4,27 +4,30 @@
 
 ## 1. 当前生产基线
 
-2026-11-23 交接时确认的状态如下；状态会漂移，操作前必须重新执行只读检查。
+2026-11-23 部署后只读验收确认的状态如下；状态会漂移，操作前必须重新执行只读检查。
 
 | 项 | 最后确认值 |
 |---|---|
-| 代码目录 | `/Users/hoye/Documents/workspace/syno-personal-butler-prod` |
-| 分支 / 提交 | `production/main` / `a2a68bec8` |
-| Host 入口 | `experiments/superagent-p0/real-feishu-client.mjs` |
+| 代码目录 | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/current` |
+| 不可变 release | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261123T141102215Z-a82bac5ac798` |
+| 公开分支 / 提交 | `main` / `a82bac5ac79858adaa7055ff7bb7b2735a7a685a` |
+| Host 入口 | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/current/experiments/superagent-p0/real-feishu-client.mjs` |
 | launchd 服务 | `com.syno.butler.host` |
 | plist | `/Users/hoye/Library/LaunchAgents/com.syno.butler.host.plist` |
-| Host PID / generation | `62024` / `14` |
+| Host PID / generation | `27186` / `15` |
 | pending / hold | `0 / 0` |
-| 飞书 adapter | `running=true`、`available=true`、`ownerBound=true` |
-| active P5 插件 | `2026.11.22.7` |
+| 飞书 adapter | `running=true`、`available=true` |
+| active P5 插件 | `2026.11.22.7`（本次部署未修改） |
 
-本轮 P0 修复只提交到独立开发工作树，没有合并、部署或重启上述生产实例。不可变 release／current 工具已经通过隔离验证，但当前生产尚未切换到该布局。
+生产已从旧 worktree 切换到不可变 release／current 布局。发布 prepare 的完整 gate 为 748 tests／742 pass／6 skipped／0 fail；activate 与真实入口加载通过。重启前确认旧 PID `62024` 退出，再启动新 PID `27186`；验收时 frozen=false、active Task、pending Decision、queued／unknown delivery、handover pending／hold 均为 0，reconciliation.blocking=false。
 
 ## 2. 目录与数据边界
 
 | 路径 | 用途 | 运维约束 |
 |---|---|---|
-| `/Users/hoye/Documents/workspace/syno-personal-butler-prod` | 当前生产代码 | 不作为普通实验目录；保持干净工作树 |
+| `/Users/hoye/Documents/workspace/syno-personal-butler-releases/current` | 当前生产代码软链 | 不在软链目标中直接改代码；通过受控 release 切换 |
+| `/Users/hoye/Documents/workspace/syno-personal-butler-releases` | 不可变生产 releases | 已存在 release 不覆盖；删除旧 release 需单独授权 |
+| `/Users/hoye/Documents/workspace/syno-personal-butler-prod` | 旧生产 worktree／旧布局回滚点 | 保持 `a2a68bec8` 与干净工作树，不作为普通实验目录 |
 | `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data` | P5、渠道状态与本地运行数据 | 不提交、不公开、不复制到测试仓库 |
 | `/Users/hoye/Documents/workspace/syno-personal-butler/.runtime-p0` | Host 状态、锁、统一 SQLite 与插件注册表 | 不直接编辑业务事实 |
 | `/Users/hoye/Documents/workspace/syno-personal-butler/.runtime-p0/host-status.json` | 统一只读状态快照 | 首先检查的 Host 状态入口 |
@@ -65,7 +68,7 @@ jq '{frozen,activeTasks,decisions,deliveries,reconciliation,handover}' \
 
 ```bash
 launchctl print gui/$(id -u)/com.syno.butler.host
-pgrep -fl 'syno-personal-butler-prod/experiments/superagent-p0/real-feishu-client.mjs'
+pgrep -fl '/experiments/superagent-p0/real-feishu-client.mjs'
 ```
 
 两者都要看。launchd 已 bootout 不代表旧进程一定退出；旧消费者仍存活时，禁止启动第二个真实消费者。Host 日志位置以 plist 的 `StandardOutPath`／`StandardErrorPath` 为准，引用日志前必须脱敏。
@@ -105,9 +108,9 @@ node scripts/deploy-production.mjs activate --release <上一步生成的绝对 
 
 `prepare` 要求干净工作树，运行完整 gate，从 `HEAD` 生成唯一 release，冻结安装生产依赖并写入 manifest。`activate` 校验 release 后原子切换同级 `current` 软链，保留旧 release。
 
-这两条命令都**不重启 Host**，也不复制 `.env`、运行数据或 vault。当前生产仍直接使用 `/Users/hoye/Documents/workspace/syno-personal-butler-prod`；在正式迁移前，不得假定 launchd 已指向 `current`。
+这两条命令都**不重启 Host**，也不复制 `.env`、运行数据或 vault。当前生产 launchd 已指向 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/current`；`current` 是软链，激活新 release 后仍须按授权窗口重启并验收 Host。
 
-回滚代码时，将 `activate --release` 指向上一份完整 release。若需要回退当前旧布局，使用已核验的 Git 提交与 launchd 备份制定单独步骤，不直接覆盖生产工作树。
+回滚代码时，将 `activate --release` 指向上一份完整 release。若需要回退本次迁移前的旧布局，旧 worktree `/Users/hoye/Documents/workspace/syno-personal-butler-prod` 保持 `a2a68bec8`，旧 launchd 配置备份为 `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/launchd-backups/20261123T141453Z-a82bac5ac/com.syno.butler.host.plist`。回退前必须确认当前消费者退出，恢复后按同一清单验收，不得并行启动两个 Host。
 
 ## 6. 服务生命周期
 
@@ -167,7 +170,7 @@ freeze → 旧消费者退出 → 安全事实导入 → 静态一致 DB 副本
 
 回滚前先冻结并确认旧消费者退出，再选择代码、插件或数据层面的对应回滚。代码回滚不应自动回滚业务事实；插件回滚只改变 active 指针，不自动证明 Host 已加载目标版本；数据恢复不能覆盖恢复窗口内新增事实。每一步都需保留前后状态与独立验收。
 
-P5 插件的 Host 对话控制命令为 `插件状态`、`插件批准 <version> <canary-commit>`、`插件回滚 <当前version> <active-sha256>`。先从状态回复复制完整命令，避免操作期间状态已变化；批准要求版本与完整 canary commit 匹配，回滚要求版本与完整 active 内容摘要匹配。已合并的插件版本目录不可覆盖，修订必须升级版本号。merge 后崩溃按 pinned commit 对账恢复，不重复合并。当前代码尚未部署，不能用这些命令冒充生产已执行。
+P5 插件的 Host 对话控制命令为 `插件状态`、`插件批准 <version> <canary-commit>`、`插件回滚 <当前version> <active-sha256>`。先从状态回复复制完整命令，避免操作期间状态已变化；批准要求版本与完整 canary commit 匹配，回滚要求版本与完整 active 内容摘要匹配。已合并的插件版本目录不可覆盖，修订必须升级版本号。merge 后崩溃按 pinned commit 对账恢复，不重复合并。这些命令已随 `a82bac5ac` 部署；本次部署未操作生产 active 插件，也不构成后续批准或回滚授权。
 
 ## 9. 故障判据
 

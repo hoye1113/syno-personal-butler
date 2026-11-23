@@ -4,26 +4,28 @@
 
 ## 1. 当前一句话状态
 
-生产仍运行 P3 native Host + 飞书 + Pi／OpenCode Go + P5；P0、P1-4、P2 四项及后续审查发现的 5 个 P1 均已完成代码与隔离验证，但**未部署、未重启生产**。P1-5 多日观察仍在等待跨日证据。
+生产运行 P3 native Host + 飞书 + Pi／OpenCode Go + P5；P0、P1-4、P2 四项及后续审查发现的 5 个 P1 已完成代码、隔离验证、公开 main 推送与生产部署。2026-11-23 已从旧生产 worktree 切换到不可变 release／current 并重启唯一 Host；P1-5 多日观察仍在等待跨日证据。
 
-## 2. 生产事实（2026-11-23 交接基线）
+## 2. 生产事实（2026-11-23 部署后验收快照）
 
 | 项 | 值 |
 |---|---|
-| 生产代码 | `/Users/hoye/Documents/workspace/syno-personal-butler-prod` |
-| 分支 / 提交 | `production/main` / `a2a68bec8` |
-| 入口 | `experiments/superagent-p0/real-feishu-client.mjs` |
+| 生产代码 | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/current` |
+| 不可变 release | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261123T141102215Z-a82bac5ac798` |
+| 公开分支 / 提交 | `main` / `a82bac5ac79858adaa7055ff7bb7b2735a7a685a` |
+| 入口 | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/current/experiments/superagent-p0/real-feishu-client.mjs` |
 | launchd | `com.syno.butler.host` |
 | plist | `/Users/hoye/Library/LaunchAgents/com.syno.butler.host.plist` |
-| Host PID / generation | `62024` / `14` |
+| Host PID / generation | `27186` / `15` |
 | pending / hold | `0 / 0` |
-| Feishu adapter | running / available / ownerBound |
-| P5 active | `2026.11.22.7` |
+| Feishu adapter | running / available |
+| P5 active | `2026.11.22.7`（本次部署未修改） |
 | 运行数据 | `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data` |
 | Host 状态 | `/Users/hoye/Documents/workspace/syno-personal-butler/.runtime-p0/host-status.json` |
 | 统一业务 DB | `/Users/hoye/Documents/workspace/syno-personal-butler/.runtime-p0/p3-decision-memory.db` |
+| 旧 launchd 备份 | `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/launchd-backups/20261123T141453Z-a82bac5ac/com.syno.butler.host.plist` |
 
-以上是最后交接值，不是本轮重新验收结果。下一位 Agent 操作前必须按 `/Users/hoye/Documents/workspace/syno-personal-butler-p0-hardening/docs/OPERATIONS.md` 重新只读核对，不得直接沿用 PID 或把历史 accepted 当作当前在线证据。
+以上是部署后的只读验收快照，不是持续在线保证。验收时旧 PID `62024` 已退出，新 PID `27186` 来自 release／current；`frozen=false`、active Task、pending Decision、queued／unknown delivery、handover pending／hold 均为 0，`reconciliation.blocking=false`。下一位 Agent 操作前仍须按 `/Users/hoye/Documents/workspace/syno-personal-butler-p0-hardening/docs/OPERATIONS.md` 重新只读核对，不得直接沿用 PID 或把历史 accepted 当作当前在线证据。
 
 ## 3. 工作树与提交
 
@@ -81,7 +83,12 @@
     - `real-feishu-client.mjs --verify-import` 加载入口全部顶层静态／动态依赖后，在存储、凭据和网络操作前退出；
     - prepare／activate 均执行真实入口，回归覆盖入口独有的缺失依赖。
 
-P2 最终 gate：744 tests／738 pass／6 skipped／0 fail。首轮修复双次 gate 均为 747 tests／741 pass／6 skipped／0 fail。本次边界修复后，本工作树及 `c8398cd63` 的独立干净 worktree 各跑一次完整 gate：均为 748 tests／742 pass／6 skipped／0 fail；Repository verification 3577 files、Active documentation 7 files、`git diff --check` 均通过。干净提交另完成真实 release prepare、生产依赖冻结安装和真实入口加载，未 activate 或部署。
+12. `a82bac5ac docs: 记录插件与入口边界修复验收`
+    - 当前公开 `main` 已 fast-forward 到 `a82bac5ac79858adaa7055ff7bb7b2735a7a685a`；GitHub Actions run `45153998552` 成功。
+
+P2 最终 gate：744 tests／738 pass／6 skipped／0 fail。首轮修复双次 gate 均为 747 tests／741 pass／6 skipped／0 fail。本次边界修复后，本工作树及 `c8398cd63` 的独立干净 worktree 各跑一次完整 gate：均为 748 tests／742 pass／6 skipped／0 fail；Repository verification 3577 files、Active documentation 7 files、`git diff --check` 均通过。干净提交另完成真实 release prepare、生产依赖冻结安装和真实入口加载；当时的隔离 release 未 activate 或部署。
+
+2026-11-23 生产发布窗口内，从公开 main 对应提交重新 prepare，完整 gate 为 748 tests／742 pass／6 skipped／0 fail，生产 release 为 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261123T141102215Z-a82bac5ac798`。activate 后备份并切换 launchd，确认旧 PID `62024` 退出再启动新 PID `27186`，generation 从 `14` 到 `15`；adapter running／available，frozen、pending／hold、unknown 与 reconciliation 验收结果见第 2 节。旧生产 worktree `/Users/hoye/Documents/workspace/syno-personal-butler-prod` 保持 `a2a68bec8`，仅作旧布局回滚点。
 
 ### 3.2 私有历史工作树
 
@@ -143,7 +150,7 @@ corepack pnpm run gate
 - 重复、过时、低相关和语言／摘要质量问题；
 - 不改变生产设置的只读证据与必要的脱敏说明。
 
-短时检查不能冒充多日观察。观察期结束前不提前选择 40／50／60，也不自动改生产权重。
+短时检查不能冒充多日观察。观察期结束前不提前选择 40／50／60，也不自动改生产权重。既定只读观察窗口为 2026-11-24 10:00 与 2026-11-25 10:00（本地时间），对应 timer `ae9a70d5`、`8f28f950`。
 
 ### P2：四项已完成代码与隔离验收
 
@@ -152,19 +159,18 @@ corepack pnpm run gate
 3. 自由聊天偏好解析：`143c5fe79`；
 4. 管家窗口内插件 canary 批准／回滚：`7fc5148ec`。
 
-X 仅有离线 fixture／假 curl／临时 SQLite 证据，不能声称真实 API 已验收；插件命令仅完成临时真实 Git 仓验收，未操作生产 active。后续若要把公开 main 用于生产，必须另开授权窗口，重新审查、制备 release、激活并验收。
+X 仅有离线 fixture／假 curl／临时 SQLite 证据，不能声称真实 API 已验收；插件命令已随 `a82bac5ac` 部署到生产，但本次未操作生产 active 插件。后续任何新代码部署仍须另开授权窗口，重新审查、制备 release、激活并验收。
 
 ## 7. 授权与停止条件
 
-当前授权覆盖独立工作树中的实现、隔离测试、文档与精确提交、清理完成后 fast-forward 更新公开 main，以及 P5 的只读多日观察。以下事项**没有**新的授权：
+公开 main 的 fast-forward、生产 release 制备／激活、launchd 切换和唯一 Host 重启已在 2026-11-23 的明确授权窗口内完成；该授权不自动延续到后续变更。当前保留的常规授权只有 P5 只读多日观察。以下事项需要新的明确授权：
 
-- 创建或激活生产发布；
-- 修改 `/Users/hoye/Documents/workspace/syno-personal-butler-prod`；
-- 切换生产 current、安装或修改 launchd；
+- 新建或激活其他生产 release；
+- 修改旧生产 worktree `/Users/hoye/Documents/workspace/syno-personal-butler-prod` 或当前 launchd 配置；
 - 停止、启动或重启生产 Host；
 - 修改生产 P5 条数、权重或 active 插件；
 - 读取、复制或输出凭据、私有 Memory 值或无关 vault 正文；
-- 删除 p0、知识仓或历史运行记录。
+- 删除 p0、知识仓、旧 release 或历史运行记录。
 
 遇到生产效果未知时先只读对账；遇到多候选对象时追问；遇到授权缺口时停下问 Owner。系统后台通知不是 Owner 批准。
 

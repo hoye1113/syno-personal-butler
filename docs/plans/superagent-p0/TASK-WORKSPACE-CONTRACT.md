@@ -151,7 +151,7 @@ project.request → Object Context / Task / Attempt
 - 生产从 `runtime/p3-project-artifacts` 切到 `vault/04-Projects` 后，旧运行目录通过显式 `legacyProjectRoot` 保留为**只读冻结修订输入**：旧 v1 可直接作为 `previousRoot` 被 Worker 读取并生成隔离 v2，但绝不自动迁移、复制或覆盖旧文件；新版只合回 vault。`real-worker-probe` 以 `--previous-root` 与 `--project-root` 分别读取旧版本和本轮候选。
 - 失败/取消的写 Task 会保留 worktree 与分支供对账，当前没有自动回收清扫；需要运维按 `.worktrees` 手动清理。
 - 飞书文档创建已收回 Host；P5 只返回 AST。
-- 插件 canary 已接入 Host 对话控制：`插件状态` 查看 active／previous／canary，`插件批准 <version> <canary-commit>` 只批准版本与完整 commit 均匹配的候选，`插件回滚 <当前version> <active-sha256>` 只回滚版本与内容摘要均匹配的 active；已合并版本目录不可覆盖，修订必须升级版本号。merge 后恢复按 pinned commit 对账，不重复合并。代码尚未部署到生产。
+- 插件 canary 已接入 Host 对话控制：`插件状态` 查看 active／previous／canary，`插件批准 <version> <canary-commit>` 只批准版本与完整 commit 均匹配的候选，`插件回滚 <当前version> <active-sha256>` 只回滚版本与内容摘要均匹配的 active；已合并版本目录不可覆盖，修订必须升级版本号。merge 后恢复按 pinned commit 对账，不重复合并。代码已随 `a82bac5ac` 部署到生产；本次部署未操作生产 active 插件。
 
 ## 验收
 

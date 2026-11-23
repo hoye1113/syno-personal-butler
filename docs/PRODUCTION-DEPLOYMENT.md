@@ -2,7 +2,7 @@
 
 ## 固定工具链
 
-- Node：`24.21.0`，由 `/Users/hoye/Documents/workspace/syno-personal-butler-prod/.nvmrc` 与 `package.json` 固定。
+- Node：`24.21.0`，由 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/current/.nvmrc` 与 `package.json` 固定。
 - pnpm：`12.11.2`，由 `packageManager` 固定，经 Corepack 调用。
 - 依赖只能由 `pnpm-lock.yaml` 安装；CI 与部署均使用 `--frozen-lockfile`。
 - `@google/genai` 是 Pi 的未使用 Google Provider 传递依赖；其安装期脚本不参与当前 OpenCode bridge 运行，因此通过 `allowBuilds` 显式拒绝。只有已核对的 `protobufjs` postinstall 被允许，不开放通配构建。
@@ -23,3 +23,14 @@ node scripts/deploy-production.mjs activate --release <上一步生成的绝对 
 `prepare` 要求源工作树干净，先跑完整 gate，再从 `HEAD` 归档代码、冻结安装生产依赖并写 `release.json`。Host 使用的 autoloop 内核快照随仓库归档；prepare 与 activate 都会检查真实入口语法，并以 `--verify-import` 加载真实入口的完整静态／动态模块图，在存储、凭据和网络操作前退出；缺失依赖会直接失败。同一 release 已存在时失败，不覆盖。`activate` 只接受依赖已安装的 release，并通过临时软链加原子 rename 切换同级的 `current`；若 `current` 是真实目录则拒绝。
 
 回滚时将 `activate --release` 指向上一份完整 release。代码指针切换与 Host 重启是两个动作；重启仍须按生产 Runbook 单独授权和验收，不能由部署脚本隐式执行。
+
+## 当前部署基线（2026-11-23）
+
+- 公开 main：`a82bac5ac79858adaa7055ff7bb7b2735a7a685a`。
+- release：`/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261123T141102215Z-a82bac5ac798`。
+- current：`/Users/hoye/Documents/workspace/syno-personal-butler-releases/current`，已指向上述 release。
+- launchd 的入口与 WorkingDirectory 均已切换到 current；旧 PID `62024` 退出后才启动新 PID `27186`，generation 为 `15`。
+- 旧布局 plist 备份：`/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/launchd-backups/20261123T141453Z-a82bac5ac/com.syno.butler.host.plist`。
+- 旧生产 worktree `/Users/hoye/Documents/workspace/syno-personal-butler-prod` 保持 `a2a68bec8`，仅作旧布局回滚点。
+
+这些是部署时快照，后续操作前必须重新核对 current、launchd、实际进程与 Host 状态。
