@@ -178,12 +178,74 @@ class GitGuard {
     const branch = `syno/job/${safeId}`;
     const directory = path.join(this.worktreeRoot, `syno-job-${safeId}`);
     await fs.mkdir(this.worktreeRoot, { recursive: true });
-    try { await fs.access(directory); throw new Error(`工作树目录已存在：${directory}`); } catch (error) {
+    try {
+      await fs.access(directory);
+      throw Object.assign(new Error(`工作树目录已存在：${directory}`), { code: "GIT_GUARD_WORKTREE_EXISTS" });
+    } catch (error) {
       if (error.code !== "ENOENT") throw error;
     }
     const { stdout } = await git(["rev-parse", "HEAD"], { cwd: this.repoRoot });
     const base = stdout.trim();
     await git(["worktree", "add", "-b", branch, directory, base], { cwd: this.repoRoot });
+    return { branch, directory, base };
+  }
+
+  /**
+   * Crash recovery: a Task's workspace identity is derived from its id, so an existing tree may be adopted instead of
+   * creating a second one. Adoption is strict: the directory must be the registered worktree of exactly this branch,
+   * the head must still be the pristine fork point, and the tree must be clean. Anything else is refused for manual
+   * reconciliation rather than silently reused.
+   */
+  async adoptWorktree(jobId) {
+    return this.writeLock.run(() => this.#adoptWorktree(jobId));
+  }
+
+  async #adoptWorktree(jobId) {
+    const safeId = String(jobId).replace(/[^a-zA-Z0-9-]/g, "-");
+    const branch = `syno/job/${safeId}`;
+    const directory = path.resolve(this.worktreeRoot, `syno-job-${safeId}`);
+    const relative = path.relative(path.resolve(this.worktreeRoot), directory);
+    if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+      throw new Error("只允许复用 Syno 管理的隔离工作区");
+    }
+    let realDirectory;
+    try {
+      realDirectory = await fs.realpath(directory);
+    } catch {
+      throw new Error(`隔离工作区不存在，不能 adopt：${directory}`);
+    }
+    const { stdout } = await git(["worktree", "list", "--porcelain"], { cwd: this.repoRoot });
+    const entries = await Promise.all(stdout
+      .split(/\r?\n\r?\n/u)
+      .map(async (block) => {
+        const lines = block.split(/\r?\n/u);
+        const worktree = lines.find((line) => line.startsWith("worktree "))?.slice("worktree ".length);
+        const ref = lines.find((line) => line.startsWith("branch "))?.slice("branch ".length);
+        const resolved = worktree ? await fs.realpath(path.resolve(worktree)).catch(() => path.resolve(worktree)) : null;
+        return { directory: resolved, ref: ref ?? null };
+      }));
+    const own = entries.filter((entry) => entry.directory === realDirectory);
+    if (own.length !== 1) throw new Error(`隔离工作区没有唯一注册记录，拒绝 adopt：${directory}`);
+    if (own[0].ref !== `refs/heads/${branch}`) {
+      throw new Error(`隔离工作区分支身份不一致，拒绝 adopt：${own[0].ref || "(detached)"} ≠ ${branch}`);
+    }
+    if (entries.some((entry) => entry !== own[0] && entry.ref === `refs/heads/${branch}`)) {
+      throw new Error(`隔离分支被多个工作区占用，拒绝 adopt：${branch}`);
+    }
+    const branchHead = await git(["rev-parse", "--verify", `refs/heads/${branch}`], { cwd: this.repoRoot, allowExitCodes: [1, 128] });
+    if (branchHead.code !== 0) throw new Error(`隔离分支不存在，拒绝 adopt：${branch}`);
+    const { stdout: worktreeHead } = await git(["rev-parse", "HEAD"], { cwd: directory });
+    if (worktreeHead.trim() !== branchHead.stdout.trim()) {
+      throw new Error(`隔离工作区 HEAD 与分支不一致，拒绝 adopt：${branch}`);
+    }
+    const dirty = await this.changedPaths(directory);
+    if (dirty.length) throw new Error(`隔离工作区存在未对账改动，拒绝 adopt：${dirty.join(", ")}`);
+    const mergeBase = await git(["merge-base", branch, "HEAD"], { cwd: this.repoRoot, allowExitCodes: [1] });
+    const base = mergeBase.code === 0 ? mergeBase.stdout.trim() : "";
+    if (!base) throw new Error(`隔离分支缺少共同祖先，拒绝 adopt：${branch}`);
+    if (worktreeHead.trim() !== base) {
+      throw new Error(`隔离工作区已包含未登记提交，拒绝 adopt：${branch}`);
+    }
     return { branch, directory, base };
   }
 
@@ -230,6 +292,22 @@ class GitGuard {
   async #removeWorktree({ directory, branch } = {}) {
     if (directory) await git(["worktree", "remove", "--force", directory], { cwd: this.repoRoot });
     if (branch) await git(["branch", "-D", branch], { cwd: this.repoRoot });
+  }
+
+  /**
+   * Audit evidence only: the merge commit that actually took this pinned commit in. The current HEAD is never
+   * accepted as a substitute, and an ambiguous history (more than one matching merge) proves nothing.
+   */
+  async findMergeCommit(commit) {
+    if (!commit) return null;
+    const { stdout } = await git(["log", "--merges", "--format=%H %P", "HEAD", "--"], { cwd: this.repoRoot });
+    const matches = stdout
+      .split(/\r?\n/u)
+      .filter(Boolean)
+      .map((line) => line.trim().split(/\s+/u))
+      .filter((parts) => parts.length >= 3 && parts[2] === commit)
+      .map((parts) => parts[0]);
+    return matches.length === 1 ? matches[0] : null;
   }
 
   async isAncestor(commit, ref = "HEAD") {

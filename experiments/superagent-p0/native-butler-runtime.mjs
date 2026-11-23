@@ -4,6 +4,8 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { executeNative, openBusinessView } from "../../../syno-autoloop-p0/examples/syno-p0/commands.ts";
 import { parseRules } from "../../../syno-autoloop-p0/protocol/rules.ts";
+import { GitGuard } from "../../packages/syno-core/git-guard.mjs";
+import { TaskWorkspaceManager } from "../../packages/syno-core/task-workspace.mjs";
 import { openHostHandover } from "./host-handover.mjs";
 import { openHostOperations } from "./host-operations.mjs";
 import { ideaContextId, ideaIndexKey } from "./idea-object.mjs";
@@ -22,6 +24,10 @@ export function openNativeButlerRuntime({
   databasePath, vaultRoot, sourcePath, sourceUrl, indexFile, resultRoot,
   ideaRoot = path.join(vaultRoot, "03-Ideas"), projectRoot = path.join(vaultRoot, "04-Projects"),
   memoryRoot = path.join(vaultRoot, "05-Memory"), now = () => Date.now(), decisionTtlMs,
+  // A Git knowledge repository opts the Host into isolated project writes: the project Specialist then produces
+  // candidates in TaskWorkspaceManager worktrees and merges only pinned, Result-Lane-approved commits.
+  repoRoot = null, worktreeRoot = null, gitGuard = null, projectWorkspaceManager = null,
+  legacyProjectRoot = null,
 }) {
   mkdirSync(path.dirname(databasePath), { recursive: true });
   const db = new DatabaseSync(databasePath);
@@ -74,11 +80,24 @@ export function openNativeButlerRuntime({
   const scopeObjectExists = ({ kind, objectId }) => Boolean(
     openBusinessView(db).get("records", kind === "idea" ? ideaIndexKey(objectId) : projectIndexKey(objectId)),
   );
+  const resolvedRepoRoot = repoRoot ? path.resolve(repoRoot) : (gitGuard?.repoRoot ? path.resolve(gitGuard.repoRoot) : null);
+  const resolvedWorktreeRoot = worktreeRoot ?? gitGuard?.worktreeRoot
+    ?? (resolvedRepoRoot ? path.join(resolvedRepoRoot, ".worktrees") : null);
+  const workspaceManager = projectWorkspaceManager ?? (resolvedRepoRoot
+    ? new TaskWorkspaceManager({
+      // D13.4: the auto-assembled Host guard keeps the product hard gate — project artifacts only merge back to main.
+      gitGuard: gitGuard ?? new GitGuard({ repoRoot: resolvedRepoRoot, worktreeRoot: resolvedWorktreeRoot, productBranch: "main" }),
+      sharedRoot: resolvedRepoRoot,
+      worktreeRoot: resolvedWorktreeRoot,
+    })
+    : null);
   const specialists = new Map([
     ["capture", openNativeCaptureRuntime({ databasePath, vaultRoot, sourcePath, sourceUrl, now, db, configureRules: false })],
     ["knowledge", openNativeKnowledgeRuntime({ databasePath, vaultRoot, indexFile, resultRoot, now, db, configureRules: false })],
     ["idea", openNativeIdeaRuntime({ databasePath, vaultRoot, ideaRoot, now, db, configureRules: false })],
-    ["project", openNativeProjectRuntime({ databasePath, vaultRoot, projectRoot, now, db, configureRules: false })],
+    ["project", openNativeProjectRuntime({
+      databasePath, vaultRoot, projectRoot, now, db, configureRules: false, workspaceManager, legacyProjectRoot,
+    })],
     ["memory", openNativeMemoryRuntime({ databasePath, vaultRoot, memoryRoot, now, db, configureRules: false, decisions, scopeObjectExists })],
   ]);
   const handover = openHostHandover({ db, now });
@@ -136,6 +155,10 @@ export function openNativeButlerRuntime({
       args.revision = receipt.frozen.revision;
     }
     const execution = specialist.begin(args);
+    // Isolated project writes prepare a worktree during begin; non-isolated Specialists stay synchronous.
+    if (execution instanceof Promise) {
+      return execution.then((resolved) => ({ status: "routed", domain: receipt.domain, decisionId, candidateId, receipt, execution: resolved }));
+    }
     return { status: "routed", domain: receipt.domain, decisionId, candidateId, receipt, execution };
   }
 

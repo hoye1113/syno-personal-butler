@@ -187,6 +187,9 @@ const projectRequest = projectRequestPath ? JSON.parse(readFileSync(projectReque
 const memoryRequestPath = option("--memory-request");
 const memoryRequest = memoryRequestPath ? JSON.parse(readFileSync(memoryRequestPath, "utf8")) : null;
 const projectRoot = option("--project-root");
+// Frozen previous versions may live in a read-only legacy root while this Task's candidates live in an isolated
+// worktree; the Worker therefore separates the read root from the candidate write root.
+const previousRoot = option("--previous-root") || projectRoot;
 const worker = option("--worker") || "OpenCode";
 assert.ok(["OpenCode", "Pi"].includes(worker), "未知真实 Worker");
 const messageId = option("--message-id");
@@ -201,12 +204,13 @@ if (memoryRequest) assertMemoryRequest(memoryRequest, worker);
 if (projectRequest) {
   assertProjectRequest(projectRequest, worker);
   assert.ok(projectRoot && path.isAbsolute(projectRoot), "项目请求必须提供只读 projectRoot 绝对路径");
+  assert.ok(previousRoot && path.isAbsolute(previousRoot), "项目请求必须提供只读 previousRoot 绝对路径");
 }
 assert.ok(
   [Boolean(ideaRequest), Boolean(captureSource), Boolean(projectRequest), Boolean(memoryRequest)].filter(Boolean).length <= 1,
   "一次 Worker 调用只能处理收录、想法、项目或记忆中的一种",
 );
-const projectPrevious = projectRequest?.action === "revise" ? readFrozenPrevious(projectRequest, projectRoot) : null;
+const projectPrevious = projectRequest?.action === "revise" ? readFrozenPrevious(projectRequest, previousRoot) : null;
 const captureSchema = {
   type: "object",
   properties: {

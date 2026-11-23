@@ -1,6 +1,6 @@
 // P3.2 project host: native runs, business Tasks, auditable steps and a versioned Markdown brief in the one fact log.
 import assert from "node:assert/strict";
-import { lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import {
@@ -37,6 +37,8 @@ import {
   projectStepKey,
   projectStepRelativePath,
   projectStepPath,
+  projectWorkspaceKey,
+  projectWorkspaceTaskId,
   sha256,
   stepById,
 } from "./project-object.mjs";
@@ -66,9 +68,30 @@ export function openNativeProjectRuntime({
   now = () => Date.now(),
   db: sharedDb = null,
   configureRules = true,
+  // When present, every real write Task runs through TaskWorkspaceManager: candidates are produced in an isolated
+  // GitGuard worktree and only a Result-Lane-approved pinned commit is merged back into this repository.
+  workspaceManager = null,
+  // Read-only compatibility seam: pre-isolation runtimes wrote projects under the runtime directory. Those versions
+  // stay frozen revision inputs only — nothing is migrated into the repository and no legacy file is ever overwritten.
+  legacyProjectRoot = null,
 }) {
-  mkdirSync(projectRoot, { recursive: true });
-  const realProjectRoot = realpathSync(projectRoot);
+  const isolatedWrites = Boolean(workspaceManager);
+  let relativeProjectRoot = null;
+  let realProjectRoot = null;
+  if (isolatedWrites) {
+    const repoRoot = path.resolve(workspaceManager.repoRoot);
+    relativeProjectRoot = path.relative(repoRoot, path.resolve(projectRoot)).replace(/\\/g, "/");
+    if (!relativeProjectRoot || relativeProjectRoot.startsWith("..") || path.isAbsolute(relativeProjectRoot)) {
+      throw new Error("隔离写任务的项目根必须位于 Git 知识仓内（不能是运行目录）");
+    }
+    // D10 同构：产品自动提交只允许 vault/** 与 ops/**，项目产物在写入前就限定在同一结构内。
+    if (!/^(?:vault|ops)\/[^\0]+$/u.test(relativeProjectRoot)) {
+      throw new Error("隔离写任务的项目根只能是 vault/** 或 ops/**");
+    }
+  } else {
+    mkdirSync(projectRoot, { recursive: true });
+    realProjectRoot = realpathSync(projectRoot);
+  }
   if (!sharedDb) mkdirSync(path.dirname(databasePath), { recursive: true });
   const db = sharedDb ?? new DatabaseSync(databasePath);
   if (!sharedDb) db.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;");
@@ -104,18 +127,19 @@ export function openNativeProjectRuntime({
     });
   }
 
-  function assertInside(file) {
+  function assertInside(file, root) {
+    const realRoot = root === realProjectRoot ? realProjectRoot : realpathSync(root);
     const realDirectory = realpathSync(path.dirname(file));
-    const prefix = `${realProjectRoot}${path.sep}`;
-    if (realDirectory !== realProjectRoot && !realDirectory.startsWith(prefix)) {
+    const prefix = `${realRoot}${path.sep}`;
+    if (realDirectory !== realRoot && !realDirectory.startsWith(prefix)) {
       throw new Error("项目产物路径逃逸出受控目录");
     }
   }
 
   /** Non-overwrite write: an existing file may only be re-adopted when its bytes already match. */
-  function writeStable(file, text) {
+  function writeStable(file, text, root) {
     mkdirSync(path.dirname(file), { recursive: true });
-    assertInside(file);
+    assertInside(file, root);
     const buffer = Buffer.from(text, "utf8");
     try {
       const existing = readStableFile(file);
@@ -134,6 +158,97 @@ export function openNativeProjectRuntime({
     }
     const written = readStableFile(file);
     return { sha256: sha256(written), bytes: written.length };
+  }
+
+  /** The repository root wins; a pre-isolation version may only be read from its frozen legacy root. */
+  function artifactFile(relativePath) {
+    const primary = path.join(projectRoot, relativePath);
+    if (existsSync(primary)) return { root: projectRoot, file: primary };
+    if (legacyProjectRoot) {
+      const legacy = path.join(legacyProjectRoot, relativePath);
+      if (existsSync(legacy)) return { root: legacyProjectRoot, file: legacy };
+    }
+    throw new Error(`缺少项目产物：${relativePath}`);
+  }
+
+  function workspaceRecord(taskId) {
+    return view().get("records", projectWorkspaceKey(taskId)) ?? null;
+  }
+
+  function writeWorkspaceRecord(taskId, patch) {
+    commit("syno.project_workspace", (current) => {
+      const key = projectWorkspaceKey(taskId);
+      const prior = current.get("records", key);
+      const next = { ...(prior ?? { key, kind: "project_workspace", taskId, createdAt: now() }), ...patch, updatedAt: now() };
+      if (prior) {
+        for (const field of ["directory", "branch", "base", "relativeRoot", "isolated"]) {
+          if (prior[field] !== undefined) assert.equal(next[field], prior[field], `同一 Task 不能更换 workspace ${field}`);
+        }
+        if (prior.planVersion != null) assert.equal(next.planVersion, prior.planVersion, "同一 Task 不能更换 workspace 计划版本");
+        if (prior.attemptId != null) assert.equal(next.attemptId, prior.attemptId, "同一 Task 不能更换 workspace Attempt");
+        if (prior.projectId != null) assert.equal(next.projectId, prior.projectId, "同一 Task 不能更换 workspace 项目对象");
+        if (prior.commit) assert.equal(next.commit ?? prior.commit, prior.commit, "验收 commit 已冻结，不能更换");
+      }
+      if (prior && ["prepared", "committed", "merged"].indexOf(prior.state) > ["prepared", "committed", "merged"].indexOf(next.state)) {
+        assert.equal(next.state, prior.state, "workspace 状态不能回退");
+      }
+      if (prior && JSON.stringify({ ...prior, updatedAt: null }) === JSON.stringify({ ...next, updatedAt: null })) return [];
+      return [{ table: "records", key, row: next }];
+    });
+    return workspaceRecord(taskId);
+  }
+
+  /**
+   * The single write root for one Task: the isolated worktree until the pinned commit is merged, then the repository
+   * check-out. Runtimes without a Git knowledge repository keep writing straight to `projectRoot`.
+   */
+  function writeRootFor(task) {
+    const record = workspaceRecord(task.id);
+    if (!record || record.state === "merged" || !record.isolated) return projectRoot;
+    return path.join(record.directory, record.relativeRoot);
+  }
+
+  function workspaceObject(record) {
+    if (!record) return null;
+    return {
+      taskId: record.taskId,
+      isolated: record.isolated,
+      directory: record.directory,
+      branch: record.branch,
+      base: record.base,
+      relativeRoot: record.relativeRoot,
+      state: record.state,
+      commit: record.commit ?? null,
+      diffHash: record.diffHash ?? null,
+      mergeCommit: record.mergeCommit ?? null,
+    };
+  }
+
+  async function ensureWorkspace({ taskId, projectId, planVersion, attemptId }) {
+    const existing = workspaceRecord(taskId);
+    if (existing) {
+      assert.equal(existing.projectId ?? projectId, projectId, "同一消息的 workspace 项目对象不一致");
+      if (existing.planVersion != null) assert.equal(existing.planVersion, planVersion, "同一消息的 workspace 计划版本不一致");
+      if (existing.attemptId != null) assert.equal(existing.attemptId, attemptId, "同一消息的 workspace Attempt 不一致");
+      return existing;
+    }
+    const workspace = await workspaceManager.prepare({
+      taskId: projectWorkspaceTaskId(taskId),
+      kind: "project_write",
+      writePaths: [relativeProjectRoot],
+    });
+    assert.equal(workspace.isolated, true, "项目写任务必须使用隔离 worktree");
+    return writeWorkspaceRecord(taskId, {
+      projectId,
+      planVersion,
+      attemptId,
+      isolated: true,
+      directory: path.resolve(workspace.directory),
+      branch: workspace.branch,
+      base: workspace.base,
+      relativeRoot: relativeProjectRoot,
+      state: "prepared",
+    });
   }
 
   function indexPath(projectId) {
@@ -214,11 +329,13 @@ export function openNativeProjectRuntime({
     const index = requireIndex(projectId);
     const entry = index.versions.find((version) => version.planVersion === index.latestVersion);
     assert.ok(entry, `项目 ${projectId} 还没有已完成的计划`);
-    const manifestFile = projectStepPath(projectRoot, projectId, entry.planVersion, "manifest");
-    assert.equal(sha256(readStableFile(manifestFile)), entry.manifestSha256, "前一计划的 manifest 已变化");
+    const manifestRelative = projectStepRelativePath(projectId, entry.planVersion, "manifest");
+    const manifest = artifactFile(manifestRelative);
+    assert.equal(sha256(readStableFile(manifest.file)), entry.manifestSha256, "前一计划的 manifest 已变化");
     const artifacts = entry.artifacts.map((artifact) => {
-      const file = path.join(projectRoot, artifact.path);
-      assert.equal(sha256(readStableFile(file)), artifact.sha256, `前一计划产物已变化：${artifact.stepId}`);
+      const resolved = artifactFile(artifact.path);
+      assert.equal(resolved.root, manifest.root, `前一计划产物分散在不同根目录：${artifact.stepId}`);
+      assert.equal(sha256(readStableFile(resolved.file)), artifact.sha256, `前一计划产物已变化：${artifact.stepId}`);
       return { ...artifact };
     });
     return {
@@ -226,6 +343,8 @@ export function openNativeProjectRuntime({
       manifestPath: entry.manifestPath,
       manifestSha256: entry.manifestSha256,
       artifacts,
+      // The frozen revision input must be read from exactly the root that produced it, never from the new write root.
+      root: manifest.root,
     };
   }
 
@@ -309,6 +428,7 @@ export function openNativeProjectRuntime({
     const attempt = current.get("records", `attempt:${task.current_attempt}`);
     const verification = task.verification_id ? current.get("records", `verification:${task.verification_id}`) : null;
     const delivery = current.get("records", deliveryKeyOf(taskId));
+    const workspace = workspaceRecord(taskId);
     const steps = STEP_IDS
       .map((stepId) => current.get("records", projectStepKey(taskId, stepId)))
       .filter(Boolean)
@@ -338,6 +458,11 @@ export function openNativeProjectRuntime({
       revision: input?.revision ?? null,
       previous: input?.previous ?? null,
       steps,
+      workspaceState: workspace?.state ?? null,
+      workspaceBranch: workspace?.branch ?? null,
+      workspaceCommit: workspace?.commit ?? null,
+      workspaceDiffHash: workspace?.diffHash ?? null,
+      mergeCommit: workspace?.mergeCommit ?? null,
       deliveryKey: delivery?.key ?? null,
       deliveryState: delivery?.state ?? null,
       maySend: delivery?.may_send ?? null,
@@ -347,6 +472,8 @@ export function openNativeProjectRuntime({
 
   function executionOf(task, { messageId, action, projectId, goal, revision, worker, job = null, inputSha256 }) {
     const record = inputRecord(task.id);
+    const writeRoot = writeRootFor(task);
+    const workspace = workspaceObject(workspaceRecord(task.id));
     return {
       taskId: task.id,
       messageId,
@@ -365,12 +492,18 @@ export function openNativeProjectRuntime({
       worker,
       job,
       state: task.state,
+      // Candidate paths follow the isolated worktree while the Task is unmerged; the logical manifest path stays the
+      // repository path because Task acceptance is version-bound, not workspace-bound.
       paths: {
-        outline: projectStepPath(projectRoot, projectId, task.context_version, "outline"),
-        deliverable: projectStepPath(projectRoot, projectId, task.context_version, "deliverable"),
+        outline: projectStepPath(writeRoot, projectId, task.context_version, "outline"),
+        deliverable: projectStepPath(writeRoot, projectId, task.context_version, "deliverable"),
         manifest: task.acceptance.path,
       },
+      writeRoot,
+      workspace,
       frozen: record?.previous ?? null,
+      // Frozen revision inputs may live in the read-only legacy root while this Task's candidates live in the worktree.
+      previousRoot: record?.previous?.root ?? null,
       deliveryKey: deliveryKeyOf(task.id),
     };
   }
@@ -416,9 +549,9 @@ export function openNativeProjectRuntime({
       const job = run?.state === "claimed" ? act("claimNext", [AGENT, `claim-${message.messageId}`]) : null;
       assert.equal(job?.run ?? existing.run_id, existing.run_id, "恢复时不能换原生 run");
       if (action === "new") ensureIndex({ projectId, contextId, goal });
-      return executionOf(existing, {
+      return attachWorkspace(existing, {
         messageId: message.messageId, action, projectId, goal, revision, worker, job,
-      });
+      }, { projectId, planVersion: existing.context_version });
     }
 
     if (activeTask(contextId)) {
@@ -476,7 +609,9 @@ export function openNativeProjectRuntime({
       assert.equal(frozen.planVersion, planVersion, "恢复时计划版本不一致");
     }
     const manifestPath = projectStepPath(projectRoot, projectId, planVersion, "manifest");
-    mkdirSync(path.dirname(manifestPath), { recursive: true });
+    // The logical manifest path is the repository location. A candidate copy only exists inside the isolated
+    // worktree until Result Lane merges it, so the main check-out stays untouched before acceptance.
+    if (!isolatedWrites) mkdirSync(path.dirname(manifestPath), { recursive: true });
     const attemptId = `attempt-${job.run}-${job.attempt}`;
     createTask(db, {
       taskId, contextId, attemptId, runId: job.run, runAttempt: job.attempt,
@@ -485,10 +620,17 @@ export function openNativeProjectRuntime({
     });
     if (action === "new") ensureIndex({ projectId, contextId, goal });
     const task = view().get("records", `task:${taskId}`);
-    return executionOf(task, {
+    return attachWorkspace(task, {
       messageId: message.messageId, action, projectId, goal, revision, worker, job,
       inputSha256: frozen.input_sha256,
-    });
+    }, { projectId, planVersion });
+  }
+
+  /** Isolated runtimes bind a running Task to exactly one worktree before any Worker sees the execution. */
+  function attachWorkspace(task, params, { projectId, planVersion }) {
+    if (!workspaceManager || task.state !== "running") return executionOf(task, params);
+    return ensureWorkspace({ taskId: task.id, projectId, planVersion, attemptId: task.current_attempt })
+      .then(() => executionOf(task, params));
   }
 
   function requireExecution(execution) {
@@ -510,7 +652,7 @@ export function openNativeProjectRuntime({
       projectStepPath(projectRoot, input.projectId, task.context_version, "manifest"),
       "Task 验收路径不是项目 manifest 路径",
     );
-    return projectStepPath(projectRoot, input.projectId, task.context_version, stepId);
+    return projectStepPath(writeRootFor(task), input.projectId, task.context_version, stepId);
   }
 
   function writeStep(execution, stepId, body) {
@@ -525,8 +667,9 @@ export function openNativeProjectRuntime({
     }
     if (task.cancel_requested || task.state !== "running") throw new Error("项目任务已取消或不允许写入候选");
     const text = assertStepBody(body, { projectId: input.projectId });
+    const root = writeRootFor(task);
     const file = fileOfStep(input, task, stepId);
-    const written = writeStable(file, text);
+    const written = writeStable(file, text, root);
     writeStepRecord({ task, input, stepId, state: "ready", ...written });
     return { stepId, path: file, relativePath: projectStepRelativePath(input.projectId, task.context_version, stepId), ...written };
   }
@@ -604,8 +747,9 @@ export function openNativeProjectRuntime({
     if (task.cancel_requested || task.state !== "running") throw new Error("项目任务已取消或不允许写入 manifest");
     assertDependencies(task, input, "manifest");
     const text = canonicalManifest(expectedManifest(task, input));
+    const root = writeRootFor(task);
     const file = fileOfStep(input, task, "manifest");
-    const written = writeStable(file, text);
+    const written = writeStable(file, text, root);
     writeStepRecord({ task, input, stepId: "manifest", state: "ready", ...written });
     return { stepId: "manifest", path: file, relativePath: projectStepRelativePath(input.projectId, task.context_version, "manifest"), ...written };
   }
@@ -627,12 +771,16 @@ export function openNativeProjectRuntime({
     return { stepId, state: "completed", path: file, sha256: prior.sha256, bytes: prior.bytes };
   }
 
+  function frozenFile(input, relativePath) {
+    return input.previous?.root ? path.join(input.previous.root, relativePath) : artifactFile(relativePath).file;
+  }
+
   function assertPreviousUnchanged(input) {
     if (!input.previous) return;
-    const manifestFile = projectStepPath(projectRoot, input.projectId, input.previous.planVersion, "manifest");
+    const manifestFile = frozenFile(input, projectStepRelativePath(input.projectId, input.previous.planVersion, "manifest"));
     assert.equal(sha256(readStableFile(manifestFile)), input.previous.manifestSha256, "修订冻结的前一计划 manifest 已变化");
     for (const artifact of input.previous.artifacts) {
-      const file = path.join(projectRoot, artifact.path);
+      const file = frozenFile(input, artifact.path);
       assert.equal(sha256(readStableFile(file)), artifact.sha256, `修订冻结的前一计划产物已变化：${artifact.stepId}`);
     }
   }
@@ -699,10 +847,18 @@ export function openNativeProjectRuntime({
 
     const records = assertStepsComplete(task, input);
     const manifestText = records.find((record) => record.stepId === "manifest").text;
-    const expected = assertManifestText(task, input, manifestText);
+    assertManifestText(task, input, manifestText);
     const manifestRecord = records.find((record) => record.stepId === "manifest");
     const fileHash = manifestRecord.sha256;
 
+    if (!workspaceManager) return settleComplete(execution, { task, input, fileHash });
+    return finalizeWorkspace(execution, { task, input, fileHash })
+      .then(() => settleComplete(execution, { task, input, fileHash }));
+  }
+
+  /** Business settlement only runs after the Result Lane has accepted the candidate and it is merged. */
+  function settleComplete(execution, { task, input, fileHash }) {
+    const current = view();
     const attempt = current.get("records", `attempt:${execution.attemptId}`);
     if (attempt?.state === "running") reportWorkerDone(db, { taskId: execution.taskId, attemptId: execution.attemptId, now: now() });
     const run = view().get("runs", execution.runId);
@@ -734,12 +890,79 @@ export function openNativeProjectRuntime({
     return trace(execution.taskId);
   }
 
+  function workspacePaths(record, input, task) {
+    return STEPS.map((step) => `${record.relativeRoot}/${projectStepRelativePath(input.projectId, task.context_version, step.id)}`
+      .replace(/\/{2,}/gu, "/"));
+  }
+
+  /**
+   * Result Lane → workspace merge. Exactly three versioned paths may change; the branch is committed, pinned,
+   * merged by pinned commit and the merged bytes are re-read from the repository before business settlement.
+   * A previous attempt's commit is reused, so recovery never re-commits or duplicates the merge.
+   */
+  async function finalizeWorkspace(execution, { task, input, fileHash }) {
+    const record = workspaceRecord(execution.taskId);
+    if (!record) throw new Error("项目写任务缺少隔离 workspace 记录，拒绝结算");
+    assert.equal(record.isolated, true, "项目写任务必须在隔离 worktree 内生成候选");
+    assert.equal(record.taskId, execution.taskId, "workspace Task 不匹配");
+    assert.equal(record.projectId, input.projectId, "workspace 项目对象与冻结输入不一致");
+    assert.equal(record.planVersion, task.context_version, "workspace 计划版本与 Task 不一致");
+    assert.equal(record.attemptId, task.current_attempt, "workspace Attempt 与 Task 不一致");
+    const workspace = { isolated: true, directory: record.directory, branch: record.branch, base: record.base };
+    if (record.state === "merged") {
+      // A crash after the merge but before release leaves an inert worktree; drop it without touching the merge.
+      await workspaceManager.discard(workspace).catch(() => {});
+      return record;
+    }
+
+    const paths = workspacePaths(record, input, task);
+    let pinned;
+    if (record.commit) {
+      // Recovery after a crash between commit and merge: the branch must still be the approved one.
+      pinned = await workspaceManager.commit(workspace, { paths, expectedPaths: paths, message: `project ${record.projectId} v${task.context_version}` });
+      assert.equal(pinned.commit, record.commit, "隔离分支在验收后发生了变化，拒绝合并");
+      assert.equal(pinned.diffHash, record.diffHash, "隔离分支在验收后发生了变化，拒绝合并");
+    } else {
+      pinned = await workspaceManager.commit(workspace, { paths, expectedPaths: paths, message: `project ${record.projectId} v${task.context_version}` });
+      writeWorkspaceRecord(execution.taskId, {
+        state: "committed",
+        commit: pinned.commit,
+        diffHash: pinned.diffHash,
+        paths,
+        manifestSha256: fileHash,
+      });
+    }
+    assert.equal(record.manifestSha256 ?? fileHash, fileHash, "manifest 验收哈希与 workspace 证据不一致");
+
+    let mergeCommit = record.mergeCommit ?? null;
+    if (!(await workspaceManager.isMerged(workspace, pinned.commit))) {
+      const merged = await workspaceManager.finalize(workspace, { merge: true, commit: pinned.commit, diffHash: pinned.diffHash });
+      assert.equal(merged.merged, true, "隔离提交没有合回主仓");
+      mergeCommit = merged.commit;
+    } else if (!mergeCommit) {
+      // The merge already happened before a crash. Only a real merge commit whose second parent is exactly this
+      // pinned commit proves it; the current HEAD is never recorded, and ambiguity keeps the evidence null.
+      mergeCommit = await workspaceManager.mergeCommitFor(pinned.commit);
+    }
+    // The repository check-out is now authoritative: read every merged byte back before settling.
+    for (const step of STEPS) {
+      const artifact = stepRecord(task.id, step.id);
+      assert.ok(artifact?.state === "completed", `合回前缺少已完成步骤：${step.id}`);
+      const file = projectStepPath(projectRoot, input.projectId, task.context_version, step.id);
+      assert.equal(sha256(readStableFile(file)), artifact.sha256, `合回后的步骤 ${step.id} 哈希不一致`);
+    }
+    writeWorkspaceRecord(execution.taskId, { state: "merged", mergeCommit });
+    await workspaceManager.discard(workspace).catch(() => {});
+    return workspaceRecord(execution.taskId);
+  }
+
   function planEntry(task, input, verification) {
     const artifacts = STEPS.map((step) => {
       const record = stepRecord(task.id, step.id);
       assert.ok(record?.state === "completed", `项目计划缺少已完成步骤：${step.id}`);
       return { stepId: step.id, path: record.path, sha256: record.sha256 };
     });
+    const workspace = workspaceRecord(task.id);
     return {
       planVersion: task.context_version,
       action: input.action,
@@ -756,6 +979,15 @@ export function openNativeProjectRuntime({
       manifestPath: projectStepRelativePath(input.projectId, task.context_version, "manifest"),
       manifestSha256: verification?.file_hash ?? null,
       artifacts,
+      workspace: workspace
+        ? {
+          branch: workspace.branch,
+          base: workspace.base,
+          commit: workspace.commit ?? null,
+          diffHash: workspace.diffHash ?? null,
+          mergeCommit: workspace.mergeCommit ?? null,
+        }
+        : null,
       completedAt: now(),
     };
   }
@@ -793,6 +1025,7 @@ export function openNativeProjectRuntime({
     complete,
     trace,
     steps: (taskId) => STEPS.map((step) => stepRecord(taskId, step.id)).filter(Boolean),
+    workspace: (taskId) => workspaceObject(workspaceRecord(taskId)),
     queued,
     projects,
     index: (projectId) => indexOf(projectId),

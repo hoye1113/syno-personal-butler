@@ -69,7 +69,9 @@ test("默认配置逐字段等于当前隔离值", () => {
   assert.equal(config.knowledgeIndexFile, "/Users/hoye/Documents/workspace/syno-p0-real-test/runtime/p2-knowledge-index.json");
   assert.equal(config.knowledgeResultRoot, "/Users/hoye/Documents/workspace/syno-p0-real-test/runtime/p3-knowledge-results");
   assert.equal(config.ideaRoot, "/Users/hoye/Documents/workspace/syno-p0-real-test/runtime/p3-idea-artifacts");
-  assert.equal(config.projectRoot, "/Users/hoye/Documents/workspace/syno-p0-real-test/runtime/p3-project-artifacts");
+  assert.equal(config.projectRoot, "/Users/hoye/Documents/workspace/syno-p0-real-test/vault/04-Projects");
+  assert.equal(config.projectWorktreeRoot, "/Users/hoye/Documents/workspace/syno-p0-real-test/runtime/worktrees");
+  assert.equal(config.legacyProjectRoot, "/Users/hoye/Documents/workspace/syno-p0-real-test/runtime/p3-project-artifacts");
   assert.equal(config.memoryRoot, "/Users/hoye/Documents/workspace/syno-p0-real-test/runtime/p3-memory-artifacts");
   assert.equal(config.stateFile, "/Users/hoye/Documents/workspace/syno-p0-real-test/local/state/feishu-channel.json");
   assert.equal(config.lockFile, "/Users/hoye/Documents/workspace/syno-p0-real-test/runtime/locks/feishu-test-channel.lock");

@@ -7,6 +7,7 @@ export const PROJECT_CONTEXT_PREFIX = "project:";
 export const PROJECT_INDEX_PREFIX = "project-index:";
 export const PROJECT_INPUT_PREFIX = "project-input:";
 export const PROJECT_STEP_PREFIX = "project-step:";
+export const PROJECT_WORKSPACE_PREFIX = "project-workspace:";
 
 /** The only project type the host may execute: a versioned local Markdown brief. */
 export const PROJECT_TYPE = "markdown-brief-v1";
@@ -42,6 +43,10 @@ export const projectContextId = (projectId) => `${PROJECT_CONTEXT_PREFIX}${proje
 export const projectIndexKey = (projectId) => `${PROJECT_INDEX_PREFIX}${projectId}`;
 export const projectInputKey = (taskId) => `${PROJECT_INPUT_PREFIX}${taskId}`;
 export const projectStepKey = (taskId, stepId) => `${PROJECT_STEP_PREFIX}${taskId}:${stepId}`;
+export const projectWorkspaceKey = (taskId) => `${PROJECT_WORKSPACE_PREFIX}${taskId}`;
+
+/** Worktree identity is derived from the Task, never from a project or version, so a retry cannot fork a second one. */
+export const projectWorkspaceTaskId = (taskId) => `syno-project-${sha256(`project-workspace:${taskId}`).slice(0, 32)}`;
 
 export const projectVersionRelative = (projectId, planVersion) => {
   assertProjectId(projectId);

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { promises as fs } from "node:fs";
+import { existsSync, promises as fs } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { createFeishuDocFromAst } from "../../packages/syno-core/feishu-doc-ast.mjs";
@@ -162,6 +162,9 @@ assert.equal(
   config.mode === "isolated-test" ? "拒绝连接非独立测试 App" : "拒绝连接非配置的生产 App",
 );
 const stateStore = new FeishuStateStore({ file: config.stateFile });
+// 项目写任务的隔离与合回要求知识根是 Git 仓。生产固定满足；未初始化 Git 的独立验收环境只能走
+// standalone 直接写入（无可合并提交），启动事件会显式标记，绝不把运行目录伪装成 worktree。
+const projectRepositoryRoot = existsSync(path.join(config.knowledgeRoot, ".git")) ? config.knowledgeRoot : null;
 const butler = openNativeButlerRuntime({
   databasePath: config.databasePath,
   vaultRoot: config.vaultRoot,
@@ -172,6 +175,11 @@ const butler = openNativeButlerRuntime({
   ideaRoot: config.ideaRoot,
   projectRoot: config.projectRoot,
   memoryRoot: config.memoryRoot,
+  // Real project writes go through TaskWorkspaceManager on the knowledge repository; the old runtime artifact
+  // directory is no longer a valid final write target and is only read as a frozen revision input.
+  repoRoot: projectRepositoryRoot,
+  legacyProjectRoot: config.legacyProjectRoot,
+  ...(projectRepositoryRoot ? { worktreeRoot: config.projectWorktreeRoot } : {}),
 });
 const native = butler.specialist("capture");
 const knowledge = butler.specialist("knowledge");
@@ -187,6 +195,12 @@ const knowledgeStore = new KnowledgeStore(knowledgeOptions);
 const hostStatusFile = config.hostStatusFile;
 const writeJson = (file, value, flag = "w") => fs.writeFile(file, JSON.stringify(value, null, 2), { mode: 0o600, flag });
 const appendCaptureEvent = (value) => fs.appendFile(captureEvents, `${JSON.stringify(value)}\n`, { mode: 0o600 });
+await appendCaptureEvent({
+  status: projectRepositoryRoot ? "project-workspace-isolated" : "project-workspace-standalone",
+  projectRoot: config.projectRoot,
+  knowledgeRoot: config.knowledgeRoot,
+  at: new Date().toISOString(),
+});
 // Stop-managed timers for isolated delivery backoff. Cleared on shutdown so no re-entry outlives this Host.
 const deliveryTimers = new Set();
 // One-shot fault-injection guards: an armed environment variable must never re-arm within one process.
@@ -673,13 +687,14 @@ const ideaFromFeishu = async (message, routed) => {
   return finishIdea(message, execution);
 };
 
-const applyProjectEvidence = (execution, artifact) => {
+const applyProjectEvidence = async (execution, artifact) => {
   project.writeStep(execution, "outline", artifact.outline);
   project.completeStep(execution, "outline");
   project.writeStep(execution, "deliverable", artifact.deliverable);
   project.completeStep(execution, "deliverable");
   project.writeManifest(execution);
   project.completeStep(execution, "manifest");
+  // Isolated writes commit, pin, merge and only then settle; standalone runtimes settle synchronously.
   return project.complete(execution);
 };
 
@@ -693,6 +708,11 @@ const finishProject = async (message, execution) => {
   const evidencePath = `${base}-evidence.json`;
   const attemptPath = `${base}-attempt.json`;
   const requestPath = `${base}-request.json`;
+  // Candidates live in the Task's isolated worktree until Result Lane merges them; `projectRoot` stays the merged
+  // repository location used for reading delivered artifacts. A frozen previous version may live in the legacy root,
+  // so the Worker reads it through a separate read-only root instead of this Task's candidate write root.
+  const writeRoot = execution.writeRoot ?? projectRoot;
+  const previousRoot = execution.frozen?.root ?? writeRoot;
   let evidence = await readJson(evidencePath);
   let trace = project.trace(execution.taskId);
 
@@ -735,7 +755,7 @@ const finishProject = async (message, execution) => {
         assert.equal(evidence.project.taskId, execution.taskId, "既有项目证据 Task 不匹配");
         assert.equal(evidence.project.attemptId, execution.attemptId, "既有项目证据 Attempt 不匹配");
         assert.equal(evidence.project.planVersion, execution.planVersion, "既有项目证据计划版本不匹配");
-        trace = applyProjectEvidence(execution, evidence.project);
+        trace = await applyProjectEvidence(execution, evidence.project);
         await appendCaptureEvent({ messageId: message.id, status: "project-recovered-evidence-without-model-replay", trace, at: new Date().toISOString() });
         return deliver();
       } catch (error) {
@@ -744,7 +764,7 @@ const finishProject = async (message, execution) => {
       }
     }
     try {
-      trace = project.complete(execution);
+      trace = await project.complete(execution);
       await appendCaptureEvent({ messageId: message.id, status: "project-recovered-artifacts-without-model-replay", trace, at: new Date().toISOString() });
       return deliver();
     } catch (error) {
@@ -770,13 +790,14 @@ const finishProject = async (message, execution) => {
   await writeJson(requestPath, request, "wx");
   try {
     if (request.previous) {
-      const frozen = readFrozenPrevious(request, projectRoot);
+      const frozen = readFrozenPrevious(request, previousRoot);
       assert.equal(frozen.manifestSha256, request.previous.manifestSha256, "调用 Worker 前冻结 manifest 已变化");
     }
     const { stdout } = await execFileAsync(process.execPath, [
       config.workerPath,
       "--project-request", requestPath,
-      "--project-root", projectRoot,
+      "--project-root", writeRoot,
+      "--previous-root", previousRoot,
       "--evidence", evidencePath,
       "--worker", execution.worker,
       "--receipt", "Native Runtime delivery pending after Result Lane; at_least_once; delivery is not read receipt",
@@ -791,7 +812,7 @@ const finishProject = async (message, execution) => {
     assert.equal(evidence.project?.resultLane, "delegated_to_host", "真实 Worker 探针不得冒充 Result Lane");
     // Isolated fault injection: the evidence exists but the host has not written project artifacts yet.
     if (process.env.SYNO_P3_PROJECT_TEST_CRASH_AFTER_WORKER === "1") process.exit(93);
-    trace = applyProjectEvidence(execution, evidence.project);
+    trace = await applyProjectEvidence(execution, evidence.project);
     await appendCaptureEvent({
       messageId: message.id,
       status: "project-result-lane-passed",
@@ -813,7 +834,7 @@ const finishProject = async (message, execution) => {
 const projectFromFeishu = async (message, routed) => {
   let execution;
   try {
-    execution = project.begin({
+    execution = await project.begin({
       appId: config.appId,
       messageId: message.id,
       chatId: message.chatId,
@@ -1651,7 +1672,7 @@ const selectionFailureText = (outcome) => {
 const selectFromFeishu = async (message, routed) => {
   let outcome;
   try {
-    outcome = butler.selectRoute({
+    outcome = await butler.selectRoute({
       appId: config.appId, messageId: message.id, chatId: message.chatId,
       ownerId: message.senderId, worker: message.worker,
     }, { decisionId: routed.decisionId, candidateId: routed.candidateId });

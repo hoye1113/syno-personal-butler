@@ -111,7 +111,12 @@ const derive = (base) => {
     knowledgeIndexFile: path.join(base.runtimeRoot, "p2-knowledge-index.json"),
     knowledgeResultRoot: path.join(base.runtimeRoot, "p3-knowledge-results"),
     ideaRoot: path.join(base.runtimeRoot, "p3-idea-artifacts"),
-    projectRoot: path.join(base.runtimeRoot, "p3-project-artifacts"),
+    // 项目产物是知识写任务：候选在 TaskWorkspaceManager 隔离 worktree 生成，验收后按 pinned commit 合回知识仓，
+    // 所以最终根必须在 vault 内，而不是运行目录（D10 只允许产品提交 vault/** 与 ops/**）。
+    projectRoot: path.join(base.knowledgeRoot, "vault", "04-Projects"),
+    projectWorktreeRoot: path.join(base.runtimeRoot, "worktrees"),
+    // 旧版 standalone 运行目录只作冻结修订输入：不迁移、不覆盖，新版候选仍写入隔离 worktree 后合回 vault。
+    legacyProjectRoot: path.join(base.runtimeRoot, "p3-project-artifacts"),
     memoryRoot: path.join(base.runtimeRoot, "p3-memory-artifacts"),
     stateFile,
     lockFile,
