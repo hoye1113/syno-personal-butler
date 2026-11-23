@@ -76,12 +76,14 @@ function printHelp() {
   node ... summarize --url <YouTube URL> [--proxy URL]
   node ... follow <编号|itemId> [--note 文本]
   node ... ignore <编号|itemId> [--note 文本]
+  node ... add-x --user-id <数字ID> [--username handle] [--name 显示名] [--id 信源ID]
 
 环境：
   P5_RADAR_HOME   数据目录（默认 <repo>/.local-data/p5-radar）
   P5_RADAR_CONFIG 数据目录配置文件（默认 <P5_RADAR_HOME>/config.json；可含 proxy/youtube/maxYoutube）
   P5_PROXY        采集代理（优先；缺省读 config.json.proxy，再读 HTTPS_PROXY/HTTP_PROXY）
   P5_YTDLP        yt-dlp 路径（默认 yt-dlp）
+  P5_X_BEARER_TOKEN  X API v2 只读 Bearer Token；仅 kind=x 信源使用，默认未启用，不写入数据库/日志
   P5_FEISHU_WEBHOOK 可选，飞书自定义机器人 webhook
 `);
 }
@@ -339,6 +341,52 @@ function mark(args, state) {
   }
 }
 
+/**
+ * Add one read-only X account to the SQLite under P5_RADAR_HOME.
+ * Never accepts or prints the bearer token; only userId/username are stored.
+ */
+function addXAccount(args) {
+  const userId = typeof args["user-id"] === "string" ? args["user-id"].trim() : "";
+  if (!/^\d{1,25}$/u.test(userId)) {
+    console.error("需要 --user-id <数字用户 ID>");
+    process.exitCode = 2;
+    return;
+  }
+  const username = typeof args.username === "string" ? args.username.trim().replace(/^@/u, "") : "";
+  const sourceId = typeof args.id === "string" && args.id.trim() ? args.id.trim() : `x-${userId}`;
+  const name = typeof args.name === "string" && args.name.trim()
+    ? args.name.trim()
+    : username ? `X · @${username}` : `X · ${userId}`;
+  const store = openRadar();
+  try {
+    if (store.getSource(sourceId)) {
+      console.error(`信源 ${sourceId} 已存在，未变更（重复 ID 不覆盖）。`);
+      process.exitCode = 1;
+      return;
+    }
+    store.seedSources([{
+      id: sourceId,
+      name,
+      kind: "x",
+      url: "",
+      tier: "T1.5",
+      weight: 0.9,
+      config: username ? { userId, username } : { userId },
+    }]);
+    const saved = store.getSource(sourceId);
+    if (!saved || saved.kind !== "x") {
+      console.error(`写入信源 ${sourceId} 失败。`);
+      process.exitCode = 1;
+      return;
+    }
+    console.log(`已添加 X 只读信源 ${sourceId}（userId=${userId}${username ? `, username=@${username}` : ""}）。`);
+    console.log(`数据库：${dbFile}`);
+    console.log("Bearer Token 仅从 P5_X_BEARER_TOKEN 读取，未写入数据库；默认信源未启用 X。");
+  } finally {
+    store.close();
+  }
+}
+
 const args = parseArgs(process.argv.slice(2));
 const command = args._[0] ?? "help";
 
@@ -367,6 +415,8 @@ if (command === "help" || command === "--help" || args.help) {
   mark(args, "followed");
 } else if (command === "ignore") {
   mark(args, "ignored");
+} else if (command === "add-x") {
+  addXAccount(args);
 } else {
   console.error(`未知命令：${command}`);
   printHelp();

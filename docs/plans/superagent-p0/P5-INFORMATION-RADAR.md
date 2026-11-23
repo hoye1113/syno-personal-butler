@@ -7,7 +7,7 @@
 
 给管家增加一个“个人 Agent 技术雷达”：
 
-- 从 AIHOT、公开 RSS、YouTube 频道采集资讯。
+- 从 AIHOT、公开 RSS、YouTube 频道及显式配置的 X 账号采集资讯。
 - 按主人的兴趣画像做预筛、去重、评分。
 - 只生成**本地静默候选**，不自动写 vault、不创建 Task、不推送外部。
 - 每天生成一份飞书摘要（首版先写本地文件，发送可选）。
@@ -17,7 +17,7 @@
 
 - 不 fork AIHOT 的 PostgreSQL/React/Docker 整套栈。
 - 不做公开站点、公开 RSS、公开 API。
-- 不直接抓 X 时间线；首版用 AIHOT 的 X 条目做 discovery，直连 X 放到 P5.1。
+- X 只通过显式配置的官方 API v2 只读时间线接入；不使用浏览器绕过、不调用任何写接口。
 - 不自动发布、不自动创建知识笔记、不自动关注/转发。
 - 不替代现有 Host 的飞书消费者。
 
@@ -42,9 +42,9 @@
 - Latent Space：`@LatentSpacePod`
 - Google DeepMind：`@GoogleDeepMind`
 
-### X（首版不做直连）
-- 已实机核查的首批：`@karpathy`、`@simonw`、`@omarsar0`、`@seekjourney`、`@openclaw`、`@hwchase17`、`@Khazix0918`、`@thinkymachines`、`@arena`；`@vista8` 可选，`@rohanpaul_ai` 只做 discovery。
-- 首版通过 AIHOT feed 间接覆盖；P5.1 再评估 X API / 浏览器采集。
+### X（P5.1 可选只读直连）
+- 首版通过 AIHOT feed 间接覆盖；现支持显式添加账号并读取官方 API v2 用户帖子时间线。
+- 默认信源不含 X 账号；未配置账号和 Bearer Token 时不会请求 X。
 
 ## 4. 流水线
 
@@ -130,6 +130,14 @@
 - 文档创建复用生产 Wiki 发布目标和现有飞书 App 凭据；不新建机器人。
 - P5 已可走 `syno.p5-radar/1` 插件：插件返回中性 AST，Host 负责飞书 docx；当前 active 版本为 `2026.11.22.7`，已覆盖 `collect`/`feedback`/`status`/`preference`，默认每日展示 50 条：25 条为你优先、8 条圈外探索、17 条其余条目；未展示条目保留在库中，失败自动回退旧 P5 CLI。
 
+## 7.4 X 只读时间线（P5.1）
+
+- 在独立数据目录显式添加账号：`node experiments/superagent-p0/p5-radar.mjs add-x --user-id <数字ID> [--username handle] [--name 显示名] [--id 信源ID]`；只写 `$P5_RADAR_HOME/p5-radar.db`，重复信源 ID 会失败且不覆盖。
+- 采集时仅从进程环境 `P5_X_BEARER_TOKEN` 读取 Bearer Token，请求 `GET https://api.x.com/2/users/:id/tweets`，参数为 `max_results=5..100`（默认 20）和 `tweet.fields=created_at,lang`。
+- 认证头通过 curl stdin 配置通道传入，不进入子进程 argv；token 不写入 source config、SQLite、日志或仓库。传输错误会脱敏，缺少 token 只让对应 X 信源失败。
+- 帖子沿用现有采集、去重、评分和日报链；`kind="post"`，正文来自 API，不调用发帖、评论、点赞、关注等写接口。
+- 本轮仅以本地 fixture、假 curl 和临时 SQLite 做离线验收；未实时核验官方文档、未连接真实 X、未启用生产账号。真实 API 权限/额度与生产启用需另行授权和验收。
+
 ## 8. 验收标准
 
 1. `run --once` 能拉取 AIHOT + 7 RSS，生成候选；重复运行不重复入库。
@@ -148,5 +156,5 @@
 - **P5.0c（已上线）**：Host 通道接入。`root-router` 增加 `radar` 域；P3 Host 内置 07:30 采集、08:00 日报，通过现有飞书 adapter 发到已绑定 Owner；`跟进 N`／`忽略 N` 走同一 router 调 P5 worker，不另起机器人。
 - **P5.0d（已实现）**：飞书文档输出。08:00 将最近 7 天全部条目（不再按画像过滤）按发布时间倒序写入按日期命名的 Wiki 文档；标题和源摘要统一中文，列出发布时间；飞书只发短链接。
 - **P5.0e（已实现）**：YouTube 每日采集；视频全部出现在清单中并显示发布时间；每日文档自动抓取带时间戳字幕并生成中文摘要，无字幕时回退到网页/源简介。访谈说话人 diarization 暂不做。
-- **P5.1**：X 直连（API/浏览器）、事件聚簇、周报。
+- **P5.1（X 只读直连已离线实现）**：官方 API v2 用户帖子时间线适配器与显式账号 CLI；仅 mock 验收，未连接真实 X 或启用生产。事件聚簇、周报仍未实现。
 - **P5.2**：反馈校准、两次评分。

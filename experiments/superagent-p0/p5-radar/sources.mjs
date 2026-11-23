@@ -1,8 +1,11 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const USER_AGENT = "syno-p5-radar/0.1 (+personal research)";
+const X_API_BASE = "https://api.x.com/2/users";
+const X_TOKEN_ENV = "P5_X_BEARER_TOKEN";
+const X_DEFAULT_MAX_RESULTS = 20;
 
 export const DEFAULT_SOURCES = Object.freeze([
   {
@@ -102,12 +105,84 @@ export function resolveProxy(env = process.env) {
   return env.P5_PROXY || env.HTTPS_PROXY || env.HTTP_PROXY || "";
 }
 
-export async function curlText(url, { proxy = "", timeout = 30, maxBuffer = 20 * 1024 * 1024 } = {}) {
+function curlArgs(url, { proxy = "", timeout = 30 } = {}) {
   const args = ["-sSL", "--compressed", "--max-time", String(timeout), "-A", USER_AGENT];
   if (proxy) args.push("-x", proxy);
-  args.push(url);
-  const { stdout } = await execFileAsync("curl", args, { maxBuffer });
-  return stdout;
+  return args;
+}
+
+function escapeCurlConfig(value) {
+  return String(value).replace(/\\/gu, "\\\\").replace(/"/gu, "\\\"");
+}
+
+function spawnCurl(args, { input = "", maxBuffer = 20 * 1024 * 1024, spawnImpl = spawn } = {}) {
+  return new Promise((resolve, reject) => {
+    let child;
+    try {
+      child = spawnImpl("curl", args, { stdio: ["pipe", "pipe", "pipe"] });
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      if (settled) return;
+      stdout += chunk;
+      if (stdout.length > maxBuffer) {
+        fail(new Error("curl 输出超过上限"));
+        child.kill?.();
+      }
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr = `${stderr}${chunk}`.slice(-2000);
+    });
+    child.on("error", (error) => fail(error));
+    child.on("close", (code) => {
+      if (settled) return;
+      if (code !== 0) {
+        const detail = stderr.trim();
+        fail(new Error(`curl 退出码 ${code}${detail ? `：${detail}` : ""}`.slice(0, 1000)));
+        return;
+      }
+      settled = true;
+      resolve(stdout);
+    });
+    child.stdin.on("error", () => {});
+    child.stdin.end(input);
+  });
+}
+
+/**
+ * curlText keeps the existing proxy/timeout behaviour. When headers are given
+ * they are handed to curl through a `--config -` stdin channel so credentials
+ * never enter the child process argv (visible with `ps`).
+ */
+export async function curlText(url, {
+  proxy = "",
+  timeout = 30,
+  maxBuffer = 20 * 1024 * 1024,
+  headers = [],
+  spawnImpl = spawn,
+} = {}) {
+  const args = curlArgs(url, { proxy, timeout });
+  const headerLines = (Array.isArray(headers) ? headers : []).map((line) => String(line)).filter(Boolean);
+  if (!headerLines.length) {
+    args.push(url);
+    const { stdout } = await execFileAsync("curl", args, { maxBuffer });
+    return stdout;
+  }
+  const config = `${headerLines.map((line) => `header = "${escapeCurlConfig(line)}"`).join("\n")}\n`;
+  args.push("--config", "-", url);
+  return spawnCurl(args, { input: config, maxBuffer, spawnImpl });
 }
 
 export async function curlJson(url, options = {}) {
@@ -282,12 +357,116 @@ export async function fetchYouTube(source, { proxy = "" } = {}) {
   return { channelId, items };
 }
 
-export async function fetchSource(source, { proxy = "" } = {}) {
+export function readXBearerToken(env = process.env) {
+  const token = String(env?.[X_TOKEN_ENV] ?? "").trim();
+  if (!token) throw new Error(`未配置 ${X_TOKEN_ENV}，X 信源未启用`);
+  // RFC 6750 b64token. Rejecting anything else also rules out curl config injection.
+  if (!/^[A-Za-z0-9\-._~+/]+=*$/u.test(token)) throw new Error(`${X_TOKEN_ENV} 格式无效`);
+  return token;
+}
+
+export function resolveXUserId(source = {}) {
+  const userId = String(source.config?.userId ?? "").trim();
+  if (!/^\d{1,25}$/u.test(userId)) throw new Error("X 信源缺少有效的数字 userId");
+  return userId;
+}
+
+export function resolveXMaxResults(config = {}) {
+  const raw = config?.maxResults;
+  if (raw === undefined || raw === null || raw === "") return X_DEFAULT_MAX_RESULTS;
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 5 || value > 100) {
+    throw new Error("X maxResults 必须是 5–100 的整数");
+  }
+  return value;
+}
+
+export function xPostUrl(tweetId, username = "") {
+  const handle = String(username ?? "").trim().replace(/^@/u, "");
+  return /^[A-Za-z0-9_]{1,15}$/u.test(handle)
+    ? `https://x.com/${handle}/status/${tweetId}`
+    : `https://x.com/i/web/status/${tweetId}`;
+}
+
+export function parseXTimeline(payload, { source = {} } = {}) {
+  const data = payload?.data;
+  if (data !== undefined && !Array.isArray(data)) throw new Error("X API 响应格式异常");
+  if (!Array.isArray(data)) {
+    if (Number(payload?.meta?.result_count) === 0) return [];
+    const detail = String(payload?.detail || payload?.title || payload?.errors?.[0]?.detail || "").trim();
+    throw new Error(`X API 返回错误${detail ? `：${detail}` : ""}`.slice(0, 300));
+  }
+  const config = source.config ?? {};
+  const userId = String(config.userId ?? "").trim();
+  const username = String(config.username ?? "").trim().replace(/^@/u, "");
+  const author = username || userId;
+  return data.map((tweet) => {
+    const id = String(tweet?.id ?? "").trim();
+    const text = String(tweet?.text ?? "").replace(/\r\n/gu, "\n").trim();
+    if (!/^\d{1,25}$/u.test(id) || !text) return null;
+    const lang = tweet.lang ? String(tweet.lang) : null;
+    return {
+      externalId: id,
+      title: text.replace(/\s+/gu, " ").slice(0, 120),
+      url: xPostUrl(id, username),
+      summary: text.slice(0, 1600),
+      publishedAt: isoDate(tweet.created_at),
+      lang,
+      kind: "post",
+      author,
+      categories: ["x"],
+      raw: {
+        platform: "x",
+        tweetId: id,
+        authorId: userId || null,
+        authorName: username || null,
+        lang,
+        conversationId: tweet.conversation_id ? String(tweet.conversation_id) : null,
+      },
+    };
+  }).filter(Boolean);
+}
+
+export async function fetchX(source, {
+  proxy = "",
+  env = process.env,
+  curlTextImpl = curlText,
+  spawnImpl = spawn,
+} = {}) {
+  const token = readXBearerToken(env);
+  try {
+    const userId = resolveXUserId(source);
+    const maxResults = resolveXMaxResults(source.config ?? {});
+    const endpoint = new URL(`${X_API_BASE}/${encodeURIComponent(userId)}/tweets`);
+    endpoint.searchParams.set("max_results", String(maxResults));
+    endpoint.searchParams.set("tweet.fields", "created_at,lang");
+    const text = await curlTextImpl(endpoint.toString(), {
+      proxy,
+      headers: [`Authorization: Bearer ${token}`],
+      spawnImpl,
+    });
+    let payload;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      throw new Error("X API 响应不是合法 JSON");
+    }
+    return { items: parseXTimeline(payload, { source }) };
+  } catch (error) {
+    // Defence in depth: never let a transport error echo the bearer token.
+    const message = String(error?.message || error).split(token).join("[redacted]").slice(0, 500);
+    throw new Error(message);
+  }
+}
+
+export async function fetchSource(source, options = {}) {
+  const { proxy = "" } = options;
   if (source.kind === "aihot") return { items: await fetchAihot(source, { proxy }) };
   if (source.kind === "rss") {
     const xml = await curlText(source.url, { proxy });
     return { items: parseFeed(xml, { source }) };
   }
   if (source.kind === "youtube") return fetchYouTube(source, { proxy });
+  if (source.kind === "x") return fetchX(source, options);
   throw new Error(`未知信源类型：${source.kind}`);
 }
