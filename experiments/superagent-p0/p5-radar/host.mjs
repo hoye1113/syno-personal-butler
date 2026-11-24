@@ -79,7 +79,7 @@ export function createP5HostRunner({
 }
 
 /**
- * Host-owned daily scheduler. Collection at 07:30 and digest at 08:00 China time,
+ * Host-owned daily scheduler. Collection at 09:30 and digest at 10:00 China time,
  * with durable same-day idempotency and bounded retry state.
  */
 export function createP5Scheduler({
@@ -89,8 +89,8 @@ export function createP5Scheduler({
   stateFile,
   now = () => new Date(),
   timeZone = CHINA_TZ,
-  collectMinute = 7 * 60 + 30,
-  digestMinute = 8 * 60,
+  collectMinute = 9 * 60 + 30,
+  digestMinute = 10 * 60,
   tickMs = 60_000,
   logger = () => {},
   setTimeoutImpl = setTimeout,

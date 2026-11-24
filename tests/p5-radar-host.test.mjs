@@ -105,12 +105,12 @@ test("daily document blocks use Chinese headings and per-article sections", () =
   assert.match(text, /跟进 1/);
 });
 
-test("P5 scheduler collects at 07:30, sends digest at 08:00, and is same-day idempotent", async (t) => {
+test("P5 scheduler collects at 09:30, sends digest at 10:00, and is same-day idempotent", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "p5-host-scheduler-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const calls = [];
   const deliveries = [];
-  let current = new Date("2026-11-21T07:29:00+08:00");
+  let current = new Date("2026-11-21T09:29:00+08:00");
   const runner = {
     async collect() { calls.push("collect"); },
     async digest() { calls.push("digest"); return "# P5 日报\n\n1. Test"; },
@@ -126,10 +126,10 @@ test("P5 scheduler collects at 07:30, sends digest at 08:00, and is same-day ide
   });
   await scheduler.tick();
   assert.deepEqual(calls, []);
-  current = new Date("2026-11-21T07:30:00+08:00");
+  current = new Date("2026-11-21T09:30:00+08:00");
   await scheduler.tick();
   assert.deepEqual(calls, ["collect"]);
-  current = new Date("2026-11-21T08:00:00+08:00");
+  current = new Date("2026-11-21T10:00:00+08:00");
   await scheduler.tick();
   assert.deepEqual(calls, ["collect", "digest"]);
   assert.equal(deliveries.length, 1);
@@ -137,7 +137,7 @@ test("P5 scheduler collects at 07:30, sends digest at 08:00, and is same-day ide
   assert.match(deliveries[0].text, /P5 日报/);
   await scheduler.tick();
   assert.equal(deliveries.length, 1);
-  current = new Date("2026-11-22T07:30:00+08:00");
+  current = new Date("2026-11-22T09:30:00+08:00");
   await scheduler.tick();
   assert.deepEqual(calls, ["collect", "digest", "collect"]);
   scheduler.stop();
@@ -147,7 +147,7 @@ test("P5 scheduler sends the short daily-doc link instead of the full digest whe
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "p5-host-doc-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const deliveries = [];
-  const current = new Date("2026-11-21T08:00:00+08:00");
+  const current = new Date("2026-11-21T10:00:00+08:00");
   const scheduler = createP5Scheduler({
     runner: {
       async collect() {},
@@ -171,7 +171,7 @@ test("P5 scheduler waits for a bound chat and retries after a failed send", asyn
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "p5-host-retry-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   let chat = null;
-  let current = new Date("2026-11-21T08:00:00+08:00");
+  let current = new Date("2026-11-21T10:00:00+08:00");
   let sends = 0;
   const scheduler = createP5Scheduler({
     runner: {
@@ -190,7 +190,7 @@ test("P5 scheduler waits for a bound chat and retries after a failed send", asyn
   chat = { chatId: "oc_owner" };
   await scheduler.tick();
   assert.equal(sends, 0, "failed/no-chat attempt sets a retry window");
-  current = new Date("2026-11-21T08:11:00+08:00");
+  current = new Date("2026-11-21T10:11:00+08:00");
   await scheduler.tick();
   assert.equal(sends, 1);
   scheduler.stop();
