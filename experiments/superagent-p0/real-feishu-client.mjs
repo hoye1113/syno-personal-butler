@@ -9,6 +9,9 @@ import { createFeishuDocFromAst } from "../../packages/syno-core/feishu-doc-ast.
 import { runActivePlugin } from "../../packages/syno-core/plugin-runner.mjs";
 import { RADAR_HELP } from "./p5-radar/command.mjs";
 import { createP5HostRunner, createP5Scheduler } from "./p5-radar/host.mjs";
+import { publishRadarSiteDigest } from "./p5-radar/site-digest.mjs";
+import { createRadarSiteStore } from "./p5-radar/site-store.mjs";
+import { applyRadarFeedback, prepareRadarCaptureSource, resolveRadarCandidates } from "./p5-radar/follow.mjs";
 import { executePluginCommand } from "./plugin-control.mjs";
 import { resolveRealFeishuConfig } from "./real-feishu-config.mjs";
 
@@ -53,6 +56,11 @@ const p5PluginDailyDoc = async () => {
   const configured = Number(settings.maxItems);
   const maxItems = Number.isSafeInteger(configured) && configured >= 10 && configured <= 200 ? configured : 50;
   const ast = await p5PluginAction("renderDailyDoc", { windowDays: 7, maxItems });
+  const siteOrigin = String(process.env.P5_RADAR_SITE_ORIGIN || "").trim();
+  if (siteOrigin) {
+    const published = await publishRadarSiteDigest({ home: p5Home, publicOrigin: siteOrigin, ast });
+    return published.message;
+  }
   const doc = await createFeishuDocFromAst({
     ast,
     configPath: path.resolve(import.meta.dirname, "../../config/knowledge-publishing.json"),
@@ -91,6 +99,7 @@ const p5DailyDoc = async () => {
     return await p5PluginDailyDoc();
   } catch (error) {
     console.log(JSON.stringify({ event: "p5-plugin-daily-doc-fallback", error: String(error?.message || error).slice(0, 300) }));
+    if (String(process.env.P5_RADAR_SITE_ORIGIN || "").trim()) throw error;
     return p5Runner.dailyDoc();
   }
 };
@@ -107,13 +116,6 @@ const p5Status = async () => {
     return await p5PluginAction("status", {});
   } catch {
     return p5Runner.status();
-  }
-};
-const p5Feedback = async (action, numbers) => {
-  try {
-    return await p5PluginAction("feedback", { action, numbers });
-  } catch {
-    return p5Runner.mark(action, numbers);
   }
 };
 const p5Preference = async (text) => {
@@ -235,7 +237,7 @@ const readJson = async (file) => {
 };
 const readChat = () => readJson(chatFile);
 
-const radarFromFeishu = async (command) => {
+const radarFromFeishu = async (command, message) => {
   if (command.action === "help") return { text: RADAR_HELP };
   if (!command.numbers?.length && ["follow", "ignore"].includes(command.action)) {
     return { text: "请提供候选编号，例如：跟进 1、4；忽略 8、9。" };
@@ -251,8 +253,20 @@ const radarFromFeishu = async (command) => {
       return { text: `每日雷达展示条数已设为 ${command.maxItems}。` };
     }
     if (command.action === "preference") return { text: await p5Preference(command.text) };
-    const outputs = await p5Feedback(command.action, command.numbers);
-    return { text: Array.isArray(outputs) ? outputs.join("\n") : String(outputs) };
+    if (command.action === "follow") return { text: await followRadarItems(message, command) };
+    const items = await resolveRadarCommandItems(command);
+    const outputs = [];
+    for (const item of items) {
+      const result = await applyRadarFeedback({ home: p5Home, itemId: item.itemId, action: "ignore" });
+      const site = createRadarSiteStore({ home: p5Home });
+      const existing = await site.follow(item.itemId);
+      await site.setFollow(item.itemId, {
+        ...(existing || {}), status: existing?.taskId ? existing.status : "ignored", ignoredAt: new Date().toISOString(),
+        itemId: item.itemId, date: item.date, index: item.index,
+      });
+      outputs.push(`已忽略 ${item.date} 第 ${item.index} 条（item ${result.itemId}），已降低相关主题或信源权重。`);
+    }
+    return { text: outputs.join("\n") };
   } catch (error) {
     return { text: `雷达操作失败：${String(error?.message || error).slice(0, 500)}` };
   }
@@ -283,7 +297,7 @@ const successText = async (trace, evidence = null) => {
   const elapsed = evidence?.workerModelPath?.elapsedMs ?? "未知（崩溃恢复）";
   const cost = typeof evidence?.costUsd === "number" ? `${evidence.costUsd} USD（CLI 回报）` : "未返回（OpenCode Go 订阅）";
   return [
-    "公开文章收录完成（原生 Runtime；已核验公开快照，非现场联网抓取）。",
+    "公开文章收录完成（原生 Runtime；已核验冻结公开快照）。",
     "Result Lane：passed；通知前重读：passed",
     "Worker／模型：OpenCode／opencode-go/deepseek-v4.1-flash",
     `Event／Run：${trace.eventId}／${trace.nativeRunId}`,
@@ -389,7 +403,7 @@ const projectSuccessText = async (trace, evidence) => {
 };
 
 
-const captureFromFeishu = async (message) => {
+const captureFromFeishu = async (message, native = butler.specialist("capture"), source = { sourcePath: config.sourcePath, sourceUrl: config.sourceUrl, sourceMaterial: "verified-public-browser-snapshot" }) => {
   let execution;
   try {
     execution = native.begin({
@@ -418,7 +432,7 @@ const captureFromFeishu = async (message) => {
     }
     const text = await successText(trace, evidence);
     try {
-      const delivery = await adapter.send({ chatId: message.chatId, text, replyTo: message.id, deliveryKey: trace.deliveryKey });
+      const delivery = await adapter.send({ chatId: message.chatId, text, replyTo: message.replyTo ?? message.id, deliveryKey: trace.deliveryKey });
       if (!delivery?.delivered) throw new Error(`飞书回复未送达：${delivery?.reason || "unknown"}`);
       native.accept(trace.deliveryKey);
       trace = native.trace(execution.taskId);
@@ -462,8 +476,8 @@ const captureFromFeishu = async (message) => {
       attemptId: execution.attemptId,
       nativeRunId: execution.runId,
       nativeRunAttempt: execution.runAttempt,
-      sourceUrl: config.sourceUrl,
-      sourceMaterial: "verified-public-browser-snapshot",
+      sourceUrl: source.sourceUrl,
+      sourceMaterial: source.sourceMaterial,
       worker: "OpenCode",
       model: "opencode-go/deepseek-v4.1-flash",
       startedAt: new Date().toISOString(),
@@ -473,7 +487,9 @@ const captureFromFeishu = async (message) => {
     if (!evidence) {
       const { stdout } = await execFileAsync(process.execPath, [
         config.workerPath,
-        "--capture", config.sourcePath,
+        "--capture", source.sourcePath,
+        "--source-url", source.sourceUrl,
+        "--source-material", source.sourceMaterial,
         "--message-id", message.id,
         "--task-id", execution.taskId,
         "--attempt-id", execution.attemptId,
@@ -956,13 +972,118 @@ const knowledgeFromFeishu = async (message, routed, candidates) => {
   }
 };
 
+async function resolveRadarCommandItems(command) {
+  let date = command.date;
+  if (!date) {
+    const names = (await fs.readdir(p5Home)).filter((name) => /^digest-\d{4}-\d{2}-\d{2}\.json$/u.test(name)).sort();
+    if (!names.length) throw new Error("还没有可操作的日报");
+    date = names.at(-1).slice(7, 17);
+  }
+  return resolveRadarCandidates({ home: p5Home, date, numbers: command.numbers });
+}
+
+function radarFollowText(status, item, taskId) {
+  const prefix = `${item.date} 第 ${item.index} 条`;
+  if (status === "captured") return `${prefix}已收录，Task ${taskId} 已通过 Result Lane。`;
+  if (status === "running") return `${prefix}正在收录，Task ${taskId} 已存在，不重复创建。`;
+  if (status === "failed") return `${prefix}的收录执行未取得回执，Task ${taskId} 保持待对账，不自动重跑。`;
+  return `${prefix}真实收录 Task：${taskId}；状态：待收录。系统按 itemId 复用任务，完成后另行通知。`;
+}
+
+async function followRadarItems(message, command) {
+  const items = await resolveRadarCommandItems(command);
+  if (items.length !== 1) return "真实收录每次只创建一条 Task，请分别发送「跟进 日期 编号」。";
+  const item = items[0];
+  const site = createRadarSiteStore({ home: p5Home });
+  const existing = await site.follow(item.itemId);
+  if (existing?.taskId && ["pending", "running", "captured", "failed"].includes(existing.status)) {
+    return radarFollowText(existing.status, item, existing.taskId);
+  }
+  const source = await prepareRadarCaptureSource({ home: p5Home, itemId: item.itemId, proxy: process.env.P5_PROXY || "" });
+  const capture = butler.captureSource(source);
+  const messageId = `radar${item.itemId}`;
+  const execution = capture.begin({
+    appId: config.appId, messageId, chatId: message.chatId, ownerId: message.senderId, worker: message.worker,
+  });
+  const follow = {
+    status: "pending", itemId: item.itemId, date: item.date, index: item.index, title: item.titleZh || item.title,
+    taskId: execution.taskId, messageId, sourcePath: source.sourcePath, sourceUrl: source.sourceUrl, sourceMaterial: source.sourceMaterial,
+    chatId: message.chatId, ownerId: message.senderId, worker: message.worker, replyTo: message.id,
+  };
+  await site.setFollow(item.itemId, follow);
+  await applyRadarFeedback({ home: p5Home, itemId: item.itemId, action: "follow" });
+  trackCapture(executeRadarFollow(follow).catch(async (error) => {
+    await site.setFollow(item.itemId, { ...follow, status: "failed", error: String(error.message || error).slice(0, 500) });
+    await notifyRadarFollowFailure(follow, error);
+    await appendCaptureEvent({ messageId, status: "background-radar-follow-failed", error: String(error.message || error).slice(0, 300), at: new Date().toISOString() });
+  }));
+  return radarFollowText("pending", item, execution.taskId);
+}
+
+async function executeRadarFollow(follow) {
+  const site = createRadarSiteStore({ home: p5Home });
+  const source = { sourcePath: follow.sourcePath, sourceUrl: follow.sourceUrl, sourceMaterial: follow.sourceMaterial || "verified-public-radar-snapshot" };
+  const capture = butler.captureSource(source);
+  const followMessage = {
+    id: follow.messageId, replyTo: follow.replyTo, chatId: follow.chatId, senderId: follow.ownerId, worker: follow.worker,
+  };
+  await site.setFollow(follow.itemId, { ...follow, status: "running" });
+  const result = await captureFromFeishu(followMessage, capture, source);
+  const trace = capture.trace(follow.taskId);
+  if (trace.taskState === "completed") {
+    await site.setFollow(follow.itemId, { ...follow, status: "captured", taskState: trace.taskState, path: trace.path, fileVersion: trace.fileVersion, deliveryState: trace.deliveryState });
+  } else if (result?.text) {
+    await site.setFollow(follow.itemId, { ...follow, status: "failed", error: result.text.slice(0, 500), taskState: trace.taskState });
+    await notifyRadarFollowFailure(follow, result.text);
+  } else {
+    await site.setFollow(follow.itemId, { ...follow, status: "pending", taskState: trace.taskState });
+  }
+  return result;
+}
+
+async function notifyRadarFollowFailure(follow, error) {
+  const detail = String(error?.message || error).slice(0, 500);
+  try {
+    const delivery = await adapter.send({
+      chatId: follow.chatId,
+      text: `雷达条目收录未完成：${follow.title || `item ${follow.itemId}`}\nTask ${follow.taskId} 未通过完成复核，已标为失败待对账，不自动重跑。\n${detail}`,
+      replyTo: follow.replyTo,
+      deliveryKey: `radar-follow-failed:${follow.taskId}`,
+    });
+    if (!delivery?.delivered) throw new Error(delivery?.reason || "飞书未确认送达");
+  } catch (deliveryError) {
+    await appendCaptureEvent({
+      messageId: follow.messageId, status: "radar-follow-failure-delivery-unknown-no-resend",
+      error: String(deliveryError.message || deliveryError).slice(0, 300), at: new Date().toISOString(),
+    });
+  }
+}
+
+async function recoverRadarFollows() {
+  const state = await readJson(path.join(p5Home, "radar-follow-state.json"));
+  for (const follow of Object.values(state?.items || {})) {
+    if (!["pending", "running"].includes(follow.status) || !follow.taskId || !follow.sourcePath) continue;
+    trackCapture(executeRadarFollow(follow).catch(async (error) => {
+      const site = createRadarSiteStore({ home: p5Home });
+      await site.setFollow(follow.itemId, { ...follow, status: "failed", error: String(error.message || error).slice(0, 500) });
+      await notifyRadarFollowFailure(follow, error);
+      await appendCaptureEvent({
+        messageId: follow.messageId, status: "radar-follow-recovery-failed", error: String(error.message || error).slice(0, 300), at: new Date().toISOString(),
+      });
+    }));
+  }
+}
+
 const backgroundCaptures = new Set();
+const trackCapture = (promise) => {
+  backgroundCaptures.add(promise);
+  void promise.finally(() => backgroundCaptures.delete(promise));
+  return promise;
+};
 const startCapture = (message) => {
-  const pending = captureFromFeishu(message)
+  trackCapture(captureFromFeishu(message)
     .then((result) => result?.queued ? null : requestCaptureDrain())
-    .catch((error) => appendCaptureEvent({ messageId: message.id, status: "background-capture-failed", error: String(error.message || error).slice(0, 300), at: new Date().toISOString() }));
-  backgroundCaptures.add(pending);
-  void pending.finally(() => backgroundCaptures.delete(pending));
+    .catch((error) => appendCaptureEvent({ messageId: message.id, status: "background-capture-failed", error: String(error.message || error).slice(0, 300), at: new Date().toISOString() })));
 };
 
 const backgroundIdeas = new Set();
@@ -1726,7 +1847,7 @@ const handleMessage = async (message) => {
   const ideaFactsBefore = idea.factCount();
   const projectFactsBefore = project.factCount();
   const routed = butler.route(message.text, candidates.map((candidate) => candidate.documentId));
-  if (routed.domain === "radar") return radarFromFeishu(routed);
+  if (routed.domain === "radar") return radarFromFeishu(routed, message);
   if (routed.domain === "plugin") return pluginFromFeishu(routed);
   if (routed.domain === "capture") {
     startCapture(message);
@@ -1995,6 +2116,7 @@ try {
   butler.handover.unfreeze({ reason: "host-start-complete" });
   await writeHostStatus({ running: true, phase: "startup-takeover" });
   settleReadyGate("ready");
+  await recoverRadarFollows();
   if (config.mode === "production") void p5Scheduler.start();
   await requestCaptureDrain();
   await requestIdeaDrain();

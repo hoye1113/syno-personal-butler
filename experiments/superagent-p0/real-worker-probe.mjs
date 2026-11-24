@@ -478,13 +478,15 @@ try {
       let capture = null;
       if (captureSource) {
       const document = parseJsonText(modelResponse.data.text);
-      assert.ok(document.title.includes("Claude Code") && document.summary.length >= 80, "收录摘要未通过来源相关性质检");
+      assert.ok(document.title.trim().length >= 5 && document.summary.length >= 80, "收录标题或摘要未通过来源相关性质检");
       assert.ok(Array.isArray(document.keyPoints) && document.keyPoints.length >= 3 && document.keyPoints.length <= 5 && document.keyPoints.every((item) => typeof item === "string" && item.length >= 10));
       assert.deepEqual(Object.keys(document).sort(), ["keyPoints", "summary", "title"], "收录 JSON 字段不符合契约");
       const sourceSha256 = sha256(captureSource);
       const id = `capture-${sourceSha256.slice(0, 24)}${runKey ? `-${runKey}` : ""}`;
       const capturedAt = new Date().toISOString();
-      const markdown = `---\nnote_id: ${id}\nsource_url: "https://code.claude.com/docs/en/best-practices"\nsource_content_sha256: ${sourceSha256}\ncaptured_at: ${capturedAt}\nworker: ${worker}\nmodel: ${MODEL.providerID}/${MODEL.id}\n---\n# ${document.title}\n\n## 摘要\n\n${document.summary}\n\n## 要点\n\n${document.keyPoints.map((item) => `- ${item}`).join("\n")}\n\n## 公开原文\n\n${captureSource.trim()}\n`;
+      const captureSourceUrl = option("--source-url") || "https://code.claude.com/docs/en/best-practices";
+      const captureSourceMaterial = option("--source-material") || "verified-public-browser-snapshot";
+      const markdown = `---\nnote_id: ${id}\nsource_url: ${JSON.stringify(captureSourceUrl)}\nsource_content_sha256: ${sourceSha256}\ncaptured_at: ${capturedAt}\nworker: ${worker}\nmodel: ${MODEL.providerID}/${MODEL.id}\n---\n# ${document.title}\n\n## 摘要\n\n${document.summary}\n\n## 要点\n\n${document.keyPoints.map((item) => `- ${item}`).join("\n")}\n\n## 公开原文\n\n${captureSource.trim()}\n`;
       const vaultRoot = option("--vault-root") || "/Users/hoye/Documents/workspace/syno-p0-real-test/vault";
       const vaultDirectory = path.join(vaultRoot, "02-Resources");
       mkdirSync(vaultDirectory, { recursive: true });
@@ -500,8 +502,8 @@ try {
         messageId: messageId || `local-browser-public-${sourceSha256.slice(0, 16)}`,
         taskId: taskId || `task-${id}`,
         attemptId: attemptId || `attempt-${process.pid}`,
-        sourceUrl: "https://code.claude.com/docs/en/best-practices",
-        sourceMaterial: "verified-public-browser-snapshot",
+        sourceUrl: captureSourceUrl,
+        sourceMaterial: captureSourceMaterial,
         sourceSha256,
         path: target,
         fileVersion: sha256(persisted),

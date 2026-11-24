@@ -41,12 +41,15 @@ export function parseRadarCommand(text) {
   const marked = explicit ?? bare;
   if (marked) {
     const raw = marked[2].trim();
+    const dated = /^(\d{4}-\d{2}-\d{2})\s+([\s\S]+)$/u.exec(raw);
+    const numbersText = dated ? dated[2] : raw;
     // A bare “跟进项目 A” is not a radar command; only numbered candidate commands
     // (or the explicit 雷达 prefix) may enter P5.
-    if (!explicit && !/^(?:#|第)?\d/u.test(raw)) return null;
+    if (!explicit && !dated && !/^(?:#|第)?\d/u.test(numbersText)) return null;
     return {
       action: marked[1] === "跟进" ? "follow" : "ignore",
-      numbers: parseCandidateNumbers(raw),
+      ...(dated ? { date: dated[1] } : {}),
+      numbers: parseCandidateNumbers(numbersText),
     };
   }
   if (/^(?:雷达|信息雷达|radar)\b/u.test(value)) return { action: "help" };
@@ -61,6 +64,7 @@ export const RADAR_HELP = [
   "  偏好：更关注 sandbox 和 agent 工程 —— 更新偏好权重",
   "  偏好：少看融资 —— 降低主题权重",
   "  也可直接说：以后多关注 Agent；别给我推模型新闻",
-  "  跟进 1、4 —— 标记候选为跟进",
-  "  忽略 8、9 —— 标记候选为忽略",
+  "  跟进 2026-11-24 1 —— 创建指定日报条目的真实收录 Task",
+  "  忽略 2026-11-24 8 —— 忽略指定日报条目并调整偏好",
+  "  跟进 1 —— 兼容命令，仅操作最新日报，不用于历史条目",
 ].join("\n");

@@ -100,6 +100,16 @@ export function openNativeButlerRuntime({
     })],
     ["memory", openNativeMemoryRuntime({ databasePath, vaultRoot, memoryRoot, now, db, configureRules: false, decisions, scopeObjectExists })],
   ]);
+  const captureSources = new Map([["default", specialists.get("capture")]]);
+  const captureSource = ({ sourcePath: dynamicPath, sourceUrl: dynamicUrl, sourceMaterial }) => {
+    const key = `${dynamicPath}\0${dynamicUrl}\0${sourceMaterial || ""}`;
+    if (!captureSources.has(key)) {
+      captureSources.set(key, openNativeCaptureRuntime({
+        databasePath, vaultRoot, sourcePath: dynamicPath, sourceUrl: dynamicUrl, sourceMaterial, now, db, configureRules: false,
+      }));
+    }
+    return captureSources.get(key);
+  };
   const handover = openHostHandover({ db, now });
   const operations = openHostOperations({ db, now, handover });
 
@@ -219,6 +229,7 @@ export function openNativeButlerRuntime({
     status: () => operations.status(),
     migrationSnapshot: () => operations.migrationSnapshot(),
     specialist: (domain) => specialists.get(domain),
+    captureSource,
     route,
     createRouteDecision,
     selectRoute,

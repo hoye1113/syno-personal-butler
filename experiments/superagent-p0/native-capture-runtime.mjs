@@ -25,7 +25,7 @@ const SOURCE_MATERIAL = "verified-public-browser-snapshot";
 const ENVIRONMENT = { secret: "syno-p1-isolated-native-test", publicUrl: "" };
 const sha256 = (text) => createHash("sha256").update(text).digest("hex");
 
-export function openNativeCaptureRuntime({ databasePath, vaultRoot, sourcePath, sourceUrl, now = () => Date.now(), db: sharedDb = null, configureRules = true }) {
+export function openNativeCaptureRuntime({ databasePath, vaultRoot, sourcePath, sourceUrl, sourceMaterial = SOURCE_MATERIAL, now = () => Date.now(), db: sharedDb = null, configureRules = true }) {
   const source = readFileSync(sourcePath, "utf8");
   const sourceSha256 = sha256(source);
   const contextId = `capture:${sourceSha256.slice(0, 16)}`;
@@ -92,7 +92,7 @@ export function openNativeCaptureRuntime({ databasePath, vaultRoot, sourcePath, 
     const worker = message.worker || "OpenCode";
     assert.ok(["OpenCode", "Pi"].includes(worker), "未知收录 Worker");
     const taskId = `task-${message.messageId}`;
-    const detail = JSON.stringify({ sourceUrl, sourceSha256, sourceMaterial: SOURCE_MATERIAL, worker, appId: message.appId, chatId: message.chatId, ownerId: message.ownerId });
+    const detail = JSON.stringify({ sourceUrl, sourceSha256, sourceMaterial, worker, appId: message.appId, chatId: message.chatId, ownerId: message.ownerId });
     const route = () => {
       const current = view();
       const context = current.get("records", `context:${contextId}`);
@@ -134,7 +134,7 @@ export function openNativeCaptureRuntime({ databasePath, vaultRoot, sourcePath, 
     const artifactPath = path.join(vaultDirectory, `capture-${sourceSha256.slice(0, 24)}-${message.messageId}.md`);
     createTask(db, {
       taskId, contextId, attemptId, runId: job.run, runAttempt: job.attempt,
-      acceptance: { path: artifactPath, hash: sourceSha256, remoteVersion: SOURCE_MATERIAL }, now: now(),
+      acceptance: { path: artifactPath, hash: sourceSha256, remoteVersion: sourceMaterial }, now: now(),
     });
     return {
       taskId, messageId: message.messageId, attemptId, runId: job.run, runAttempt: job.attempt, contextId,
@@ -174,7 +174,7 @@ export function openNativeCaptureRuntime({ databasePath, vaultRoot, sourcePath, 
       assert.equal(evidence.capture?.path, execution.artifactPath, "证据路径不匹配");
       assert.equal(evidence.capture?.sourceSha256, sourceSha256, "证据原文版本不匹配");
       assert.equal(evidence.capture?.fileVersion, fileHash, "证据文件版本不匹配");
-      assert.equal(evidence.capture?.sourceMaterial, SOURCE_MATERIAL, "证据来源材料不匹配");
+      assert.equal(evidence.capture?.sourceMaterial, sourceMaterial, "证据来源材料不匹配");
       assert.equal(evidence.capture?.resultLane, "passed", "Worker 自报复核未通过");
     }
     const attempt = current.get("records", `attempt:${execution.attemptId}`);
@@ -199,7 +199,7 @@ export function openNativeCaptureRuntime({ databasePath, vaultRoot, sourcePath, 
         attemptId: execution.attemptId,
         actualPath: execution.artifactPath,
         actualHash: sourceSha256,
-        actualRemoteVersion: SOURCE_MATERIAL,
+        actualRemoteVersion: sourceMaterial,
         actualFileHash: fileHash,
         qualityScore: 100,
         now: now(),
