@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#eee9dc">
+  <title>P5 信息雷达</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#reading-list">跳到阅读列表</a>
+  <header class="masthead">
+    <div class="brand-line">
+      <p class="eyebrow">P5 · DAILY RADAR</p>
+      <button id="theme-toggle" class="icon-button" type="button" aria-label="切换深色模式" title="切换深浅色">◐</button>
+    </div>
+    <div class="title-line">
+      <h1 id="page-title">今日雷达</h1>
+      <p id="issue-date" class="issue-date"></p>
+    </div>
+    <p id="day-deck" class="day-deck">只呈现今天第一次遇见的内容。读过的留在历史，不再打扰明天。</p>
+  </header>
+
+  <nav class="view-nav" aria-label="阅读视图">
+    <button type="button" data-view="today" aria-current="page">今日新增</button>
+    <button type="button" data-view="unread">全部未读</button>
+    <button type="button" data-view="read">已阅</button>
+    <button type="button" data-view="followed">已跟进</button>
+    <button type="button" data-view="ignored">已忽略</button>
+  </nav>
+
+  <div class="tools">
+    <search class="search-box" role="search">
+      <label class="sr-only" for="search-input">搜索标题、来源或日期</label>
+      <input id="search-input" type="search" placeholder="搜索标题、来源、日期" autocomplete="off">
+    </search>
+    <label class="history-select"><span class="sr-only">选择历史日报</span><select id="history-select"><option value="">全部历史</option></select></label>
+  </div>
+
+  <main class="workspace">
+    <section id="list-pane" class="list-pane" aria-labelledby="list-heading">
+      <div class="list-meta">
+        <h2 id="list-heading">阅读清单</h2>
+        <p id="result-count" aria-live="polite"></p>
+      </div>
+      <div id="bulk-bar" class="bulk-bar" hidden>
+        <button id="read-page" type="button">本页全部已阅</button>
+        <button id="undo-page" type="button" hidden>撤销本页已阅</button>
+      </div>
+      <div id="status" class="status-message" role="status">正在读取真实日报…</div>
+      <ol id="reading-list" class="reading-list"></ol>
+    </section>
+
+    <article id="detail-pane" class="detail-pane" aria-labelledby="detail-title" hidden>
+      <div class="detail-topline">
+        <button id="close-detail" class="back-button" type="button">← 返回清单</button>
+        <span id="detail-number" class="detail-number"></span>
+      </div>
+      <header class="detail-header">
+        <p id="detail-source" class="eyebrow"></p>
+        <h2 id="detail-title"></h2>
+        <p id="detail-original-title" class="original-title"></p>
+        <p id="detail-meta" class="detail-meta"></p>
+      </header>
+      <div class="article-body">
+        <section><h3>摘要</h3><p id="detail-summary"></p></section>
+        <section id="points-section"><h3>核心要点</h3><ul id="detail-points"></ul></section>
+        <section id="why-section"><h3>为什么值得看</h3><p id="detail-why"></p></section>
+        <p id="detail-scope" class="source-scope"></p>
+        <a id="original-link" class="original-link" target="_blank" rel="noopener noreferrer">阅读原文 ↗</a>
+        <div class="follow-command">
+          <h3>需要收录？</h3>
+          <p>回到飞书发送这条命令。管家会创建真实收录任务，完成后另行通知。</p>
+          <div><code id="follow-text"></code><button id="copy-follow" type="button">复制命令</button></div>
+          <p id="follow-status" class="follow-status"></p>
+        </div>
+      </div>
+      <footer class="reading-actions">
+        <button id="read-toggle" class="primary-button" type="button"></button>
+        <button id="detail-copy" type="button">复制跟进命令</button>
+      </footer>
+    </article>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

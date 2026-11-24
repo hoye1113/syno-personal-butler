@@ -148,8 +148,23 @@ export function createP5Scheduler({
           const text = typeof runner.dailyDoc === "function" ? await runner.dailyDoc() : await runner.digest();
           const chat = await readChat();
           if (!chat?.chatId) throw Object.assign(new Error("没有已绑定的 Owner 会话"), { code: "P5_NO_CHAT" });
-          const delivery = await send({ chatId: chat.chatId, text });
+          let delivery;
+          try {
+            delivery = await send({ chatId: chat.chatId, text });
+          } catch (error) {
+            // The transport may have accepted the message. Persist an explicit unknown outcome and
+            // require reconciliation instead of regenerating and blindly resending the daily link.
+            state.lastDigestDate = date;
+            state.lastDigestAt = timestamp.toISOString();
+            state.lastDigestDelivery = "unknown";
+            state.lastDigestError = String(error?.message || error).slice(0, 500);
+            delete state.digestRetryAt;
+            log("p5-digest-unknown-no-retry", { date, error: state.lastDigestError });
+            await writeState(stateFile, state);
+            return state;
+          }
           if (delivery?.delivered !== true) throw new Error(delivery?.reason || "飞书未确认送达");
+          state.lastDigestDelivery = "accepted";
           state.lastDigestDate = date;
           state.lastDigestAt = timestamp.toISOString();
           delete state.digestRetryAt;

@@ -13,6 +13,7 @@
     "vault:migrate": "node scripts/vault-migrate.mjs",
     "probe:weixin": "node scripts/probe-weixin.mjs",
     "probe:feishu": "node scripts/probe-feishu.mjs",
+    "p5:site": "node experiments/superagent-p0/p5-radar-site.mjs",
     "syno:doctor": "node scripts/syno-doctor.mjs",
     "gate": "node scripts/run-tests.mjs && node scripts/verify-repository.mjs && node scripts/check-active-docs.mjs && git diff --check"
   },

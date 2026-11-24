@@ -26,7 +26,7 @@ function publishedLabel(value) {
   }).format(date);
 }
 
-function sourceStatusLabel(summary) {
+export function sourceStatusLabel(summary) {
   const status = String(summary.sourceStatus || "");
   if (status === "transcript-timed") return "视频字幕（含时间戳）";
   if (status === "transcript-plain") return "视频字幕（无时间戳）";
@@ -51,6 +51,25 @@ export function buildDocumentAst({ date, entries, totalItems = entries.length, u
     publishedAt: entry.item.published_at,
     kind: entry.item.kind,
   }));
+  const details = entries.map((entry, index) => {
+    const item = entry.item;
+    const summary = entry.summary;
+    return {
+      index: index + 1,
+      itemId: item.item_id,
+      title: item.title,
+      titleZh: summary.titleZh || item.title,
+      publishedAt: item.published_at,
+      kind: item.kind,
+      source: item.source_name || item.source_id || "未知",
+      url: item.url,
+      summary: summary.summaryZh || item.summary || "资料不足。",
+      points: Array.isArray(summary.points) ? summary.points.map(cleanText) : [],
+      why: summary.whyZh || "",
+      sourceStatus: sourceStatusLabel(summary),
+      group: entry.group || "rest",
+    };
+  });
   const groupLabels = {
     preferred: "为你优先",
     explore: "圈外探索",
@@ -58,7 +77,7 @@ export function buildDocumentAst({ date, entries, totalItems = entries.length, u
   };
   const blocks = [
     { type: "paragraph", text: `日期：${date} · 本次展示 ${items.length} 条（库中共 ${totalItems} 条）${unfiltered ? "；不按画像过滤，未展示条目仍保留" : ""}` },
-    { type: "paragraph", text: "上层为你优先，中层为圈外探索，下层为其余条目；每篇列出中文标题、来源、发布时间和中文摘要。回复「跟进 N」或「忽略 N」操作。" },
+    { type: "paragraph", text: "每篇列出中文标题、来源、发布时间和中文摘要。回复「跟进 日期 编号」创建真实收录 Task，或「忽略 日期 编号」调整偏好。" },
   ];
   let currentGroup = null;
   entries.forEach((entry, index) => {
@@ -92,7 +111,7 @@ export function buildDocumentAst({ date, entries, totalItems = entries.length, u
       blocks.push({ type: "paragraph", text: summary.whyZh });
     }
     blocks.push({ type: "link", text: "原文", url: item.url });
-    blocks.push({ type: "paragraph", text: `操作：回复「跟进 ${index + 1}」或「忽略 ${index + 1}」` });
+    blocks.push({ type: "paragraph", text: `操作：回复「跟进 ${date} ${index + 1}」或「忽略 ${date} ${index + 1}」` });
     if (index < entries.length - 1) blocks.push({ type: "divider" });
   });
   return {
@@ -100,7 +119,9 @@ export function buildDocumentAst({ date, entries, totalItems = entries.length, u
     date,
     unfiltered,
     items,
+    details,
+    totalItems,
     blocks,
-    shortMessage: `今日 P5 信息雷达已整理：共 ${items.length} 条，未按画像过滤，按发布时间倒序；标题、摘要、视频字幕摘要和发布时间已写入飞书文档。回复「跟进 N」或「忽略 N」操作。`,
+    shortMessage: `今日 P5 信息雷达已整理：共 ${items.length} 条。回复「跟进 ${date} N」创建真实收录任务，或「忽略 ${date} N」调整偏好。`,
   };
 }

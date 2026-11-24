@@ -4,6 +4,7 @@ import path from "node:path";
 import { DEFAULT_MODEL, createOpenCodeClient } from "./opencode.mjs";
 import { summarizeArticle, summarizeVideoDoc } from "./article.mjs";
 import { ensurePreferences, rankEntries } from "./preferences.mjs";
+import { historicalItemIds } from "./exposure.mjs";
 import { translateFeedItems } from "./translate.mjs";
 import { fetchTranscript } from "./youtube.mjs";
 
@@ -52,7 +53,9 @@ export async function buildDailyDoc({
   if (!store) throw new Error("每日文档缺少 store");
   if (!date) throw new Error("每日文档缺少 date");
   const since = new Date(Date.now() - Number(windowDays) * 86_400_000).toISOString();
-  const items = store.listItemsForDoc({ since, limit });
+  const allItems = store.listItemsForDoc({ since, limit });
+  const shown = await historicalItemIds({ home, date });
+  const items = allItems.filter((item) => !shown.has(Number(item.item_id)));
   const cached = new Map();
   const pending = [];
   const videos = [];
@@ -174,10 +177,10 @@ export async function buildDailyDoc({
     const preferences = await ensurePreferences({ store, home });
     const rankedEntries = rankEntries(entries, preferences, { maxItems });
     const shortMessage = [
-      `今日 P5 信息雷达已整理：展示 ${rankedEntries.length} 条（库中共 ${entries.length} 条）；上层为你优先，中层圈外探索，下层其余条目。`,
-      "未展示的条目仍保留在库中。回复「跟进 N」或「忽略 N」操作。",
+      `今日 P5 信息雷达已整理：新增 ${rankedEntries.length} 条；以前展示过的 ${allItems.length - entries.length} 条不再重复进入今日新增。`,
+      "未读条目仍保留在历史中。回复「跟进 日期 编号」创建真实收录任务，或「忽略 日期 编号」降低相关权重。",
     ].join("\n");
-    if (renderOnly) return { entries: rankedEntries, itemCount: rankedEntries.length, totalItems: entries.length, message: shortMessage };
+    if (renderOnly) return { entries: rankedEntries, itemCount: rankedEntries.length, totalItems: entries.length, candidateCount: allItems.length, message: shortMessage };
 
     const { createFeishuDailyDoc } = await import("./feishu-doc.mjs");
     const doc = await createFeishuDailyDoc({

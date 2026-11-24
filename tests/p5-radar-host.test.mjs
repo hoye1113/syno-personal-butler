@@ -102,7 +102,7 @@ test("daily document blocks use Chinese headings and per-article sections", () =
   assert.match(text, /English title/);
   assert.match(text, /发布：/);
   assert.match(text, /资料范围：源摘要/);
-  assert.match(text, /跟进 1/);
+  assert.match(text, /跟进 2026-11-21 1/);
 });
 
 test("P5 scheduler collects at 09:30, sends digest at 10:00, and is same-day idempotent", async (t) => {
@@ -164,6 +164,38 @@ test("P5 scheduler sends the short daily-doc link instead of the full digest whe
   await scheduler.tick();
   assert.equal(deliveries.length, 1);
   assert.match(deliveries[0].text, /wiki\/doc/);
+  scheduler.stop();
+});
+
+test("P5 scheduler records transport unknown and never blindly resends that day's link", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "p5-host-unknown-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  let current = new Date("2026-11-21T10:00:00+08:00");
+  let generated = 0;
+  let sends = 0;
+  const events = [];
+  const scheduler = createP5Scheduler({
+    runner: {
+      async collect() {},
+      async dailyDoc() { generated += 1; return "今日雷达：https://radar.example.com"; },
+      async digest() { throw new Error("not used"); },
+      async mark() {}, async status() { return "status"; },
+    },
+    send: async () => { sends += 1; throw new Error("socket closed after write"); },
+    readChat: async () => ({ chatId: "oc_owner" }),
+    stateFile: path.join(root, "p5-scheduler.json"),
+    now: () => current,
+    logger: (event) => events.push(event),
+  });
+  const first = await scheduler.tick();
+  assert.equal(first.lastDigestDelivery, "unknown");
+  assert.equal(first.lastDigestDate, "2026-11-21");
+  current = new Date("2026-11-21T10:11:00+08:00");
+  await scheduler.tick();
+  assert.equal(generated, 1);
+  assert.equal(sends, 1);
+  assert.ok(events.includes("p5-digest-unknown-no-retry"));
+  assert.ok(!events.includes("p5-digest-sent"));
   scheduler.stop();
 });
 

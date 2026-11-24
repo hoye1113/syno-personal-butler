@@ -58,7 +58,7 @@ function publishedLabel(value) {
 export function renderDailyDocBlocks({ date, items }) {
   const blocks = [
     textBlock(`日期：${date} · 全部 ${items.length} 条（未按画像过滤）`),
-    textBlock("按发布时间倒序。每篇列出中文标题、来源、发布时间和中文摘要；回复「跟进 1」或「忽略 1」操作。摘要来自源 feed 或已缓存深读，未逐篇抓取全文。"),
+    textBlock(`按发布时间倒序。每篇列出中文标题、来源、发布时间和中文摘要；回复「跟进 ${date} 1」或「忽略 ${date} 1」操作。摘要来自源 feed 或已缓存深读，未逐篇抓取全文。`),
   ];
   items.forEach((entry, index) => {
     const item = entry.item ?? entry;
@@ -98,7 +98,7 @@ export function renderDailyDocBlocks({ date, items }) {
       blocks.push(textBlock(summary.whyZh));
     }
     blocks.push(textBlock(`原文：${item.url}`));
-    blocks.push(textBlock(`操作：回复「跟进 ${index + 1}」或「忽略 ${index + 1}」`));
+    blocks.push(textBlock(`操作：回复「跟进 ${date} ${index + 1}」或「忽略 ${date} ${index + 1}」`));
     if (index < items.length - 1) blocks.push(dividerBlock());
   });
   return blocks;
