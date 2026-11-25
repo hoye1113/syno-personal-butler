@@ -33,6 +33,7 @@ async function fixture({ invalidAst = false } = {}) {
       date: "2026-11-22",
       title: "P5 信息雷达 · 2026-11-22",
       items: [{ index: 1, itemId: 1, title: "x", titleZh: "中文标题", publishedAt: null, kind: "article" }],
+      details: [{ index: 1, itemId: 1, title: "x", titleZh: "中文标题", publishedAt: null, kind: "article" }],
       blocks: [{ type: "paragraph", text: "内容" }],
       shortMessage: "今日 1 条",
     };

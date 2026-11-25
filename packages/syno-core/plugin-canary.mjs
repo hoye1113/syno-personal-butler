@@ -44,7 +44,10 @@ async function runCommand(command, { cwd, env = process.env } = {}) {
 
 export function validateCanaryAst(ast, { maxItems = 50 } = {}) {
   if (!ast || typeof ast !== "object") throw canaryError("P5_CANARY_AST_INVALID", "canary 没有返回 AST");
-  if (!ast.date || !Array.isArray(ast.items) || !Array.isArray(ast.blocks)) throw canaryError("P5_CANARY_AST_INVALID", "AST 缺少 date/items/blocks");
+  if (!ast.date || !Array.isArray(ast.items) || !Array.isArray(ast.details) || !Array.isArray(ast.blocks)) throw canaryError("P5_CANARY_AST_INVALID", "AST 缺少 date/items/details/blocks");
+  if (ast.items.length !== ast.details.length || ast.items.some((item, index) => Number(item.itemId) !== Number(ast.details[index].itemId) || Number(item.index) !== Number(ast.details[index].index))) {
+    throw canaryError("P5_CANARY_AST_INVALID", "AST items/details 编号不一致");
+  }
   if (ast.items.length < 1 || ast.items.length > maxItems) throw canaryError("P5_CANARY_ITEM_COUNT_INVALID", `条目数 ${ast.items.length} 超出 1–${maxItems}`);
   if (ast.blocks.length < 1 || ast.blocks.length > maxItems * 20) throw canaryError("P5_CANARY_BLOCK_COUNT_INVALID", `blocks ${ast.blocks.length} 超出合理范围`);
   for (const item of ast.items) {
