@@ -4,6 +4,7 @@ import path from "node:path";
 const DATE = /^\d{4}-\d{2}-\d{2}$/u;
 const DAY_FILE = /^radar-day-(\d{4}-\d{2}-\d{2})\.json$/u;
 const DOC_FILE = /^daily-doc-(\d{4}-\d{2}-\d{2})\.json$/u;
+const GROWTH_FILE = /^radar-growth-(github|skill)-(\d{4}-\d{2}-\d{2})\.json$/u;
 const FOLLOW_MUTATIONS = new Map();
 
 async function readJson(file, fallback = null) {
@@ -131,6 +132,30 @@ export function createRadarSiteStore({ home, stateHome = home, now = () => new D
         return [item.title, item.titleZh, item.source, item.sourceName, item.date]
           .some((value) => String(value ?? "").normalize("NFKC").toLocaleLowerCase("zh-CN").includes(needle));
       });
+    },
+
+    async growth({ board, date = "" } = {}) {
+      if (!["github", "skill"].includes(board)) throw Object.assign(new Error("榜单类型无效"), { status: 400 });
+      if (date) {
+        const parsed = new Date(`${date}T00:00:00Z`);
+        if (!DATE.test(date) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+          throw Object.assign(new Error("日期格式无效"), { status: 400 });
+        }
+      }
+      let names = [];
+      try { names = await fs.readdir(home); } catch (error) { if (error.code !== "ENOENT") throw error; }
+      const candidates = names.map((name) => ({ name, match: GROWTH_FILE.exec(name) }))
+        .filter(({ match }) => match?.[1] === board && (!date || match[2] === date))
+        .sort((a, b) => b.match[2].localeCompare(a.match[2]));
+      for (const { name, match } of candidates) {
+        const snapshot = await readJson(path.join(home, name));
+        if (snapshot?.schema !== 1 || snapshot.board !== board || snapshot.date !== match[2] || !Array.isArray(snapshot.items)) continue;
+        const status = await readJson(path.join(home, "radar-growth-status.json"), { boards: {} });
+        const current = status.boards?.[board];
+        const stale = current?.status === "error" && (!date || current.date === snapshot.date) && String(current.updatedAt || "") >= String(snapshot.generatedAt || "");
+        return { ...snapshot, stale, statusError: stale ? String(current.error || "上游暂不可用").slice(0, 200) : "" };
+      }
+      return null;
     },
 
     async setRead(itemIds, read) {

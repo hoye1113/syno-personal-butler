@@ -63,6 +63,24 @@ test("legacy manifest filtering happens after read-only source and feedback hydr
   assert.equal(searched.items[0].index, 3);
 });
 
+test("growth API serves validated snapshots without read or follow semantics", async (t) => {
+  const { home, origin } = await runningServer(t);
+  await fs.writeFile(path.join(home, "radar-growth-github-2026-11-25.json"), JSON.stringify({
+    schema: 1, board: "github", date: "2026-11-25", generatedAt: "2026-11-25T02:00:00Z", window: "7d",
+    coverage: "AI 候选池", attribution: { label: "GitHub Risers", license: "MIT" },
+    items: [{ repo: "owner/project", index: 1, gained: 120, stars: 900, analysis: { status: "metadata" } }],
+  }));
+  const response = await fetch(`${origin}/api/growth?board=github`);
+  assert.equal(response.status, 200);
+  const value = await response.json();
+  assert.equal(value.growth.items[0].repo, "owner/project");
+  assert.equal(value.growth.stale, false);
+  assert.equal((await (await fetch(`${origin}/api/growth?board=github&date=2026-11-24`)).json()).growth, null);
+  for (const query of ["board=other", "board=../secret", "board=github&date=2026-1-1", "board=github&date=2026-02-30"]) {
+    assert.equal((await fetch(`${origin}/api/growth?${query}`)).status, 400, query);
+  }
+});
+
 test("radar authentication protects HTML and APIs without exposing credentials", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "p5-site-auth-"));
   const authFile = path.join(root, "auth.json");
@@ -71,6 +89,7 @@ test("radar authentication protects HTML and APIs without exposing credentials",
   const { origin } = await runningServer(t, { authFile, allowInsecure: false });
   const anonymous = await fetch(`${origin}/api/items`, { redirect: "manual" });
   assert.equal(anonymous.status, 401);
+  assert.equal((await fetch(`${origin}/api/growth?board=github`)).status, 401);
   assert.equal((await fetch(`${origin}/styles.css`)).status, 200, "login stylesheet must be public");
   const denied = await fetch(`${origin}/login`, { method: "POST", headers: { Origin: origin, "Content-Type": "application/x-www-form-urlencoded" }, body: "password=wrong", redirect: "manual" });
   assert.equal(denied.status, 403);

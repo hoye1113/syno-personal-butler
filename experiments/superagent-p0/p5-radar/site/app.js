@@ -1,6 +1,9 @@
 const $ = (id) => document.getElementById(id);
-const state = { view: "today", date: "", q: "", items: [], current: null, days: [], loading: 0 };
-const labels = { today: "今日雷达", all: "历史雷达", unread: "全部未读", read: "已阅归档", followed: "跟进记录", ignored: "已忽略" };
+const state = { view: "today", date: "", q: "", items: [], current: null, days: [], growth: null, loading: 0 };
+const labels = { today: "今日雷达", all: "历史雷达", unread: "全部未读", read: "已阅归档", followed: "跟进记录", ignored: "已忽略", github: "GitHub 增长", skill: "Skill 增长" };
+const newsDeck = "只呈现今天第一次遇见的内容。读过的留在历史，不再打扰明天。";
+const number = new Intl.NumberFormat("zh-CN");
+const isGrowthView = () => ["github", "skill"].includes(state.view);
 let toastTimer;
 let searchTimer;
 let listScroll = 0;
@@ -29,9 +32,10 @@ function params() {
 
 function syncUrl({ item = null, push = false } = {}) {
   const url = new URL(location.href);
-  for (const key of ["view", "date", "q", "item", "itemDate"]) url.searchParams.delete(key);
+  for (const key of ["view", "date", "q", "item", "itemDate", "repo"]) url.searchParams.delete(key);
   for (const [key, value] of params()) url.searchParams.set(key, value);
-  if (item) { url.searchParams.set("item", item.itemId); url.searchParams.set("itemDate", item.date); }
+  if (item?.isGrowth) url.searchParams.set("repo", item.repoKey);
+  else if (item) { url.searchParams.set("item", item.itemId); url.searchParams.set("itemDate", item.date); }
   history[push ? "pushState" : "replaceState"]({ scroll: listScroll }, "", url);
 }
 
@@ -58,7 +62,59 @@ function followLabel(follow) {
   }[follow?.status] || "";
 }
 
+function renderGrowth() {
+  const snapshot = state.growth;
+  $("page-title").textContent = labels[state.view];
+  $("issue-date").textContent = snapshot ? `${snapshot.date}${snapshot.stale ? " · 陈旧快照" : ""}` : "尚未采集";
+  $("day-deck").textContent = state.view === "github" ? "看真实窗口增量，不把累计 Star 误当增长。连续在榜只更新版本，不产生未读。" : "在明确候选池内寻找 Skill 仓库的 24 小时关注度变化，不自动安装或执行任何 Skill。";
+  $("list-heading").textContent = "增长榜单";
+  $("result-count").textContent = `${state.items.length} 个项目`;
+  $("tools").hidden = true;
+  $("bulk-bar").hidden = true;
+  $("growth-meta").hidden = !snapshot;
+  if (snapshot) {
+    $("growth-coverage").textContent = snapshot.coverage;
+    $("growth-source").textContent = `数据日期：${snapshot.source?.sourceDate || snapshot.date} · 获取于 ${formatDate(snapshot.source?.fetchedAt, true)}${snapshot.stale ? " · 最近更新失败，展示最近好快照" : ""}`;
+    $("growth-attribution").textContent = `${snapshot.attribution.label} ↗`;
+    $("growth-attribution").href = snapshot.attribution.url;
+    $("growth-license").textContent = `${snapshot.attribution.license} ↗`;
+    $("growth-license").href = snapshot.attribution.licenseUrl;
+  }
+  const list = $("reading-list");
+  list.replaceChildren();
+  $("status").hidden = state.items.length > 0;
+  if (!state.items.length) $("status").textContent = "尚未生成榜单。请运行 pnpm p5:growth 后刷新。";
+  for (const item of state.items) {
+    const growth = item.growth;
+    const li = element("li", "reading-item growth-item");
+    li.dataset.repo = item.repoKey;
+    li.append(element("span", "item-index", String(item.index).padStart(2, "0")));
+    const body = element("div", "item-body");
+    body.append(element("p", "item-source", `${state.view === "github" ? "AI / Agent · 7 日" : "Skill · 24 小时"} · ${item.date}`));
+    const button = element("button", "item-title-button");
+    button.type = "button";
+    button.setAttribute("aria-label", `查看项目：${item.repoKey}`);
+    button.append(element("span", "item-title", item.repoKey));
+    button.addEventListener("click", () => openItem(item, true));
+    body.append(button);
+    if (item.summary) body.append(element("p", "item-summary", item.summary));
+    const footer = element("div", "item-footer");
+    footer.append(element("span", "growth-delta", `+${number.format(growth.gained)} Star`));
+    footer.append(element("span", "", `总计 ${number.format(growth.stars)}`));
+    if (state.view === "github") footer.append(element("span", "", `日均 ${number.format(growth.perDay)}`));
+    else if (growth.pushedAt) footer.append(element("span", "", `推送 ${growth.pushedAt.slice(0, 10)}`));
+    body.append(footer);
+    li.append(body);
+    list.append(li);
+  }
+}
+
 function render() {
+  if (isGrowthView()) return renderGrowth();
+  $("tools").hidden = false;
+  $("growth-meta").hidden = true;
+  $("list-heading").textContent = "阅读清单";
+  $("day-deck").textContent = newsDeck;
   $("page-title").textContent = state.date ? `${state.date.slice(5).replace("-", "月")}日` : labels[state.view];
   const latest = state.days[0]?.date;
   $("issue-date").textContent = state.date || latest || "暂无日报";
@@ -98,14 +154,39 @@ function render() {
 async function load() {
   const generation = ++state.loading;
   $("status").hidden = false;
-  $("status").textContent = "正在读取真实日报…";
+  $("status").textContent = isGrowthView() ? "正在读取增长榜…" : "正在读取真实日报…";
   try {
-    const value = await request(`/api/items?${params()}`);
-    if (generation !== state.loading) return;
-    state.items = value.items;
+    if (isGrowthView()) {
+      const query = new URLSearchParams({ board: state.view });
+      if (state.date) query.set("date", state.date);
+      const value = await request(`/api/growth?${query}`);
+      if (generation !== state.loading) return;
+      state.growth = value.growth;
+      state.items = (value.growth?.items || []).map((item) => ({
+        ...item,
+        isGrowth: true,
+        repoKey: item.repo,
+        itemId: null,
+        date: value.growth.date,
+        source: value.growth.title,
+        title: item.repo,
+        titleZh: item.repo,
+        summary: item.analysis?.summary || item.description || "资料不足。",
+        points: item.analysis?.points || [],
+        why: item.analysis?.why || "",
+        growth: item,
+      }));
+    } else {
+      const value = await request(`/api/items?${params()}`);
+      if (generation !== state.loading) return;
+      state.growth = null;
+      state.items = value.items;
+    }
     render();
     if (state.current) {
-      const fresh = state.items.find((item) => item.itemId === state.current.itemId && item.date === state.current.date);
+      const fresh = state.items.find((item) => isGrowthView()
+        ? item.repoKey === state.current.repoKey
+        : item.itemId === state.current.itemId && item.date === state.current.date);
       if (fresh) state.current = fresh;
       fillDetail();
     }
@@ -120,9 +201,39 @@ async function load() {
 
 function command(item) { return `跟进 ${item.date} ${item.index}`; }
 
+function fillGrowthDetail(item) {
+  const growth = item.growth;
+  const analysis = growth.analysis || {};
+  const windowLabel = state.view === "github" ? "近 7 日" : "近 24 小时";
+  $("detail-number").textContent = `NO. ${String(item.index).padStart(2, "0")} · ${windowLabel}`;
+  $("detail-source").textContent = `${labels[state.view]} · ${item.date}`;
+  $("detail-title").textContent = item.repoKey;
+  $("detail-original-title").textContent = "";
+  $("detail-meta").textContent = `${windowLabel} +${number.format(growth.gained)} Star · 总计 ${number.format(growth.stars)} Star`;
+  $("detail-summary").textContent = analysis.summary || item.summary || "资料不足。";
+  const points = $("detail-points");
+  points.replaceChildren();
+  for (const point of analysis.points || []) points.append(element("li", "", point));
+  $("points-section").hidden = !(analysis.points || []).length;
+  $("why-section").hidden = !analysis.why;
+  $("detail-why").textContent = analysis.why || "";
+  const evidence = analysis.status === "generated"
+    ? `公开 README 分析 · ${analysis.model || "分析模型"} · SHA-256 ${analysis.readmeSha256 || "未知"}`
+    : "公开元数据分析 · 未运行外部模型";
+  $("detail-scope").textContent = `${evidence}。${analysis.limitations || ""}${state.growth ? ` 覆盖范围：${state.growth.coverage}` : ""}`;
+  $("original-link").href = growth.url;
+  $("original-link").textContent = "打开 GitHub 项目 ↗";
+  $("follow-command").hidden = true;
+  $("reading-actions").hidden = true;
+}
+
 function fillDetail() {
   const item = state.current;
   if (!item) return;
+  if (item.isGrowth) return fillGrowthDetail(item);
+  $("follow-command").hidden = false;
+  $("reading-actions").hidden = false;
+  $("original-link").textContent = "阅读原文 ↗";
   $("detail-number").textContent = `NO. ${String(item.index).padStart(2, "0")} · ${item.date}`;
   $("detail-source").textContent = item.source || "未知来源";
   $("detail-title").textContent = item.titleZh || item.title;
@@ -157,7 +268,8 @@ function openItem(item, push) {
 
 function closeDetail(useHistory = false) {
   if (!state.current) return;
-  if (useHistory && new URL(location.href).searchParams.has("item")) { history.back(); return; }
+  const url = new URL(location.href);
+  if (useHistory && (url.searchParams.has("item") || url.searchParams.has("repo"))) { history.back(); return; }
   state.current = null;
   $("detail-pane").hidden = true;
   document.body.style.overflow = "";
@@ -248,7 +360,7 @@ $("theme-toggle").addEventListener("click", () => {
 document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeDetail(true); });
 window.addEventListener("popstate", () => {
   const url = new URL(location.href);
-  if (!url.searchParams.has("item")) closeDetail();
+  if (!url.searchParams.has("item") && !url.searchParams.has("repo")) closeDetail();
 });
 
 async function init() {
@@ -262,6 +374,9 @@ async function init() {
     if (button.dataset.view === state.view) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
   }
+  const activeView = document.querySelector('[data-view][aria-current="page"]');
+  const viewNav = document.querySelector(".view-nav");
+  if (activeView) viewNav.scrollLeft = Math.max(0, activeView.offsetLeft - (viewNav.clientWidth - activeView.offsetWidth) / 2);
   await Promise.all([loadSummary(), load()]);
   const itemId = Number(url.searchParams.get("item"));
   if (itemId) {
@@ -271,6 +386,11 @@ async function init() {
       const value = await request(`/api/items?view=all&date=${encodeURIComponent(itemDate)}`);
       item = value.items.find((candidate) => candidate.itemId === itemId);
     }
+    if (item) openItem(item, false);
+  }
+  const repo = url.searchParams.get("repo");
+  if (repo && isGrowthView()) {
+    const item = state.items.find((candidate) => candidate.repoKey === repo);
     if (item) openItem(item, false);
   }
 }

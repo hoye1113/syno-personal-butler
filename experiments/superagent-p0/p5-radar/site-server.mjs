@@ -139,6 +139,9 @@ export async function createRadarSiteServer({ home, stateHome = home, databasePa
       }
       if (url.pathname === "/api/summary" && req.method === "GET") return send(res, 200, await store.summary());
       if (url.pathname === "/api/items" && req.method === "GET") return send(res, 200, { items: await items(url) });
+      if (url.pathname === "/api/growth" && req.method === "GET") {
+        return send(res, 200, { growth: await store.growth({ board: url.searchParams.get("board") || "", date: url.searchParams.get("date") || "" }) });
+      }
       if (url.pathname === "/api/read" && req.method === "POST") {
         assertOrigin(req);
         const input = JSON.parse(await body(req));
