@@ -151,7 +151,7 @@ export function createRadarSiteStore({ home, stateHome = home, now = () => new D
         }
       }
       const needle = String(q).trim().normalize("NFKC").toLocaleLowerCase("zh-CN");
-      return items.filter((item) => {
+      const filtered = items.filter((item) => {
         if (view === "unread" && (item.readAt || (item.legacy && !item.unreadAt))) return false;
         if (view === "read" && !item.readAt) return false;
         if (view === "followed" && item.follow.status === "none") return false;
@@ -160,6 +160,9 @@ export function createRadarSiteStore({ home, stateHome = home, now = () => new D
         return [item.title, item.titleZh, item.source, item.sourceName, item.date]
           .some((value) => String(value ?? "").normalize("NFKC").toLocaleLowerCase("zh-CN").includes(needle));
       });
+      const readOrder = (item) => item.readAt || (item.legacy && !item.unreadAt) ? 1 : 0;
+      // Stable partition only when data is loaded; mutations in the open page do not reorder the list.
+      return filtered.sort((left, right) => readOrder(left) - readOrder(right));
     },
 
     async growth({ board, date = "" } = {}) {

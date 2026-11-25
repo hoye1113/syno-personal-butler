@@ -54,6 +54,14 @@ function element(tag, className, text) {
 }
 
 function isUnread(item) { return !item.readAt && (!item.legacy || Boolean(item.unreadAt)); }
+function isCurrent(item) { return state.current && !state.current.isGrowth && item.itemId === state.current.itemId && item.date === state.current.date; }
+function syncListSelection() {
+  for (const node of $("reading-list").children) {
+    if (node.dataset.repo) continue;
+    const item = state.items.find((candidate) => String(candidate.itemId) === node.dataset.itemId);
+    node.classList.toggle("is-current", Boolean(item && isCurrent(item)));
+  }
+}
 
 function followLabel(follow) {
   return {
@@ -127,7 +135,7 @@ function render() {
   $("status").hidden = state.items.length > 0;
   if (!state.items.length) $("status").textContent = state.q ? "没有匹配的内容，换个关键词试试。" : state.view === "today" ? "今天没有新增。历史内容仍可在上方查找。" : "这里还没有内容。";
   for (const item of state.items) {
-    const li = element("li", `reading-item${item.readAt ? " is-read" : ""}`);
+    const li = element("li", `reading-item${item.readAt ? " is-read" : ""}${isCurrent(item) ? " is-current" : ""}`);
     li.dataset.itemId = item.itemId;
     li.append(element("span", "item-index", String(item.index).padStart(2, "0")));
     const body = element("div", "item-body");
@@ -151,10 +159,18 @@ function render() {
   }
 }
 
+function setLoading(active) {
+  $("list-loading").hidden = !active;
+  if (active) $("reading-list").setAttribute("aria-busy", "true");
+  else $("reading-list").removeAttribute("aria-busy");
+}
+
 async function load() {
   const generation = ++state.loading;
-  $("status").hidden = false;
-  $("status").textContent = isGrowthView() ? "正在读取增长榜…" : "正在读取真实日报…";
+  setLoading(true);
+  const hasContent = state.items.length > 0;
+  $("status").hidden = hasContent;
+  if (!hasContent) $("status").textContent = isGrowthView() ? "正在读取增长榜…" : "正在读取真实日报…";
   try {
     if (isGrowthView()) {
       const query = new URLSearchParams({ board: state.view });
@@ -196,6 +212,8 @@ async function load() {
     $("reading-list").replaceChildren();
     $("status").hidden = false;
     $("status").textContent = `${error.message}。请稍后重试。`;
+  } finally {
+    if (generation === state.loading) setLoading(false);
   }
 }
 
@@ -210,6 +228,7 @@ function fillGrowthDetail(item) {
   $("detail-title").textContent = item.repoKey;
   $("detail-original-title").textContent = "";
   $("detail-meta").textContent = `${windowLabel} +${number.format(growth.gained)} Star · 总计 ${number.format(growth.stars)} Star`;
+  $("detail-read-state").hidden = true;
   $("detail-summary").textContent = analysis.summary || item.summary || "资料不足。";
   const points = $("detail-points");
   points.replaceChildren();
@@ -239,6 +258,7 @@ function fillDetail() {
   $("detail-title").textContent = item.titleZh || item.title;
   $("detail-original-title").textContent = item.title && item.title !== item.titleZh ? item.title : "";
   $("detail-meta").textContent = `${item.kind === "video" ? "视频" : "文章"} · ${formatDate(item.publishedAt, true)}`;
+  $("detail-read-state").hidden = !item.readAt;
   $("detail-summary").textContent = item.summary || "资料不足。";
   const points = $("detail-points");
   points.replaceChildren();
@@ -280,6 +300,7 @@ function setDetailExpanded(expanded, restoreFocus = true) {
 function openItem(item, push) {
   if (push) listScroll = window.scrollY;
   state.current = item;
+  syncListSelection();
   setDetailExpanded(false, false);
   fillDetail();
   $("detail-pane").hidden = false;
@@ -298,6 +319,7 @@ function closeDetail(useHistory = false) {
   const url = new URL(location.href);
   if (useHistory && (url.searchParams.has("item") || url.searchParams.has("repo"))) { history.back(); return; }
   state.current = null;
+  syncListSelection();
   setDetailExpanded(false, false);
   $("detail-pane").hidden = true;
   document.body.style.overflow = "";
@@ -317,7 +339,7 @@ async function markRead(itemIds, read) {
     }
     render();
     fillDetail();
-    await Promise.all([load(), loadSummary()]);
+    await loadSummary();
     toast(read ? `已将 ${itemIds.length} 条标为已阅` : `已恢复 ${itemIds.length} 条为未读`);
   } catch (error) { toast(error.message); }
 }

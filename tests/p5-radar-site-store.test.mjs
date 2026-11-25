@@ -43,6 +43,7 @@ test("site snapshot preserves numbering and read state is persistent and reversi
   assert.equal(store.url(ast.date), "https://radar.example.com/?date=2026-11-24");
   assert.deepEqual((await store.items()).map((item) => [item.index, item.itemId, item.titleZh]), [[1, 7, "中文 7"], [2, 8, "中文 8"]]);
   await store.setRead([7], true);
+  assert.deepEqual((await store.items()).map((item) => item.itemId), [8, 7], "a fresh load stably places read items after unread items");
   now = new Date("2026-11-24T02:01:00Z");
   await store.setRead([7], true);
   assert.equal((await store.items({ view: "read" }))[0].readAt, "2026-11-24T02:00:00.000Z");

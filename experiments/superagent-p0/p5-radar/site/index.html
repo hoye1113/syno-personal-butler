@@ -45,7 +45,10 @@
     <section id="list-pane" class="list-pane" aria-labelledby="list-heading">
       <div class="list-meta">
         <h2 id="list-heading">阅读清单</h2>
-        <p id="result-count" aria-live="polite"></p>
+        <div class="list-status">
+          <span id="list-loading" class="list-loading" role="status" aria-label="正在更新清单" hidden><span class="loading-spinner" aria-hidden="true"></span></span>
+          <p id="result-count" aria-live="polite"></p>
+        </div>
       </div>
       <div id="growth-meta" class="growth-meta" hidden>
         <p id="growth-coverage"></p>
@@ -73,7 +76,7 @@
           <p id="detail-source" class="eyebrow"></p>
           <h2 id="detail-title"></h2>
           <p id="detail-original-title" class="original-title"></p>
-          <p id="detail-meta" class="detail-meta"></p>
+          <p class="detail-meta"><span id="detail-meta"></span><span id="detail-read-state" class="detail-read-state" hidden>已读</span></p>
         </header>
         <div class="article-body">
           <section><h3>摘要</h3><p id="detail-summary"></p></section>
