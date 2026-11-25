@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 import test from "node:test";
 
 import { freshDailyEntries } from "../experiments/superagent-p0/p5-radar/exposure.mjs";
 import { buildDocumentAst } from "../experiments/superagent-p0/p5-radar/document-model.mjs";
 import { createRadarSiteStore } from "../experiments/superagent-p0/p5-radar/site-store.mjs";
+
+const execFileAsync = promisify(execFile);
 
 async function fixture(t) {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "p5-site-store-"));
@@ -63,6 +68,46 @@ test("follow state serializes independent Host writers and preserves ignore feed
   await second.setFollow(1, { status: "captured", taskId: "task-1" });
   assert.equal((await first.follow(1)).status, "captured");
   assert.equal((await first.follow(1)).ignoredAt, "2026-11-24T00:00:00Z");
+});
+
+test("web marks use the shared stateHome and become executable only through an existing Task mapping", async (t) => {
+  const home = await fixture(t);
+  const stateHome = path.join(home, "site-state");
+  const store = createRadarSiteStore({ home, stateHome });
+  const ast = buildDocumentAst({ date: "2026-11-24", entries: [entry(7), entry(8)] });
+  await store.publish(ast);
+  await store.setFollow(7, { status: "captured", taskId: "task-old", itemId: 7, date: "2026-11-24", index: 1 });
+  const marked = await store.markFollow(8, true);
+  assert.equal(marked.status, "marked");
+  assert.equal(marked.date, "2026-11-24");
+  assert.equal(marked.index, 2);
+  assert.deepEqual((await store.markedFollows()).map((item) => item.itemId), [8]);
+  assert.equal((await store.follow(7)).taskId, "task-old");
+  assert.deepEqual(await store.markFollow(7, false), await store.follow(7));
+  await store.setFollow(8, { ...marked, status: "pending", taskId: "task-new" });
+  assert.equal((await store.follow(8)).markedAt, marked.markedAt);
+  assert.deepEqual(await store.markedFollows(), []);
+  assert.equal((await store.markFollow(8, false)).taskId, "task-new");
+  const persisted = JSON.parse(await fs.readFile(path.join(stateHome, "radar-follow-state.json"), "utf8"));
+  assert.equal(persisted.items["7"].taskId, "task-old");
+  assert.equal(persisted.items["8"].taskId, "task-new");
+});
+
+test("separate Host and website processes serialize writes without losing existing Tasks", async (t) => {
+  const home = await fixture(t);
+  const stateHome = path.join(home, "shared-state");
+  await fs.mkdir(stateHome);
+  await fs.writeFile(path.join(home, "radar-day-2026-11-24.json"), JSON.stringify({
+    schema: 1, date: "2026-11-24", items: [1, 2, 3, 4].map((itemId) => ({ itemId, index: itemId, title: `Item ${itemId}` })),
+  }));
+  await fs.writeFile(path.join(stateHome, "radar-follow-state.json"), JSON.stringify({ schema: 1, items: { 99: { itemId: 99, status: "captured", taskId: "task-preserved" } } }));
+  const moduleUrl = pathToFileURL(path.resolve("experiments/superagent-p0/p5-radar/site-store.mjs")).href;
+  const script = `import { createRadarSiteStore } from ${JSON.stringify(moduleUrl)}; await createRadarSiteStore({ home: ${JSON.stringify(home)}, stateHome: ${JSON.stringify(stateHome)} }).markFollow(Number(process.argv[1]), true);`;
+  await Promise.all([1, 2, 3, 4].map((itemId) => execFileAsync(process.execPath, ["--input-type=module", "--eval", script, String(itemId)], { timeout: 15_000 })));
+  const state = JSON.parse(await fs.readFile(path.join(stateHome, "radar-follow-state.json"), "utf8"));
+  assert.deepEqual(Object.keys(state.items).sort(), ["1", "2", "3", "4", "99"]);
+  assert.equal(state.items["99"].taskId, "task-preserved");
+  for (const itemId of [1, 2, 3, 4]) assert.equal(state.items[String(itemId)].status, "marked");
 });
 
 test("historical manifests remain searchable and filters never renumber a daily item", async (t) => {

@@ -23,6 +23,27 @@ async function atomicJson(file, value) {
   await fs.rename(temporary, file);
 }
 
+async function withFileLock(file, operation) {
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  const lock = `${file}.lock`;
+  const startedAt = Date.now();
+  let handle;
+  while (!handle) {
+    try { handle = await fs.open(lock, "wx", 0o600); }
+    catch (error) {
+      if (error.code !== "EEXIST") throw error;
+      // A crashed writer may leave a lock. Fail closed until both writers are stopped and the state is reconciled.
+      if (Date.now() - startedAt > 10_000) throw new Error("跟进状态写入锁超时，请先对账");
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+  try { return await operation(); }
+  finally {
+    await handle.close();
+    await fs.unlink(lock).catch((error) => { if (error.code !== "ENOENT") throw error; });
+  }
+}
+
 function itemState(item, readState, followState) {
   return {
     ...item,
@@ -65,6 +86,13 @@ export function createRadarSiteStore({ home, stateHome = home, now = () => new D
       readJson(followFile, { schema: 1, items: {} }),
     ]);
     return { readState, followState };
+  }
+
+  function mutateFollow(write) {
+    const previous = FOLLOW_MUTATIONS.get(followFile) || Promise.resolve();
+    const operation = previous.then(() => withFileLock(followFile, write), () => withFileLock(followFile, write));
+    FOLLOW_MUTATIONS.set(followFile, operation.catch(() => {}));
+    return operation;
   }
 
   return {
@@ -178,7 +206,7 @@ export function createRadarSiteStore({ home, stateHome = home, now = () => new D
     async setFollow(itemId, value) {
       const id = Number(itemId);
       if (!Number.isSafeInteger(id) || id <= 0) throw new Error("条目 ID 无效");
-      const write = async () => {
+      return mutateFollow(async () => {
         const { followState } = await states();
         followState.items[String(id)] = {
           ...value,
@@ -187,11 +215,41 @@ export function createRadarSiteStore({ home, stateHome = home, now = () => new D
         };
         await atomicJson(followFile, followState);
         return followState.items[String(id)];
-      };
-      const previous = FOLLOW_MUTATIONS.get(followFile) || Promise.resolve();
-      const operation = previous.then(write, write);
-      FOLLOW_MUTATIONS.set(followFile, operation.catch(() => {}));
-      return operation;
+      });
+    },
+
+    async markFollow(itemId, marked) {
+      const id = Number(itemId);
+      if (!Number.isSafeInteger(id) || id <= 0 || typeof marked !== "boolean") {
+        throw Object.assign(new Error("跟进标记参数无效"), { status: 400 });
+      }
+      const known = new Map((await this.items({ view: "all" })).map((item) => [item.itemId, item]));
+      const item = known.get(id);
+      if (!item) throw Object.assign(new Error("不能标记不存在的雷达条目"), { status: 404 });
+      return mutateFollow(async () => {
+        const { followState } = await states();
+        const key = String(id);
+        const existing = followState.items[key];
+        if (existing?.taskId || (!marked && existing?.status !== "marked")) return existing ?? null;
+        if (!marked) {
+          delete followState.items[key];
+        } else if (existing?.status !== "marked") {
+          followState.items[key] = {
+            ...existing,
+            status: "marked", itemId: id, date: item.date, index: item.index, title: item.titleZh || item.title,
+            markedAt: now().toISOString(), source: "web", updatedAt: now().toISOString(),
+          };
+        }
+        await atomicJson(followFile, followState);
+        return followState.items[key] ?? null;
+      });
+    },
+
+    async markedFollows() {
+      const { followState } = await states();
+      return Object.values(followState.items)
+        .filter((item) => item?.status === "marked" && !item.taskId)
+        .sort((a, b) => String(a.markedAt || "").localeCompare(String(b.markedAt || "")) || Number(a.itemId) - Number(b.itemId));
     },
 
     async follow(itemId) {

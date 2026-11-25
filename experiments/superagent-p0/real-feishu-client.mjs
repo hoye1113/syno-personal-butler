@@ -11,7 +11,7 @@ import { RADAR_HELP } from "./p5-radar/command.mjs";
 import { createP5HostRunner, createP5Scheduler } from "./p5-radar/host.mjs";
 import { publishRadarSiteDigest } from "./p5-radar/site-digest.mjs";
 import { createRadarSiteStore } from "./p5-radar/site-store.mjs";
-import { applyRadarFeedback, prepareRadarCaptureSource, resolveRadarCandidates } from "./p5-radar/follow.mjs";
+import { applyRadarFeedback, prepareRadarCaptureSource, recoverableRadarFollows, resolveRadarCandidates, resolveRadarMarkedFollows } from "./p5-radar/follow.mjs";
 import { executePluginCommand } from "./plugin-control.mjs";
 import { resolveRealFeishuConfig } from "./real-feishu-config.mjs";
 
@@ -20,6 +20,8 @@ import { resolveRealFeishuConfig } from "./real-feishu-config.mjs";
 const config = resolveRealFeishuConfig(process.env);
 const execFileAsync = promisify(execFile);
 const p5Home = path.join(config.localDataRoot, "p5-radar");
+const p5StateHome = process.env.P5_RADAR_STATE_HOME || p5Home;
+const radarSite = () => createRadarSiteStore({ home: p5Home, stateHome: p5StateHome });
 const p5Runner = createP5HostRunner({
   cliPath: path.join(import.meta.dirname, "p5-radar.mjs"),
   home: p5Home,
@@ -253,12 +255,13 @@ const radarFromFeishu = async (command, message) => {
       return { text: `每日雷达展示条数已设为 ${command.maxItems}。` };
     }
     if (command.action === "preference") return { text: await p5Preference(command.text) };
+    if (command.action === "followMarked") return { text: await followMarkedRadarItems(message, command) };
     if (command.action === "follow") return { text: await followRadarItems(message, command) };
     const items = await resolveRadarCommandItems(command);
     const outputs = [];
     for (const item of items) {
       const result = await applyRadarFeedback({ home: p5Home, itemId: item.itemId, action: "ignore" });
-      const site = createRadarSiteStore({ home: p5Home });
+      const site = radarSite();
       const existing = await site.follow(item.itemId);
       await site.setFollow(item.itemId, {
         ...(existing || {}), status: existing?.taskId ? existing.status : "ignored", ignoredAt: new Date().toISOString(),
@@ -990,11 +993,32 @@ function radarFollowText(status, item, taskId) {
   return `${prefix}真实收录 Task：${taskId}；状态：待收录。系统按 itemId 复用任务，完成后另行通知。`;
 }
 
+async function followMarkedRadarItems(message, command) {
+  const { marked, selected } = await resolveRadarMarkedFollows({
+    home: p5Home, stateHome: p5StateHome, numbers: command.numbers, all: command.all,
+  });
+  if (!marked.length) return "没有网站标记的待处理跟进。";
+  if (!selected.length) {
+    const lines = marked.map((item, index) => `${index + 1}. ${item.date} 第 ${item.index} 条｜${item.title || `item ${item.itemId}`}`);
+    return [`待管家处理 ${marked.length} 条，尚未创建收录 Task：`, ...lines, "回复“处理网站跟进 编号”选择一条；明确全部收录请回复“处理网站跟进 全部”。"].join("\n");
+  }
+  const outputs = [];
+  for (const item of selected) {
+    try {
+      outputs.push(await followRadarItems(message, { action: "follow", date: item.date, numbers: [String(item.index)] }));
+    } catch (error) {
+      if (selected.length === 1) throw error;
+      outputs.push(`${item.date} 第 ${item.index} 条未创建 Task：${String(error.message || error).slice(0, 300)}`);
+    }
+  }
+  return outputs.join("\n");
+}
+
 async function followRadarItems(message, command) {
   const items = await resolveRadarCommandItems(command);
   if (items.length !== 1) return "真实收录每次只创建一条 Task，请分别发送「跟进 日期 编号」。";
   const item = items[0];
-  const site = createRadarSiteStore({ home: p5Home });
+  const site = radarSite();
   const existing = await site.follow(item.itemId);
   if (existing?.taskId && ["pending", "running", "captured", "failed"].includes(existing.status)) {
     return radarFollowText(existing.status, item, existing.taskId);
@@ -1006,6 +1030,7 @@ async function followRadarItems(message, command) {
     appId: config.appId, messageId, chatId: message.chatId, ownerId: message.senderId, worker: message.worker,
   });
   const follow = {
+    ...(existing || {}),
     status: "pending", itemId: item.itemId, date: item.date, index: item.index, title: item.titleZh || item.title,
     taskId: execution.taskId, messageId, sourcePath: source.sourcePath, sourceUrl: source.sourceUrl, sourceMaterial: source.sourceMaterial,
     chatId: message.chatId, ownerId: message.senderId, worker: message.worker, replyTo: message.id,
@@ -1021,7 +1046,7 @@ async function followRadarItems(message, command) {
 }
 
 async function executeRadarFollow(follow) {
-  const site = createRadarSiteStore({ home: p5Home });
+  const site = radarSite();
   const source = { sourcePath: follow.sourcePath, sourceUrl: follow.sourceUrl, sourceMaterial: follow.sourceMaterial || "verified-public-radar-snapshot" };
   const capture = butler.captureSource(source);
   const followMessage = {
@@ -1060,11 +1085,10 @@ async function notifyRadarFollowFailure(follow, error) {
 }
 
 async function recoverRadarFollows() {
-  const state = await readJson(path.join(p5Home, "radar-follow-state.json"));
-  for (const follow of Object.values(state?.items || {})) {
-    if (!["pending", "running"].includes(follow.status) || !follow.taskId || !follow.sourcePath) continue;
+  const state = await readJson(path.join(p5StateHome, "radar-follow-state.json"));
+  for (const follow of recoverableRadarFollows(state)) {
     trackCapture(executeRadarFollow(follow).catch(async (error) => {
-      const site = createRadarSiteStore({ home: p5Home });
+      const site = radarSite();
       await site.setFollow(follow.itemId, { ...follow, status: "failed", error: String(error.message || error).slice(0, 500) });
       await notifyRadarFollowFailure(follow, error);
       await appendCaptureEvent({

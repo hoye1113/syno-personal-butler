@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { fetchArticleText } from "./article.mjs";
 import { ensurePreferences, recordFeedback, savePreferences } from "./preferences.mjs";
 import { openStore } from "./store.mjs";
+import { createRadarSiteStore } from "./site-store.mjs";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/u;
 const RADAR_SOURCE_MATERIAL = "verified-public-radar-snapshot";
@@ -25,6 +26,23 @@ export async function resolveRadarCandidates({ home, date, numbers }) {
     if (!item) throw new Error(`${date} 没有编号 ${value}`);
     return { ...item, itemId: Number(item.itemId), date };
   });
+}
+
+export async function resolveRadarMarkedFollows({ home, stateHome = home, numbers = [], all = false }) {
+  const marked = await createRadarSiteStore({ home, stateHome }).markedFollows();
+  if (!numbers.length) return { marked, selected: all || marked.length === 1 ? marked : [] };
+  if (all) throw new Error("“全部”不能和编号同时选择");
+  const positions = [...new Set(numbers.map((value) => Number(value)))];
+  if (positions.some((value) => !Number.isSafeInteger(value) || value < 1 || value > marked.length)) {
+    throw new Error("待处理编号无效，请重新发送“处理网站跟进”查看清单");
+  }
+  if (positions.length !== 1) throw new Error("每次选择一条；如需全部收录，请发送“处理网站跟进 全部”");
+  return { marked, selected: [marked[positions[0] - 1]] };
+}
+
+export function recoverableRadarFollows(state) {
+  return Object.values(state?.items || {}).filter((follow) =>
+    ["pending", "running"].includes(follow.status) && follow.taskId && follow.sourcePath);
 }
 
 export async function applyRadarFeedback({ home, itemId, action }) {

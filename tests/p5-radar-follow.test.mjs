@@ -7,7 +7,8 @@ import test from "node:test";
 
 import { openNativeButlerRuntime } from "../experiments/superagent-p0/native-butler-runtime.mjs";
 import { parseRadarCommand } from "../experiments/superagent-p0/p5-radar/command.mjs";
-import { prepareRadarCaptureSource, resolveRadarCandidates } from "../experiments/superagent-p0/p5-radar/follow.mjs";
+import { prepareRadarCaptureSource, recoverableRadarFollows, resolveRadarCandidates, resolveRadarMarkedFollows } from "../experiments/superagent-p0/p5-radar/follow.mjs";
+import { createRadarSiteStore } from "../experiments/superagent-p0/p5-radar/site-store.mjs";
 import { openStore } from "../experiments/superagent-p0/p5-radar/store.mjs";
 import { publishRadarSiteDigest } from "../experiments/superagent-p0/p5-radar/site-digest.mjs";
 import { buildDocumentAst } from "../experiments/superagent-p0/p5-radar/document-model.mjs";
@@ -27,6 +28,36 @@ test("dated radar commands resolve only that date and never fall back to latest 
   await fs.writeFile(path.join(home, "digest-2026-11-24.json"), JSON.stringify({ date: "2026-11-24", items: [{ itemId: 99, index: 4 }] }));
   assert.equal((await resolveRadarCandidates({ home, date: "2026-11-22", numbers: ["4"] }))[0].itemId, 42);
   await assert.rejects(() => resolveRadarCandidates({ home, date: "2026-11-21", numbers: ["4"] }), /找不到 2026-11-21/u);
+});
+
+test("marked website intents select existing dated follow commands without creating Tasks while choosing", async (t) => {
+  const home = await fixture(t);
+  const stateHome = path.join(home, "site-state");
+  const items = [{ itemId: 42, index: 4, title: "First" }, { itemId: 43, index: 5, title: "Second" }];
+  await fs.writeFile(path.join(home, "radar-day-2026-11-24.json"), JSON.stringify({ schema: 1, date: "2026-11-24", items }));
+  await fs.writeFile(path.join(home, "digest-2026-11-24.json"), JSON.stringify({ date: "2026-11-24", items }));
+  const site = createRadarSiteStore({ home, stateHome });
+  await site.markFollow(42, true);
+  await site.markFollow(43, true);
+  assert.deepEqual(parseRadarCommand("处理我在网站上标记的跟进"), { action: "followMarked", all: false, numbers: [] });
+  assert.deepEqual(parseRadarCommand("处理网站跟进 全部"), { action: "followMarked", all: true, numbers: [] });
+  const waiting = await resolveRadarMarkedFollows({ home, stateHome });
+  assert.equal(waiting.marked.length, 2);
+  assert.deepEqual(waiting.selected, [], "multiple marks must wait for an explicit choice");
+  const chosen = await resolveRadarMarkedFollows({ home, stateHome, numbers: ["2"] });
+  assert.equal(chosen.selected[0].itemId, 43);
+  const candidates = await resolveRadarCandidates({ home, date: chosen.selected[0].date, numbers: [String(chosen.selected[0].index)] });
+  assert.equal(candidates[0].itemId, 43);
+  assert.equal((await site.follow(43)).taskId, undefined);
+  assert.equal((await resolveRadarMarkedFollows({ home, stateHome, all: true })).selected.length, 2);
+  await assert.rejects(() => resolveRadarMarkedFollows({ home, stateHome, numbers: ["1", "2"] }), /每次选择一条/u);
+  await site.markFollow(42, false);
+  const single = await resolveRadarMarkedFollows({ home, stateHome });
+  assert.equal(single.selected[0].itemId, 43);
+  await site.setFollow(43, { ...single.selected[0], status: "pending", taskId: "task-43", sourcePath: "/fixture/source.md" });
+  assert.deepEqual(await site.markedFollows(), []);
+  const recovery = recoverableRadarFollows({ items: { marked: { status: "marked", itemId: 99 }, task: await site.follow(43) } });
+  assert.deepEqual(recovery.map((item) => item.taskId), ["task-43"], "pure marks are never executed as crash recovery");
 });
 
 test("radar capture source freezes real stored content and is reused without refetch", async (t) => {

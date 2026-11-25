@@ -58,7 +58,7 @@ function isUnread(item) { return !item.readAt && (!item.legacy || Boolean(item.u
 function followLabel(follow) {
   return {
     pending: "待收录", running: "收录处理中", captured: "已收录", failed: "收录失败",
-    followed: "已标记跟进", ignored: "已忽略", none: "",
+    marked: "待管家处理", followed: "已标记跟进", ignored: "已忽略", none: "",
   }[follow?.status] || "";
 }
 
@@ -249,8 +249,11 @@ function fillDetail() {
   $("detail-scope").textContent = `资料范围：${item.sourceStatus || "源摘要"}`;
   $("original-link").href = item.url;
   $("follow-text").textContent = command(item);
-  $("follow-status").textContent = followLabel(item.follow);
+  const marked = item.follow?.status === "marked" && !item.follow?.taskId;
+  $("follow-status").textContent = marked ? "待管家处理，尚未创建收录任务" : followLabel(item.follow);
   $("read-toggle").textContent = item.readAt ? "标为未读" : "标为已阅";
+  $("follow-toggle").textContent = item.follow?.taskId ? followLabel(item.follow) : marked ? "取消跟进标记" : "跟进收录";
+  $("follow-toggle").disabled = Boolean(item.follow?.taskId);
 }
 
 function setDetailExpanded(expanded, restoreFocus = true) {
@@ -305,9 +308,15 @@ function closeDetail(useHistory = false) {
 async function markRead(itemIds, read) {
   try {
     const result = await request("/api/read", { method: "POST", body: JSON.stringify({ itemIds, read }) });
-    if (state.current && itemIds.includes(state.current.itemId)) {
+    const ids = new Set(itemIds);
+    state.items = state.items.map((item) => ids.has(item.itemId)
+      ? { ...item, readAt: read ? (item.readAt || result.at) : null }
+      : item);
+    if (state.current && ids.has(state.current.itemId)) {
       state.current = { ...state.current, readAt: read ? (state.current.readAt || result.at) : null };
     }
+    render();
+    fillDetail();
     await Promise.all([load(), loadSummary()]);
     toast(read ? `已将 ${itemIds.length} 条标为已阅` : `已恢复 ${itemIds.length} 条为未读`);
   } catch (error) { toast(error.message); }
@@ -327,6 +336,30 @@ async function copyFollow() {
     area.remove();
   }
   toast("已复制，请粘贴到飞书发送");
+}
+
+async function markFollow() {
+  if (!state.current) return;
+  const itemId = state.current.itemId;
+  const marked = !(state.current.follow?.status === "marked" && !state.current.follow?.taskId);
+  $("follow-toggle").disabled = true;
+  try {
+    const result = await request("/api/follow", { method: "POST", body: JSON.stringify({ itemId, marked }) });
+    const follow = result.follow ?? { status: "none" };
+    state.items = state.items.map((item) => item.itemId === itemId ? { ...item, follow } : item);
+    if (state.current?.itemId === itemId) {
+      state.current = { ...state.current, follow };
+      fillDetail();
+    }
+    render();
+    if (follow.taskId) toast(`已有真实任务：${followLabel(follow)}，未覆盖任务状态`);
+    else if (follow.status === "marked") toast("已标记，待管家处理");
+    else if (follow.status === "none") toast("已取消跟进标记");
+    else toast(`状态已更新：${followLabel(follow)}`);
+  } catch (error) {
+    if (state.current?.itemId === itemId) fillDetail();
+    toast(error.message);
+  }
 }
 
 async function loadSummary() {
@@ -376,7 +409,7 @@ $("read-toggle").addEventListener("click", () => state.current && markRead([stat
 $("read-page").addEventListener("click", () => markRead(state.items.filter(isUnread).map((item) => item.itemId), true));
 $("undo-page").addEventListener("click", () => markRead(state.items.filter((item) => item.readAt).map((item) => item.itemId), false));
 $("copy-follow").addEventListener("click", copyFollow);
-$("detail-copy").addEventListener("click", copyFollow);
+$("follow-toggle").addEventListener("click", markFollow);
 $("expand-detail").addEventListener("click", () => setDetailExpanded(!$("detail-pane").classList.contains("is-expanded")));
 $("theme-toggle").addEventListener("click", () => {
   const dark = document.documentElement.dataset.theme === "dark";

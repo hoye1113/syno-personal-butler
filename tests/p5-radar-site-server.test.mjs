@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { createRadarSiteServer } from "../experiments/superagent-p0/p5-radar/site-server.mjs";
+import { createRadarSiteStore } from "../experiments/superagent-p0/p5-radar/site-store.mjs";
 import { openStore } from "../experiments/superagent-p0/p5-radar/store.mjs";
 
 async function runningServer(t, options = {}) {
@@ -39,6 +40,36 @@ test("radar HTTP serves real data, static assets and persistent read mutations",
   });
   assert.equal(csrf.status, 403);
   assert.equal((await (await fetch(`${origin}/api/items?view=read`)).json()).items.length, 1);
+});
+
+test("follow API marks intents immediately, reverses only marks and never overwrites a Task", async (t) => {
+  const { home, origin } = await runningServer(t);
+  const write = (body, requestOrigin = origin) => fetch(`${origin}/api/follow`, {
+    method: "POST", headers: { Origin: requestOrigin, "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  assert.equal((await write({ itemId: 1, marked: true }, "https://attacker.example")).status, 403);
+  assert.equal((await write({ itemId: 1, marked: "yes" })).status, 400);
+  assert.equal((await write({ itemId: true, marked: true })).status, 400);
+  assert.equal((await write({ itemId: 999, marked: true })).status, 404);
+  const first = await (await write({ itemId: 1, marked: true })).json();
+  assert.equal(first.follow.status, "marked");
+  assert.equal(first.follow.source, "web");
+  assert.equal(first.follow.taskId, undefined);
+  const duplicate = await (await write({ itemId: 1, marked: true })).json();
+  assert.equal(duplicate.follow.markedAt, first.follow.markedAt);
+  const listed = await (await fetch(`${origin}/api/items?view=followed`)).json();
+  assert.equal(listed.items[0].follow.status, "marked");
+  const cancelled = await (await write({ itemId: 1, marked: false })).json();
+  assert.equal(cancelled.follow, null);
+  assert.equal((await (await fetch(`${origin}/api/items?view=followed`)).json()).items.length, 0);
+  await write({ itemId: 1, marked: true });
+  const store = createRadarSiteStore({ home });
+  const marked = await store.follow(1);
+  await store.setFollow(1, { ...marked, status: "pending", taskId: "task-existing" });
+  const protectedTask = await (await write({ itemId: 1, marked: false })).json();
+  assert.equal(protectedTask.follow.status, "pending");
+  assert.equal(protectedTask.follow.taskId, "task-existing");
+  assert.equal(protectedTask.follow.markedAt, marked.markedAt);
 });
 
 test("legacy manifest filtering happens after read-only source and feedback hydration", async (t) => {
@@ -90,6 +121,7 @@ test("radar authentication protects HTML and APIs without exposing credentials",
   const anonymous = await fetch(`${origin}/api/items`, { redirect: "manual" });
   assert.equal(anonymous.status, 401);
   assert.equal((await fetch(`${origin}/api/growth?board=github`)).status, 401);
+  assert.equal((await fetch(`${origin}/api/follow`, { method: "POST", headers: { Origin: origin }, body: JSON.stringify({ itemId: 1, marked: true }) })).status, 401);
   assert.equal((await fetch(`${origin}/styles.css`)).status, 200, "login stylesheet must be public");
   const denied = await fetch(`${origin}/login`, { method: "POST", headers: { Origin: origin, "Content-Type": "application/x-www-form-urlencoded" }, body: "password=wrong", redirect: "manual" });
   assert.equal(denied.status, 403);
@@ -119,4 +151,10 @@ test("radar authentication protects HTML and APIs without exposing credentials",
     body: JSON.stringify({ itemIds: [1], read: true }),
   });
   assert.equal(opaqueMutation.status, 403);
+  const opaqueFollow = await fetch(`${origin}/api/follow`, {
+    method: "POST",
+    headers: { Cookie: cookie, Origin: "null", "Sec-Fetch-Site": "same-origin", "Content-Type": "application/json" },
+    body: JSON.stringify({ itemId: 1, marked: true }),
+  });
+  assert.equal(opaqueFollow.status, 403);
 });

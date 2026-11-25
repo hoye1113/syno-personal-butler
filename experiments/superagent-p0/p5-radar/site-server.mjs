@@ -162,6 +162,17 @@ export async function createRadarSiteServer({ home, stateHome = home, databasePa
         const result = await operation;
         return send(res, 200, result);
       }
+      if (url.pathname === "/api/follow" && req.method === "POST") {
+        assertOrigin(req);
+        const input = JSON.parse(await body(req));
+        if (!Number.isSafeInteger(input.itemId) || input.itemId <= 0 || typeof input.marked !== "boolean") {
+          return send(res, 400, { error: "itemId 或 marked 无效" });
+        }
+        const operation = mutation.then(() => store.markFollow(input.itemId, input.marked), () => store.markFollow(input.itemId, input.marked));
+        mutation = operation.catch(() => {});
+        const follow = await operation;
+        return send(res, 200, { itemId: input.itemId, marked: input.marked, follow });
+      }
       const asset = STATIC.get(url.pathname);
       if (asset && req.method === "GET") {
         return send(res, 200, await fs.readFile(path.join(ROOT, asset[0])), asset[1]);
