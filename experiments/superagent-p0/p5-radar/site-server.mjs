@@ -49,12 +49,20 @@ async function body(req, limit = 32_768) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-function assertOrigin(req) {
+function assertOrigin(req, { allowOpaqueSameOrigin = false } = {}) {
   const origin = req.headers.origin;
   if (!origin) throw Object.assign(new Error("写请求缺少 Origin"), { status: 403 });
+  if (origin === "null" && allowOpaqueSameOrigin
+    && req.headers["sec-fetch-site"] === "same-origin") return;
   let parsed;
   try { parsed = new URL(origin); } catch {
-    console.log(JSON.stringify({ event: "radar-origin-invalid", origin: String(origin).slice(0, 200) }));
+    console.log(JSON.stringify({
+      event: "radar-origin-invalid",
+      origin: String(origin).slice(0, 200),
+      fetchSite: String(req.headers["sec-fetch-site"] || ""),
+      fetchMode: String(req.headers["sec-fetch-mode"] || ""),
+      fetchDest: String(req.headers["sec-fetch-dest"] || ""),
+    }));
     throw Object.assign(new Error("Origin 无效"), { status: 403 });
   }
   if (!["http:", "https:"].includes(parsed.protocol) || parsed.host.toLowerCase() !== String(req.headers.host).toLowerCase()) {
@@ -120,7 +128,7 @@ export async function createRadarSiteServer({ home, stateHome = home, databasePa
         return send(res, 200, loginPage(), "text/html; charset=utf-8");
       }
       if (url.pathname === "/login" && req.method === "POST") {
-        assertOrigin(req);
+        assertOrigin(req, { allowOpaqueSameOrigin: true });
         const fields = new URLSearchParams(await body(req));
         const password = fields.get("password") || "";
         if (!auth || !sameSecret(password, auth.password ?? "")) {

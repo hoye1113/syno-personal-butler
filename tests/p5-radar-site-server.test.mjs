@@ -93,10 +93,30 @@ test("radar authentication protects HTML and APIs without exposing credentials",
   assert.equal((await fetch(`${origin}/styles.css`)).status, 200, "login stylesheet must be public");
   const denied = await fetch(`${origin}/login`, { method: "POST", headers: { Origin: origin, "Content-Type": "application/x-www-form-urlencoded" }, body: "password=wrong", redirect: "manual" });
   assert.equal(denied.status, 403);
+  const opaqueCrossSite = await fetch(`${origin}/login`, {
+    method: "POST",
+    headers: { Origin: "null", "Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "navigate", "Sec-Fetch-Dest": "document", "Content-Type": "application/x-www-form-urlencoded" },
+    body: "password=correct+horse",
+    redirect: "manual",
+  });
+  assert.equal(opaqueCrossSite.status, 403);
+  const opaqueLogin = await fetch(`${origin}/login`, {
+    method: "POST",
+    headers: { Origin: "null", "Sec-Fetch-Site": "same-origin", "Sec-Fetch-Mode": "navigate", "Sec-Fetch-Dest": "document", "Content-Type": "application/x-www-form-urlencoded" },
+    body: "password=correct+horse",
+    redirect: "manual",
+  });
+  assert.equal(opaqueLogin.status, 303);
   const login = await fetch(`${origin}/login`, { method: "POST", headers: { Origin: origin, "Content-Type": "application/x-www-form-urlencoded" }, body: "password=correct+horse", redirect: "manual" });
   assert.equal(login.status, 303);
   const cookie = login.headers.get("set-cookie").split(";")[0];
   assert.match(login.headers.get("set-cookie"), /HttpOnly; SameSite=Lax/u);
   const authorized = await fetch(`${origin}/api/items`, { headers: { Cookie: cookie } });
   assert.equal(authorized.status, 200);
+  const opaqueMutation = await fetch(`${origin}/api/read`, {
+    method: "POST",
+    headers: { Cookie: cookie, Origin: "null", "Sec-Fetch-Site": "same-origin", "Sec-Fetch-Mode": "navigate", "Sec-Fetch-Dest": "document", "Content-Type": "application/json" },
+    body: JSON.stringify({ itemIds: [1], read: true }),
+  });
+  assert.equal(opaqueMutation.status, 403);
 });
