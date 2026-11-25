@@ -1,25 +1,27 @@
 # Syno 当前运维手册
 
-> 更新日期：2026-11-23。本文只描述 P3 native Host、Pi／OpenCode Go、P5 与飞书的当前运维方式。DSH、3088／8888、旧 Harness 恢复和 Windows 服务步骤已经不属于当前生产入口。
+> 更新日期：2026-11-25。本文只描述 P3 native Host、Pi／OpenCode Go、P5 与飞书的当前运维方式。DSH、3088／8888、旧 Harness 恢复和 Windows 服务步骤已经不属于当前生产入口。
 
 ## 1. 当前生产基线
 
-2026-11-23 部署后只读验收确认的状态如下；状态会漂移，操作前必须重新执行只读检查。
+2026-11-25 P5 网站与增长榜部署后验收确认的状态如下；状态会漂移，操作前必须重新执行只读检查。
 
 | 项 | 最后确认值 |
 |---|---|
 | 代码目录 | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/current` |
-| 不可变 release | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261123T141102215Z-a82bac5ac798` |
-| 公开分支 / 提交 | `main` / `a82bac5ac79858adaa7055ff7bb7b2735a7a685a` |
+| 不可变 release | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261125T023235128Z-a735322d3bc6` |
+| 公开分支 / 提交 | `main` / `a735322d3bc68126ad1dd5aabea9c219d740502b` |
 | Host 入口 | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/current/experiments/superagent-p0/real-feishu-client.mjs` |
 | launchd 服务 | `com.syno.butler.host` |
 | plist | `/Users/hoye/Library/LaunchAgents/com.syno.butler.host.plist` |
-| Host PID / generation | `27186` / `15` |
+| Host PID / generation | `9157` / `18` |
 | pending / hold | `0 / 0` |
 | 飞书 adapter | `running=true`、`available=true` |
-| active P5 插件 | `2026.11.22.7`（本次部署未修改） |
+| active P5 插件 | `2026.11.22.8`（真实 AST dry-run 45 条／45 details／509 blocks 后激活） |
+| 雷达网站 | `https://radar.hoyework.online`，`com.syno.butler.radar`，监听 `127.0.0.1:61210` |
+| Tunnel | `com.agentconnect.tunnel`，保留 `console.hoyework.online` 并新增 `radar.hoyework.online` |
 
-生产已从旧 worktree 切换到不可变 release／current 布局。发布 prepare 的完整 gate 为 748 tests／742 pass／6 skipped／0 fail；activate 与真实入口加载通过。重启前确认旧 PID `62024` 退出，再启动新 PID `27186`；验收时 frozen=false、active Task、pending Decision、queued／unknown delivery、handover pending／hold 均为 0，reconciliation.blocking=false。
+本次 prepare 完整 gate 为 772 tests／766 pass／6 skipped／0 fail。Host 单消费者重启前确认旧 PID `9083` 退出，再启动 PID `9157`；验收时 frozen=false、active Task、pending Decision、queued／unknown delivery、handover pending／hold 均为 0，reconciliation.blocking=false。网站认证、状态和日志独立于 P5 业务 home； active 插件从不可变 release 加载，避免 Host 新代码与旧 worktree AST 混用。
 
 ## 2. 目录与数据边界
 
@@ -78,7 +80,13 @@ pgrep -fl '/experiments/superagent-p0/real-feishu-client.mjs'
 ```bash
 jq . /Users/hoye/Documents/workspace/syno-personal-butler/.local-data/p5-radar/settings.json
 jq . /Users/hoye/Documents/workspace/syno-personal-butler/.runtime-p0/plugins/p5-radar/active.json
+jq . /Users/hoye/Documents/workspace/syno-personal-butler/.runtime-p0/p5-scheduler.json
+jq . /Users/hoye/Documents/workspace/syno-personal-butler/.local-data/p5-radar/radar-growth-status.json
+launchctl print gui/$(id -u)/com.syno.butler.radar
+launchctl print gui/$(id -u)/com.agentconnect.tunnel
 ```
+
+增长榜在 09:30 采集后、10:00 日报前同日最多尝试一次。两个来源独立结算；失败只记录 `lastGrowthStatus=failed`，不得每个 tick 重试，也不得阻断资讯日报。网站回退最近好快照并显示 stale，不得伪造今日数据。公网 `/api/growth` 必须登录；匿名返回 401。登录对 `Origin: null` 的唯一兼容仅限 `Sec-Fetch-Site: same-origin`，其他写接口不接受空 Origin。
 
 日常状态优先在绑定 Owner 的飞书私聊发送 `雷达状态`。每日展示量、偏好权重和反馈效果需要跨 2–3 天观察；一次成功采集或一篇日报不能代替多日评估。
 
