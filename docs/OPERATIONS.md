@@ -4,24 +4,25 @@
 
 ## 1. 当前生产基线
 
-2026-11-25 P5 网站与增长榜部署后验收确认的状态如下；状态会漂移，操作前必须重新执行只读检查。
+2026-11-25 P5 桌面阅读与网站跟进部署后确认的状态如下；需要登录的公网交互验收仍待完成，状态会漂移，操作前必须重新执行只读检查。
 
 | 项 | 最后确认值 |
 |---|---|
 | 代码目录 | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/current` |
-| 不可变 release | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261125T023235128Z-a735322d3bc6` |
-| 公开分支 / 提交 | `main` / `a735322d3bc68126ad1dd5aabea9c219d740502b` |
+| 不可变 release | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261125T052937419Z-f5b56a338eb0` |
+| 公开分支 / 提交 | `main` / `f5b56a338eb042ebb1cc826f730d4f5393704f17` |
 | Host 入口 | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/current/experiments/superagent-p0/real-feishu-client.mjs` |
 | launchd 服务 | `com.syno.butler.host` |
 | plist | `/Users/hoye/Library/LaunchAgents/com.syno.butler.host.plist` |
-| Host PID / generation | `9157` / `18` |
+| Host PID / generation | `54603` / `19` |
 | pending / hold | `0 / 0` |
 | 飞书 adapter | `running=true`、`available=true` |
 | active P5 插件 | `2026.11.22.8`（真实 AST dry-run 45 条／45 details／509 blocks 后激活） |
-| 雷达网站 | `https://radar.hoyework.online`，`com.syno.butler.radar`，监听 `127.0.0.1:61210` |
-| Tunnel | `com.agentconnect.tunnel`，保留 `console.hoyework.online` 并新增 `radar.hoyework.online` |
+| 雷达网站 | `https://radar.hoyework.online`，`com.syno.butler.radar`，PID `54606`，监听 `127.0.0.1:61210` |
+| Host / 网站共享状态 | `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/p5-radar-site/state`（`P5_RADAR_STATE_HOME`） |
+| Tunnel | `com.agentconnect.tunnel`，PID `8915`，保留 `console.hoyework.online` 与 `radar.hoyework.online`，本轮未重启 |
 
-本次 prepare 完整 gate 为 772 tests／766 pass／6 skipped／0 fail。Host 单消费者重启前确认旧 PID `9083` 退出，再启动 PID `9157`；验收时 frozen=false、active Task、pending Decision、queued／unknown delivery、handover pending／hold 均为 0，reconciliation.blocking=false。网站认证、状态和日志独立于 P5 业务 home； active 插件从不可变 release 加载，避免 Host 新代码与旧 worktree AST 混用。
+本次 prepare 完整 gate 为 776 tests／770 pass／6 skipped／0 fail。Host 单消费者重启前确认旧 PID `9157` 退出，再启动 PID `54603`；网站旧 PID `91294` 退出后启动 `54606`。验收时 frozen=false、active Task、pending Decision、queued／unknown delivery、handover pending／hold 均为 0，reconciliation.blocking=false，adapter running／available=true。两份旧 follow-state 均为 ENOENT，因此以 0 itemId／0 taskId 初始化共享状态，没有覆盖已阅状态；迁移与 plist 备份位于 `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/launchd-backups/20261125T053505Z-f5b56a338eb0`。公网匿名 summary／follow 均为 401、跨站登录为 403，公网 CSS 与 release SHA-256 一致；需要登录的 UI、已阅、marked／撤销和已认证跨站写 403 尚待人工登录后的生产验收。active 插件继续从不可变 release 加载并保持 `.8`。
 
 ## 2. 目录与数据边界
 
@@ -119,6 +120,8 @@ node scripts/deploy-production.mjs activate --release <上一步生成的绝对 
 这两条命令都**不重启 Host**，也不复制 `.env`、运行数据或 vault。当前生产 launchd 已指向 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/current`；`current` 是软链，激活新 release 后仍须按授权窗口重启并验收 Host。
 
 回滚代码时，将 `activate --release` 指向上一份完整 release。若需要回退本次迁移前的旧布局，旧 worktree `/Users/hoye/Documents/workspace/syno-personal-butler-prod` 保持 `a2a68bec8`，旧 launchd 配置备份为 `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/launchd-backups/20261123T141453Z-a82bac5ac/com.syno.butler.host.plist`。回退前必须确认当前消费者退出，恢复后按同一清单验收，不得并行启动两个 Host。
+
+本次 P5 阅读／跟进更新的上一 release 是 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261125T023235128Z-a735322d3bc6`，Host／网站 plist 与状态迁移证据位于 `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/launchd-backups/20261125T053505Z-f5b56a338eb0`。代码、两个 plist 和共享 follow-state 必须成组回滚；具体保真步骤见 `/Users/hoye/Documents/workspace/syno-personal-butler-p0-hardening/docs/plans/superagent-p0/P5-FOLLOW-UI-PRODUCTION-HANDOFF.md`。
 
 ## 6. 服务生命周期
 

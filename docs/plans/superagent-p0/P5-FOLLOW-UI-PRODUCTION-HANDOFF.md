@@ -1,6 +1,6 @@
 # P5 桌面阅读与网站跟进生产更新交接
 
-状态：本地实现与隔离验收完成，等待 Owner 单独批准推送、release、生产状态迁移和服务重启。当前未修改生产。
+状态：两个功能提交已推送 main，不可变 release、共享 stateHome 和单实例 Host／网站已上线；匿名公网边界已验收。需要登录的公网 UI、已阅、marked／撤销及已认证跨站写保护仍待 Owner 在隔离浏览器手动登录后完成，不能宣称本轮全部验收通过。
 
 ## 本地完成证据
 
@@ -39,8 +39,21 @@
 - 桌面 800／1280／1920 与移动端正文完整可读，暗色按钮默认、hover、focus、disabled 对比清晰，全屏可通过 Esc 退出。
 - Host、网站和 Tunnel 保持单实例，无新增 unknown／hold 被隐瞒，无生产数据被测试覆盖。
 
+## 2026-11-25 生产执行证据
+
+- main 已从 `739b3c231dba4dfda78f2e8078f7921ab42630e2` 推送到 `f5b56a338eb042ebb1cc826f730d4f5393704f17`。
+- 新 release 为 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261125T052937419Z-f5b56a338eb0`，`current` 已原子指向该目录。prepare 再次运行完整 gate：776 tests、770 pass、6 skipped、0 fail，仓库 3601 files 与活跃文档 7 files 校验通过。
+- 旧 Host PID `9157` 与旧网站 PID `91294` 均确认退出后才 bootstrap。新 Host PID `54603`、generation `19`，新网站 PID `54606`；Tunnel 保持 PID `8915`，未重启。Host frozen=false，active Task、pending Decision、queued／unknown delivery、handover pending／hold 均为 0，adapter running／available=true，active 插件保持 `2026.11.22.8`。
+- 实际网站 stateHome 是 `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/p5-radar-site/state`，Host 已增加完全相同的 `P5_RADAR_STATE_HOME`；`P5_RADAR_HOME` 仍只指向日报内容源。
+- 停机后复核 P5 home 与实际网站 stateHome 的 follow-state 均为 ENOENT，锁文件不存在。因此共享状态以 `{schema:1,items:{}}` 原子初始化，合并 itemId／taskId／冲突均为 0；没有旧 Task 映射可合并，也没有创建新 Task。未写入或覆盖 `radar-read-state.json`。
+- plist 备份、迁移事实与 SHA-256 保存在 `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/launchd-backups/20261125T053505Z-f5b56a338eb0`。
+- 公网匿名 `GET /api/summary` 与 `POST /api/follow` 均返回 401；`Origin:null` 且 `Sec-Fetch-Site:cross-site` 的登录写请求返回 403。公网 `styles.css` 与 release 文件 SHA-256 均为 `cc739a1bb632db73512780bff8724e4c5439cb4ef96a8e5d2430c1c6479c87d3`。
+- 隔离 Agent Window 到达生产登录页但没有现成登录态，且未读取密码、Cookie 或认证文件。故桌面／移动端暗色阅读、全屏 Esc、已阅即时状态、marked／撤销、刷新持久化及已认证跨站 `/api/follow` 403 仍未做生产点击验收；这些项目只有隔离 fixture 证据，不得记为生产通过。
+- 从 active release 只读调用 `resolveRadarMarkedFollows` 与 `recoverableRadarFollows`，共享状态分别返回 0 marked、0 selected、0 recoverable；未触发外部模型、飞书或 vault 收录。
+
 ## 回滚
 
+- 本次成组回滚的上一 release 是 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261125T023235128Z-a735322d3bc6`，plist 来源为上述 `20261125T053505Z-f5b56a338eb0` 备份；先停止两个写入进程并另存当前共享 follow-state，再恢复代码、配置和与旧 Host 兼容的 Task 映射，不得直接丢弃上线后新增事实。
 - 有 active 收录或结果未知时先对账，不在执行中直接切换状态文件。
 - Host、网站、release、stateHome 配置和 follow-state 必须作为一组回滚。旧 Host 只读取 P5 home，因此切回旧代码前须从已合并状态恢复其 Task 映射，不能让 Host 回到另一份过期文件。
 - 保留迁移前备份、合并后的 marked／Task／Result Lane 事实和差异记录，不删除、不伪造。
