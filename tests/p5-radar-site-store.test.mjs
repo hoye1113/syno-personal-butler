@@ -55,6 +55,36 @@ test("site snapshot preserves numbering and read state is persistent and reversi
   assert.equal((await store.summary()).days[0].unreadCount, 1);
 });
 
+test("reactions are persistent, idempotent and imply read without creating follow state", async (t) => {
+  const home = await fixture(t);
+  let now = new Date("2026-11-25T02:00:00Z");
+  const store = createRadarSiteStore({ home, now: () => now });
+  await store.publish(buildDocumentAst({ date: "2026-11-25", entries: [entry(7), entry(8)] }));
+  const liked = await store.setReaction(7, "like");
+  assert.equal(liked.reaction, "like");
+  assert.equal(liked.readAt, "2026-11-25T02:00:00.000Z");
+  const firstRecord = JSON.parse(await fs.readFile(path.join(home, "radar-reactions.json"), "utf8")).items["7"];
+  now = new Date("2026-11-25T02:01:00Z");
+  await store.setReaction(7, "like");
+  const duplicateRecord = JSON.parse(await fs.readFile(path.join(home, "radar-reactions.json"), "utf8")).items["7"];
+  assert.equal(duplicateRecord.reactedAt, firstRecord.reactedAt);
+  assert.equal(duplicateRecord.updatedAt, firstRecord.updatedAt);
+  assert.deepEqual((await store.items()).map((item) => item.itemId), [8, 7]);
+  await store.setReaction(7, "dislike");
+  const disliked = (await store.items({ view: "read" }))[0];
+  assert.equal(disliked.reaction, "dislike");
+  assert.equal(disliked.readAt, liked.readAt);
+  assert.equal(disliked.follow.status, "none");
+  now = new Date("2026-11-25T02:02:00Z");
+  const cancelled = await store.setReaction(7, null);
+  assert.equal(cancelled.reaction, null);
+  assert.equal(cancelled.readAt, liked.readAt, "cancelling a reaction never creates unread debt");
+  assert.equal((await store.items({ view: "read" }))[0].reaction, null);
+  await assert.rejects(() => store.setReaction(7, "love"), /reaction 参数无效/u);
+  await assert.rejects(() => store.setReaction(999, "like"), /不存在/u);
+});
+
+
 test("follow state serializes independent Host writers and preserves ignore feedback", async (t) => {
   const home = await fixture(t);
   const first = createRadarSiteStore({ home });

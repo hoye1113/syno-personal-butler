@@ -1,17 +1,20 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import {
   applyExplicitPreference,
+  applyRadarReactions,
   ensurePreferences,
+  loadRadarReactions,
   loadPreferences,
   rankEntries,
   recordFeedback,
   seedPreferences,
 } from "../experiments/superagent-p0/p5-radar/preferences.mjs";
+import { buildDailyDoc } from "../experiments/superagent-p0/p5-radar/daily-doc.mjs";
 import { openStore } from "../experiments/superagent-p0/p5-radar/store.mjs";
 
 function tempRoot() {
@@ -83,6 +86,58 @@ test("feedback and explicit preference update weights without filtering", () => 
   const lessRecommended = applyExplicitPreference({ preferences, text: "以后少推 coding 内容" });
   assert.equal(lessRecommended.negative, true);
   assert.equal(preferences.topics["AI Coding / 工程"], 1);
+});
+
+test("reaction overlays affect the next ranking without cumulative writes or filtering", async () => {
+  const root = tempRoot();
+  const store = openStore({ file: path.join(root, "radar.db") });
+  try {
+    store.seedSources([
+      { id: "s1", name: "S1", kind: "rss" },
+      { id: "s2", name: "S2", kind: "rss" },
+    ]);
+    const liked = store.insertItem({ sourceId: "s1", externalId: "liked", title: "Liked", url: "https://example.com/liked" });
+    const disliked = store.insertItem({ sourceId: "s2", externalId: "disliked", title: "Disliked", url: "https://example.com/disliked" });
+    store.saveScore(liked.id, { score: 60, reason: "x", topics: ["AI Coding / 工程"], excluded: false, sourceWeight: 1 });
+    store.saveScore(disliked.id, { score: 60, reason: "x", topics: ["模型 / 前沿"], excluded: false, sourceWeight: 1 });
+    const reactions = { schema: 1, items: {
+      [liked.id]: { itemId: liked.id, reaction: "like" },
+      [disliked.id]: { itemId: disliked.id, reaction: "dislike" },
+    } };
+    writeFileSync(path.join(root, "radar-reactions.json"), JSON.stringify(reactions));
+    const preferences = { topics: {}, sources: {}, explicit: [], seededAt: "x" };
+    applyRadarReactions({ preferences, reactions: await loadRadarReactions(root), store });
+    assert.equal(preferences.topics["AI Coding / 工程"], 1);
+    assert.equal(preferences.topics["模型 / 前沿"], -1);
+    assert.equal(preferences.sources.s1, 0.5);
+    assert.equal(preferences.sources.s2, -0.5);
+    const entries = [
+      entry(100, ["AI Coding / 工程"], "s1", 60, "2026-11-25T00:00:00Z"),
+      entry(101, ["模型 / 前沿"], "s2", 60, "2026-11-24T00:00:00Z"),
+    ];
+    const ranked = rankEntries(entries, preferences);
+    assert.equal(ranked[0].item.item_id, 100);
+    assert.equal(ranked.length, 2);
+    assert.deepEqual((await loadPreferences(root)).topics, {}, "reaction overlays never rewrite Host preferences");
+    const codingFuture = store.insertItem({ sourceId: "s1", externalId: "coding-future", title: "Coding future", url: "https://example.com/coding-future", publishedAt: "2026-11-25T01:00:00Z" });
+    const modelFuture = store.insertItem({ sourceId: "s2", externalId: "model-future", title: "Model future", url: "https://example.com/model-future", publishedAt: "2026-11-25T01:00:00Z" });
+    store.saveScore(codingFuture.id, { score: 60, reason: "x", topics: ["AI Coding / 工程"], excluded: false, sourceWeight: 1 });
+    store.saveScore(modelFuture.id, { score: 60, reason: "x", topics: ["模型 / 前沿"], excluded: false, sourceWeight: 1 });
+    for (const item of [codingFuture, modelFuture]) {
+      store.saveArticleSummary(item.id, { model: "fixture", titleZh: item.title, summaryZh: "这是一段足够长且无需外部模型的真实隔离摘要。", points: [], whyZh: "", sourceStatus: "article" });
+    }
+    writeFileSync(path.join(root, "daily-doc-2026-11-24.json"), JSON.stringify({ date: "2026-11-24", items: [{ itemId: liked.id }, { itemId: disliked.id }] }));
+    const daily = await buildDailyDoc({ store, home: root, date: "2026-11-25", renderOnly: true });
+    assert.deepEqual(daily.entries.map((entry) => entry.item.item_id), [codingFuture.id, modelFuture.id], "the real daily-doc chain applies reaction overlays");
+    reactions.items[liked.id].reaction = "dislike";
+    writeFileSync(path.join(root, "radar-reactions.json"), JSON.stringify(reactions));
+    const switched = { topics: {}, sources: {}, explicit: [], seededAt: "x" };
+    applyRadarReactions({ preferences: switched, reactions: await loadRadarReactions(root), store });
+    assert.equal(switched.topics["AI Coding / 工程"], -1, "switching reaction reverses the old signal without accumulation");
+  } finally {
+    store.close();
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("ranking keeps every entry, raises preferred, and reserves exploration", () => {

@@ -66,7 +66,7 @@ function syncListSelection() {
 function followLabel(follow) {
   return {
     pending: "待收录", running: "收录处理中", captured: "已收录", failed: "收录失败",
-    marked: "待管家处理", followed: "已标记跟进", ignored: "已忽略", none: "",
+    marked: "已收藏 · 待处理", followed: "已标记跟进", ignored: "已忽略", none: "",
   }[follow?.status] || "";
 }
 
@@ -151,6 +151,7 @@ function render() {
     footer.append(element("span", "", item.kind === "video" ? "视频" : "文章"));
     footer.append(element("span", "", formatDate(item.publishedAt)));
     if (item.readAt) footer.append(element("span", "read-mark", "已阅"));
+    if (item.reaction) footer.append(element("span", `reaction-mark${item.reaction === "dislike" ? " is-dislike" : ""}`, item.reaction === "like" ? "已点赞" : "已点踩"));
     const follow = followLabel(item.follow);
     if (follow) footer.append(element("span", "follow-mark", follow));
     body.append(footer);
@@ -270,10 +271,16 @@ function fillDetail() {
   $("original-link").href = item.url;
   $("follow-text").textContent = command(item);
   const marked = item.follow?.status === "marked" && !item.follow?.taskId;
-  $("follow-status").textContent = marked ? "待管家处理，尚未创建收录任务" : followLabel(item.follow);
-  $("read-toggle").textContent = item.readAt ? "标为未读" : "标为已阅";
-  $("follow-toggle").textContent = item.follow?.taskId ? followLabel(item.follow) : marked ? "取消跟进标记" : "跟进收录";
-  $("follow-toggle").disabled = Boolean(item.follow?.taskId);
+  $("follow-status").textContent = marked ? "已收藏，待管家处理，尚未创建收录任务；再次点击可取消收藏" : followLabel(item.follow);
+  for (const [id, reaction, activeLabel] of [["like-toggle", "like", "已点赞"], ["dislike-toggle", "dislike", "已点踩"]]) {
+    const active = item.reaction === reaction;
+    $(id).textContent = active ? activeLabel : reaction === "like" ? "点赞" : "点踩";
+    $(id).setAttribute("aria-pressed", String(active));
+    $(id).disabled = false;
+  }
+  $("favorite-toggle").textContent = item.follow?.taskId ? followLabel(item.follow) : marked ? "取消收藏" : "收藏";
+  $("favorite-toggle").setAttribute("aria-pressed", String(Boolean(marked)));
+  $("favorite-toggle").disabled = Boolean(item.follow?.taskId);
 }
 
 function setDetailExpanded(expanded, restoreFocus = true) {
@@ -360,11 +367,35 @@ async function copyFollow() {
   toast("已复制，请粘贴到飞书发送");
 }
 
+function setReactionBusy(busy) {
+  for (const id of ["like-toggle", "dislike-toggle", "favorite-toggle"]) $(id).disabled = busy;
+}
+
+async function markReaction(reaction) {
+  if (!state.current) return;
+  const itemId = state.current.itemId;
+  const next = state.current.reaction === reaction ? null : reaction;
+  setReactionBusy(true);
+  try {
+    const result = await request("/api/reaction", { method: "POST", body: JSON.stringify({ itemId, reaction: next }) });
+    state.items = state.items.map((item) => item.itemId === itemId ? { ...item, reaction: result.reaction, readAt: result.readAt } : item);
+    if (state.current?.itemId === itemId) {
+      state.current = { ...state.current, reaction: result.reaction, readAt: result.readAt };
+    }
+    render();
+    toast(next === "like" ? "已点赞并标为已读" : next === "dislike" ? "已点踩并标为已读" : "已取消反应，保留已读状态");
+  } catch (error) {
+    toast(error.message);
+  } finally {
+    if (state.current?.itemId === itemId) fillDetail();
+  }
+}
+
 async function markFollow() {
   if (!state.current) return;
   const itemId = state.current.itemId;
   const marked = !(state.current.follow?.status === "marked" && !state.current.follow?.taskId);
-  $("follow-toggle").disabled = true;
+  $("favorite-toggle").disabled = true;
   try {
     const result = await request("/api/follow", { method: "POST", body: JSON.stringify({ itemId, marked }) });
     const follow = result.follow ?? { status: "none" };
@@ -375,8 +406,8 @@ async function markFollow() {
     }
     render();
     if (follow.taskId) toast(`已有真实任务：${followLabel(follow)}，未覆盖任务状态`);
-    else if (follow.status === "marked") toast("已标记，待管家处理");
-    else if (follow.status === "none") toast("已取消跟进标记");
+    else if (follow.status === "marked") toast("已收藏，待管家处理");
+    else if (follow.status === "none") toast("已取消收藏");
     else toast(`状态已更新：${followLabel(follow)}`);
   } catch (error) {
     if (state.current?.itemId === itemId) fillDetail();
@@ -387,6 +418,7 @@ async function markFollow() {
 async function loadSummary() {
   const value = await request("/api/summary");
   state.days = value.days;
+  if (!state.date) $("issue-date").textContent = state.days[0]?.date || "暂无日报";
   const select = $("history-select");
   const selected = state.date;
   select.replaceChildren(element("option", "", "全部历史"));
@@ -427,11 +459,12 @@ $("history-select").addEventListener("change", (event) => {
   load();
 });
 $("close-detail").addEventListener("click", () => closeDetail(true));
-$("read-toggle").addEventListener("click", () => state.current && markRead([state.current.itemId], !state.current.readAt));
+$("like-toggle").addEventListener("click", () => markReaction("like"));
+$("dislike-toggle").addEventListener("click", () => markReaction("dislike"));
 $("read-page").addEventListener("click", () => markRead(state.items.filter(isUnread).map((item) => item.itemId), true));
 $("undo-page").addEventListener("click", () => markRead(state.items.filter((item) => item.readAt).map((item) => item.itemId), false));
 $("copy-follow").addEventListener("click", copyFollow);
-$("follow-toggle").addEventListener("click", markFollow);
+$("favorite-toggle").addEventListener("click", markFollow);
 $("expand-detail").addEventListener("click", () => setDetailExpanded(!$("detail-pane").classList.contains("is-expanded")));
 $("theme-toggle").addEventListener("click", () => {
   const dark = document.documentElement.dataset.theme === "dark";

@@ -42,6 +42,31 @@ test("radar HTTP serves real data, static assets and persistent read mutations",
   assert.equal((await (await fetch(`${origin}/api/items?view=read`)).json()).items.length, 1);
 });
 
+test("reaction API validates input, marks read and never creates a follow Task", async (t) => {
+  const { origin } = await runningServer(t);
+  const write = (body, requestOrigin = origin) => fetch(`${origin}/api/reaction`, {
+    method: "POST", headers: { Origin: requestOrigin, "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  assert.equal((await write({ itemId: 1, reaction: "like" }, "https://attacker.example")).status, 403);
+  assert.equal((await write({ itemId: 1, reaction: "love" })).status, 400);
+  assert.equal((await write({ itemId: true, reaction: "like" })).status, 400);
+  assert.equal((await write({ itemId: 999, reaction: "like" })).status, 404);
+  const liked = await (await write({ itemId: 1, reaction: "like" })).json();
+  assert.equal(liked.reaction, "like");
+  assert.ok(liked.readAt);
+  const duplicate = await (await write({ itemId: 1, reaction: "like" })).json();
+  assert.equal(duplicate.readAt, liked.readAt);
+  const listed = await (await fetch(`${origin}/api/items?view=read`)).json();
+  assert.equal(listed.items[0].reaction, "like");
+  assert.equal(listed.items[0].follow.status, "none");
+  const disliked = await (await write({ itemId: 1, reaction: "dislike" })).json();
+  assert.equal(disliked.reaction, "dislike");
+  assert.equal(disliked.readAt, liked.readAt);
+  const cancelled = await (await write({ itemId: 1, reaction: null })).json();
+  assert.equal(cancelled.reaction, null);
+  assert.equal(cancelled.readAt, liked.readAt);
+});
+
 test("follow API marks intents immediately, reverses only marks and never overwrites a Task", async (t) => {
   const { home, origin } = await runningServer(t);
   const write = (body, requestOrigin = origin) => fetch(`${origin}/api/follow`, {
@@ -122,6 +147,7 @@ test("radar authentication protects HTML and APIs without exposing credentials",
   assert.equal(anonymous.status, 401);
   assert.equal((await fetch(`${origin}/api/growth?board=github`)).status, 401);
   assert.equal((await fetch(`${origin}/api/follow`, { method: "POST", headers: { Origin: origin }, body: JSON.stringify({ itemId: 1, marked: true }) })).status, 401);
+  assert.equal((await fetch(`${origin}/api/reaction`, { method: "POST", headers: { Origin: origin }, body: JSON.stringify({ itemId: 1, reaction: "like" }) })).status, 401);
   assert.equal((await fetch(`${origin}/styles.css`)).status, 200, "login stylesheet must be public");
   const denied = await fetch(`${origin}/login`, { method: "POST", headers: { Origin: origin, "Content-Type": "application/x-www-form-urlencoded" }, body: "password=wrong", redirect: "manual" });
   assert.equal(denied.status, 403);
@@ -157,4 +183,10 @@ test("radar authentication protects HTML and APIs without exposing credentials",
     body: JSON.stringify({ itemId: 1, marked: true }),
   });
   assert.equal(opaqueFollow.status, 403);
+  const opaqueReaction = await fetch(`${origin}/api/reaction`, {
+    method: "POST",
+    headers: { Cookie: cookie, Origin: "null", "Sec-Fetch-Site": "same-origin", "Content-Type": "application/json" },
+    body: JSON.stringify({ itemId: 1, reaction: "like" }),
+  });
+  assert.equal(opaqueReaction.status, 403);
 });

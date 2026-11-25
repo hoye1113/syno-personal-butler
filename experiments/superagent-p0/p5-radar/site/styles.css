@@ -113,7 +113,8 @@
   .item-title-button:hover .item-title { color: var(--blue); }
   .item-summary { display: -webkit-box; margin-top: .55rem; overflow: hidden; color: var(--muted); font-size: .85rem; line-height: 1.75; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   .item-footer { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .85rem; margin-top: .75rem; color: var(--muted); font-size: .7rem; }
-  .read-mark { color: var(--green); }
+  .read-mark, .reaction-mark { color: var(--green); }
+  .reaction-mark.is-dislike { color: var(--danger); }
   .follow-mark { color: var(--blue); }
   .growth-delta { color: var(--gold); font-weight: 650; font-variant-numeric: tabular-nums; }
 
@@ -145,12 +146,16 @@
   .follow-command button { flex: 0 0 auto; min-height: 44px; border: 0; background: transparent; color: var(--blue); }
   .follow-status { margin-top: .5rem; color: var(--green) !important; }
 
-  .reading-actions { position: static; flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; padding: .8rem 1.25rem calc(.8rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--hairline); background: var(--paper); }
+  .reading-actions { position: static; flex: 0 0 auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .65rem; padding: .8rem 1.25rem calc(.8rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--hairline); background: var(--paper); }
   .reading-actions button, .primary-button { min-height: 46px; padding: .6rem 1rem; border: 1px solid var(--hairline); border-radius: 2px; background: transparent; font-weight: 650; }
-  .reading-actions button:hover { border-color: var(--blue); }
+  .reading-actions button { padding-right: .4rem; padding-left: .4rem; font-size: .85rem; white-space: nowrap; }
+  .reading-actions button:hover:not(:disabled) { border-color: var(--blue); }
+  .reading-actions button[aria-pressed="true"] { border-color: var(--indigo); background: var(--indigo); color: var(--paper); }
+  .reading-actions #dislike-toggle[aria-pressed="true"] { border-color: var(--danger); background: transparent; color: var(--danger); }
+  .reading-actions button:disabled, .primary-button:disabled { cursor: default; border-color: var(--hairline); background: transparent; color: var(--muted); }
   .reading-actions .primary-button, .primary-button { border-color: var(--indigo); background: var(--indigo); color: var(--paper); }
   .reading-actions .primary-button:hover, .primary-button:hover { border-color: var(--blue); background: var(--blue); color: var(--paper); }
-  .reading-actions .primary-button:disabled, .primary-button:disabled { cursor: default; border-color: var(--hairline); background: transparent; color: var(--muted); }
+  .reading-actions .primary-button:disabled { cursor: default; border-color: var(--hairline); background: transparent; color: var(--muted); }
   :root[data-theme="dark"] .reading-actions .primary-button, :root[data-theme="dark"] .primary-button { color: var(--paper); background: var(--indigo); border-color: var(--indigo); }
   :root[data-theme="dark"] .reading-actions .primary-button:hover, :root[data-theme="dark"] .primary-button:hover { color: var(--paper); background: var(--blue); border-color: var(--blue); }
   :root[data-theme="dark"] .reading-actions .primary-button:disabled, :root[data-theme="dark"] .primary-button:disabled { cursor: default; color: var(--muted); background: transparent; border-color: var(--hairline); }

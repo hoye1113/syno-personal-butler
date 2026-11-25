@@ -1,11 +1,13 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
+import { loadRadarReactions } from "./preferences.mjs";
+
 const DATE = /^\d{4}-\d{2}-\d{2}$/u;
 const DAY_FILE = /^radar-day-(\d{4}-\d{2}-\d{2})\.json$/u;
 const DOC_FILE = /^daily-doc-(\d{4}-\d{2}-\d{2})\.json$/u;
 const GROWTH_FILE = /^radar-growth-(github|skill)-(\d{4}-\d{2}-\d{2})\.json$/u;
-const FOLLOW_MUTATIONS = new Map();
+const STATE_MUTATIONS = new Map();
 
 async function readJson(file, fallback = null) {
   try {
@@ -44,12 +46,13 @@ async function withFileLock(file, operation) {
   }
 }
 
-function itemState(item, readState, followState) {
+function itemState(item, readState, followState, reactionState) {
   return {
     ...item,
     readAt: readState.items[String(item.itemId)]?.readAt ?? null,
     unreadAt: readState.items[String(item.itemId)]?.unreadAt ?? null,
     follow: followState.items[String(item.itemId)] ?? { status: item.candidateState === "followed" ? "followed" : item.candidateState === "ignored" ? "ignored" : "none" },
+    reaction: reactionState.items[String(item.itemId)]?.reaction ?? null,
   };
 }
 
@@ -57,6 +60,7 @@ export function createRadarSiteStore({ home, stateHome = home, now = () => new D
   if (!home) throw new Error("雷达站缺少 home");
   const readFile = path.join(stateHome, "radar-read-state.json");
   const followFile = path.join(stateHome, "radar-follow-state.json");
+  const reactionFile = path.join(home, "radar-reactions.json");
 
   async function days() {
     let names = [];
@@ -81,17 +85,18 @@ export function createRadarSiteStore({ home, stateHome = home, now = () => new D
   }
 
   async function states() {
-    const [readState, followState] = await Promise.all([
+    const [readState, followState, reactionState] = await Promise.all([
       readJson(readFile, { schema: 1, items: {} }),
       readJson(followFile, { schema: 1, items: {} }),
+      loadRadarReactions(home),
     ]);
-    return { readState, followState };
+    return { readState, followState, reactionState };
   }
 
-  function mutateFollow(write) {
-    const previous = FOLLOW_MUTATIONS.get(followFile) || Promise.resolve();
-    const operation = previous.then(() => withFileLock(followFile, write), () => withFileLock(followFile, write));
-    FOLLOW_MUTATIONS.set(followFile, operation.catch(() => {}));
+  function mutateState(file, write) {
+    const previous = STATE_MUTATIONS.get(file) || Promise.resolve();
+    const operation = previous.then(() => withFileLock(file, write), () => withFileLock(file, write));
+    STATE_MUTATIONS.set(file, operation.catch(() => {}));
     return operation;
   }
 
@@ -137,7 +142,7 @@ export function createRadarSiteStore({ home, stateHome = home, now = () => new D
       if (!["today", "all", "unread", "read", "followed", "ignored"].includes(view)) throw new Error("视图无效");
       const all = await days();
       const selected = date ? all.filter((day) => day.date === date) : view === "today" ? all.slice(0, 1) : all;
-      const { readState, followState } = await states();
+      const { readState, followState, reactionState } = await states();
       const seen = new Set();
       const items = [];
       for (const day of selected) {
@@ -146,7 +151,7 @@ export function createRadarSiteStore({ home, stateHome = home, now = () => new D
           if (!Number.isSafeInteger(itemId) || itemId <= 0) continue;
           if (!date && seen.has(itemId)) continue;
           seen.add(itemId);
-          const item = itemState({ ...raw, date: day.date, legacy: !day.schema }, readState, followState);
+          const item = itemState({ ...raw, date: day.date, legacy: !day.schema }, readState, followState, reactionState);
           items.push(item);
         }
       }
@@ -206,10 +211,43 @@ export function createRadarSiteStore({ home, stateHome = home, now = () => new D
       return { itemIds: ids, read, at };
     },
 
+    async setReaction(itemId, reaction) {
+      const id = Number(itemId);
+      if (!Number.isSafeInteger(id) || id <= 0 || ![null, "like", "dislike"].includes(reaction)) {
+        throw Object.assign(new Error("reaction 参数无效"), { status: 400 });
+      }
+      const known = new Map((await this.items({ view: "all" })).map((item) => [item.itemId, item]));
+      const item = known.get(id);
+      if (!item) throw Object.assign(new Error("不能评价不存在的雷达条目"), { status: 404 });
+      const next = await mutateState(reactionFile, async () => {
+        const state = await loadRadarReactions(home);
+        const key = String(id);
+        const existing = state.items[key];
+        if ((!reaction && !existing) || existing?.reaction === reaction) return existing ?? null;
+        if (!reaction) delete state.items[key];
+        else {
+          state.items[key] = {
+            itemId: id,
+            reaction,
+            reactedAt: existing?.reactedAt ?? now().toISOString(),
+            updatedAt: now().toISOString(),
+          };
+        }
+        await atomicJson(reactionFile, state);
+        return state.items[key] ?? null;
+      });
+      let readAt = item.readAt;
+      if (reaction) {
+        const read = await this.setRead([id], true);
+        readAt ||= read.at;
+      }
+      return { itemId: id, reaction: next?.reaction ?? null, readAt };
+    },
+
     async setFollow(itemId, value) {
       const id = Number(itemId);
       if (!Number.isSafeInteger(id) || id <= 0) throw new Error("条目 ID 无效");
-      return mutateFollow(async () => {
+      return mutateState(followFile, async () => {
         const { followState } = await states();
         followState.items[String(id)] = {
           ...value,
@@ -229,7 +267,7 @@ export function createRadarSiteStore({ home, stateHome = home, now = () => new D
       const known = new Map((await this.items({ view: "all" })).map((item) => [item.itemId, item]));
       const item = known.get(id);
       if (!item) throw Object.assign(new Error("不能标记不存在的雷达条目"), { status: 404 });
-      return mutateFollow(async () => {
+      return mutateState(followFile, async () => {
         const { followState } = await states();
         const key = String(id);
         const existing = followState.items[key];

@@ -162,6 +162,16 @@ export async function createRadarSiteServer({ home, stateHome = home, databasePa
         const result = await operation;
         return send(res, 200, result);
       }
+      if (url.pathname === "/api/reaction" && req.method === "POST") {
+        assertOrigin(req);
+        const input = JSON.parse(await body(req));
+        if (!Number.isSafeInteger(input.itemId) || input.itemId <= 0 || ![null, "like", "dislike"].includes(input.reaction)) {
+          return send(res, 400, { error: "itemId 或 reaction 无效" });
+        }
+        const operation = mutation.then(() => store.setReaction(input.itemId, input.reaction), () => store.setReaction(input.itemId, input.reaction));
+        mutation = operation.catch(() => {});
+        return send(res, 200, await operation);
+      }
       if (url.pathname === "/api/follow" && req.method === "POST") {
         assertOrigin(req);
         const input = JSON.parse(await body(req));

@@ -64,6 +64,38 @@ export async function savePreferences(home, preferences) {
   await fs.rename(temporary, path.join(home, "preferences.json"));
 }
 
+export async function loadRadarReactions(home) {
+  try {
+    const parsed = JSON.parse(await fs.readFile(path.join(home, "radar-reactions.json"), "utf8"));
+    if (parsed?.schema !== 1 || !parsed.items || typeof parsed.items !== "object" || Array.isArray(parsed.items)) {
+      throw new Error("雷达 reaction 状态格式无效");
+    }
+    return parsed;
+  } catch (error) {
+    if (error.code === "ENOENT") return { schema: 1, items: {} };
+    throw error;
+  }
+}
+
+export function applyRadarReactions({ preferences, reactions, store }) {
+  if (!preferences || !store) throw new Error("applyRadarReactions 缺少 preferences 或 store");
+  for (const reaction of Object.values(reactions?.items || {})) {
+    const itemId = Number(reaction?.itemId);
+    if (!Number.isSafeInteger(itemId) || itemId <= 0 || !["like", "dislike"].includes(reaction?.reaction)) {
+      throw new Error("雷达 reaction 记录无效");
+    }
+    const item = store.getItem(itemId);
+    if (!item) continue;
+    recordFeedback({
+      preferences,
+      item,
+      score: store.getScore(itemId),
+      action: reaction.reaction === "like" ? "follow" : "ignore",
+    });
+  }
+  return preferences;
+}
+
 function increment(map, key, delta) {
   if (!key) return;
   map[key] = Number((map[key] || 0) + delta);

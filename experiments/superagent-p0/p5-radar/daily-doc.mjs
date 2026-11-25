@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { DEFAULT_MODEL, createOpenCodeClient } from "./opencode.mjs";
 import { summarizeArticle, summarizeVideoDoc } from "./article.mjs";
-import { ensurePreferences, rankEntries } from "./preferences.mjs";
+import { applyRadarReactions, ensurePreferences, loadRadarReactions, rankEntries } from "./preferences.mjs";
 import { historicalItemIds } from "./exposure.mjs";
 import { translateFeedItems } from "./translate.mjs";
 import { fetchTranscript } from "./youtube.mjs";
@@ -175,6 +175,7 @@ export async function buildDailyDoc({
       summary: cached.get(item.item_id) || generated.get(item.item_id) || fallbackSummary(item, new Error("未生成中文摘要")),
     }));
     const preferences = await ensurePreferences({ store, home });
+    applyRadarReactions({ preferences, reactions: await loadRadarReactions(home), store });
     const rankedEntries = rankEntries(entries, preferences, { maxItems });
     const shortMessage = [
       `今日 P5 信息雷达已整理：新增 ${rankedEntries.length} 条；以前展示过的 ${allItems.length - entries.length} 条不再重复进入今日新增。`,
