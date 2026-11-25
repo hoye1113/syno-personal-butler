@@ -53,7 +53,10 @@ function assertOrigin(req) {
   const origin = req.headers.origin;
   if (!origin) throw Object.assign(new Error("写请求缺少 Origin"), { status: 403 });
   let parsed;
-  try { parsed = new URL(origin); } catch { throw Object.assign(new Error("Origin 无效"), { status: 403 }); }
+  try { parsed = new URL(origin); } catch {
+    console.log(JSON.stringify({ event: "radar-origin-invalid", origin: String(origin).slice(0, 200) }));
+    throw Object.assign(new Error("Origin 无效"), { status: 403 });
+  }
   if (!["http:", "https:"].includes(parsed.protocol) || parsed.host.toLowerCase() !== String(req.headers.host).toLowerCase()) {
     throw Object.assign(new Error("拒绝跨站写请求"), { status: 403 });
   }
