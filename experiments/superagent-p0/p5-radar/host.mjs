@@ -46,6 +46,7 @@ async function writeState(file, state) {
  */
 export function createP5HostRunner({
   cliPath,
+  growthCliPath = cliPath ? path.join(path.dirname(cliPath), "p5-radar-growth.mjs") : "",
   home,
   env = process.env,
   execFileImpl = execFileAsync,
@@ -54,11 +55,11 @@ export function createP5HostRunner({
   maxBuffer = 4 * 1024 * 1024,
 } = {}) {
   if (!cliPath) throw new Error("P5 Host runner 缺少 cliPath");
-  const run = async (args, { timeout = commandTimeoutMs } = {}) => {
+  const run = async (args, { timeout = commandTimeoutMs, file = cliPath } = {}) => {
     const childEnv = { ...env };
     if (home) childEnv.P5_RADAR_HOME = home;
-    const { stdout } = await execFileImpl(process.execPath, [cliPath, ...args], {
-      cwd: path.dirname(cliPath),
+    const { stdout } = await execFileImpl(process.execPath, [file, ...args], {
+      cwd: path.dirname(file),
       env: childEnv,
       timeout,
       maxBuffer,
@@ -67,6 +68,7 @@ export function createP5HostRunner({
   };
   return {
     collect: () => run(["run"], { timeout: collectTimeoutMs }),
+    growth: () => run([], { file: growthCliPath }),
     digest: async () => (await run(["digest"])).replace(/\n已写入 [^\n]+$/u, "").trim(),
     dailyDoc: () => run(["daily-doc"], { timeout: collectTimeoutMs }),
     status: () => run(["status"]),
@@ -135,6 +137,22 @@ export function createP5Scheduler({
           log("p5-collect-failed", { error: state.lastCollectError });
         }
       }
+    }
+
+    if (typeof runner.growth === "function" && minutes >= collectMinute && state.lastGrowthDate !== date) {
+      // Growth has its own per-board stale fallback. One failed attempt must neither retry every tick nor block the digest.
+      try {
+        await runner.growth();
+        state.lastGrowthStatus = "ok";
+        delete state.lastGrowthError;
+        log("p5-growth-ok", { date });
+      } catch (error) {
+        state.lastGrowthStatus = "failed";
+        state.lastGrowthError = String(error?.message || error).slice(0, 500);
+        log("p5-growth-failed", { date, error: state.lastGrowthError });
+      }
+      state.lastGrowthDate = date;
+      state.lastGrowthAt = timestamp.toISOString();
     }
 
     if (minutes >= digestMinute && state.lastDigestDate !== date) {

@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { parseCandidateNumbers, parseRadarCommand } from "../experiments/superagent-p0/p5-radar/command.mjs";
-import { createP5Scheduler } from "../experiments/superagent-p0/p5-radar/host.mjs";
+import { createP5HostRunner, createP5Scheduler } from "../experiments/superagent-p0/p5-radar/host.mjs";
 import { parseArticleJson, summarizeVideoDoc } from "../experiments/superagent-p0/p5-radar/article.mjs";
 import { renderDailyDocBlocks } from "../experiments/superagent-p0/p5-radar/feishu-doc.mjs";
 import { routeRoot } from "../experiments/superagent-p0/root-router.mjs";
@@ -103,6 +103,62 @@ test("daily document blocks use Chinese headings and per-article sections", () =
   assert.match(text, /发布：/);
   assert.match(text, /资料范围：源摘要/);
   assert.match(text, /跟进 2026-11-21 1/);
+});
+
+test("P5 Host runner invokes growth CLI with the same explicit isolated home", async () => {
+  const calls = [];
+  const runner = createP5HostRunner({
+    cliPath: "/release/experiments/p5-radar.mjs",
+    growthCliPath: "/release/experiments/p5-radar-growth.mjs",
+    home: "/isolated/p5-home",
+    env: { EXISTING: "kept" },
+    execFileImpl: async (executable, args, options) => {
+      calls.push({ executable, args, options });
+      return { stdout: "{\"ok\":true}\n" };
+    },
+  });
+  await runner.growth();
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].args, ["/release/experiments/p5-radar-growth.mjs"]);
+  assert.equal(calls[0].options.cwd, "/release/experiments");
+  assert.equal(calls[0].options.env.P5_RADAR_HOME, "/isolated/p5-home");
+  assert.equal(calls[0].options.env.EXISTING, "kept");
+});
+
+test("P5 growth failure is recorded once and never blocks the daily digest", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "p5-host-growth-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const calls = [];
+  const deliveries = [];
+  const events = [];
+  let current = new Date("2026-11-21T09:30:00+08:00");
+  const scheduler = createP5Scheduler({
+    runner: {
+      async collect() { calls.push("collect"); },
+      async growth() { calls.push("growth"); throw new Error("skill upstream failed"); },
+      async dailyDoc() { calls.push("digest"); return "今日雷达：https://radar.example.com"; },
+    },
+    send: async (payload) => { deliveries.push(payload); return { delivered: true }; },
+    readChat: async () => ({ chatId: "oc_owner" }),
+    stateFile: path.join(root, "p5-scheduler.json"),
+    now: () => current,
+    logger: (event) => events.push(event),
+  });
+  const failed = await scheduler.tick();
+  assert.equal(failed.lastGrowthStatus, "failed");
+  assert.match(failed.lastGrowthError, /skill upstream/u);
+  current = new Date("2026-11-21T09:45:00+08:00");
+  await scheduler.tick();
+  assert.deepEqual(calls, ["collect", "growth"], "不在每次 tick 重试同一来源");
+  current = new Date("2026-11-21T10:00:00+08:00");
+  const sent = await scheduler.tick();
+  assert.equal(sent.lastGrowthStatus, "failed");
+  assert.equal(sent.lastDigestDelivery, "accepted");
+  assert.equal(deliveries.length, 1);
+  assert.deepEqual(calls, ["collect", "growth", "digest"]);
+  assert.ok(events.includes("p5-growth-failed"));
+  assert.ok(events.includes("p5-digest-sent"));
+  scheduler.stop();
 });
 
 test("P5 scheduler collects at 09:30, sends digest at 10:00, and is same-day idempotent", async (t) => {
