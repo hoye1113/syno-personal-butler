@@ -253,17 +253,41 @@ function fillDetail() {
   $("read-toggle").textContent = item.readAt ? "标为未读" : "标为已阅";
 }
 
+function setDetailExpanded(expanded, restoreFocus = true) {
+  const pane = $("detail-pane");
+  const button = $("expand-detail");
+  pane.classList.toggle("is-expanded", expanded);
+  document.body.style.overflow = expanded || matchMedia("(max-width: 799px)").matches ? "hidden" : "";
+  button.setAttribute("aria-pressed", String(expanded));
+  button.textContent = expanded ? "退出全屏" : "全屏阅读";
+  if (expanded) {
+    pane.setAttribute("role", "dialog");
+    pane.setAttribute("aria-modal", "true");
+    $("detail-title").focus({ preventScroll: true });
+  } else {
+    pane.removeAttribute("role");
+    pane.removeAttribute("aria-modal");
+    if (state.current && !matchMedia("(max-width: 799px)").matches) {
+      window.scrollTo({ top: document.querySelector(".workspace").offsetTop, behavior: "instant" });
+    }
+    if (restoreFocus) button.focus({ preventScroll: true });
+  }
+}
+
 function openItem(item, push) {
   if (push) listScroll = window.scrollY;
   state.current = item;
+  setDetailExpanded(false, false);
   fillDetail();
   $("detail-pane").hidden = false;
   $("detail-pane").classList.add("is-open");
-  document.body.style.overflow = "hidden";
-  $("detail-pane").scrollTop = 0;
+  const mobile = matchMedia("(max-width: 799px)").matches;
+  document.body.style.overflow = mobile ? "hidden" : "";
+  if (!mobile) window.scrollTo({ top: document.querySelector(".workspace").offsetTop, behavior: "instant" });
+  $("detail-scroll").scrollTop = 0;
   syncUrl({ item, push });
   $("detail-title").setAttribute("tabindex", "-1");
-  if (push && matchMedia("(max-width: 799px)").matches) $("detail-title").focus({ preventScroll: true });
+  if (push && mobile) $("detail-title").focus({ preventScroll: true });
 }
 
 function closeDetail(useHistory = false) {
@@ -271,6 +295,7 @@ function closeDetail(useHistory = false) {
   const url = new URL(location.href);
   if (useHistory && (url.searchParams.has("item") || url.searchParams.has("repo"))) { history.back(); return; }
   state.current = null;
+  setDetailExpanded(false, false);
   $("detail-pane").hidden = true;
   document.body.style.overflow = "";
   syncUrl();
@@ -352,12 +377,33 @@ $("read-page").addEventListener("click", () => markRead(state.items.filter(isUnr
 $("undo-page").addEventListener("click", () => markRead(state.items.filter((item) => item.readAt).map((item) => item.itemId), false));
 $("copy-follow").addEventListener("click", copyFollow);
 $("detail-copy").addEventListener("click", copyFollow);
+$("expand-detail").addEventListener("click", () => setDetailExpanded(!$("detail-pane").classList.contains("is-expanded")));
 $("theme-toggle").addEventListener("click", () => {
   const dark = document.documentElement.dataset.theme === "dark";
   document.documentElement.dataset.theme = dark ? "light" : "dark";
   localStorage.setItem("p5-radar-theme", dark ? "light" : "dark");
 });
-document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeDetail(true); });
+document.addEventListener("keydown", (event) => {
+  const expanded = $("detail-pane").classList.contains("is-expanded");
+  if (event.key === "Escape") {
+    if (expanded) setDetailExpanded(false);
+    else closeDetail(true);
+    return;
+  }
+  if (event.key !== "Tab" || !expanded) return;
+  const focusable = [...$("detail-pane").querySelectorAll("button:not(:disabled), a[href], input, select, [tabindex='0']")]
+    .filter((node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden");
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable.at(-1);
+  if (event.shiftKey && (document.activeElement === first || !focusable.includes(document.activeElement))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (document.activeElement === last || !focusable.includes(document.activeElement))) {
+    event.preventDefault();
+    first.focus();
+  }
+});
 window.addEventListener("popstate", () => {
   const url = new URL(location.href);
   if (!url.searchParams.has("item") && !url.searchParams.has("repo")) closeDetail();

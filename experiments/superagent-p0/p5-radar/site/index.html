@@ -61,27 +61,32 @@
     </section>
 
     <article id="detail-pane" class="detail-pane" aria-labelledby="detail-title" hidden>
-      <div class="detail-topline">
-        <button id="close-detail" class="back-button" type="button">← 返回清单</button>
-        <span id="detail-number" class="detail-number"></span>
-      </div>
-      <header class="detail-header">
-        <p id="detail-source" class="eyebrow"></p>
-        <h2 id="detail-title"></h2>
-        <p id="detail-original-title" class="original-title"></p>
-        <p id="detail-meta" class="detail-meta"></p>
-      </header>
-      <div class="article-body">
-        <section><h3>摘要</h3><p id="detail-summary"></p></section>
-        <section id="points-section"><h3>核心要点</h3><ul id="detail-points"></ul></section>
-        <section id="why-section"><h3>为什么值得看</h3><p id="detail-why"></p></section>
-        <p id="detail-scope" class="source-scope"></p>
-        <a id="original-link" class="original-link" target="_blank" rel="noopener noreferrer">阅读原文 ↗</a>
-        <div id="follow-command" class="follow-command">
-          <h3>需要收录？</h3>
-          <p>回到飞书发送这条命令。管家会创建真实收录任务，完成后另行通知。</p>
-          <div><code id="follow-text"></code><button id="copy-follow" type="button">复制命令</button></div>
-          <p id="follow-status" class="follow-status"></p>
+      <div id="detail-scroll" class="detail-scroll">
+        <div class="detail-topline">
+          <button id="close-detail" class="back-button" type="button">← 返回清单</button>
+          <div class="detail-tools">
+            <button id="expand-detail" class="expand-button" type="button" aria-pressed="false">全屏阅读</button>
+            <span id="detail-number" class="detail-number"></span>
+          </div>
+        </div>
+        <header class="detail-header">
+          <p id="detail-source" class="eyebrow"></p>
+          <h2 id="detail-title"></h2>
+          <p id="detail-original-title" class="original-title"></p>
+          <p id="detail-meta" class="detail-meta"></p>
+        </header>
+        <div class="article-body">
+          <section><h3>摘要</h3><p id="detail-summary"></p></section>
+          <section id="points-section"><h3>核心要点</h3><ul id="detail-points"></ul></section>
+          <section id="why-section"><h3>为什么值得看</h3><p id="detail-why"></p></section>
+          <p id="detail-scope" class="source-scope"></p>
+          <a id="original-link" class="original-link" target="_blank" rel="noopener noreferrer">阅读原文 ↗</a>
+          <div id="follow-command" class="follow-command">
+            <h3>需要收录？</h3>
+            <p>回到飞书发送这条命令。管家会创建真实收录任务，完成后另行通知。</p>
+            <div><code id="follow-text"></code><button id="copy-follow" type="button">复制命令</button></div>
+            <p id="follow-status" class="follow-status"></p>
+          </div>
         </div>
       </div>
       <footer id="reading-actions" class="reading-actions">
