@@ -86,13 +86,14 @@
           <a id="original-link" class="original-link" target="_blank" rel="noopener noreferrer">阅读原文 ↗</a>
           <div id="follow-command" class="follow-command">
             <h3>需要收录？</h3>
-            <p>底部“收藏”只标记待管家处理，不会直接创建任务。点赞或点踩会标为已读，并用于调整后续日报优先级。也可复制命令到飞书发送。</p>
+            <p>“标为已阅”只更新阅读状态，不调整偏好。“收藏”只标记待管家处理，不会直接创建任务。点赞或点踩会标为已读，并用于调整后续日报优先级。也可复制命令到飞书发送。</p>
             <div><code id="follow-text"></code><button id="copy-follow" type="button">复制命令</button></div>
             <p id="follow-status" class="follow-status"></p>
           </div>
         </div>
       </div>
-      <footer id="reading-actions" class="reading-actions" aria-label="阅读反馈与收藏">
+      <footer id="reading-actions" class="reading-actions" aria-label="阅读状态、反馈与收藏">
+        <button id="read-toggle" type="button" aria-pressed="false">标为已阅</button>
         <button id="like-toggle" type="button" aria-pressed="false">点赞</button>
         <button id="dislike-toggle" type="button" aria-pressed="false">点踩</button>
         <button id="favorite-toggle" type="button" aria-pressed="false">收藏</button>

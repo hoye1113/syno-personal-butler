@@ -146,7 +146,7 @@
   .follow-command button { flex: 0 0 auto; min-height: 44px; border: 0; background: transparent; color: var(--blue); }
   .follow-status { margin-top: .5rem; color: var(--green) !important; }
 
-  .reading-actions { position: static; flex: 0 0 auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .65rem; padding: .8rem 1.25rem calc(.8rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--hairline); background: var(--paper); }
+  .reading-actions { position: static; flex: 0 0 auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .65rem; padding: .8rem 1.25rem calc(.8rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--hairline); background: var(--paper); }
   .reading-actions button, .primary-button { min-height: 46px; padding: .6rem 1rem; border: 1px solid var(--hairline); border-radius: 2px; background: transparent; font-weight: 650; }
   .reading-actions button { padding-right: .4rem; padding-left: .4rem; font-size: .85rem; white-space: nowrap; }
   .reading-actions button:hover:not(:disabled) { border-color: var(--blue); }

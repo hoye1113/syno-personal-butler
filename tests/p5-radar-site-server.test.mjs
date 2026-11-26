@@ -27,7 +27,9 @@ test("radar HTTP serves real data, static assets and persistent read mutations",
   const page = await fetch(`${origin}/`);
   assert.equal(page.status, 200);
   assert.match(page.headers.get("content-security-policy"), /frame-ancestors 'none'/u);
-  assert.match(await page.text(), /P5 信息雷达/u);
+  const html = await page.text();
+  assert.match(html, /P5 信息雷达/u);
+  assert.match(html, /id="read-toggle"[\s\S]*id="like-toggle"[\s\S]*id="dislike-toggle"[\s\S]*id="favorite-toggle"/u);
   const initial = await (await fetch(`${origin}/api/items?view=today`)).json();
   assert.equal(initial.items[0].titleZh, "真实标题");
   const read = await fetch(`${origin}/api/read`, {

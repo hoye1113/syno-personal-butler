@@ -272,6 +272,9 @@ function fillDetail() {
   $("follow-text").textContent = command(item);
   const marked = item.follow?.status === "marked" && !item.follow?.taskId;
   $("follow-status").textContent = marked ? "已收藏，待管家处理，尚未创建收录任务；再次点击可取消收藏" : followLabel(item.follow);
+  $("read-toggle").textContent = item.readAt ? "标为未读" : "标为已阅";
+  $("read-toggle").setAttribute("aria-pressed", String(Boolean(item.readAt)));
+  $("read-toggle").disabled = false;
   for (const [id, reaction, activeLabel] of [["like-toggle", "like", "已点赞"], ["dislike-toggle", "dislike", "已点踩"]]) {
     const active = item.reaction === reaction;
     $(id).textContent = active ? activeLabel : reaction === "like" ? "点赞" : "点踩";
@@ -335,6 +338,7 @@ function closeDetail(useHistory = false) {
 }
 
 async function markRead(itemIds, read) {
+  setActionBusy(true);
   try {
     const result = await request("/api/read", { method: "POST", body: JSON.stringify({ itemIds, read }) });
     const ids = new Set(itemIds);
@@ -345,10 +349,10 @@ async function markRead(itemIds, read) {
       state.current = { ...state.current, readAt: read ? (state.current.readAt || result.at) : null };
     }
     render();
-    fillDetail();
     await loadSummary();
     toast(read ? `已将 ${itemIds.length} 条标为已阅` : `已恢复 ${itemIds.length} 条为未读`);
   } catch (error) { toast(error.message); }
+  finally { fillDetail(); }
 }
 
 async function copyFollow() {
@@ -367,15 +371,15 @@ async function copyFollow() {
   toast("已复制，请粘贴到飞书发送");
 }
 
-function setReactionBusy(busy) {
-  for (const id of ["like-toggle", "dislike-toggle", "favorite-toggle"]) $(id).disabled = busy;
+function setActionBusy(busy) {
+  for (const id of ["read-toggle", "like-toggle", "dislike-toggle", "favorite-toggle"]) $(id).disabled = busy;
 }
 
 async function markReaction(reaction) {
   if (!state.current) return;
   const itemId = state.current.itemId;
   const next = state.current.reaction === reaction ? null : reaction;
-  setReactionBusy(true);
+  setActionBusy(true);
   try {
     const result = await request("/api/reaction", { method: "POST", body: JSON.stringify({ itemId, reaction: next }) });
     state.items = state.items.map((item) => item.itemId === itemId ? { ...item, reaction: result.reaction, readAt: result.readAt } : item);
@@ -459,6 +463,7 @@ $("history-select").addEventListener("change", (event) => {
   load();
 });
 $("close-detail").addEventListener("click", () => closeDetail(true));
+$("read-toggle").addEventListener("click", () => state.current && markRead([state.current.itemId], !state.current.readAt));
 $("like-toggle").addEventListener("click", () => markReaction("like"));
 $("dislike-toggle").addEventListener("click", () => markReaction("dislike"));
 $("read-page").addEventListener("click", () => markRead(state.items.filter(isUnread).map((item) => item.itemId), true));

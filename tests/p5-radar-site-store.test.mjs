@@ -80,6 +80,14 @@ test("reactions are persistent, idempotent and imply read without creating follo
   assert.equal(cancelled.reaction, null);
   assert.equal(cancelled.readAt, liked.readAt, "cancelling a reaction never creates unread debt");
   assert.equal((await store.items({ view: "read" }))[0].reaction, null);
+  const reactionsBeforeNeutralRead = await fs.readFile(path.join(home, "radar-reactions.json"), "utf8");
+  await store.setRead([8], true);
+  const neutral = (await store.items({ view: "all" })).find((item) => item.itemId === 8);
+  assert.ok(neutral.readAt);
+  assert.equal(neutral.reaction, null);
+  assert.equal(await fs.readFile(path.join(home, "radar-reactions.json"), "utf8"), reactionsBeforeNeutralRead, "neutral read never writes reactions");
+  await store.setRead([8], false);
+  assert.equal((await store.items({ view: "unread" }))[0].reaction, null, "neutral unread also leaves reactions untouched");
   await assert.rejects(() => store.setReaction(7, "love"), /reaction 参数无效/u);
   await assert.rejects(() => store.setReaction(999, "like"), /不存在/u);
 });
