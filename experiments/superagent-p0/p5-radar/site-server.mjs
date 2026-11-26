@@ -138,6 +138,9 @@ export async function createRadarSiteServer({ home, stateHome = home, databasePa
         if (state.lastCollectError) result.push({
           kind: "scheduler-collect", label: "定时采集失败", message: String(state.lastCollectError).slice(0, 200), at: state.lastCollectAt || null,
         });
+        if (state.lastPolymarketError && !polymarket?.stale) result.push({
+          kind: "scheduler-polymarket", label: "Polymarket 采集失败", message: String(state.lastPolymarketError).slice(0, 200), at: state.lastPolymarketAt || null,
+        });
         if (state.lastDigestError) {
           const unknown = state.lastDigestDelivery === "unknown";
           result.push({

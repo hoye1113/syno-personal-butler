@@ -222,6 +222,19 @@ test("summary 汇总信源、增长榜、Polymarket 与调度异常，不触发�
   assert.match(alerts.find((alert) => alert.kind === "scheduler-digest").message, /结果未知，先对账/u);
 });
 
+test("Polymarket 首次失败且没有好快照时仍显示调度告警", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "p5-site-polymarket-first-error-"));
+  const schedulerStateFile = path.join(root, "p5-scheduler.json");
+  await fs.writeFile(schedulerStateFile, JSON.stringify({
+    lastPolymarketStatus: "failed", lastPolymarketError: "fetch failed", lastPolymarketAt: "2026-11-26T12:09:42Z",
+  }));
+  const { origin } = await runningServer(t, { schedulerStateFile });
+  const { alerts } = await (await fetch(`${origin}/api/summary`)).json();
+  const alert = alerts.find((candidate) => candidate.kind === "scheduler-polymarket");
+  assert.equal(alert.label, "Polymarket 采集失败");
+  assert.match(alert.message, /fetch failed/u);
+});
+
 test("growth API serves validated snapshots without read or follow semantics", async (t) => {
   const { home, origin } = await runningServer(t);
   await fs.writeFile(path.join(home, "radar-growth-github-2026-11-25.json"), JSON.stringify({
