@@ -159,7 +159,7 @@
 - **P5.1（X 只读直连已离线实现）**：官方 API v2 用户帖子时间线适配器与显式账号 CLI；仅 mock 验收，未连接真实 X 或启用生产。事件聚簇、周报仍未实现。
 - **P5.2**：反馈校准、两次评分。
 
-## 7.5 Personal 融合日报（本地实现，未部署）
+## 7.5 Personal 融合日报（已部署，自然调度与已认证 UI 待验收）
 
 - 新增 Hacker News 采集时点 Top 30：读取官方 `topstories` 和最多 30 个 story 条目；删除／无效条目被过滤，因此最终可能少于 30 条。非法原文 URL 回退到 HN 原帖。排名、points、评论数和 HN 讨论链接进入日报详情，明确“站内热度不代表事实真实性”。
 - 新增 AI News Radar 公开 `data/daily-brief.json`，最多 20 条；只接受采集时点前 48 小时内的快照，拒绝明显未来时间。保留来源层级、来源数和最多 20 个相关来源链接，不把 persona 主观评论作为事实摘要。空数值字段保持未知，不误判为官方一手。
@@ -168,4 +168,7 @@
 - Polymarket 同日幂等；次日失败保留最近好快照并标 stale，显式历史日期不被后续失败污染。Host 每日独立结算一次，失败不阻断资讯日报或飞书 HTML 短链。
 - 网站 summary 汇总信源 `last_error`、GitHub／Skill 增长榜 stale、Polymarket stale，以及通过 `P5_RADAR_SCHEDULER_STATE` 显式提供的采集／日报异常。delivery unknown 只提示先对账，不自动重发。
 - 2026-11-26 隔离 smoke：HN 真实返回 30 条，AI News Radar 真实返回 20 条；Polymarket 的 Node fetch 与 curl 均连接超时（HTTP 000），真实市场采集未成功，失败路径由 fixture 覆盖。
-- 隔离浏览器验收覆盖 HN／AI 证据详情、Polymarket 清单／详情／深链、stale、无文章操作、390×844 暗色和 1200px 亮色；控制台无消息。本轮未提交、未推送、未部署，生产仍不含这些能力。
+- 隔离浏览器验收覆盖 HN／AI 证据详情、Polymarket 清单／详情／深链、stale、无文章操作、390×844 暗色和 1200px 亮色；控制台无消息。
+- 功能提交 `a0008884088ce8b10d400cf0d6198e7190204802` 与首次 Polymarket 失败告警修复 `d8de24811fdad0632bfea47a992df5ea52d1e358` 已快进推送 main。当前 release 为 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261126T121323078Z-d8de24811fda`，第二次 prepare 完整 gate 为 789 项、783 pass、0 fail、6 skipped。
+- 生产网站 PID `17766` 已加载 `P5_RADAR_SCHEDULER_STATE`；匿名 summary／Polymarket／growth API 均为 401，CSS 为 200。Host PID `89850`、generation `22`，adapter running／available=true，pending／hold 和 unknown delivery 均为空；Host 仍从 a000888 首次 release 运行，d8de248 仅修改网站告警，无需再次重启 Host。
+- 生产 Polymarket 于 2026-11-26 自动尝试一次并失败，状态为 `fetch failed`，没有任何好快照；未手动重试。首次失败告警代码与 scheduler 配置已经部署，但已认证 UI 尚未看到该告警，HN／AI 也尚待 2026-11-27 自然调度验收。后续步骤见 `/Users/hoye/Documents/workspace/syno-personal-butler-p0-hardening/docs/plans/superagent-p0/P5-FUSION-DAILY-HANDOFF.md`。
