@@ -164,7 +164,7 @@ export function openStore({ file }) {
     `),
     listItemsForDoc: db.prepare(`
       SELECT i.id AS item_id, i.title, i.url, i.summary, i.published_at, i.fetched_at,
-             i.kind, i.source_id, s.name AS source_name, s.tier, sc.score, sc.topics_json, sc.excluded
+             i.kind, i.source_id, i.raw_json, s.name AS source_name, s.tier, sc.score, sc.topics_json, sc.excluded
       FROM items i
       JOIN sources s ON s.id = i.source_id
       LEFT JOIN scores sc ON sc.item_id = i.id
@@ -328,7 +328,13 @@ export function openStore({ file }) {
         } catch {
           topics = [];
         }
-        return { ...row, topics };
+        let raw = null;
+        try {
+          raw = JSON.parse(row.raw_json || "null");
+        } catch {
+          raw = null;
+        }
+        return { ...row, topics, raw };
       });
     },
     getScore(itemId) {

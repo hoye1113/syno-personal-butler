@@ -61,7 +61,7 @@ async function readJson(file, fallback = null) {
   }
 }
 
-async function fetchText(url, { fetchImpl, timeoutMs = 30_000, maxBytes = MAX_SOURCE_BYTES } = {}) {
+export async function fetchText(url, { fetchImpl, timeoutMs = 30_000, maxBytes = MAX_SOURCE_BYTES } = {}) {
   const response = await fetchImpl(url, {
     headers: { Accept: url.endsWith(".csv") ? "text/csv" : "application/json", "User-Agent": "p5-growth-radar/1" },
     signal: AbortSignal.timeout(timeoutMs),

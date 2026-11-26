@@ -158,3 +158,14 @@
 - **P5.0e（已实现）**：YouTube 每日采集；视频全部出现在清单中并显示发布时间；每日文档自动抓取带时间戳字幕并生成中文摘要，无字幕时回退到网页/源简介。访谈说话人 diarization 暂不做。
 - **P5.1（X 只读直连已离线实现）**：官方 API v2 用户帖子时间线适配器与显式账号 CLI；仅 mock 验收，未连接真实 X 或启用生产。事件聚簇、周报仍未实现。
 - **P5.2**：反馈校准、两次评分。
+
+## 7.5 Personal 融合日报（本地实现，未部署）
+
+- 新增 Hacker News 采集时点 Top 30：读取官方 `topstories` 和最多 30 个 story 条目；删除／无效条目被过滤，因此最终可能少于 30 条。非法原文 URL 回退到 HN 原帖。排名、points、评论数和 HN 讨论链接进入日报详情，明确“站内热度不代表事实真实性”。
+- 新增 AI News Radar 公开 `data/daily-brief.json`，最多 20 条；只接受采集时点前 48 小时内的快照，拒绝明显未来时间。保留来源层级、来源数和最多 20 个相关来源链接，不把 persona 主观评论作为事实摘要。空数值字段保持未知，不误判为官方一手。
+- 两个来源复用 `fetchSource → collectSources → SQLite → 日报 AST → HTML`；聚合源权重低于官方一手 RSS。现有 `why_zh` 补充“项目关联与选题”，只使用公开文章或字幕，不读取或外发真实 vault 正文。
+- Polymarket 使用公开只读 Gamma API，按 24 小时成交量保留 Top 10；独立写入 `radar-polymarket-YYYY-MM-DD.json`、原始响应、SHA-256 和状态文件，不写文章 DB、不分配跟进编号。页面不显示已阅、reaction、收藏或跟进操作；不下单、不连接钱包。价格变化按“百分点”展示，不作为事实概率或投资建议。
+- Polymarket 同日幂等；次日失败保留最近好快照并标 stale，显式历史日期不被后续失败污染。Host 每日独立结算一次，失败不阻断资讯日报或飞书 HTML 短链。
+- 网站 summary 汇总信源 `last_error`、GitHub／Skill 增长榜 stale、Polymarket stale，以及通过 `P5_RADAR_SCHEDULER_STATE` 显式提供的采集／日报异常。delivery unknown 只提示先对账，不自动重发。
+- 2026-11-26 隔离 smoke：HN 真实返回 30 条，AI News Radar 真实返回 20 条；Polymarket 的 Node fetch 与 curl 均连接超时（HTTP 000），真实市场采集未成功，失败路径由 fixture 覆盖。
+- 隔离浏览器验收覆盖 HN／AI 证据详情、Polymarket 清单／详情／深链、stale、无文章操作、390×844 暗色和 1200px 亮色；控制台无消息。本轮未提交、未推送、未部署，生产仍不含这些能力。

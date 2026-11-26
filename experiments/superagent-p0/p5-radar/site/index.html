@@ -31,7 +31,13 @@
     <button type="button" data-view="ignored">已忽略</button>
     <button type="button" data-view="github" class="growth-nav">GitHub 增长</button>
     <button type="button" data-view="skill">Skill 增长</button>
+    <button type="button" data-view="polymarket">Polymarket</button>
   </nav>
+
+  <section id="alerts" class="alerts" aria-labelledby="alerts-heading" hidden>
+    <h2 id="alerts-heading">异常与告警</h2>
+    <ul id="alerts-list"></ul>
+  </section>
 
   <div id="tools" class="tools">
     <search class="search-box" role="search">
@@ -81,7 +87,8 @@
         <div class="article-body">
           <section><h3>摘要</h3><p id="detail-summary"></p></section>
           <section id="points-section"><h3>核心要点</h3><ul id="detail-points"></ul></section>
-          <section id="why-section"><h3>为什么值得看</h3><p id="detail-why"></p></section>
+          <section id="why-section"><h3>项目关联与选题</h3><p id="detail-why"></p></section>
+          <section id="detail-evidence" hidden><h3>来源与热度</h3><p id="detail-evidence-text"></p><div id="detail-evidence-links" class="evidence-links"></div></section>
           <p id="detail-scope" class="source-scope"></p>
           <a id="original-link" class="original-link" target="_blank" rel="noopener noreferrer">阅读原文 ↗</a>
           <div id="follow-command" class="follow-command">

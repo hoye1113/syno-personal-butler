@@ -1,9 +1,11 @@
 const $ = (id) => document.getElementById(id);
-const state = { view: "today", date: "", q: "", items: [], current: null, days: [], growth: null, loading: 0 };
-const labels = { today: "今日雷达", all: "历史雷达", unread: "全部未读", read: "已阅归档", followed: "跟进记录", ignored: "已忽略", github: "GitHub 增长", skill: "Skill 增长" };
+const state = { view: "today", date: "", q: "", items: [], current: null, days: [], growth: null, polymarket: null, loading: 0 };
+const labels = { today: "今日雷达", all: "历史雷达", unread: "全部未读", read: "已阅归档", followed: "跟进记录", ignored: "已忽略", github: "GitHub 增长", skill: "Skill 增长", polymarket: "Polymarket 观察" };
 const newsDeck = "只呈现今天第一次遇见的内容。读过的留在历史，不再打扰明天。";
 const number = new Intl.NumberFormat("zh-CN");
+const compactNumber = new Intl.NumberFormat("zh-CN", { notation: "compact", maximumFractionDigits: 1 });
 const isGrowthView = () => ["github", "skill"].includes(state.view);
+const isPolymarketView = () => state.view === "polymarket";
 let toastTimer;
 let searchTimer;
 let listScroll = 0;
@@ -32,9 +34,10 @@ function params() {
 
 function syncUrl({ item = null, push = false } = {}) {
   const url = new URL(location.href);
-  for (const key of ["view", "date", "q", "item", "itemDate", "repo"]) url.searchParams.delete(key);
+  for (const key of ["view", "date", "q", "item", "itemDate", "repo", "market"]) url.searchParams.delete(key);
   for (const [key, value] of params()) url.searchParams.set(key, value);
   if (item?.isGrowth) url.searchParams.set("repo", item.repoKey);
+  else if (item?.isPolymarket) url.searchParams.set("market", item.marketKey);
   else if (item) { url.searchParams.set("item", item.itemId); url.searchParams.set("itemDate", item.date); }
   history[push ? "pushState" : "replaceState"]({ scroll: listScroll }, "", url);
 }
@@ -57,7 +60,7 @@ function isUnread(item) { return !item.readAt && (!item.legacy || Boolean(item.u
 function isCurrent(item) { return state.current && !state.current.isGrowth && item.itemId === state.current.itemId && item.date === state.current.date; }
 function syncListSelection() {
   for (const node of $("reading-list").children) {
-    if (node.dataset.repo) continue;
+    if (node.dataset.repo || node.dataset.market) continue;
     const item = state.items.find((candidate) => String(candidate.itemId) === node.dataset.itemId);
     node.classList.toggle("is-current", Boolean(item && isCurrent(item)));
   }
@@ -87,6 +90,7 @@ function renderGrowth() {
     $("growth-attribution").href = snapshot.attribution.url;
     $("growth-license").textContent = `${snapshot.attribution.license} ↗`;
     $("growth-license").href = snapshot.attribution.licenseUrl;
+    $("growth-license").hidden = false;
   }
   const list = $("reading-list");
   list.replaceChildren();
@@ -117,7 +121,63 @@ function renderGrowth() {
   }
 }
 
+function pricePercent(value) {
+  return `${(Number(value) * 100).toFixed(1)}%`;
+}
+
+function priceChange(value) {
+  if (value === null || value === undefined || value === "" || !Number.isFinite(Number(value))) return "24h 变化未知";
+  const points = Number(value) * 100;
+  return `24h ${points > 0 ? "+" : ""}${points.toFixed(1)} 个百分点`;
+}
+
+function renderPolymarket() {
+  const snapshot = state.polymarket;
+  $("page-title").textContent = labels.polymarket;
+  $("issue-date").textContent = snapshot ? `${snapshot.date}${snapshot.stale ? " · 陈旧快照" : ""}` : "尚未采集";
+  $("day-deck").textContent = "观察预测市场的价格与成交变化。它只反映交易行为，不是事实概率或投资建议。";
+  $("list-heading").textContent = "市场观察";
+  $("result-count").textContent = `${state.items.length} 个市场`;
+  $("tools").hidden = true;
+  $("bulk-bar").hidden = true;
+  $("growth-meta").hidden = !snapshot;
+  if (snapshot) {
+    $("growth-coverage").textContent = snapshot.coverage;
+    $("growth-source").textContent = `获取于 ${formatDate(snapshot.source?.fetchedAt, true)}${snapshot.stale ? " · 最近更新失败，展示最近好快照" : ""}`;
+    $("growth-attribution").textContent = `${snapshot.attribution.label} ↗`;
+    $("growth-attribution").href = snapshot.attribution.url;
+    $("growth-license").hidden = true;
+  }
+  const list = $("reading-list");
+  list.replaceChildren();
+  $("status").hidden = state.items.length > 0;
+  if (!state.items.length) $("status").textContent = "尚未生成市场快照。";
+  for (const item of state.items) {
+    const market = item.market;
+    const li = element("li", "reading-item");
+    li.dataset.market = item.marketKey;
+    li.append(element("span", "item-index", String(item.index).padStart(2, "0")));
+    const body = element("div", "item-body");
+    body.append(element("p", "item-source", `预测市场 · 24 小时 · ${item.date}`));
+    const button = element("button", "item-title-button");
+    button.type = "button";
+    button.setAttribute("aria-label", `查看市场：${item.title}`);
+    button.append(element("span", "item-title", item.title));
+    button.addEventListener("click", () => openItem(item, true));
+    body.append(button);
+    if (market.event?.title && market.event.title !== market.question) body.append(element("p", "item-summary", market.event.title));
+    const footer = element("div", "item-footer");
+    footer.append(element("span", "growth-delta", `YES ${pricePercent(market.yesPrice)}`));
+    footer.append(element("span", "", priceChange(market.oneDayPriceChange)));
+    footer.append(element("span", "", `24h 成交 ${compactNumber.format(market.volume24hr)}`));
+    body.append(footer);
+    li.append(body);
+    list.append(li);
+  }
+}
+
 function render() {
+  if (isPolymarketView()) return renderPolymarket();
   if (isGrowthView()) return renderGrowth();
   $("tools").hidden = false;
   $("growth-meta").hidden = true;
@@ -171,14 +231,33 @@ async function load() {
   setLoading(true);
   const hasContent = state.items.length > 0;
   $("status").hidden = hasContent;
-  if (!hasContent) $("status").textContent = isGrowthView() ? "正在读取增长榜…" : "正在读取真实日报…";
+  if (!hasContent) $("status").textContent = isPolymarketView() ? "正在读取市场快照…" : isGrowthView() ? "正在读取增长榜…" : "正在读取真实日报…";
   try {
-    if (isGrowthView()) {
+    if (isPolymarketView()) {
+      const query = new URLSearchParams();
+      if (state.date) query.set("date", state.date);
+      const value = await request(`/api/polymarket?${query}`);
+      if (generation !== state.loading) return;
+      state.growth = null;
+      state.polymarket = value.polymarket;
+      state.items = (value.polymarket?.items || []).map((item) => ({
+        ...item,
+        isPolymarket: true,
+        marketKey: item.id,
+        itemId: null,
+        date: value.polymarket.date,
+        source: value.polymarket.title,
+        title: item.question,
+        titleZh: item.question,
+        market: item,
+      }));
+    } else if (isGrowthView()) {
       const query = new URLSearchParams({ board: state.view });
       if (state.date) query.set("date", state.date);
       const value = await request(`/api/growth?${query}`);
       if (generation !== state.loading) return;
       state.growth = value.growth;
+      state.polymarket = null;
       state.items = (value.growth?.items || []).map((item) => ({
         ...item,
         isGrowth: true,
@@ -197,13 +276,16 @@ async function load() {
       const value = await request(`/api/items?${params()}`);
       if (generation !== state.loading) return;
       state.growth = null;
+      state.polymarket = null;
       state.items = value.items;
     }
     render();
     if (state.current) {
-      const fresh = state.items.find((item) => isGrowthView()
-        ? item.repoKey === state.current.repoKey
-        : item.itemId === state.current.itemId && item.date === state.current.date);
+      const fresh = state.items.find((item) => isPolymarketView()
+        ? item.marketKey === state.current.marketKey
+        : isGrowthView()
+          ? item.repoKey === state.current.repoKey
+          : item.itemId === state.current.itemId && item.date === state.current.date);
       if (fresh) state.current = fresh;
       fillDetail();
     }
@@ -220,7 +302,22 @@ async function load() {
 
 function command(item) { return `跟进 ${item.date} ${item.index}`; }
 
+function fillSourceEvidence(evidence) {
+  $("detail-evidence").hidden = !evidence;
+  $("detail-evidence-text").textContent = evidence?.text || "";
+  const links = $("detail-evidence-links");
+  links.replaceChildren();
+  for (const link of evidence?.links || []) {
+    const anchor = element("a", "", `${link.source} · ${link.title} ↗`);
+    anchor.href = link.url;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    links.append(anchor);
+  }
+}
+
 function fillGrowthDetail(item) {
+  fillSourceEvidence(null);
   const growth = item.growth;
   const analysis = growth.analysis || {};
   const windowLabel = state.view === "github" ? "近 7 日" : "近 24 小时";
@@ -247,9 +344,35 @@ function fillGrowthDetail(item) {
   $("reading-actions").hidden = true;
 }
 
+function fillPolymarketDetail(item) {
+  fillSourceEvidence(null);
+  const market = item.market;
+  $("detail-number").textContent = `NO. ${String(item.index).padStart(2, "0")} · 24 小时`;
+  $("detail-source").textContent = `${labels.polymarket} · ${item.date}`;
+  $("detail-title").textContent = market.question;
+  $("detail-original-title").textContent = market.event?.title && market.event.title !== market.question ? market.event.title : "";
+  $("detail-meta").textContent = `YES ${pricePercent(market.yesPrice)} · ${priceChange(market.oneDayPriceChange)}`;
+  $("detail-read-state").hidden = true;
+  $("detail-summary").textContent = `当前 YES 市场价格为 ${pricePercent(market.yesPrice)}。${priceChange(market.oneDayPriceChange)}。价格反映交易行为，不代表事件一定会或不会发生。`;
+  const points = $("detail-points");
+  points.replaceChildren();
+  points.append(element("li", "", `过去 24 小时成交量：${compactNumber.format(market.volume24hr)}。`));
+  points.append(element("li", "", `报告流动性：${Number.isFinite(market.liquidity) ? compactNumber.format(market.liquidity) : "未知"}。`));
+  if (market.endDate) points.append(element("li", "", `市场预计结束时间：${formatDate(market.endDate, true)}。`));
+  $("points-section").hidden = false;
+  $("why-section").hidden = true;
+  $("detail-why").textContent = "";
+  $("detail-scope").textContent = `${state.polymarket?.coverage || "预测市场观察"} 数据来自公开只读 Gamma API；本页面不下单、不连接钱包。`;
+  $("original-link").href = market.url;
+  $("original-link").textContent = "打开 Polymarket 市场 ↗";
+  $("follow-command").hidden = true;
+  $("reading-actions").hidden = true;
+}
+
 function fillDetail() {
   const item = state.current;
   if (!item) return;
+  if (item.isPolymarket) return fillPolymarketDetail(item);
   if (item.isGrowth) return fillGrowthDetail(item);
   $("follow-command").hidden = false;
   $("reading-actions").hidden = false;
@@ -268,6 +391,7 @@ function fillDetail() {
   $("why-section").hidden = !item.why;
   $("detail-why").textContent = item.why || "";
   $("detail-scope").textContent = `资料范围：${item.sourceStatus || "源摘要"}`;
+  fillSourceEvidence(item.sourceEvidence);
   $("original-link").href = item.url;
   $("follow-text").textContent = command(item);
   const marked = item.follow?.status === "marked" && !item.follow?.taskId;
@@ -327,7 +451,7 @@ function openItem(item, push) {
 function closeDetail(useHistory = false) {
   if (!state.current) return;
   const url = new URL(location.href);
-  if (useHistory && (url.searchParams.has("item") || url.searchParams.has("repo"))) { history.back(); return; }
+  if (useHistory && (url.searchParams.has("item") || url.searchParams.has("repo") || url.searchParams.has("market"))) { history.back(); return; }
   state.current = null;
   syncListSelection();
   setDetailExpanded(false, false);
@@ -422,7 +546,17 @@ async function markFollow() {
 async function loadSummary() {
   const value = await request("/api/summary");
   state.days = value.days;
-  if (!state.date) $("issue-date").textContent = state.days[0]?.date || "暂无日报";
+  const alerts = value.alerts || [];
+  $("alerts").hidden = !alerts.length;
+  const alertList = $("alerts-list");
+  alertList.replaceChildren();
+  for (const alert of alerts) {
+    const item = element("li");
+    item.append(element("strong", "", alert.label));
+    item.append(element("span", "", `${alert.message}${alert.at ? ` · ${formatDate(alert.at, true)}` : ""}`));
+    alertList.append(item);
+  }
+  if (!state.date && !isGrowthView() && !isPolymarketView()) $("issue-date").textContent = state.days[0]?.date || "暂无日报";
   const select = $("history-select");
   const selected = state.date;
   select.replaceChildren(element("option", "", "全部历史"));
@@ -499,7 +633,7 @@ document.addEventListener("keydown", (event) => {
 });
 window.addEventListener("popstate", () => {
   const url = new URL(location.href);
-  if (!url.searchParams.has("item") && !url.searchParams.has("repo")) closeDetail();
+  if (!url.searchParams.has("item") && !url.searchParams.has("repo") && !url.searchParams.has("market")) closeDetail();
 });
 
 async function init() {
@@ -530,6 +664,11 @@ async function init() {
   const repo = url.searchParams.get("repo");
   if (repo && isGrowthView()) {
     const item = state.items.find((candidate) => candidate.repoKey === repo);
+    if (item) openItem(item, false);
+  }
+  const market = url.searchParams.get("market");
+  if (market && isPolymarketView()) {
+    const item = state.items.find((candidate) => candidate.marketKey === market);
     if (item) openItem(item, false);
   }
 }

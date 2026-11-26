@@ -110,6 +110,7 @@ test("P5 Host runner invokes growth CLI with the same explicit isolated home", a
   const runner = createP5HostRunner({
     cliPath: "/release/experiments/p5-radar.mjs",
     growthCliPath: "/release/experiments/p5-radar-growth.mjs",
+    polymarketCliPath: "/release/experiments/p5-radar-polymarket.mjs",
     home: "/isolated/p5-home",
     env: { EXISTING: "kept" },
     execFileImpl: async (executable, args, options) => {
@@ -123,6 +124,9 @@ test("P5 Host runner invokes growth CLI with the same explicit isolated home", a
   assert.equal(calls[0].options.cwd, "/release/experiments");
   assert.equal(calls[0].options.env.P5_RADAR_HOME, "/isolated/p5-home");
   assert.equal(calls[0].options.env.EXISTING, "kept");
+  await runner.polymarket();
+  assert.deepEqual(calls[1].args, ["/release/experiments/p5-radar-polymarket.mjs"]);
+  assert.equal(calls[1].options.env.P5_RADAR_HOME, "/isolated/p5-home");
 });
 
 test("P5 growth failure is recorded once and never blocks the daily digest", async (t) => {
@@ -158,6 +162,37 @@ test("P5 growth failure is recorded once and never blocks the daily digest", asy
   assert.deepEqual(calls, ["collect", "growth", "digest"]);
   assert.ok(events.includes("p5-growth-failed"));
   assert.ok(events.includes("p5-digest-sent"));
+  scheduler.stop();
+});
+
+test("P5 Polymarket failure is isolated from collection and daily delivery", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "p5-host-polymarket-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const calls = [];
+  const deliveries = [];
+  let current = new Date("2026-11-26T09:30:00+08:00");
+  const scheduler = createP5Scheduler({
+    runner: {
+      async collect() { calls.push("collect"); },
+      async polymarket() { calls.push("polymarket"); throw new Error("gamma unavailable"); },
+      async dailyDoc() { calls.push("digest"); return "今日雷达：https://radar.example.com"; },
+    },
+    send: async (payload) => { deliveries.push(payload); return { delivered: true }; },
+    readChat: async () => ({ chatId: "oc_owner" }),
+    stateFile: path.join(root, "p5-scheduler.json"),
+    now: () => current,
+  });
+  const failed = await scheduler.tick();
+  assert.equal(failed.lastPolymarketStatus, "failed");
+  assert.match(failed.lastPolymarketError, /gamma unavailable/u);
+  current = new Date("2026-11-26T09:45:00+08:00");
+  await scheduler.tick();
+  assert.deepEqual(calls, ["collect", "polymarket"]);
+  current = new Date("2026-11-26T10:00:00+08:00");
+  const sent = await scheduler.tick();
+  assert.equal(sent.lastDigestDelivery, "accepted");
+  assert.equal(deliveries.length, 1);
+  assert.deepEqual(calls, ["collect", "polymarket", "digest"]);
   scheduler.stop();
 });
 

@@ -26,6 +26,63 @@ function publishedLabel(value) {
   }).format(date);
 }
 
+function evidenceUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return ["http:", "https:"].includes(url.protocol) ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+export function buildSourceEvidence(item) {
+  const raw = item?.raw;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  if (Number.isFinite(raw.hnRank) || raw.hnUrl) {
+    const links = evidenceUrl(raw.hnUrl)
+      ? [{ title: "Hacker News 讨论", url: evidenceUrl(raw.hnUrl), source: "Hacker News" }]
+      : [];
+    const rank = Number.isFinite(raw.hnRank) ? `第 ${raw.hnRank} 位` : "排名未知";
+    const score = Number.isFinite(raw.hnScore) ? `${raw.hnScore} points` : "分数未知";
+    const comments = Number.isFinite(raw.hnComments) ? `${raw.hnComments} 条评论` : "评论数未知";
+    return {
+      kind: "hackernews",
+      rank: Number.isFinite(raw.hnRank) ? raw.hnRank : null,
+      score: Number.isFinite(raw.hnScore) ? raw.hnScore : null,
+      comments: Number.isFinite(raw.hnComments) ? raw.hnComments : null,
+      text: `Hacker News 站内热度：采集时点${rank}，${score}，${comments}。站内热度不代表事实真实性。`,
+      links,
+    };
+  }
+  if (raw.aiNewsRadarGeneratedAt || Array.isArray(raw.relatedSources)) {
+    const links = (Array.isArray(raw.relatedSources) ? raw.relatedSources : []).map((source) => {
+      const url = evidenceUrl(source?.url);
+      if (!url) return null;
+      return {
+        title: cleanText(source.title) || "相关来源",
+        url,
+        source: cleanText(source.sourceName || source.source) || "未知来源",
+      };
+    }).filter(Boolean).slice(0, 20);
+    const sourceCount = Number.isFinite(raw.sourceCount) && raw.sourceCount > 0
+      ? raw.sourceCount : Math.max(1, links.length);
+    const official = raw.sourceTierRank === 0;
+    const verification = sourceCount > 1 ? "multi-source" : "single-source";
+    const labels = [official ? "官方一手" : "", sourceCount > 1 ? `多源一致（${sourceCount} 个来源）` : "单一来源待核实"].filter(Boolean);
+    return {
+      kind: "ai-news-radar",
+      official,
+      verification,
+      sourceCount,
+      sourceTierLabel: cleanText(raw.sourceTierLabel) || null,
+      generatedAt: raw.aiNewsRadarGeneratedAt || null,
+      text: `来源核实：${labels.join(" · ")}。AI News Radar 精选快照；聚合排序不代表事实真实性。`,
+      links,
+    };
+  }
+  return null;
+}
+
 export function sourceStatusLabel(summary) {
   const status = String(summary.sourceStatus || "");
   if (status === "transcript-timed") return "视频字幕（含时间戳）";
@@ -67,6 +124,7 @@ export function buildDocumentAst({ date, entries, totalItems = entries.length, u
       points: Array.isArray(summary.points) ? summary.points.map(cleanText) : [],
       why: summary.whyZh || "",
       sourceStatus: sourceStatusLabel(summary),
+      sourceEvidence: buildSourceEvidence(item),
       group: entry.group || "rest",
     };
   });
@@ -100,6 +158,13 @@ export function buildDocumentAst({ date, entries, totalItems = entries.length, u
       ].filter(Boolean).join(" · "),
     });
     blocks.push({ type: "paragraph", text: `资料范围：${sourceStatusLabel(summary)}` });
+    const sourceEvidence = buildSourceEvidence(item);
+    if (sourceEvidence) {
+      blocks.push({ type: "paragraph", text: sourceEvidence.text });
+      for (const link of sourceEvidence.links) {
+        blocks.push({ type: "link", text: `相关来源：${link.source} · ${link.title}`, url: link.url });
+      }
+    }
     blocks.push({ type: "heading", level: 3, text: "摘要" });
     blocks.push({ type: "paragraph", text: summary.summaryZh || item.summary || "资料不足。" });
     if (Array.isArray(summary.points) && summary.points.length) {
@@ -107,7 +172,7 @@ export function buildDocumentAst({ date, entries, totalItems = entries.length, u
       blocks.push({ type: "bullets", items: summary.points.map(cleanText) });
     }
     if (summary.whyZh) {
-      blocks.push({ type: "heading", level: 3, text: "为什么值得看" });
+      blocks.push({ type: "heading", level: 3, text: "项目关联与选题" });
       blocks.push({ type: "paragraph", text: summary.whyZh });
     }
     blocks.push({ type: "link", text: "原文", url: item.url });

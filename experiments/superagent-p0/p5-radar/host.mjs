@@ -47,6 +47,7 @@ async function writeState(file, state) {
 export function createP5HostRunner({
   cliPath,
   growthCliPath = cliPath ? path.join(path.dirname(cliPath), "p5-radar-growth.mjs") : "",
+  polymarketCliPath = cliPath ? path.join(path.dirname(cliPath), "p5-radar-polymarket.mjs") : "",
   home,
   env = process.env,
   execFileImpl = execFileAsync,
@@ -69,6 +70,7 @@ export function createP5HostRunner({
   return {
     collect: () => run(["run"], { timeout: collectTimeoutMs }),
     growth: () => run([], { file: growthCliPath }),
+    polymarket: () => run([], { file: polymarketCliPath }),
     digest: async () => (await run(["digest"])).replace(/\n已写入 [^\n]+$/u, "").trim(),
     dailyDoc: () => run(["daily-doc"], { timeout: collectTimeoutMs }),
     status: () => run(["status"]),
@@ -153,6 +155,22 @@ export function createP5Scheduler({
       }
       state.lastGrowthDate = date;
       state.lastGrowthAt = timestamp.toISOString();
+    }
+
+    if (typeof runner.polymarket === "function" && minutes >= collectMinute && state.lastPolymarketDate !== date) {
+      // Market snapshots are independently settled and never block the daily HTML link.
+      try {
+        await runner.polymarket();
+        state.lastPolymarketStatus = "ok";
+        delete state.lastPolymarketError;
+        log("p5-polymarket-ok", { date });
+      } catch (error) {
+        state.lastPolymarketStatus = "failed";
+        state.lastPolymarketError = String(error?.message || error).slice(0, 500);
+        log("p5-polymarket-failed", { date, error: state.lastPolymarketError });
+      }
+      state.lastPolymarketDate = date;
+      state.lastPolymarketAt = timestamp.toISOString();
     }
 
     if (minutes >= digestMinute && state.lastDigestDate !== date) {

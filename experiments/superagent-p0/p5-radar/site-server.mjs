@@ -82,7 +82,7 @@ function loginPage(message = "") {
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>进入信息雷达</title><link rel="stylesheet" href="/styles.css"></head><body class="login-body"><main class="login-sheet"><p class="eyebrow">P5 · DAILY RADAR</p><h1>回到今天的阅读。</h1><p>这是你的私人雷达站，请输入访问密码。</p><form method="post" action="/login"><label for="password">访问密码</label><input id="password" name="password" type="password" autocomplete="current-password" required autofocus><button class="primary-button" type="submit">进入雷达站</button><p class="form-error" role="alert">${message}</p></form></main></body></html>`;
 }
 
-export async function createRadarSiteServer({ home, stateHome = home, databasePath = "", authFile = "", publicOrigin = "", allowInsecure = false }) {
+export async function createRadarSiteServer({ home, stateHome = home, databasePath = "", schedulerStateFile = "", authFile = "", publicOrigin = "", allowInsecure = false }) {
   if (!allowInsecure && !authFile) throw new Error("公网雷达站必须配置 authFile；仅本地开发可显式 allowInsecure");
   const store = createRadarSiteStore({ home, stateHome, publicOrigin });
   const content = openRadarContent({ databasePath });
@@ -119,6 +119,41 @@ export async function createRadarSiteServer({ home, stateHome = home, databasePa
     });
   }
 
+  async function alerts() {
+    const [sourceAlerts, github, skill, polymarket] = await Promise.all([
+      content.alerts(),
+      store.growth({ board: "github" }),
+      store.growth({ board: "skill" }),
+      store.polymarket(),
+    ]);
+    const result = [...sourceAlerts];
+    for (const [kind, snapshot, label] of [["growth", github, "GitHub 增长榜"], ["growth", skill, "Skill 增长榜"], ["polymarket", polymarket, "Polymarket"]]) {
+      if (snapshot?.stale) result.push({
+        kind, label: `${label}使用陈旧快照`, message: snapshot.statusError || "上游暂不可用", at: snapshot.generatedAt || null,
+      });
+    }
+    if (schedulerStateFile) {
+      try {
+        const state = JSON.parse(await fs.readFile(schedulerStateFile, "utf8"));
+        if (state.lastCollectError) result.push({
+          kind: "scheduler-collect", label: "定时采集失败", message: String(state.lastCollectError).slice(0, 200), at: state.lastCollectAt || null,
+        });
+        if (state.lastDigestError) {
+          const unknown = state.lastDigestDelivery === "unknown";
+          result.push({
+            kind: "scheduler-digest",
+            label: unknown ? "日报投递结果未知" : "日报生成或投递失败",
+            message: `${unknown ? "结果未知，先对账，不自动重发。" : ""}${String(state.lastDigestError).slice(0, 200)}`,
+            at: state.lastDigestAt || null,
+          });
+        }
+      } catch (error) {
+        if (error.code !== "ENOENT") result.push({ kind: "scheduler-state", label: "调度状态读取失败", message: "状态文件无效", at: null });
+      }
+    }
+    return result;
+  }
+
   let mutation = Promise.resolve();
   const server = http.createServer(async (req, res) => {
     try {
@@ -148,10 +183,16 @@ export async function createRadarSiteServer({ home, stateHome = home, databasePa
         if (url.pathname.startsWith("/api/")) return send(res, 401, { error: "需要登录" });
         return send(res, 302, "", "text/plain; charset=utf-8", { Location: "/login" });
       }
-      if (url.pathname === "/api/summary" && req.method === "GET") return send(res, 200, await store.summary());
+      if (url.pathname === "/api/summary" && req.method === "GET") {
+        const [summary, alertItems] = await Promise.all([store.summary(), alerts()]);
+        return send(res, 200, { ...summary, alerts: alertItems });
+      }
       if (url.pathname === "/api/items" && req.method === "GET") return send(res, 200, { items: await items(url) });
       if (url.pathname === "/api/growth" && req.method === "GET") {
         return send(res, 200, { growth: await store.growth({ board: url.searchParams.get("board") || "", date: url.searchParams.get("date") || "" }) });
+      }
+      if (url.pathname === "/api/polymarket" && req.method === "GET") {
+        return send(res, 200, { polymarket: await store.polymarket({ date: url.searchParams.get("date") || "" }) });
       }
       if (url.pathname === "/api/read" && req.method === "POST") {
         assertOrigin(req);
@@ -202,6 +243,7 @@ export async function startRadarSiteServerFromEnv() {
     home: process.env.P5_RADAR_HOME,
     stateHome: process.env.P5_RADAR_STATE_HOME || process.env.P5_RADAR_HOME,
     databasePath: process.env.P5_RADAR_DB || "",
+    schedulerStateFile: process.env.P5_RADAR_SCHEDULER_STATE || "",
     authFile: process.env.P5_RADAR_AUTH_FILE || "",
     publicOrigin: process.env.P5_RADAR_SITE_ORIGIN || "",
     allowInsecure: process.env.P5_RADAR_ALLOW_INSECURE === "1",

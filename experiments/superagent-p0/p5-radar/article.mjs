@@ -27,7 +27,7 @@ JSON 字段：
   "title_zh": "准确、可读的中文标题；专有名词保留英文",
   "summary_zh": "2-4 句中文结论，说明这篇讲什么、最重要的判断",
   "key_points": ["3-6 条中文要点；每条 1-2 句；保留可行动的方法、数据、取舍、失败经验"],
-  "why_zh": "1-2 句，说明对个人 AI Agent / Harness / Context / Memory / AI Coding 的关联；不要泛泛而谈"
+  "why_zh": "1-2 句，说明对个人 AI Agent / Harness / Context / Memory / AI Coding 的关联；适合时给一个具体选题或小实验，不要泛泛而谈"
 }
 
 如果资料不足以支持某个字段，明确写“资料不足”，不要编造。`;
@@ -49,7 +49,7 @@ ${truncated ? "注意：字幕超长，已截断，结论只覆盖提供的部�
   "title_zh": "准确、可读的中文标题；专有名词保留英文",
   "summary_zh": "2-4 句中文结论，说明视频讲什么、最重要的判断",
   "key_points": ["3-6 条中文要点；每条 1-2 句；有字幕时间戳时在句首或句末标注 [MM:SS]"],
-  "why_zh": "1-2 句，说明对个人 AI Agent / Harness / Context / Memory / AI Coding 的关联"
+  "why_zh": "1-2 句，说明对个人 AI Agent / Harness / Context / Memory / AI Coding 的关联；适合时给一个具体选题或小实验"
 }
 
 如果字幕没有信息支持某个字段，明确写“资料不足”，不要编造。

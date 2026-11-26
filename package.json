@@ -15,6 +15,7 @@
     "probe:feishu": "node scripts/probe-feishu.mjs",
     "p5:site": "node experiments/superagent-p0/p5-radar-site.mjs",
     "p5:growth": "node experiments/superagent-p0/p5-radar-growth.mjs",
+    "p5:polymarket": "node experiments/superagent-p0/p5-radar-polymarket.mjs",
     "syno:doctor": "node scripts/syno-doctor.mjs",
     "gate": "node scripts/run-tests.mjs && node scripts/verify-repository.mjs && node scripts/check-active-docs.mjs && git diff --check"
   },

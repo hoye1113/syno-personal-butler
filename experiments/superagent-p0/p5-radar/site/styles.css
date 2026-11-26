@@ -81,6 +81,13 @@
   .view-nav button[aria-current="page"] { border-bottom-color: var(--gold); color: var(--ink); font-weight: 650; }
   .view-nav .growth-nav { margin-left: .5rem; }
 
+  .alerts { padding: 1rem 1.25rem; border-bottom: 1px solid var(--hairline); background: color-mix(in oklch, var(--danger) 5%, var(--paper)); }
+  .alerts h2 { color: var(--danger); font-size: .78rem; letter-spacing: .08em; }
+  .alerts ul { display: grid; gap: .7rem; margin-top: .75rem; padding-left: 1.1rem; }
+  .alerts li { padding-left: .2rem; color: var(--muted); font-size: .78rem; line-height: 1.65; }
+  .alerts strong { display: block; color: var(--ink); font-weight: 650; }
+  .alerts span { overflow-wrap: anywhere; }
+
   .tools { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .65rem; padding: 1rem 1.25rem; }
   .tools input, .tools select { min-height: 44px; border: 1px solid var(--hairline); border-radius: 2px; background: transparent; color: var(--ink); }
   .tools input { width: 100%; padding: .6rem .8rem; }
@@ -138,6 +145,8 @@
   .article-body ul { padding-left: 1.2rem; }
   .article-body li + li { margin-top: .65rem; }
   .source-scope { margin-top: 2rem; color: var(--muted); font-size: .75rem !important; }
+  .evidence-links { display: grid; gap: .35rem; margin-top: .8rem; }
+  .evidence-links a { min-height: 44px; padding: .55rem 0; overflow-wrap: anywhere; font-size: .85rem; line-height: 1.6; text-underline-offset: .25em; }
   .original-link { display: inline-flex; align-items: center; min-height: 44px; margin-top: 1rem; font-weight: 650; text-underline-offset: .25em; }
   .follow-command { margin-top: 2.5rem; padding: 1.25rem 0; border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
   .follow-command p { color: var(--muted); font-size: .82rem; line-height: 1.75; }

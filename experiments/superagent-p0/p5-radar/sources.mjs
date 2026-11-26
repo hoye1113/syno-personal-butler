@@ -17,6 +17,23 @@ export const DEFAULT_SOURCES = Object.freeze([
     weight: 0.8,
   },
   {
+    id: "hackernews-top",
+    name: "Hacker News Top 30",
+    kind: "hackernews",
+    url: "https://hacker-news.firebaseio.com/v0/topstories.json",
+    tier: "T2",
+    weight: 0.65,
+    config: { limit: 30 },
+  },
+  {
+    id: "ai-news-radar",
+    name: "AI News Radar",
+    kind: "ai-news-radar",
+    url: "https://learnprompt.github.io/ai-news-radar/data/daily-brief.json",
+    tier: "T1.5",
+    weight: 0.65,
+  },
+  {
     id: "rss-openai-news",
     name: "OpenAI News",
     kind: "rss",
@@ -459,9 +476,129 @@ export async function fetchX(source, {
   }
 }
 
+export async function fetchHackerNews(source, { proxy = "", curlJsonImpl = curlJson } = {}) {
+  const configuredLimit = source.config?.limit ?? 30;
+  const limit = Number(configuredLimit);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 30) throw new Error("Hacker News limit 必须是 1–30 的整数");
+  const ids = await curlJsonImpl(source.url, { proxy });
+  if (!Array.isArray(ids)) throw new Error("Hacker News topstories 响应不是数组");
+  const selected = [];
+  const seen = new Set();
+  for (const value of ids) {
+    const id = Number(value);
+    if (!Number.isSafeInteger(id) || id <= 0 || seen.has(id)) continue;
+    seen.add(id);
+    selected.push({ id, rank: selected.length + 1 });
+    if (selected.length === limit) break;
+  }
+  const stories = await Promise.all(selected.map(async ({ id, rank }) => {
+    const item = await curlJsonImpl(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, { proxy });
+    if (item?.type !== "story" || item.deleted === true || item.dead === true) return null;
+    const title = stripHtml(item.title);
+    if (!title || Number(item.id) !== id) return null;
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(item.url || `https://news.ycombinator.com/item?id=${id}`, "https://news.ycombinator.com/");
+    } catch {
+      parsedUrl = new URL(`https://news.ycombinator.com/item?id=${id}`);
+    }
+    const url = ["http:", "https:"].includes(parsedUrl.protocol) ? parsedUrl.toString() : `https://news.ycombinator.com/item?id=${id}`;
+    const timestamp = Number(item.time);
+    const score = Number(item.score);
+    const comments = Number(item.descendants);
+    return {
+      externalId: String(id),
+      title,
+      url,
+      summary: `Hacker News 采集时点第 ${rank} 位；${Number.isFinite(score) ? score : 0} points，${Number.isFinite(comments) ? comments : 0} 条评论。`,
+      publishedAt: Number.isFinite(timestamp) ? new Date(timestamp * 1000).toISOString() : null,
+      lang: null,
+      kind: "article",
+      author: stripHtml(item.by),
+      categories: ["hacker-news"],
+      raw: {
+        hnRank: rank,
+        hnScore: Number.isFinite(score) ? score : null,
+        hnComments: Number.isFinite(comments) ? comments : null,
+        hnAuthor: stripHtml(item.by) || null,
+        hnUrl: `https://news.ycombinator.com/item?id=${id}`,
+      },
+    };
+  }));
+  return { items: stories.filter(Boolean) };
+}
+
+export async function fetchAiNewsRadar(source, { proxy = "", curlJsonImpl = curlJson, now = () => new Date() } = {}) {
+  const optionalNumber = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  };
+  const payload = await curlJsonImpl(source.url, { proxy });
+  const generatedAtMs = Date.parse(payload?.generated_at);
+  if (!Number.isFinite(generatedAtMs)) throw new Error("AI News Radar 缺少有效 generated_at");
+  const currentMs = now().getTime();
+  if (generatedAtMs > currentMs + 5 * 60_000) throw new Error("AI News Radar generated_at 位于未来");
+  if (currentMs - generatedAtMs > 48 * 3_600_000) throw new Error("AI News Radar 快照超过 48 小时");
+  if (!Array.isArray(payload.items)) throw new Error("AI News Radar 缺少 items");
+  const items = [];
+  for (const [index, rawItem] of payload.items.slice(0, 20).entries()) {
+    let url;
+    try {
+      url = new URL(rawItem?.url || rawItem?.primary_url || "");
+      if (!["http:", "https:"].includes(url.protocol)) continue;
+    } catch {
+      continue;
+    }
+    const title = stripHtml(rawItem.title);
+    if (!title) continue;
+    const relatedSources = (Array.isArray(rawItem.sources) ? rawItem.sources : []).map((entry) => {
+      try {
+        const relatedUrl = new URL(entry?.url || "");
+        if (!["http:", "https:"].includes(relatedUrl.protocol)) return null;
+        return {
+          title: stripHtml(entry.title),
+          url: relatedUrl.toString(),
+          sourceName: stripHtml(entry.source_name || entry.source),
+          publishedAt: isoDate(entry.published_at),
+        };
+      } catch {
+        return null;
+      }
+    }).filter(Boolean).slice(0, 20);
+    const sourceCount = optionalNumber(rawItem.source_count);
+    items.push({
+      externalId: String(rawItem.story_id || rawItem.id || url.toString()),
+      title,
+      url: url.toString(),
+      summary: stripHtml(rawItem.summary || rawItem.summary_zh || rawItem.description).slice(0, 1600),
+      publishedAt: isoDate(rawItem.published_at) || relatedSources.map((entry) => entry.publishedAt).find(Boolean) || null,
+      lang: null,
+      kind: "article",
+      author: stripHtml(rawItem.source_name || rawItem.source),
+      categories: rawItem.ai_label ? [String(rawItem.ai_label)] : ["ai-news-radar"],
+      raw: {
+        aiNewsRadarGeneratedAt: new Date(generatedAtMs).toISOString(),
+        aiNewsRadarRank: index + 1,
+        titleZh: stripHtml(rawItem.title_zh) || null,
+        sourceCount: sourceCount >= 1 ? sourceCount : Math.max(1, relatedSources.length),
+        sourceTierRank: optionalNumber(rawItem.source_tier_rank),
+        sourceTierLabel: stripHtml(rawItem.source_tier_label) || null,
+        importanceScore: optionalNumber(rawItem.importance_score),
+        importanceLabel: stripHtml(rawItem.importance_label) || null,
+        aiLabel: stripHtml(rawItem.ai_label) || null,
+        relatedSources,
+      },
+    });
+  }
+  return { items };
+}
+
 export async function fetchSource(source, options = {}) {
   const { proxy = "" } = options;
   if (source.kind === "aihot") return { items: await fetchAihot(source, { proxy }) };
+  if (source.kind === "hackernews") return fetchHackerNews(source, options);
+  if (source.kind === "ai-news-radar") return fetchAiNewsRadar(source, options);
   if (source.kind === "rss") {
     const xml = await curlText(source.url, { proxy });
     return { items: parseFeed(xml, { source }) };
