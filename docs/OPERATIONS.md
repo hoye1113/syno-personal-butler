@@ -1,20 +1,20 @@
 # Syno 当前运维手册
 
-> 更新日期：2026-11-26。本文只描述 P3 native Host、Pi／OpenCode Go、P5 与飞书的当前运维方式。DSH、3088／8888、旧 Harness 恢复和 Windows 服务步骤已经不属于当前生产入口。
+> 更新日期：2026-11-27。本文只描述 P3 native Host、Pi／OpenCode Go、P5 与飞书的当前运维方式。DSH、3088／8888、旧 Harness 恢复和 Windows 服务步骤已经不属于当前生产入口。
 
 ## 1. 当前生产基线
 
-2026-11-26 P5 融合日报部署后确认的状态如下；需要登录的公网交互验收和下一自然日自然调度验收仍待完成，状态会漂移，操作前必须重新执行只读检查。
+2026-11-27 Polymarket 代理修复部署后确认的状态如下；2026-11-27 自然调度验收仍待完成，状态会漂移，操作前必须重新执行只读检查。
 
 | 项 | 最后确认值 |
 |---|---|
 | 代码目录 | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/current` |
-| 不可变 release | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261126T121323078Z-d8de24811fda` |
-| 公开分支 / 提交 | `main` / `d8de24811fdad0632bfea47a992df5ea52d1e358` |
+| 不可变 release | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261126T160502737Z-62301bccb623` |
+| 公开分支 / 提交 | `main` / `62301bccb6231155e757a1ed0dc092662e50e5fb` |
 | Host 入口 | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/current/experiments/superagent-p0/real-feishu-client.mjs` |
 | launchd 服务 | `com.syno.butler.host` |
 | plist | `/Users/hoye/Library/LaunchAgents/com.syno.butler.host.plist` |
-| Host PID / generation | `89850` / `22` |
+| Host PID / generation | `23474` / `23` |
 | pending / hold | `0 / 0` |
 | 飞书 adapter | `running=true`、`available=true` |
 | active P5 插件 | `2026.11.22.8` |
@@ -23,7 +23,7 @@
 | 网站 scheduler 状态 | `/Users/hoye/Documents/workspace/syno-personal-butler/.runtime-p0/p5-scheduler.json`（`P5_RADAR_SCHEDULER_STATE`） |
 | Tunnel | `com.agentconnect.tunnel`，PID `8915`，保留 `console.hoyework.online` 与 `radar.hoyework.online`，本轮未重启 |
 
-第二次 prepare 完整 gate 为 789 tests／783 pass／6 skipped／0 fail。Host PID `89850` 首次从 a000888 release 启动；d8de248 只修改网站首次 Polymarket 失败告警，因此第二次仅重启网站。网站最终通过 bootout/bootstrap 重新加载 plist，PID `17766`，真实环境包含 `P5_RADAR_SCHEDULER_STATE`。验收时 frozen=false、active Task、pending Decision、queued／unknown delivery、handover pending／hold 均为空，reconciliation.blocking=false，adapter running／available=true；Host phase 仍为 `startup-takeover`，不仅凭该字段宣称 ready。公网匿名 summary／Polymarket／growth API 均为 401，CSS 为 200。`lastDigestDate=2026-11-26`、`lastDigestDelivery=accepted`，未补跑或重发日报。Polymarket 自动尝试一次后为 `failed / fetch failed`，没有任何好快照；已认证告警 UI 和 HN／AI 自然调度尚待验收。plist 备份位于 `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/launchd-backups/20261126T120747Z-a00088840`。
+Polymarket 代理修复的 prepare 完整 gate 为 791 tests／785 pass／6 skipped／0 fail。现有 `config.json.proxy` 经隔离真实 smoke 验证可取得 10 个市场；生产未手动补跑。Host 单实例重启后 PID `23474`、generation `23`，adapter running／available=true，active Task、pending Decision、queued／unknown delivery、handover pending／hold 均为空，reconciliation.blocking=false；phase 为 `startup-takeover`，不仅凭该字段宣称 ready。网站 PID `17766` 与 Tunnel PID `8915` 本次未重启。生产 Owner 登录后已实际看到 Polymarket 首次失败告警和空快照页面，桌面／移动端无明显横向溢出。scheduler 仍保留 `lastPolymarketDate=2026-11-26 / failed`，2026-11-27 自然结果待 Timer `718d2ebd` 于 10:05 只读核对。
 
 ## 2. 目录与数据边界
 
@@ -124,7 +124,7 @@ node scripts/deploy-production.mjs activate --release <上一步生成的绝对 
 
 回滚代码时，将 `activate --release` 指向上一份完整 release。若需要回退本次迁移前的旧布局，旧 worktree `/Users/hoye/Documents/workspace/syno-personal-butler-prod` 保持 `a2a68bec8`，旧 launchd 配置备份为 `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/launchd-backups/20261123T141453Z-a82bac5ac/com.syno.butler.host.plist`。回退前必须确认当前消费者退出，恢复后按同一清单验收，不得并行启动两个 Host。
 
-本次 P5 融合日报当前 release 是 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261126T121323078Z-d8de24811fda`，上一 release 是 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261126T120835651Z-a0008884088c`；plist 备份位于 `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/launchd-backups/20261126T120747Z-a00088840`。回滚时必须同时核对 `current`、实际进程身份和网站 `P5_RADAR_SCHEDULER_STATE`，不得只切软链便宣称完成。更早的阅读／跟进状态保真步骤见 `/Users/hoye/Documents/workspace/syno-personal-butler-p0-hardening/docs/plans/superagent-p0/P5-FOLLOW-UI-PRODUCTION-HANDOFF.md`。
+本次 P5 融合日报当前 release 是 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261126T160502737Z-62301bccb623`，上一 release 是 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261126T121323078Z-d8de24811fda`；plist 备份位于 `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/launchd-backups/20261126T120747Z-a00088840`。回滚时必须同时核对 `current`、实际进程身份和网站 `P5_RADAR_SCHEDULER_STATE`，不得只切软链便宣称完成。更早的阅读／跟进状态保真步骤见 `/Users/hoye/Documents/workspace/syno-personal-butler-p0-hardening/docs/plans/superagent-p0/P5-FOLLOW-UI-PRODUCTION-HANDOFF.md`。
 
 ## 6. 服务生命周期
 

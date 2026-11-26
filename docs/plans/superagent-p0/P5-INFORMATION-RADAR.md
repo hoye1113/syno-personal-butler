@@ -166,9 +166,10 @@
 - 两个来源复用 `fetchSource → collectSources → SQLite → 日报 AST → HTML`；聚合源权重低于官方一手 RSS。现有 `why_zh` 补充“项目关联与选题”，只使用公开文章或字幕，不读取或外发真实 vault 正文。
 - Polymarket 使用公开只读 Gamma API，按 24 小时成交量保留 Top 10；独立写入 `radar-polymarket-YYYY-MM-DD.json`、原始响应、SHA-256 和状态文件，不写文章 DB、不分配跟进编号。页面不显示已阅、reaction、收藏或跟进操作；不下单、不连接钱包。价格变化按“百分点”展示，不作为事实概率或投资建议。
 - Polymarket 同日幂等；次日失败保留最近好快照并标 stale，显式历史日期不被后续失败污染。Host 每日独立结算一次，失败不阻断资讯日报或飞书 HTML 短链。
+- Polymarket CLI 复用主雷达的 `P5_RADAR_CONFIG`／`config.json.proxy` 规则；有代理时使用既有 `curlText`，无代理时保留 fetch。代理错误在返回结果和状态文件中脱敏，不输出代理地址或凭据。
 - 网站 summary 汇总信源 `last_error`、GitHub／Skill 增长榜 stale、Polymarket stale，以及通过 `P5_RADAR_SCHEDULER_STATE` 显式提供的采集／日报异常。delivery unknown 只提示先对账，不自动重发。
 - 2026-11-26 隔离 smoke：HN 真实返回 30 条，AI News Radar 真实返回 20 条；Polymarket 的 Node fetch 与 curl 均连接超时（HTTP 000），真实市场采集未成功，失败路径由 fixture 覆盖。
 - 隔离浏览器验收覆盖 HN／AI 证据详情、Polymarket 清单／详情／深链、stale、无文章操作、390×844 暗色和 1200px 亮色；控制台无消息。
-- 功能提交 `a0008884088ce8b10d400cf0d6198e7190204802` 与首次 Polymarket 失败告警修复 `d8de24811fdad0632bfea47a992df5ea52d1e358` 已快进推送 main。当前 release 为 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261126T121323078Z-d8de24811fda`，第二次 prepare 完整 gate 为 789 项、783 pass、0 fail、6 skipped。
-- 生产网站 PID `17766` 已加载 `P5_RADAR_SCHEDULER_STATE`；匿名 summary／Polymarket／growth API 均为 401，CSS 为 200。Host PID `89850`、generation `22`，adapter running／available=true，pending／hold 和 unknown delivery 均为空；Host 仍从 a000888 首次 release 运行，d8de248 仅修改网站告警，无需再次重启 Host。
-- 生产 Polymarket 于 2026-11-26 自动尝试一次并失败，状态为 `fetch failed`，没有任何好快照；未手动重试。首次失败告警代码与 scheduler 配置已经部署，但已认证 UI 尚未看到该告警，HN／AI 也尚待 2026-11-27 自然调度验收。后续步骤见 `/Users/hoye/Documents/workspace/syno-personal-butler-p0-hardening/docs/plans/superagent-p0/P5-FUSION-DAILY-HANDOFF.md`。
+- 功能提交 `a0008884088ce8b10d400cf0d6198e7190204802`、首次 Polymarket 失败告警修复 `d8de24811fdad0632bfea47a992df5ea52d1e358`、代理修复 `62301bccb6231155e757a1ed0dc092662e50e5fb` 已快进推送 main。当前 release 为 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261126T160502737Z-62301bccb623`，代理修复 prepare 完整 gate 为 791 项、785 pass、0 fail、6 skipped。
+- 生产网站 PID `17766` 已加载 `P5_RADAR_SCHEDULER_STATE`；匿名 summary／Polymarket／growth API 均为 401，CSS 为 200。代理修复后 Host PID `23474`、generation `23`，adapter running／available=true，pending／hold 和 unknown delivery 均为空；网站与 Tunnel 未重启。
+- 生产 Polymarket 于 2026-11-26 自动尝试一次并失败，状态为 `fetch failed`，没有任何好快照；未手动重试。Owner 登录后的生产 UI 已实际看到首次失败告警和空快照页面，桌面／移动端无明显横向溢出。代理修复已通过隔离真实 Top 10 smoke 并部署，生产 scheduler 尚无 2026-11-27 自然采集结果；后续只读验收见 `/Users/hoye/Documents/workspace/syno-personal-butler-p0-hardening/docs/plans/superagent-p0/P5-FUSION-DAILY-HANDOFF.md`。
