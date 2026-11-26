@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { fetchText } from "./growth.mjs";
+import { curlText, resolveProxy } from "./sources.mjs";
 
 export const POLYMARKET_SOURCE = "https://gamma-api.polymarket.com/markets?closed=false&limit=20&order=volume24hr&ascending=false";
 
@@ -106,6 +107,8 @@ async function updateStatus(home, value) {
 export async function refreshPolymarketBoard({
   home,
   fetchImpl = fetch,
+  proxy = resolveProxy(),
+  curlTextImpl = curlText,
   now = () => new Date(),
   force = false,
 } = {}) {
@@ -123,7 +126,16 @@ export async function refreshPolymarketBoard({
   }
 
   try {
-    const raw = await fetchText(POLYMARKET_SOURCE, { fetchImpl });
+    const raw = proxy
+      ? {
+        text: await curlTextImpl(POLYMARKET_SOURCE, {
+          proxy,
+          timeout: 30,
+          maxBuffer: 4 * 1024 * 1024,
+          headers: ["Accept: application/json", "User-Agent: p5-growth-radar/1"],
+        }),
+      }
+      : await fetchText(POLYMARKET_SOURCE, { fetchImpl });
     const items = selectMarkets(JSON.parse(raw.text));
     const rawPath = path.join("polymarket-sources", date, "markets.json");
     const snapshot = {
@@ -152,7 +164,9 @@ export async function refreshPolymarketBoard({
     await updateStatus(home, { status: "ok", date, updatedAt: fetchedAt, cached: false });
     return { status: "ok", cached: false, file, itemCount: items.length };
   } catch (error) {
-    const message = cleanText(error?.message || error, 200) || "未知错误";
+    const rawMessage = String(error?.message || error);
+    const safeMessage = proxy ? rawMessage.split(String(proxy)).join("[代理已脱敏]") : rawMessage;
+    const message = cleanText(safeMessage, 200) || "未知错误";
     await updateStatus(home, { status: "error", date, updatedAt: fetchedAt, error: message });
     return { status: "error", error: message };
   }

@@ -99,3 +99,43 @@ test("Polymarket 失败保留上一份快照，网站只读接口标 stale 且�
   assert.equal((await store.polymarket({ date: "2026-11-26" })).stale, false);
   await assert.rejects(() => store.polymarket({ date: "2026-02-30" }), /日期/u);
 });
+
+test("Polymarket 配置代理时通过 curl 获取真实快照", async (t) => {
+  const home = await temporaryHome(t);
+  const proxy = "http://127.0.0.1:7890";
+  const result = await refreshPolymarketBoard({
+    home,
+    now: fixedNow,
+    proxy,
+    fetchImpl: async () => { throw new Error("配置代理时不应直连"); },
+    curlTextImpl: async (url, options) => {
+      assert.equal(url, POLYMARKET_SOURCE);
+      assert.equal(options.proxy, proxy);
+      return JSON.stringify([market(0)]);
+    },
+  });
+
+  assert.equal(result.status, "ok");
+  assert.equal(result.itemCount, 1);
+  const snapshot = JSON.parse(await fs.readFile(path.join(home, "radar-polymarket-2026-11-26.json"), "utf8"));
+  assert.equal(snapshot.items[0].question, "Will event 1 happen?");
+});
+
+test("Polymarket 代理错误在状态和接口结果中脱敏", async (t) => {
+  const home = await temporaryHome(t);
+  const proxy = "http://user:supersecret@127.0.0.1:7890";
+  const result = await refreshPolymarketBoard({
+    home,
+    now: fixedNow,
+    proxy,
+    fetchImpl: async () => { throw new Error("配置代理时不应直连"); },
+    curlTextImpl: async () => { throw new Error(`curl -x ${proxy} 连接失败`); },
+  });
+
+  assert.equal(result.status, "error");
+  assert.equal(result.error.includes("supersecret"), false);
+  assert.equal(result.error.includes(proxy), false);
+  const status = await fs.readFile(path.join(home, "radar-polymarket-status.json"), "utf8");
+  assert.equal(status.includes("supersecret"), false);
+  assert.equal(status.includes(proxy), false);
+});
