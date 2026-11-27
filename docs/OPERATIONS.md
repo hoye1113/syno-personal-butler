@@ -4,17 +4,17 @@
 
 ## 1. 当前生产基线
 
-2026-11-27 全项目无效代码清理部署后确认的状态如下；2026-11-27 自然调度验收仍待完成，状态会漂移，操作前必须重新执行只读检查。
+2026-11-27 日报编号、插件超时与模块入口契约修复部署后确认的状态如下。2026-11-27 自然调度已完成只读验收，但它早于本次 release，不能代替本次修复的下一次自然调度验收；状态会漂移，操作前必须重新执行只读检查。
 
 | 项 | 最后确认值 |
 |---|---|
 | 代码目录 | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/current` |
-| 不可变 release | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261127T000903054Z-82616b2ad0ba` |
-| 公开分支 / 提交 | `main` / `82616b2ad0baa1a984327e59c2b631b99449da9b` |
+| 不可变 release | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261127T062949493Z-46c5fbf1dbe1` |
+| 公开分支 / 提交 | `main` / `46c5fbf1dbe1c31fa5a02c694bc64410d3afc41f` |
 | Host 入口 | `/Users/hoye/Documents/workspace/syno-personal-butler-releases/current/experiments/superagent-p0/real-feishu-client.mjs` |
 | launchd 服务 | `com.syno.butler.host` |
 | plist | `/Users/hoye/Library/LaunchAgents/com.syno.butler.host.plist` |
-| Host PID / generation | `81123` / `24` |
+| Host PID / generation | `95039` / `25` |
 | pending / hold | `0 / 0` |
 | 飞书 adapter | `running=true`、`available=true` |
 | active P5 插件 | `2026.11.22.8` |
@@ -22,8 +22,13 @@
 | Host / 网站共享状态 | `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/p5-radar-site/state`（`P5_RADAR_STATE_HOME`） |
 | 网站 scheduler 状态 | `/Users/hoye/Documents/workspace/syno-personal-butler/.runtime-p0/p5-scheduler.json`（`P5_RADAR_SCHEDULER_STATE`） |
 | Tunnel | `com.agentconnect.tunnel`，PID `8915`，保留 `console.hoyework.online` 与 `radar.hoyework.online`，本轮未重启 |
+| Cloudflare Web Analytics | `hoyework.online` 已禁用；未删除站点，未修改或放宽 CSP |
 
-全项目清理的 prepare 完整 gate 为 791 tests／785 pass／6 skipped／0 fail；审计报告为 `docs/plans/dead-code-audit-2026-11-27.md`。Host 单实例重启后 PID `81123`、generation `24`，adapter running／available=true，active Task、pending Decision、queued／unknown delivery、handover pending／hold 均为空，reconciliation.blocking=false；phase 为 `startup-takeover`，不仅凭该字段宣称 ready。模块图显示本轮运行代码变更仅被 Host 加载，因此网站 PID `17766` 与 Tunnel PID `8915` 未重启。Polymarket 生产仍未手动补跑；scheduler 的自然结果待 Timer `718d2ebd` 于 10:05 只读核对。
+本次 prepare 完整 gate 为 795 tests／789 pass／6 skipped／0 fail，仓库 3601 个文件、7 个活动文档、模块入口审计和 `git diff --check` 全部通过；审计报告为 `docs/plans/dead-code-audit-2026-11-27.md`。Host 单实例重启后 PID `95039`、generation `25`，adapter running／available=true，active Task、pending Decision、queued／unknown delivery、handover pending／hold 均为空，reconciliation.blocking=false；phase 为 `startup-takeover`，不仅凭该字段宣称 ready。网站 PID `17766` 与 Tunnel PID `8915` 未重启。
+
+2026-11-27 自然调度于北京时间 09:30 完成采集、增长榜和 Polymarket，状态均为 `ok`；日报于 10:22 生成，投递为 `accepted`，这不表示用户已读。真实日报 50 条、编号连续，其中 Hacker News Top 30 为 18 条、AI News Radar 为 17 条。已认证 UI 核对了两类来源的详情、证据链接、连续编号和已阅／reaction／收藏操作区，未点击按钮改写生产状态。Polymarket UI 与原始快照均为实际 9 条，“Top 10”是最多 10 条的覆盖范围，不能补写为 10 条；原始响应 SHA-256 为 `40d654c169495269453c1c4630d9a77767633f7e0dcc814292dd7adae0b2c561`。未手动补跑或重发。
+
+Cloudflare Web Analytics 经 Owner 明确确认后已永久关闭，返回站点列表后的持久状态为“已禁用”。公开 `/login` 未匹配 `cloudflareinsights`、`beacon.min.js`、`static.cloudflareinsights` 或 `<script`，CSP 仍为 `default-src 'self'; script-src 'self'`，未为第三方统计脚本放宽。
 
 ## 2. 目录与数据边界
 
@@ -103,7 +108,7 @@ corepack pnpm install --frozen-lockfile
 corepack pnpm run gate
 ```
 
-`gate` 包含全量 Node 测试、仓库验证、active 文档检查和 `git diff --check`。CI 在 main 推送和 Pull Request 上执行相同冻结安装与 gate，不读取生产凭据，也不部署生产。
+`gate` 包含全量 Node 测试、仓库验证、active 文档检查、模块入口审计和 `git diff --check`。CI 在 main 推送和 Pull Request 上执行相同冻结安装与 gate，不读取生产凭据，也不部署生产。
 
 普通测试必须使用隔离 App、临时数据库和临时运行目录。不得用生产 App、生产 DB、生产 Inbox／Outbox、生产 Wiki 或真实 Owner 会话做普通回归。模型 Worker 固定使用 `opencode-go/deepseek-v4.1-flash`；不得为了测试改用高成本主 Agent 额度。
 
@@ -124,7 +129,7 @@ node scripts/deploy-production.mjs activate --release <上一步生成的绝对 
 
 回滚代码时，将 `activate --release` 指向上一份完整 release。若需要回退本次迁移前的旧布局，旧 worktree `/Users/hoye/Documents/workspace/syno-personal-butler-prod` 保持 `a2a68bec8`，旧 launchd 配置备份为 `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/launchd-backups/20261123T141453Z-a82bac5ac/com.syno.butler.host.plist`。回退前必须确认当前消费者退出，恢复后按同一清单验收，不得并行启动两个 Host。
 
-本次全项目清理当前 release 是 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261127T000903054Z-82616b2ad0ba`，上一 release 是 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261126T160502737Z-62301bccb623`；plist 备份位于 `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/launchd-backups/20261126T120747Z-a00088840`。回滚时必须同时核对 `current`、实际进程身份和网站 `P5_RADAR_SCHEDULER_STATE`，不得只切软链便宣称完成。更早的阅读／跟进状态保真步骤见 `/Users/hoye/Documents/workspace/syno-personal-butler-p0-hardening/docs/plans/superagent-p0/P5-FOLLOW-UI-PRODUCTION-HANDOFF.md`。
+当前 release 是 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261127T062949493Z-46c5fbf1dbe1`，上一 release 是 `/Users/hoye/Documents/workspace/syno-personal-butler-releases/20261127T000903054Z-82616b2ad0ba`；plist 备份位于 `/Users/hoye/Documents/workspace/syno-personal-butler/.local-data/launchd-backups/20261126T120747Z-a00088840`。回滚时必须同时核对 `current`、实际进程身份和网站 `P5_RADAR_SCHEDULER_STATE`，不得只切软链便宣称完成。更早的阅读／跟进状态保真步骤见 `/Users/hoye/Documents/workspace/syno-personal-butler-p0-hardening/docs/plans/superagent-p0/P5-FOLLOW-UI-PRODUCTION-HANDOFF.md`。
 
 ## 6. 服务生命周期
 
