@@ -46,6 +46,7 @@ export async function buildDailyDoc({
   windowDays = 7,
   limit = 200,
   maxItems = 50,
+  timeoutMs = 420_000,
   log = () => {},
   renderOnly = false,
   docPublisher,
@@ -75,11 +76,23 @@ export async function buildDailyDoc({
   const ownsClient = client === null;
   const needsModel = pending.length > 0 || videos.length > 0 || articlesToEnrich.length > 0;
   const openCode = client || (needsModel ? await createOpenCodeClient({ model }) : null);
+  const budget = Number(timeoutMs);
+  const deadline = Date.now() + (Number.isFinite(budget) && budget > 0 ? budget : 420_000);
+  // Reserve 180s for a final 120s transcript fetch and cleanup before the Host's 600s kill.
+  const budgetedClient = openCode ? {
+    ...openCode,
+    generate: async (options = {}) => {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw new Error("日报生成时间预算已耗尽");
+      return openCode.generate({ ...options, timeout: Math.max(1, Math.min(options.timeout ?? 180_000, remaining)) });
+    },
+  } : null;
   const generated = new Map();
   try {
     // Videos are deep-read automatically, independent of the old profile score.
     // A video without subtitles falls back to its feed summary.
     for (const item of videos) {
+      if (Date.now() >= deadline) continue;
       const full = store.getItem(item.item_id) ?? item;
       let transcript = String(full.content || "");
       const hasTimestamps = /\[\d{1,2}:\d{2}(?::\d{2})?\]/u.test(transcript);
@@ -105,7 +118,7 @@ export async function buildDailyDoc({
           const summary = await summarizeVideoDoc({
             item,
             transcript,
-            client: openCode,
+            client: budgetedClient,
             model,
           });
           generated.set(item.item_id, summary);
@@ -128,10 +141,11 @@ export async function buildDailyDoc({
     // HF and some sources ship empty RSS descriptions. Enrich those articles
     // from their body via the proxy-backed curl fetcher instead of showing 资料不足.
     for (const item of articlesToEnrich) {
+      if (Date.now() >= deadline) continue;
       try {
         const summary = await summarizeArticle({
           item: { ...item, source_name: item.source_name },
-          client: openCode,
+          client: budgetedClient,
           model,
           proxy,
         });
@@ -150,10 +164,10 @@ export async function buildDailyDoc({
       }
     }
 
-    if (pending.length && openCode) {
+    if (pending.length && budgetedClient) {
       const results = await translateFeedItems({
         items: pending,
-        client: openCode,
+        client: budgetedClient,
         model,
         log,
       });

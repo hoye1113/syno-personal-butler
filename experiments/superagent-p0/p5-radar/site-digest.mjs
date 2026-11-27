@@ -5,13 +5,14 @@ import { createRadarSiteStore } from "./site-store.mjs";
 
 /** Publish one ordered snapshot before the Feishu link can be sent. */
 export async function publishRadarSiteDigest({ home, publicOrigin, ast }) {
-  if (!Array.isArray(ast?.items) || !Array.isArray(ast?.details) || ast.items.length !== ast.details.length
-    || ast.items.some((item, index) => Number(item.itemId) !== Number(ast.details[index].itemId) || Number(item.index) !== Number(ast.details[index].index))) {
-    throw new Error("日报 AST 的编号与网站详情不一致，拒绝发布");
+  if (!Array.isArray(ast?.details) || ast.details.some((item, index) =>
+    !Number.isSafeInteger(Number(item?.itemId)) || Number(item.itemId) <= 0 || Number(item.index) !== index + 1)) {
+    throw new Error("日报详情的条目 ID 或连续编号无效，拒绝发布");
   }
   const store = createRadarSiteStore({ home, publicOrigin });
   await store.publish(ast);
-  const items = (ast.items || []).map((item) => ({
+  // 网站详情是唯一编号事实源；冗余的 ast.items 不参与网站与跟进映射。
+  const items = ast.details.map((item) => ({
     index: item.index,
     itemId: item.itemId,
     title: item.title,

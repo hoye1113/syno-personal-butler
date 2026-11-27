@@ -117,10 +117,25 @@ test("site digest publishes snapshot and numbering before returning a sendable l
   assert.equal(snapshot.items[0].index, manifest.items[0].index);
 });
 
-test("site digest rejects split numbering before writing a snapshot", async (t) => {
+test("site digest derives follow numbering from details when redundant items are stale", async (t) => {
+  const home = await fixture(t);
+  const ast = buildDocumentAst({ date: "2026-11-24", entries: [{
+    item: { item_id: 7, title: "Real", url: "https://example.com/7", source_name: "Source", kind: "article" },
+    summary: { titleZh: "真实", summaryZh: "摘要", points: [], whyZh: "" },
+  }] });
+  ast.items = [{ itemId: 999, index: 99 }];
+  const result = await publishRadarSiteDigest({ home, publicOrigin: "https://radar.example.com", ast });
+  assert.equal(result.manifest.items[0].itemId, 7);
+  assert.equal(result.manifest.items[0].index, 1);
+  const snapshot = JSON.parse(await fs.readFile(path.join(home, "radar-day-2026-11-24.json"), "utf8"));
+  assert.equal(snapshot.items[0].itemId, result.manifest.items[0].itemId);
+  assert.equal(snapshot.items[0].index, result.manifest.items[0].index);
+});
+
+test("site digest rejects nonsequential detail numbering before writing a snapshot", async (t) => {
   const home = await fixture(t);
   const ast = buildDocumentAst({ date: "2026-11-24", entries: [] });
-  ast.items.push({ itemId: 1, index: 1 });
+  ast.details = [{ itemId: 1, index: 2 }];
   await assert.rejects(() => publishRadarSiteDigest({ home, publicOrigin: "https://radar.example.com", ast }), /拒绝发布/u);
   await assert.rejects(() => fs.access(path.join(home, "radar-day-2026-11-24.json")));
 });

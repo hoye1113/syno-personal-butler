@@ -1,0 +1,99 @@
+{
+  "schema": "syno-module-entrypoints-v1",
+  "productionRoots": [
+    "experiments/superagent-p0/real-feishu-client.mjs",
+    "experiments/superagent-p0/p5-radar-site.mjs"
+  ],
+  "retainedModules": [
+    {
+      "file": "apps/syno/syno/approval-advisor.mjs",
+      "category": "product-boundary",
+      "reason": "审批建议属于有设计记录的未接线产品能力，删除需要单独的产品边界决策。",
+      "evidence": ["docs/plans/dead-code-audit-2026-11-27.md"]
+    },
+    {
+      "file": "apps/syno/syno/knowledge-confirmation.mjs",
+      "category": "security-boundary",
+      "reason": "知识变更需要 Owner 确认，保留授权边界，不按普通无引用代码处理。",
+      "evidence": ["docs/NEXT-AGENT-OPTIMIZATION-PLAN.md"]
+    },
+    {
+      "file": "apps/syno/syno/mac-service-manager.mjs",
+      "category": "platform-compatibility",
+      "reason": "平台服务管理是兼容入口，当前静态入口不覆盖人工部署场景。",
+      "evidence": ["docs/PLATFORM-COMPATIBILITY.md"]
+    },
+    {
+      "file": "apps/syno/syno/server-api-allowlist.mjs",
+      "category": "security-boundary",
+      "reason": "服务端 API allowlist 属于发布安全边界，保留既有生产验证契约。",
+      "evidence": ["docs/plans/superagent-p0/P0-VERIFICATION.md"]
+    },
+    {
+      "file": "experiments/superagent-p0/idea-worker-smoke.mjs",
+      "category": "manual-entry",
+      "reason": "Idea 对象 Worker 的人工验收入口，不要求生产入口静态可达。",
+      "evidence": ["docs/plans/dead-code-audit-2026-11-27.md"]
+    },
+    {
+      "file": "experiments/superagent-p0/legacy-production-handover.mjs",
+      "category": "manual-entry",
+      "reason": "旧生产交接 rehearsal 的人工运维入口，保留用于交接审计。",
+      "evidence": ["docs/plans/superagent-p0/P4-PRODUCTION-HANDOVER-RUNBOOK.md"]
+    },
+    {
+      "file": "experiments/superagent-p0/memory-worker-smoke.mjs",
+      "category": "manual-entry",
+      "reason": "Memory 对象 Worker 的人工验收入口，保留独立对象隔离验证。",
+      "evidence": ["experiments/superagent-p0/p3-decision-memory-work/BLOCKED.md"]
+    },
+    {
+      "file": "experiments/superagent-p0/pi-worker-client.mjs",
+      "category": "dynamic-path",
+      "reason": "测试与 probe 通过文件路径读取此 Worker，不依赖静态 import 可达性。",
+      "evidence": ["tests/pi-worker-packaging.test.mjs"]
+    },
+    {
+      "file": "experiments/superagent-p0/production-rehearsal.mjs",
+      "category": "manual-entry",
+      "reason": "生产 rehearsal 是 runbook 驱动的人工运维入口，不是生产 Host 依赖。",
+      "evidence": ["docs/plans/superagent-p0/P4-PRODUCTION-HANDOVER-RUNBOOK.md"]
+    },
+    {
+      "file": "experiments/superagent-p0/project-worker-smoke.mjs",
+      "category": "manual-entry",
+      "reason": "Project 对象 Worker 的人工验收入口，保留独立对象隔离验证。",
+      "evidence": ["experiments/superagent-p0/p3-project-work/PROGRESS.md"]
+    },
+    {
+      "file": "experiments/superagent-p0/real-worker-probe.mjs",
+      "category": "manual-entry",
+      "reason": "真实 Worker probe 是人工诊断入口，有 smoke 与验收文档引用。",
+      "evidence": ["docs/plans/superagent-p0/P0-VERIFICATION.md"]
+    },
+    {
+      "file": "packages/syno-core/fetch-url-tool.mjs",
+      "category": "public-contract",
+      "reason": "公共 knowledge.fetch_url 与 SSRF 边界属于可复用能力，不因当前未接线删除。",
+      "evidence": ["docs/plans/chat-read-browser-escalation.md"]
+    },
+    {
+      "file": "packages/syno-core/provider-credential-store.mjs",
+      "category": "security-boundary",
+      "reason": "Provider 凭据存储属于安全边界，禁止按普通无引用模块清理。",
+      "evidence": ["AGENTS.md"]
+    },
+    {
+      "file": "packages/syno-core/settings-registry.mjs",
+      "category": "public-contract",
+      "reason": "设置注册表与 JSON schema 构成公共设置契约，静态 import 不是唯一消费方式。",
+      "evidence": ["docs/CONTEXT-MANAGEMENT-ROADMAP.md"]
+    },
+    {
+      "file": "packages/syno-core/syno-core.mjs",
+      "category": "public-contract",
+      "reason": "公共包聚合入口由仓库校验明确要求，仓外消费者不受本模块图覆盖。",
+      "evidence": ["scripts/verify-repository.mjs"]
+    }
+  ]
+}

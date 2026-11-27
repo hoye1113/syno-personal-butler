@@ -4,7 +4,7 @@
 
 本轮覆盖整个 `syno-personal-butler-p0-hardening` 项目的受控源码、脚本、测试、插件与相关文档引用，排除 `node_modules` 和运行数据。没有把“静态无入边”直接等同于“可删除”。
 
-最终最小清理：删除 10 个确认无有效引用的内部文件，移除 7 组未接线函数／常量及 `TokenTracker` 只写不读状态，并修正 1 个不支持未提交删除路径的发布测试。代码清理涉及 18 个既有文件、576 行删除、5 行新增，另新增本报告。未提交、未推送、未部署，生产未修改或重启。
+最终最小清理：删除 10 个确认无有效引用的内部文件，移除 7 组未接线函数／常量及 `TokenTracker` 只写不读状态，并修正 1 个不支持未提交删除路径的发布测试。代码清理涉及 18 个既有文件、576 行删除、5 行新增，另新增本报告。该轮清理随后以 `82616b2ad0baa1a984327e59c2b631b99449da9b` 快进推送 main，并通过不可变 release 部署；下文新增的入口契约属于后续本地收口，不冒充当时已部署内容。
 
 ## 入口与引用方法
 
@@ -26,7 +26,7 @@
 | 加入测试后可达 | 288 |
 | 完全不可达但保留 | 15 |
 
-审计脚本及最终模块图位于 `/tmp/syno-dead-code-audit.mjs`、`/tmp/syno-unused-function-audit.mjs`、`/tmp/syno-unused-exports-audit.mjs`、`/tmp/syno-code-graph-report.json`，均不属于项目新功能。
+临时审计脚本及当时模块图位于 `/tmp/syno-dead-code-audit.mjs`、`/tmp/syno-unused-function-audit.mjs`、`/tmp/syno-unused-exports-audit.mjs`、`/tmp/syno-code-graph-report.json`。后续已将需要持续执行的可达性检查收口为仓库自有的 `scripts/audit-module-references.mjs`，不再依赖 `/tmp` 文件。
 
 ## 已安全删除的文件
 
@@ -86,6 +86,14 @@
 - `LarkCalendarAdapter` 虽无当前 JS 调用，但有真实飞书日历 CRUD 验收记录，作为公共适配器保留。
 - `plugins/p5-radar/2026.11.22.7/bin/plugin.mjs` 与 `2026.11.22.8/bin/plugin.mjs` 内容相同，但属于不同不可变插件版本，均保留。
 - `scoreItemWithLLM` 等已删符号在代码、配置、脚本中复查无残留引用；历史文档只作为当时决策记录，不改成伪历史。
+
+## 后续收口：显式入口与保留契约
+
+- `config/module-entrypoints.json` 声明两个生产入口及以上 15 个保留模块；每项包含分类、保留理由和可检查的证据文件。
+- `scripts/audit-module-references.mjs` 复用三套入口的静态图逻辑，同时读取 tracked 与未忽略 untracked 文件，过滤工作树中已删除路径。完全不可达且未声明的模块进入 `unclassifiedUnreachable`，已接入三套入口但仍保留声明的模块进入 `staleRetainedModules`，两者都会使 CLI 失败。
+- `package.json` 新增 `audit:modules`，并将审计接入 `verify` 和 `gate`。显式保留只表示“不要误删”，不表示生产已接线。
+- `tests/module-entrypoints.test.mjs` 验证 15 项证据及当前模块图，并用临时 git fixture 覆盖未分类不可达、失效保留、重复声明和缺失文件。
+- 当前审计图：308 个受控 `.mjs`，生产可达 59，运维可达 110，含测试可达 290，显式保留 15，未分类不可达 0，失效保留 0。计算式动态加载、仓外消费者和未记录人工命令仍是静态分析盲区。
 
 ## 验证证据
 

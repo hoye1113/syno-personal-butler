@@ -26,6 +26,17 @@
 - 模块图确认本轮运行代码变更仅被 Host 加载；网站 PID `17766` 与 Tunnel PID `8915` 均未重启，网站继续加载 `P5_RADAR_SCHEDULER_STATE`。
 - 生产 scheduler 仍保留 `lastPolymarketDate=2026-11-26 / failed`，尚无 2026-11-27 自然采集结果；未手动补跑、重发日报或反复请求市场接口。
 
+## 本地收口：日报编号与模块入口契约（未提交、未推送、未部署）
+
+- 历史生产日志中的 5 次 `p5-plugin-daily-doc-fallback` 已分类并分别处理：3 次为“日报 AST 的编号与网站详情不一致”，2 次为插件未返回 JSON 的超时类失败。前者修复编号事实源；后者通过内部时间预算和确定性 `exit=null` 回归修复，尚未部署或经过生产自然调度验收。
+- `buildDailyDoc()` 新增默认 420 秒内部时间预算，所有模型调用共享剩余时间；耗尽后使用既有公开摘要降级路径，不再等待 Host 在 600 秒强杀。预算为最后一次 120 秒字幕抓取和清理保留 180 秒余量。回归通过真实 `runPluginEntry()` 驱动悬挂模型请求，修复前稳定得到“插件未返回 JSON（exit=null）”，修复后返回合法 JSON、`translation-fallback` 和原始公开摘要。
+- `publishRadarSiteDigest()` 现在以 `ast.details` 为网站展示和编号的唯一事实源，网站 snapshot、跟进 manifest 和 digest 均从 `details` 派生；冗余的 `ast.items` 不再参与网站编号映射。非法 itemId 和非连续详情编号仍拒绝发布，旧飞书文档 AST 的 `items` 字段保留。
+- `config/module-entrypoints.json` 显式声明两个生产入口和 15 个人工入口／公共契约／安全边界模块；`scripts/audit-module-references.mjs` 将未分类不可达和已接线后的失效保留分开，接入 `verify` 与 `gate`。
+- 定向回归：插件、日报、偏好、跟进共 37 项，37 pass，0 fail；其中日报与入口契约共 9 项。模块图为 308 个 `.mjs`、生产可达 59、运维可达 110、含测试可达 290，显式保留 15，未分类不可达和失效保留均为 0。
+- 第一轮完整测试为 794 项、788 pass、0 fail、6 skipped；随后仓库卫生检查因清单理由中的 `macOS` 字样命中 `config/` 的既有 Apple 实现引用禁令而失败。已只修改该理由措辞，仓库校验、活动文档、入口审计和 `git diff --check` 随后通过；未放宽任何校验。
+- 超时修复后的最终完整 gate：795 项、789 pass、0 fail、6 skipped；仓库 3601 个文件、7 个活动文档、入口审计和 `git diff --check` 全部通过。日志为 `/tmp/syno-plugin-deadline-gate.log`。
+- Cloudflare：先只读确认 `hoyework.online` 的 Web Analytics 为“启用，排除欧盟的访问者数据”、JS 自动注入，过去 24 小时页面浏览量和访问量均为 0。Owner 随后明确确认永久关闭；已将 RUM 改为“禁用”并更新，返回站点列表后持久状态显示“已禁用”。未删除站点，未放宽或修改 CSP。
+
 ## 下一轮 Plan：2026-11-27 自然调度只读验收
 
 ### 目标
@@ -44,3 +55,15 @@
 - HN／AI 新文章进入真实日报，证据链接完整，既有文章编号、已阅、reaction、收藏语义不回归。
 - Polymarket 通过现有代理生成真实 Top 10；失败时告警可见，资讯日报和 HTML 短链不受影响。
 - 自然调度与已认证 UI 均有生产证据，不能用 fixture、隔离 smoke 或匿名 401 代替。
+
+## 后续待授权 Plan
+
+### 目标
+
+决定是否关闭 Cloudflare Web Analytics，并在获得明确授权后提交、推送和部署本轮本地修复，再通过生产自然调度验收两类日报 fallback 修复。
+
+### 步骤与验收
+
+1. Owner 明确确认不再需要 Web Analytics 后，才把 RUM 改为“禁用”并更新；随后只读核对自动注入消失且 CSP 不放宽。若未确认，保持现状。
+2. 获得提交／推送／部署授权后，只暂存本轮声明的精确路径，复核 diff 和 gate，再生成不可变 release；生产验收与自然调度观察分开记录，不补跑、不重发。
+3. 部署后的自然调度应不再出现 AST 编号分裂或模型累积耗时导致的 `exit=null`；若出现其他插件错误，保留原始分类并另行诊断。fixture 通过不能代替这项生产证据。
