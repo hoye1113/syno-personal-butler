@@ -1,5 +1,4 @@
 const OUTPUT_ACTIONABLE_STATUSES = Object.freeze(["suggested", "accepted", "drafting", "practiced"]);
-const OUTPUT_TERMINAL_STATUSES = Object.freeze(["published", "dismissed"]);
 const ACTIONABLE = new Set(OUTPUT_ACTIONABLE_STATUSES);
 const OUTPUT_TRANSITIONS = Object.freeze({
   accept: Object.freeze({ from: Object.freeze(["suggested"]), status: "accepted" }),
@@ -26,4 +25,4 @@ function outputTransition(action, status) {
   return transition?.from.includes(status) ? transition : null;
 }
 
-export { OUTPUT_ACTIONABLE_STATUSES, OUTPUT_TERMINAL_STATUSES, OUTPUT_TRANSITIONS, isActionableOutput, outputTransition, presentOutputOpportunity };
+export { OUTPUT_ACTIONABLE_STATUSES, OUTPUT_TRANSITIONS, isActionableOutput, outputTransition, presentOutputOpportunity };

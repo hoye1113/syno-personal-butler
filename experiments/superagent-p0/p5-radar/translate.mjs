@@ -1,9 +1,5 @@
 import { DEFAULT_MODEL } from "./opencode.mjs";
 
-function hasChinese(value) {
-  return /[\u3400-\u9fff]/u.test(String(value || ""));
-}
-
 function cleanFeedText(value) {
   return String(value || "")
     .replace(/<[^>]+>/gu, " ")
@@ -101,5 +97,3 @@ export async function translateFeedItems({
   }
   return results;
 }
-
-export { hasChinese };

@@ -90,7 +90,8 @@ test("Host 与测试不依赖仓外内核路径", () => {
   const files = execFileSync("git", ["ls-files"], {
     cwd: source,
     encoding: "utf8",
-  }).trim().split("\n").filter((file) => /^(?:experiments|packages|tests)\/.+\.mjs$/u.test(file));
+  }).trim().split("\n").filter((file) => /^(?:experiments|packages|tests)\/.+\.mjs$/u.test(file))
+    .filter((file) => existsSync(path.join(source, file)));
   const externalKernel = ["syno", "autoloop", "p0"].join("-");
   const offenders = files.filter((file) => readFileSync(path.join(source, file), "utf8").includes(externalKernel));
   assert.deepEqual(offenders, [], "干净 checkout 不能依赖相邻私有仓库");

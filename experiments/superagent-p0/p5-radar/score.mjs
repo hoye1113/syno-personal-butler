@@ -71,14 +71,6 @@ const EXCLUDE_RULES = [
 
 const TIER_WEIGHT = { T1: 1, "T1.5": 0.8, T2: 0.6, EXCLUDE_MP: 0.2 };
 
-export const INTEREST_PROFILE = `我是个人 AI Agent / 知识管家 builder。最关心：
-1. Agent 工程：Harness、Agent Loop、Context Engineering、Memory/RAG、Tool/MCP/Skills、Eval、可靠性。
-2. AI Coding：Claude Code、Codex、OpenClaw、Cursor、Gemini CLI、Agent 框架与工程实践。
-3. 模型与产品：与 agentic 能力、上下文、工具调用、价格、本地部署相关的模型发布；AI 原生产品与组织。
-4. 个人 AI / 超级个体：单人构建产品、知识管理自动化。
-低相关：融资、股价、财报、裁员八卦、政治、crypto、消费级折扣、纯营销稿。
-判断标准：这条信息能不能帮我构建/运营更好的个人 AI Agent 或知识管家？`;
-
 function clamp(value, min = 0, max = 100) {
   return Math.max(min, Math.min(max, value));
 }
@@ -130,28 +122,4 @@ export function scoreItem(item, source = {}) {
 
 export function isCandidate(score, threshold = CANDIDATE_THRESHOLD) {
   return !score.excluded && score.score >= threshold;
-}
-
-export async function scoreItemWithLLM(item, source, { llm, threshold = CANDIDATE_THRESHOLD } = {}) {
-  const rules = scoreItem(item, source);
-  if (typeof llm !== "function") return rules;
-  try {
-    const result = await llm({
-      system: "你是个人 AI Agent 技术雷达的筛选器。只输出 JSON。",
-      prompt: `${INTEREST_PROFILE}\n\n请给下面这条资讯打 0-100 分，并给出 1-2 句中文理由和主题标签。\n标题：${item.title}\n来源：${source.name}\n摘要：${item.summary}\n\n输出 JSON：{"score":number,"reason":string,"topics":string[]}`,
-    });
-    const parsed = typeof result === "string" ? JSON.parse(result) : result;
-    if (!Number.isFinite(Number(parsed?.score))) return rules;
-    const score = clamp(Math.round(Number(parsed.score)));
-    return {
-      ...rules,
-      score,
-      excluded: rules.excluded || score < 25,
-      reason: String(parsed.reason ?? rules.reason).slice(0, 500),
-      topics: Array.isArray(parsed.topics) ? parsed.topics.map(String).slice(0, 8) : rules.topics,
-      threshold,
-    };
-  } catch {
-    return rules;
-  }
 }

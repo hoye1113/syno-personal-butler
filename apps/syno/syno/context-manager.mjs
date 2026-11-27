@@ -24,22 +24,6 @@ function toolDigest(content) {
 
 // 与 ProviderClient 同源的 token 估算（含 tools 定义），保证阈值判断一致。
 class TokenTracker {
-  constructor() {
-    this.usageByConversation = new Map();
-  }
-
-  trackUsage(usage, conversationId) {
-    if (!usage || !conversationId) return;
-    const promptTokens = Number(usage.prompt_tokens);
-    if (Number.isFinite(promptTokens) && promptTokens >= 0) {
-      this.usageByConversation.set(conversationId, promptTokens);
-    }
-  }
-
-  lastRealTokens(conversationId) {
-    return this.usageByConversation.get(conversationId) ?? null;
-  }
-
   estimate(messages, tools) {
     return estimateTokens(messages, tools);
   }
@@ -272,7 +256,6 @@ class ContextManager {
   // ---- 对外委托 ----
   // feature（M2c COST，默认 "agent"）把本次 usage 累计进 byFeature 账本；向后兼容（旧调用方省略第三参仍归 "agent"）。
   trackUsage(usage, conversationId, feature = "agent") {
-    this.tokenTracker.trackUsage(usage, conversationId);
     this.#recordFeatureUsage(feature, usage);
   }
 
@@ -515,7 +498,7 @@ class ContextManager {
   }
 
   // M2c COST：按特征累计一次 LLM 调用的 token 开销（OpenAI 格式 usage）。
-  // usage 缺失 / 字段非有限数 → no-op（绝不产生 NaN），与 TokenTracker.trackUsage 的防御一致。只暴露聚合、无明文。
+  // usage 缺失 / 字段非有限数 → no-op（绝不产生 NaN）。只暴露聚合、无明文。
   #recordFeatureUsage(feature, usage) {
     if (!usage) return;
     const promptTokens = Number(usage.prompt_tokens);

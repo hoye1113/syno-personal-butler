@@ -9,7 +9,6 @@ const CHUNK_ALGORITHM_VERSION = "paragraph-v1";
 const ANALYSIS_CONTRACT_VERSION = "capture-analysis-v1";
 const PROMPT_VERSION = "capture-prompt-v1";
 const ANALYSIS_POLICY_VERSION = "capture-policy-v1";
-const CHUNK_STATES = Object.freeze(["pending", "running", "completed", "failed_retryable", "failed_terminal", "invalidated"]);
 
 function digest(value) {
   return createHash("sha256").update(String(value), "utf8").digest("hex");
@@ -244,7 +243,6 @@ export {
   ANALYSIS_CONTRACT_VERSION,
   ANALYSIS_POLICY_VERSION,
   CHUNK_ALGORITHM_VERSION,
-  CHUNK_STATES,
   PROMPT_VERSION,
   CaptureChunkStore,
   chunkIdentity,

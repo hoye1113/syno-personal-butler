@@ -16,7 +16,6 @@ const HIGH_RISK_INTENTS = new Set([
   "new_tag",
   "migrate_integrate",
 ]);
-const COMPLEX_INTENTS = new Set(["complex_analysis"]);
 
 const WRITE_INTENTS = new Set([
   "create_action",
@@ -94,4 +93,4 @@ function evaluate(request = {}, context = {}) {
   });
 }
 
-export { COMPLEX_INTENTS, FORBIDDEN_INTENTS, HIGH_RISK_INTENTS, PROFILE_ROOTS, evaluate, inferIntent };
+export { FORBIDDEN_INTENTS, HIGH_RISK_INTENTS, PROFILE_ROOTS, evaluate, inferIntent };

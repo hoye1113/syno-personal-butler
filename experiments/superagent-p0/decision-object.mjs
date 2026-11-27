@@ -3,8 +3,6 @@ import { createHash } from "node:crypto";
 
 export const DECISION_ID = /^decision-[a-f0-9]{16}$/u;
 export const DECISION_RECORD_PREFIX = "decision-record:";
-export const DECISION_CONTEXT_PREFIX = "decision:";
-export const DECISION_KINDS = ["route.select", "memory.confirm"];
 
 export const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
@@ -13,7 +11,6 @@ export const decisionIdForMessage = ({ appId, messageId }) =>
   `decision-${sha256(`${appId}:${messageId}`).slice(0, 16)}`;
 
 export const decisionRecordKey = (decisionId) => `${DECISION_RECORD_PREFIX}${decisionId}`;
-export const decisionContextId = (decisionId) => `${DECISION_CONTEXT_PREFIX}${decisionId}`;
 
 export function assertDecisionId(decisionId) {
   if (!DECISION_ID.test(String(decisionId))) throw new Error(`非法 Decision ID：${decisionId}`);
